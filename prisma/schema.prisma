@@ -1,0 +1,1307 @@
+// Æquilibri — Prisma schema
+// Ported from the Django models of uc1_roofing, uc2_didi, uc3_msme.
+// Table names are pinned with @@map to the Django defaults (`<app_label>_<model>`)
+// so this schema can run against the EXISTING Postgres database with zero data loss.
+// Choice fields are modelled as String (Django stored them as varchar, not PG enums);
+// the allowed values live in src/types as TS string-literal unions.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================================
+// UC1 — ROOFING
+// =====================================================================
+
+model Uc1Contact {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(200)
+  email     String   @default("")
+  phone     String   @default("") @db.VarChar(30)
+  company   String   @default("") @db.VarChar(200)
+  address   String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  quotes Uc1Quote[]
+
+  @@index([createdAt])
+  @@map("uc1_roofing_contact")
+}
+
+model Uc1RateCard {
+  id          Int      @id @default(autoincrement())
+  material    String   @db.VarChar(50)
+  pitchType   String   @map("pitch_type") @db.VarChar(20)
+  description String   @default("") @db.VarChar(300)
+  unit        String   @default("m²") @db.VarChar(20)
+  rateExGst   Decimal  @map("rate_ex_gst") @db.Decimal(10, 2)
+  isActive    Boolean  @default(true) @map("is_active")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([material, pitchType])
+  @@map("uc1_roofing_ratecard")
+}
+
+model Uc1Quote {
+  id                    Int      @id @default(autoincrement())
+  refNumber             String   @unique @map("ref_number") @db.VarChar(20)
+  contactId             Int?     @map("contact_id")
+  propertyAddress       String   @map("property_address")
+  flatAreaSqm           Decimal  @map("flat_area_sqm") @db.Decimal(10, 2)
+  pitchType             String   @default("standard") @map("pitch_type") @db.VarChar(20)
+  wasteFactorPct        Decimal  @default(10.0) @map("waste_factor_pct") @db.Decimal(5, 1)
+  material              String   @default("colorbond") @db.VarChar(50)
+  notes                 String   @default("")
+  status                String   @default("draft") @db.VarChar(20)
+  roofPolygonJson       String?  @map("roof_polygon_json")
+  roofSectionsJson      String?  @map("roof_sections_json")
+  eaveLm                Decimal  @default(0) @map("eave_lm") @db.Decimal(8, 2)
+  perimeterM            Decimal  @default(0) @map("perimeter_m") @db.Decimal(8, 2)
+  ridgeLm               Decimal  @default(0) @map("ridge_lm") @db.Decimal(8, 2)
+  valleyLm              Decimal  @default(0) @map("valley_lm") @db.Decimal(8, 2)
+  hipLm                 Decimal  @default(0) @map("hip_lm") @db.Decimal(8, 2)
+  rakeLm                Decimal  @default(0) @map("rake_lm") @db.Decimal(8, 2)
+  pitchDegActual        Decimal  @default(0) @map("pitch_deg_actual") @db.Decimal(5, 1)
+  storeys               Int      @default(1) @db.SmallInt
+  roofColour            String   @default("") @map("roof_colour") @db.VarChar(60)
+  detectedEquipmentJson String?  @map("detected_equipment_json")
+  pricingMechanism      String   @default("cost_plus") @map("pricing_mechanism") @db.VarChar(20)
+  pricingMode           String   @default("") @map("pricing_mode") @db.VarChar(20)
+  packageTier           String   @default("") @map("package_tier") @db.VarChar(20)
+  markupPct             Decimal  @default(0.10) @map("markup_pct") @db.Decimal(5, 4)
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  contact          Uc1Contact?           @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  items            Uc1QuoteItem[]
+  polygon          Uc1RoofPolygon?
+  lidarAnalysis    Uc1RoofLidarAnalysis?
+  solarReferrals   Uc1SolarReferral[]
+  purchaseOrders   Uc1PurchaseOrder[]
+  stormLeads       Uc1StormLead[]
+  conditionReports Uc1RoofConditionReport[]
+  executionLogs    Uc1ExecutionLog[]
+
+  @@index([createdAt])
+  @@map("uc1_roofing_quote")
+}
+
+model Uc1QuoteItem {
+  id             Int     @id @default(autoincrement())
+  quoteId        Int     @map("quote_id")
+  description    String  @db.VarChar(300)
+  quantity       Decimal @db.Decimal(10, 2)
+  unit           String  @default("m²") @db.VarChar(20)
+  unitPriceExGst Decimal @map("unit_price_ex_gst") @db.Decimal(10, 2)
+  sortOrder      Int     @default(0) @map("sort_order") @db.SmallInt
+
+  quote Uc1Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("uc1_roofing_quoteitem")
+}
+
+model Uc1RoofPolygon {
+  id              Int      @id @default(autoincrement())
+  quoteId         Int?     @unique @map("quote_id")
+  coordinatesJson String   @default("[]") @map("coordinates_json")
+  detectionPath   String   @default("") @map("detection_path") @db.VarChar(50)
+  confidence      String   @default("") @db.VarChar(20)
+  areaSqmRaw      Decimal  @default(0) @map("area_sqm_raw") @db.Decimal(10, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  quote Uc1Quote? @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("uc1_roofing_roofpolygon")
+}
+
+model Uc1BuildingFootprint {
+  id          Int    @id @default(autoincrement())
+  minLat      Float  @map("min_lat")
+  maxLat      Float  @map("max_lat")
+  minLon      Float  @map("min_lon")
+  maxLon      Float  @map("max_lon")
+  centroidLat Float  @map("centroid_lat")
+  centroidLon Float  @map("centroid_lon")
+  areaSqm     Float  @map("area_sqm")
+  geometry    String
+
+  @@index([minLat, maxLat])
+  @@index([minLon, maxLon])
+  @@map("uc1_roofing_buildingfootprint")
+}
+
+model Uc1FootprintTileCache {
+  quadkey    String   @id @db.VarChar(32)
+  importedAt DateTime @default(now()) @map("imported_at")
+
+  @@map("uc1_roofing_footprinttilecache")
+}
+
+model Uc1PriceCheckLog {
+  id              Int      @id @default(autoincrement())
+  runAt           DateTime @default(now()) @map("run_at")
+  status          String   @default("success") @db.VarChar(20)
+  vendorsChecked  Int      @default(0) @map("vendors_checked") @db.SmallInt
+  pricesUpdated   Int      @default(0) @map("prices_updated") @db.SmallInt
+  pricesUnchanged Int      @default(0) @map("prices_unchanged") @db.SmallInt
+  errors          Int      @default(0) @db.SmallInt
+  summary         String   @default("")
+  rawLog          String   @default("") @map("raw_log")
+
+  @@map("uc1_roofing_pricechecklog")
+}
+
+model Uc1Vendor {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(200)
+  contactName  String   @default("") @map("contact_name") @db.VarChar(200)
+  contactEmail String   @default("") @map("contact_email")
+  contactPhone String   @default("") @map("contact_phone") @db.VarChar(30)
+  website      String   @default("")
+  suburb       String   @default("") @db.VarChar(100)
+  state        String   @default("QLD") @db.VarChar(10)
+  notes        String   @default("")
+  isPreferred  Boolean  @default(false) @map("is_preferred")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  prices         Uc1VendorMaterialPrice[]
+  purchaseOrders Uc1PurchaseOrder[]
+
+  @@map("uc1_roofing_vendor")
+}
+
+model Uc1VendorMaterialPrice {
+  id             Int       @id @default(autoincrement())
+  vendorId       Int       @map("vendor_id")
+  material       String    @db.VarChar(50)
+  itemCode       String    @default("") @map("item_code") @db.VarChar(50)
+  description    String    @db.VarChar(300)
+  unit           String    @default("m²") @db.VarChar(20)
+  unitPriceExGst Decimal   @map("unit_price_ex_gst") @db.Decimal(10, 2)
+  leadDays       Int       @default(3) @map("lead_days") @db.SmallInt
+  priceSourceUrl String    @default("") @map("price_source_url")
+  previousPrice  Decimal?  @map("previous_price") @db.Decimal(10, 2)
+  lastVerified   DateTime? @map("last_verified")
+  isAvailable    Boolean   @default(true) @map("is_available")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  vendor Uc1Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, material])
+  @@map("uc1_roofing_vendormaterialprice")
+}
+
+model Uc1PurchaseOrder {
+  id                    Int       @id @default(autoincrement())
+  poNumber              String    @unique @map("po_number") @db.VarChar(20)
+  quoteId               Int?      @map("quote_id")
+  vendorId              Int       @map("vendor_id")
+  status                String    @default("draft") @db.VarChar(20)
+  deliveryAddress       String    @default("") @map("delivery_address")
+  requestedDeliveryDate DateTime? @map("requested_delivery_date") @db.Date
+  notes                 String    @default("")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  quote   Uc1Quote?              @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  vendor  Uc1Vendor              @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  poItems Uc1PurchaseOrderItem[]
+
+  @@map("uc1_roofing_purchaseorder")
+}
+
+model Uc1PurchaseOrderItem {
+  id              Int     @id @default(autoincrement())
+  purchaseOrderId Int     @map("purchase_order_id")
+  description     String  @db.VarChar(300)
+  itemCode        String  @default("") @map("item_code") @db.VarChar(50)
+  quantity        Decimal @db.Decimal(10, 2)
+  unit            String  @default("m²") @db.VarChar(20)
+  unitPriceExGst  Decimal @map("unit_price_ex_gst") @db.Decimal(10, 2)
+  sortOrder       Int     @default(0) @map("sort_order") @db.SmallInt
+
+  purchaseOrder Uc1PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@map("uc1_roofing_purchaseorderitem")
+}
+
+model Uc1RoofLidarAnalysis {
+  id                    Int      @id @default(autoincrement())
+  quoteId               Int      @unique @map("quote_id")
+  perimeterM            Float    @default(0) @map("perimeter_m")
+  gutteringLinearM      Float    @default(0) @map("guttering_linear_m")
+  ridgeHeightM          Float?   @map("ridge_height_m")
+  eaveHeightM           Float?   @map("eave_height_m")
+  heightRangeM          Float?   @map("height_range_m")
+  scaffoldingRequired   Boolean  @default(false) @map("scaffolding_required")
+  scaffoldingLinearM    Float    @default(0) @map("scaffolding_linear_m")
+  scaffoldingRiskLevel  String   @default("low") @map("scaffolding_risk_level") @db.VarChar(10)
+  scaffoldingReason     String   @default("") @map("scaffolding_reason") @db.VarChar(200)
+  structureCount        Int      @default(1) @map("structure_count") @db.SmallInt
+  structuresJson        String   @default("[]") @map("structures_json")
+  solarPanels           Boolean  @default(false) @map("solar_panels")
+  solarHw               Boolean  @default(false) @map("solar_hw")
+  lidarCoverage         String   @default("none") @map("lidar_coverage") @db.VarChar(20)
+  dataSource            String   @default("") @map("data_source") @db.VarChar(50)
+  analysisNotes         String   @default("") @map("analysis_notes")
+  elapsedMs             Int      @default(0) @map("elapsed_ms")
+  analyzedAt            DateTime @updatedAt @map("analyzed_at")
+
+  quote Uc1Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("uc1_roofing_rooflidaranalysis")
+}
+
+model Uc1ExecutionLog {
+  id         Int      @id @default(autoincrement())
+  toolName   String   @map("tool_name") @db.VarChar(100)
+  payload    String
+  result     String
+  status     String   @default("success") @db.VarChar(20)
+  durationMs Int      @default(0) @map("duration_ms")
+  quoteId    Int?     @map("quote_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  quote Uc1Quote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("uc1_roofing_executionlog")
+}
+
+model Uc1GutteringRate {
+  id          Int      @id @default(autoincrement())
+  itemType    String   @map("item_type") @db.VarChar(30)
+  description String   @db.VarChar(200)
+  unit        String   @default("lm") @db.VarChar(20)
+  rateExGst   Decimal  @map("rate_ex_gst") @db.Decimal(10, 2)
+  isActive    Boolean  @default(true) @map("is_active")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("uc1_roofing_gutteringrate")
+}
+
+model Uc1SolarPartner {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(200)
+  contactName     String   @default("") @map("contact_name") @db.VarChar(200)
+  contactEmail    String   @default("") @map("contact_email")
+  contactPhone    String   @default("") @map("contact_phone") @db.VarChar(30)
+  referralFeePct  Decimal  @default(10.0) @map("referral_fee_pct") @db.Decimal(5, 2)
+  avgInstallValue Decimal  @default(10000) @map("avg_install_value") @db.Decimal(10, 2)
+  isActive        Boolean  @default(true) @map("is_active")
+  notes           String   @default("")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  referrals Uc1SolarReferral[]
+
+  @@map("uc1_roofing_solarpartner")
+}
+
+model Uc1SolarReferral {
+  id                    Int       @id @default(autoincrement())
+  quoteId               Int       @map("quote_id")
+  partnerId             Int?      @map("partner_id")
+  status                String    @default("pending") @db.VarChar(20)
+  solarPotentialKwh     Float     @default(0) @map("solar_potential_kwh")
+  bestSectionArea       Float     @default(0) @map("best_section_area")
+  bestSectionFacing     String    @default("") @map("best_section_facing") @db.VarChar(20)
+  estimatedCapacityKw   Float     @default(0) @map("estimated_capacity_kw")
+  estimatedInstallValue Decimal   @default(0) @map("estimated_install_value") @db.Decimal(10, 2)
+  estimatedReferralFee  Decimal   @default(0) @map("estimated_referral_fee") @db.Decimal(10, 2)
+  clientNotes           String    @default("") @map("client_notes")
+  submittedAt           DateTime? @map("submitted_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+
+  quote   Uc1Quote         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  partner Uc1SolarPartner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+
+  @@map("uc1_roofing_solarreferral")
+}
+
+model Uc1FinanceProvider {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(100)
+  slug            String   @unique @db.VarChar(30)
+  interestRatePct Decimal  @default(0) @map("interest_rate_pct") @db.Decimal(5, 2)
+  minTermMonths   Int      @default(12) @map("min_term_months")
+  maxTermMonths   Int      @default(60) @map("max_term_months")
+  minAmount       Decimal  @default(1000) @map("min_amount") @db.Decimal(10, 2)
+  tagline         String   @default("") @db.VarChar(200)
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("uc1_roofing_financeprovider")
+}
+
+model Uc1StormEvent {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(200)
+  eventType       String   @default("hail") @map("event_type") @db.VarChar(20)
+  eventDate       DateTime @map("event_date") @db.Date
+  severity        Int      @default(3)
+  affectedSuburbs String   @map("affected_suburbs")
+  state           String   @default("QLD") @db.VarChar(10)
+  notes           String   @default("")
+  leadsGenerated  Int      @default(0) @map("leads_generated")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  leads Uc1StormLead[]
+
+  @@map("uc1_roofing_stormevent")
+}
+
+model Uc1StormLead {
+  id             Int      @id @default(autoincrement())
+  stormEventId   Int      @map("storm_event_id")
+  address        String   @db.VarChar(300)
+  suburb         String   @db.VarChar(100)
+  state          String   @default("QLD") @db.VarChar(10)
+  roofAreaSqm    Float    @default(0) @map("roof_area_sqm")
+  estimatedValue Decimal  @default(0) @map("estimated_value") @db.Decimal(10, 2)
+  status         String   @default("new") @db.VarChar(20)
+  contactName    String   @default("") @map("contact_name") @db.VarChar(200)
+  contactPhone   String   @default("") @map("contact_phone") @db.VarChar(30)
+  contactEmail   String   @default("") @map("contact_email")
+  notes          String   @default("")
+  quoteId        Int?     @map("quote_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  stormEvent Uc1StormEvent @relation(fields: [stormEventId], references: [id], onDelete: Cascade)
+  quote      Uc1Quote?     @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  @@map("uc1_roofing_stormlead")
+}
+
+model Uc1RoofConditionReport {
+  id                 Int      @id @default(autoincrement())
+  quoteId            Int      @map("quote_id")
+  reportNumber       String   @unique @map("report_number") @db.VarChar(20)
+  reportType         String   @default("homebuyer") @map("report_type") @db.VarChar(20)
+  clientName         String   @default("") @map("client_name") @db.VarChar(200)
+  clientEmail        String   @default("") @map("client_email")
+  clientCompany      String   @default("") @map("client_company") @db.VarChar(200)
+  conditionGrade     String   @default("B") @map("condition_grade") @db.VarChar(2)
+  conditionScore     Int      @default(70) @map("condition_score")
+  lifeRemainingYears Int      @default(10) @map("life_remaining_years")
+  urgencyLevel       String   @default("routine") @map("urgency_level") @db.VarChar(20)
+  aiAssessment       String   @default("") @map("ai_assessment")
+  recommendedWorks   String   @default("") @map("recommended_works")
+  inspectorName      String   @default("") @map("inspector_name") @db.VarChar(200)
+  priceExGst         Decimal  @default(350) @map("price_ex_gst") @db.Decimal(8, 2)
+  status             String   @default("draft") @db.VarChar(20)
+  generatedAt        DateTime @default(now()) @map("generated_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  quote Uc1Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("uc1_roofing_roofconditionreport")
+}
+
+model Uc1RoofAnalysisCache {
+  id            Int      @id @default(autoincrement())
+  cacheKey      String   @unique @map("cache_key") @db.VarChar(128)
+  address       String   @default("") @db.VarChar(255)
+  lat           Float
+  lng           Float
+  zoom          Int
+  imageHash     String   @map("image_hash") @db.VarChar(64)
+  resultJson    Json     @map("result_json")
+  modelVersion  String   @default("claude-opus-4-7") @map("model_version") @db.VarChar(64)
+  promptVersion String   @default("v1") @map("prompt_version") @db.VarChar(32)
+  createdAt     DateTime @default(now()) @map("created_at")
+  lastHitAt     DateTime @updatedAt @map("last_hit_at")
+  hitCount      Int      @default(0) @map("hit_count")
+
+  @@index([address, createdAt])
+  @@map("uc1_roofing_roofanalysiscache")
+}
+
+// ── Memory architecture / learning loop (UC1) ────────────────────────
+// Episodic: Job + Correction. Hypothesis → LearningRule promotion.
+// Contextual Intelligence snapshot. See aequilibri Memory Architecture doc.
+
+model Uc1Job {
+  id                    Int       @id @default(autoincrement())
+  quoteId               Int?      @map("quote_id")
+  address               String    @default("")
+  estimatorId           Int?      @map("estimator_id")
+  sessionOpenAt         DateTime? @map("session_open_at")
+  sessionCloseAt        DateTime? @map("session_close_at")
+  // AI estimates (set at session close)
+  estimatedAreaM2       Float     @default(0) @map("estimated_area_m2")
+  estimatedValleyLm     Float     @default(0) @map("estimated_valley_lm")
+  estimatedRidgeLm      Float     @default(0) @map("estimated_ridge_lm")
+  estimatedEaveLm       Float     @default(0) @map("estimated_eave_lm")
+  estimatedHipLm        Float     @default(0) @map("estimated_hip_lm")
+  estimatedTotal        Decimal   @default(0) @map("estimated_total") @db.Decimal(12, 2)
+  // Actual outcomes (set when job invoiced)
+  actualAreaM2          Float?    @map("actual_area_m2")
+  actualValleyLm        Float?    @map("actual_valley_lm")
+  actualRidgeLm         Float?    @map("actual_ridge_lm")
+  actualEaveLm          Float?    @map("actual_eave_lm")
+  actualHipLm           Float?    @map("actual_hip_lm")
+  actualTotal           Decimal?  @map("actual_total") @db.Decimal(12, 2)
+  // Derived
+  variancePctArea       Float?    @map("variance_pct_area")
+  variancePctQuote      Float?    @map("variance_pct_quote")
+  learningRuleCandidate Boolean   @default(false) @map("learning_rule_candidate")
+  rulesAppliedJson      String    @default("[]") @map("rules_applied_json") // codes of rules applied
+  status                String    @default("open") @db.VarChar(20) // open | estimated | completed | invoiced
+  notes                 String    @default("")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  completedAt           DateTime? @map("completed_at")
+
+  estimator   Uc1TeamMember? @relation(fields: [estimatorId], references: [id], onDelete: SetNull)
+  corrections Uc1Correction[]
+
+  @@index([createdAt])
+  @@map("uc1_roofing_job")
+}
+
+model Uc1Correction {
+  id           Int       @id @default(autoincrement())
+  jobId        Int?      @map("job_id")
+  quoteId      Int?      @map("quote_id")
+  address      String    @default("")
+  suburb       String    @default("") @db.VarChar(120)
+  lat          Float?
+  lng          Float?
+  dimension    String    @db.VarChar(40) // roof_area | valley_lm | ridge_lm | pitch | contingency ...
+  aiValue      Float     @default(0) @map("ai_value")
+  humanValue   Float     @default(0) @map("human_value")
+  variancePct  Float     @default(0) @map("variance_pct")
+  rootCause    String    @default("") @map("root_cause") // REQUIRED — never blank
+  estimatorId  Int?      @map("estimator_id")
+  hypothesisId Int?      @map("hypothesis_id")
+  ruleId       Int?      @map("rule_id") // set if this correction led to a rule
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  job        Uc1Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  estimator  Uc1TeamMember?  @relation(fields: [estimatorId], references: [id], onDelete: SetNull)
+  hypothesis Uc1Hypothesis?  @relation(fields: [hypothesisId], references: [id], onDelete: SetNull)
+
+  @@index([dimension, createdAt])
+  @@map("uc1_roofing_correction")
+}
+
+model Uc1Hypothesis {
+  id               Int      @id @default(autoincrement())
+  description      String
+  dimension        String   @db.VarChar(40)
+  rootCausePattern String   @default("") @map("root_cause_pattern")
+  triggerCondition String   @default("") @map("trigger_condition")
+  sampleCount      Int      @default(0) @map("sample_count")
+  avgVariancePct   Float    @default(0) @map("avg_variance_pct")
+  confidence       Int      @default(0) // 0-100
+  status           String   @default("pending") @db.VarChar(20) // pending | active | validated | rejected | promoted
+  promoteToRule    Boolean  @default(false) @map("promote_to_rule")
+  createdAt        DateTime @default(now()) @map("created_at")
+  reviewedAt       DateTime? @map("reviewed_at")
+
+  corrections Uc1Correction[]
+  rules       Uc1LearningRule[]
+
+  @@map("uc1_roofing_hypothesis")
+}
+
+model Uc1LearningRule {
+  id               Int       @id @default(autoincrement())
+  ruleCode         String    @unique @map("rule_code") @db.VarChar(20)
+  description      String
+  category         String    @default("measurement") @db.VarChar(30) // measurement | pricing | scope | regional | equipment
+  dimension        String    @db.VarChar(40)
+  triggerCondition String    @default("") @map("trigger_condition")
+  adjustment       String    @default("{}") // JSON: { type, value }
+  priority         Int       @default(3)
+  confidence       Int       @default(72)
+  timesTriggered   Int       @default(0) @map("times_triggered")
+  isActive         Boolean   @default(true) @map("is_active")
+  autoApply        Boolean   @default(false) @map("auto_apply")
+  sourceId         Int?      @map("source_id")
+  taughtById       Int?      @map("taught_by_id")
+  dateActivated    DateTime? @map("date_activated")
+  notes            String    @default("")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  source    Uc1Hypothesis?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  taughtBy  Uc1TeamMember?  @relation(fields: [taughtById], references: [id], onDelete: SetNull)
+
+  @@map("uc1_roofing_learningrule")
+}
+
+model Uc1IntelligenceSnapshot {
+  id                   Int      @id @default(autoincrement())
+  capturedAt           DateTime @default(now()) @map("captured_at")
+  totalJobs            Int      @default(0) @map("total_jobs")
+  completedJobs        Int      @default(0) @map("completed_jobs")
+  accuracyRatePct      Float    @default(0) @map("accuracy_rate_pct")
+  activeRules          Int      @default(0) @map("active_rules")
+  autoApplyRules       Int      @default(0) @map("auto_apply_rules")
+  avgConfidence        Float    @default(0) @map("avg_confidence")
+  confidenceTrajectory String   @default("stable") @map("confidence_trajectory") @db.VarChar(20) // improving | stable | degrading
+  topRulesJson         String   @default("[]") @map("top_rules_json")
+  gapsJson             String   @default("[]") @map("gaps_json")
+  notes                String   @default("")
+
+  @@map("uc1_roofing_intelligencesnapshot")
+}
+
+// ── Customer configuration (Port City Roofing) ──────────────────────
+
+model Uc1TeamMember {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(200)
+  role            String   @default("estimator") @db.VarChar(30) // estimator | director | admin | technician
+  accuracyProfile String   @default("") @map("accuracy_profile") // free text — known tendencies
+  isActive        Boolean  @default(true) @map("is_active")
+  dateJoined      DateTime @default(now()) @map("date_joined") @db.Date
+
+  corrections  Uc1Correction[]
+  jobs         Uc1Job[]
+  rules        Uc1LearningRule[]
+
+  @@map("uc1_roofing_teammember")
+}
+
+model Uc1Region {
+  id         Int     @id @default(autoincrement())
+  name       String  @unique @db.VarChar(100) // "Townsville Metro", "Cairns", "Mackay"
+  postcodes  String  @default("")              // comma-separated list
+  travelDays Int     @default(0) @map("travel_days")
+  travelRate Decimal @default(0) @map("travel_rate") @db.Decimal(8, 2)
+  premiumPct Float   @default(0) @map("premium_pct")
+  isActive   Boolean @default(true) @map("is_active")
+
+  @@map("uc1_roofing_region")
+}
+
+model Uc1Workstream {
+  id                 Int      @id @default(autoincrement())
+  name               String   @db.VarChar(200)
+  description        String   @default("")
+  milestone          String   @default("") @db.VarChar(300)
+  status             String   @default("active") @db.VarChar(20) // active | paused | complete
+  loadAtSessionStart Boolean  @default(false) @map("load_at_session_start")
+  lastUpdated        DateTime @updatedAt @map("last_updated")
+  notes              String   @default("")
+
+  @@map("uc1_roofing_workstream")
+}
+
+// ── Domain extension ────────────────────────────────────────────────
+
+model Uc1ReferenceData {
+  id          Int     @id @default(autoincrement())
+  type        String  @db.VarChar(30) // roof_type | boundary_type | material | equipment | compliance
+  name        String  @db.VarChar(100)
+  code        String  @db.VarChar(20)
+  description String  @default("")
+  isActive    Boolean @default(true) @map("is_active")
+
+  @@unique([type, code])
+  @@map("uc1_roofing_referencedata")
+}
+
+model Uc1MaterialsCatalogue {
+  id          Int     @id @default(autoincrement())
+  sku         String  @unique @db.VarChar(50)
+  name        String  @db.VarChar(200)
+  category    String  @default("") @db.VarChar(100)
+  unit        String  @default("m²") @db.VarChar(20)
+  description String  @default("")
+  isActive    Boolean @default(true) @map("is_active")
+
+  @@map("uc1_roofing_materialscatalogue")
+}
+
+model Uc1NomenclatureOverride {
+  id           Int    @id @default(autoincrement())
+  customerTerm String @unique @map("customer_term") @db.VarChar(100)
+  standardTerm String @map("standard_term") @db.VarChar(100)
+  notes        String @default("")
+
+  @@map("uc1_roofing_nomenclatureoverride")
+}
+
+model Uc1Decision {
+  id          Int      @id @default(autoincrement())
+  description String
+  rationale   String   @default("")
+  alternatives String  @default("") // alternatives considered
+  status      String   @default("confirmed") @db.VarChar(30)
+  madeBy      String   @default("") @map("made_by") @db.VarChar(200)
+  jobId       Int?     @map("job_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("uc1_roofing_decision")
+}
+
+model Uc1ActionHub {
+  id               Int       @id @default(autoincrement())
+  action           String    @db.VarChar(500)
+  priority         String    @default("P2") @db.VarChar(4) // P1 | P2 | P3
+  dueDate          DateTime? @map("due_date") @db.Date
+  triggerCondition String    @default("") @map("trigger_condition")
+  status           String    @default("open") @db.VarChar(20) // open | in_progress | done | deferred
+  notes            String    @default("")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, dueDate])
+  @@map("uc1_roofing_actionhub")
+}
+
+// =====================================================================
+// UC2 — DIDI (Dulong Downs project coordinator)
+// =====================================================================
+
+model Uc2RefBudget {
+  id              Int     @id @default(autoincrement())
+  category        String  @unique @db.VarChar(200)
+  budgetAllocated Decimal @default(0) @map("budget_allocated") @db.Decimal(12, 2)
+  notes           String  @default("")
+
+  budgets Uc2Budget[]
+
+  @@map("uc2_didi_refbudget")
+}
+
+model Uc2RefCategory {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique @db.VarChar(200)
+  type        String  @default("") @db.VarChar(100)
+  description String  @default("")
+
+  actions      Uc2ActionHub[]
+  decisions    Uc2Decision[]
+  procurements Uc2Procurement[]
+
+  @@map("uc2_didi_refcategory")
+}
+
+model Uc2RefZone {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique @db.VarChar(100)
+  description String  @default("")
+  areaSqm     Decimal @default(0) @map("area_sqm") @db.Decimal(8, 2)
+
+  actions   Uc2ActionHub[]
+  documents Uc2Document[]
+  rooms     Uc2RoomMatrix[]
+
+  @@map("uc2_didi_refzone")
+}
+
+model Uc2Metadata {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(200)
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("uc2_didi_metadata")
+}
+
+model Uc2ActionHub {
+  id         Int       @id @default(autoincrement())
+  action     String    @db.VarChar(500)
+  owner      String    @db.VarChar(200)
+  dueDate    DateTime? @map("due_date") @db.Date
+  status     String    @default("open") @db.VarChar(30)
+  priority   String    @default("medium") @db.VarChar(20)
+  categoryId Int?      @map("category_id")
+  zoneId     Int?      @map("zone_id")
+  notes      String    @default("")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  category Uc2RefCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  zone     Uc2RefZone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  @@map("uc2_didi_actionhub")
+}
+
+model Uc2Budget {
+  id          Int      @id @default(autoincrement())
+  categoryId  Int?     @map("category_id")
+  phase       String   @default("") @db.VarChar(200)
+  description String   @default("") @db.VarChar(300)
+  estimated   Decimal  @default(0) @db.Decimal(12, 2)
+  actual      Decimal  @default(0) @db.Decimal(12, 2)
+  committed   Decimal  @default(0) @db.Decimal(12, 2)
+
+  category Uc2RefBudget? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@map("uc2_didi_budget")
+}
+
+model Uc2Cashflow {
+  id        Int     @id @default(autoincrement())
+  period    String  @db.VarChar(20)
+  projected Decimal @default(0) @db.Decimal(12, 2)
+  actual    Decimal @default(0) @db.Decimal(12, 2)
+  notes     String  @default("")
+
+  @@map("uc2_didi_cashflow")
+}
+
+model Uc2ChangeLog {
+  id          Int      @id @default(autoincrement())
+  tableName   String   @map("table_name") @db.VarChar(100)
+  recordId    String   @map("record_id") @db.VarChar(50)
+  field       String   @db.VarChar(100)
+  oldValue    String   @default("") @map("old_value")
+  newValue    String   @default("") @map("new_value")
+  changedBy   String   @default("Didi AI") @map("changed_by") @db.VarChar(200)
+  confirmedBy String   @default("") @map("confirmed_by") @db.VarChar(200)
+  timestamp   DateTime @default(now())
+
+  @@map("uc2_didi_changelog")
+}
+
+model Uc2Decision {
+  id          Int       @id @default(autoincrement())
+  description String
+  madeBy      String    @map("made_by") @db.VarChar(200)
+  date        DateTime? @db.Date
+  status      String    @default("confirmed") @db.VarChar(30)
+  rationale   String    @default("")
+  categoryId  Int?      @map("category_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  category Uc2RefCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@map("uc2_didi_decision")
+}
+
+model Uc2Document {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(300)
+  docType    String    @default("") @map("doc_type") @db.VarChar(100)
+  version    String    @default("1.0") @db.VarChar(20)
+  zoneId     Int?      @map("zone_id")
+  url        String    @default("")
+  uploadDate DateTime? @map("upload_date") @db.Date
+  notes      String    @default("")
+
+  zone Uc2RefZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  @@map("uc2_didi_document")
+}
+
+model Uc2Procurement {
+  id         Int       @id @default(autoincrement())
+  item       String    @db.VarChar(300)
+  vendorName String    @map("vendor_name") @db.VarChar(200)
+  quantity   Decimal   @default(1) @db.Decimal(10, 2)
+  unitPrice  Decimal   @default(0) @map("unit_price") @db.Decimal(12, 2)
+  total      Decimal   @default(0) @db.Decimal(12, 2)
+  status     String    @default("pending") @db.VarChar(50)
+  dueDate    DateTime? @map("due_date") @db.Date
+  categoryId Int?      @map("category_id")
+  notes      String    @default("")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  category Uc2RefCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@map("uc2_didi_procurement")
+}
+
+model Uc2ProjectPhase {
+  id             Int       @id @default(autoincrement())
+  name           String    @db.VarChar(200)
+  status         String    @default("not_started") @db.VarChar(30)
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  completionPct  Int       @default(0) @map("completion_pct")
+  budgetEstimate Decimal   @default(0) @map("budget_estimate") @db.Decimal(12, 2)
+  order          Int       @default(0) @db.SmallInt
+  notes          String    @default("")
+
+  projectPlans Uc2ProjectPlan[]
+
+  @@map("uc2_didi_projectphase")
+}
+
+model Uc2ProjectPlan {
+  id          Int       @id @default(autoincrement())
+  task        String    @db.VarChar(300)
+  phaseId     Int?      @map("phase_id")
+  owner       String    @default("") @db.VarChar(200)
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  status      String    @default("not_started") @db.VarChar(30)
+  pctComplete Int       @default(0) @map("pct_complete")
+  notes       String    @default("")
+
+  phase Uc2ProjectPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+
+  @@map("uc2_didi_projectplan")
+}
+
+model Uc2RoomMatrix {
+  id            Int     @id @default(autoincrement())
+  zoneId        Int?    @map("zone_id")
+  roomName      String  @map("room_name") @db.VarChar(200)
+  areaSqm       Decimal @default(0) @map("area_sqm") @db.Decimal(8, 2)
+  floorFinish   String  @default("") @map("floor_finish") @db.VarChar(100)
+  wallFinish    String  @default("") @map("wall_finish") @db.VarChar(100)
+  ceilingHeight Decimal @default(2.7) @map("ceiling_height") @db.Decimal(5, 2)
+  notes         String  @default("")
+
+  zone Uc2RefZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  @@map("uc2_didi_roommatrix")
+}
+
+model Uc2Vendor {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique @db.VarChar(200)
+  category String  @default("") @db.VarChar(100)
+  contact  String  @default("") @db.VarChar(200)
+  email    String  @default("")
+  phone    String  @default("") @db.VarChar(30)
+  rating   Decimal @default(5.0) @db.Decimal(3, 1)
+  notes    String  @default("")
+  isActive Boolean @default(true) @map("is_active")
+
+  @@map("uc2_didi_vendor")
+}
+
+model Uc2ExecutionLog {
+  id         Int      @id @default(autoincrement())
+  toolName   String   @map("tool_name") @db.VarChar(100)
+  payload    String
+  result     String
+  status     String   @default("success") @db.VarChar(20)
+  durationMs Int      @default(0) @map("duration_ms")
+  sessionId  String   @default("") @map("session_id") @db.VarChar(50)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("uc2_didi_executionlog")
+}
+
+model Uc2Hypothesis {
+  id            Int       @id @default(autoincrement())
+  description   String
+  sourceSession String    @default("") @map("source_session") @db.VarChar(50)
+  evidence      String    @default("")
+  status        String    @default("pending") @db.VarChar(30)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  reviewedAt    DateTime? @map("reviewed_at")
+  reviewedBy    String    @default("") @map("reviewed_by") @db.VarChar(200)
+
+  rules Uc2LearningRule[]
+
+  @@map("uc2_didi_hypothesis")
+}
+
+model Uc2LearningRule {
+  id             Int      @id @default(autoincrement())
+  ruleCode       String   @unique @map("rule_code") @db.VarChar(20)
+  description    String
+  category       String   @default("") @db.VarChar(100)
+  isActive       Boolean  @default(true) @map("is_active")
+  cannotOverride Boolean  @default(false) @map("cannot_override")
+  sourceId       Int?     @map("source_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  source Uc2Hypothesis? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@map("uc2_didi_learningrule")
+}
+
+model Uc2ChatSession {
+  id        Int       @id @default(autoincrement())
+  sessionId String    @unique @map("session_id") @db.VarChar(50)
+  startedAt DateTime  @default(now()) @map("started_at")
+  closedAt  DateTime? @map("closed_at")
+  summary   String    @default("")
+
+  messages Uc2ChatMessage[]
+
+  @@map("uc2_didi_chatsession")
+}
+
+model Uc2ChatMessage {
+  id                Int      @id @default(autoincrement())
+  sessionId         Int      @map("session_id")
+  role              String   @db.VarChar(20)
+  content           String
+  toolCalls         String   @default("[]") @map("tool_calls")
+  hasProposal       Boolean  @default(false) @map("has_proposal")
+  proposalConfirmed Boolean  @default(false) @map("proposal_confirmed")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  session Uc2ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("uc2_didi_chatmessage")
+}
+
+// =====================================================================
+// UC3 — MSME (multi-tenant construction project coordinator)
+// =====================================================================
+
+model Uc3Tenant {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(200)
+  orgId     String   @unique @map("org_id") @db.VarChar(100)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  projects               Uc3Project[]
+  phases                 Uc3Phase[]
+  actions                Uc3ActionItem[]
+  risks                  Uc3Risk[]
+  budgets                Uc3Budget[]
+  vendors                Uc3Vendor[]
+  decisions              Uc3Decision[]
+  documents              Uc3Document[]
+  cashflows              Uc3Cashflow[]
+  users                  Uc3TenantUser[]
+  execLogs               Uc3ExecutionLog[]
+  chatMessages           Uc3ChatMessage[]
+  variations             Uc3VariationOrder[]
+  portalTokens           Uc3ClientPortalToken[]
+  accountingConnections  Uc3AccountingConnection[]
+  weeklyReports          Uc3WeeklyReport[]
+  meetingMinutes         Uc3MeetingMinutes[]
+
+  @@map("uc3_msme_tenant")
+}
+
+model Uc3Project {
+  id          Int       @id @default(autoincrement())
+  tenantId    Int       @map("tenant_id")
+  name        String    @db.VarChar(300)
+  client      String    @default("") @db.VarChar(200)
+  status      String    @default("planning") @db.VarChar(30)
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  description String    @default("")
+  healthScore Int       @default(50) @map("health_score")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant         Uc3Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  phases         Uc3Phase[]
+  actions        Uc3ActionItem[]
+  risks          Uc3Risk[]
+  budgets        Uc3Budget[]
+  decisions      Uc3Decision[]
+  documents      Uc3Document[]
+  cashflows      Uc3Cashflow[]
+  variations     Uc3VariationOrder[]
+  portalTokens   Uc3ClientPortalToken[]
+  weeklyReports  Uc3WeeklyReport[]
+  meetingMinutes Uc3MeetingMinutes[]
+  execLogs       Uc3ExecutionLog[]
+  chatMessages   Uc3ChatMessage[]
+
+  @@index([createdAt])
+  @@map("uc3_msme_project")
+}
+
+model Uc3Phase {
+  id            Int       @id @default(autoincrement())
+  projectId     Int       @map("project_id")
+  tenantId      Int       @map("tenant_id")
+  name          String    @db.VarChar(200)
+  status        String    @default("not_started") @db.VarChar(30)
+  completionPct Int       @default(0) @map("completion_pct")
+  startDate     DateTime? @map("start_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+  order         Int       @default(0) @db.SmallInt
+  isAiDraft     Boolean   @default(false) @map("is_ai_draft")
+  approvedBy    String    @default("") @map("approved_by") @db.VarChar(200)
+
+  project Uc3Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actions Uc3ActionItem[]
+  budgets Uc3Budget[]
+
+  @@map("uc3_msme_phase")
+}
+
+model Uc3ActionItem {
+  id          Int       @id @default(autoincrement())
+  projectId   Int       @map("project_id")
+  phaseId     Int?      @map("phase_id")
+  tenantId    Int       @map("tenant_id")
+  title       String    @db.VarChar(300)
+  description String    @default("")
+  owner       String    @default("") @db.VarChar(200)
+  dueDate     DateTime? @map("due_date") @db.Date
+  priority    String    @default("medium") @db.VarChar(20)
+  status      String    @default("open") @db.VarChar(30)
+  createdByAi Boolean   @default(false) @map("created_by_ai")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase   Uc3Phase?  @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_actionitem")
+}
+
+model Uc3Risk {
+  id             Int       @id @default(autoincrement())
+  projectId      Int       @map("project_id")
+  tenantId       Int       @map("tenant_id")
+  description    String
+  likelihood     Int
+  impact         Int
+  mitigation     String    @default("")
+  status         String    @default("open") @db.VarChar(30)
+  owner          String    @default("") @db.VarChar(200)
+  createdByAi    Boolean   @default(false) @map("created_by_ai")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  escalatedAt    DateTime? @map("escalated_at")
+  escalationNote String    @default("") @map("escalation_note")
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_risk")
+}
+
+model Uc3Budget {
+  id          Int     @id @default(autoincrement())
+  projectId   Int     @map("project_id")
+  phaseId     Int?    @map("phase_id")
+  tenantId    Int     @map("tenant_id")
+  description String  @db.VarChar(300)
+  estimated   Decimal @default(0) @db.Decimal(12, 2)
+  actual      Decimal @default(0) @db.Decimal(12, 2)
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase   Uc3Phase?  @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_budget")
+}
+
+model Uc3Vendor {
+  id           Int     @id @default(autoincrement())
+  tenantId     Int     @map("tenant_id")
+  name         String  @db.VarChar(200)
+  category     String  @default("") @db.VarChar(100)
+  contactName  String  @default("") @map("contact_name") @db.VarChar(200)
+  contactEmail String  @default("") @map("contact_email")
+  contactPhone String  @default("") @map("contact_phone") @db.VarChar(30)
+  rating       Int     @default(8)
+  notes        String  @default("")
+  isActive     Boolean @default(true) @map("is_active")
+
+  tenant Uc3Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_vendor")
+}
+
+model Uc3Decision {
+  id          Int       @id @default(autoincrement())
+  projectId   Int       @map("project_id")
+  tenantId    Int       @map("tenant_id")
+  description String
+  rationale   String    @default("")
+  status      String    @default("draft") @db.VarChar(30)
+  isAiDraft   Boolean   @default(false) @map("is_ai_draft")
+  draftedBy   String    @default("AI") @map("drafted_by") @db.VarChar(200)
+  confirmedBy String    @default("") @map("confirmed_by") @db.VarChar(200)
+  confirmedAt DateTime? @map("confirmed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_decision")
+}
+
+model Uc3Document {
+  id          Int       @id @default(autoincrement())
+  projectId   Int       @map("project_id")
+  tenantId    Int       @map("tenant_id")
+  name        String    @db.VarChar(300)
+  docType     String    @default("") @map("doc_type") @db.VarChar(100)
+  version     String    @default("1.0") @db.VarChar(20)
+  uploadDate  DateTime? @map("upload_date") @db.Date
+  uploadedBy  String    @default("") @map("uploaded_by") @db.VarChar(200)
+  notes       String    @default("")
+  fileContent String    @default("") @map("file_content")
+  aiAnalysis  String    @default("") @map("ai_analysis")
+  analyzedAt  DateTime? @map("analyzed_at")
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_document")
+}
+
+model Uc3Cashflow {
+  id        Int     @id @default(autoincrement())
+  projectId Int     @map("project_id")
+  tenantId  Int     @map("tenant_id")
+  period    String  @db.VarChar(20)
+  projected Decimal @default(0) @db.Decimal(12, 2)
+  actual    Decimal @default(0) @db.Decimal(12, 2)
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_cashflow")
+}
+
+model Uc3TenantUser {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int      @map("tenant_id")
+  email      String
+  name       String   @db.VarChar(200)
+  role       String   @default("readonly") @db.VarChar(30)
+  mfaEnabled Boolean  @default(false) @map("mfa_enabled")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Uc3Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@map("uc3_msme_tenantuser")
+}
+
+model Uc3ExecutionLog {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int?     @map("tenant_id")
+  projectId   Int?     @map("project_id")
+  toolName    String   @map("tool_name") @db.VarChar(100)
+  payload     String
+  result      String
+  status      String   @default("success") @db.VarChar(20)
+  aiAuthority String   @default("") @map("ai_authority") @db.VarChar(50)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant  Uc3Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Uc3Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("uc3_msme_executionlog")
+}
+
+model Uc3ChatMessage {
+  id              Int      @id @default(autoincrement())
+  tenantId        Int?     @map("tenant_id")
+  projectId       Int?     @map("project_id")
+  role            String   @db.VarChar(20)
+  content         String
+  requiresApproval Boolean @default(false) @map("requires_approval")
+  approved        Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant  Uc3Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Uc3Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@map("uc3_msme_chatmessage")
+}
+
+model Uc3VariationOrder {
+  id            Int       @id @default(autoincrement())
+  projectId     Int       @map("project_id")
+  tenantId      Int       @map("tenant_id")
+  refNumber     String    @default("") @map("ref_number") @db.VarChar(20)
+  title         String    @db.VarChar(300)
+  description   String
+  scopeChange   String    @default("") @map("scope_change")
+  costImpact    Decimal   @default(0) @map("cost_impact") @db.Decimal(12, 2)
+  timeImpactDays Int      @default(0) @map("time_impact_days")
+  status        String    @default("draft") @db.VarChar(30)
+  isAiDrafted   Boolean   @default(false) @map("is_ai_drafted")
+  submittedBy   String    @default("") @map("submitted_by") @db.VarChar(200)
+  approvedBy    String    @default("") @map("approved_by") @db.VarChar(200)
+  approvedAt    DateTime? @map("approved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_variationorder")
+}
+
+model Uc3ClientPortalToken {
+  id         Int       @id @default(autoincrement())
+  projectId  Int       @map("project_id")
+  tenantId   Int       @map("tenant_id")
+  token      String    @unique @db.VarChar(64)
+  label      String    @default("") @db.VarChar(200)
+  isActive   Boolean   @default(true) @map("is_active")
+  viewsCount Int       @default(0) @map("views_count")
+  expiresAt  DateTime? @map("expires_at") @db.Date
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_clientportaltoken")
+}
+
+model Uc3AccountingConnection {
+  id             Int       @id @default(autoincrement())
+  tenantId       Int       @map("tenant_id")
+  provider       String    @default("xero") @db.VarChar(20)
+  status         String    @default("disconnected") @db.VarChar(20)
+  orgName        String    @default("") @map("org_name") @db.VarChar(200)
+  accessToken    String    @default("") @map("access_token")
+  lastSync       DateTime? @map("last_sync")
+  syncLog        String    @default("") @map("sync_log")
+  recordsSynced  Int       @default(0) @map("records_synced")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant Uc3Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_accountingconnection")
+}
+
+model Uc3WeeklyReport {
+  id            Int       @id @default(autoincrement())
+  projectId     Int       @map("project_id")
+  tenantId      Int       @map("tenant_id")
+  weekEnding    DateTime  @map("week_ending") @db.Date
+  title         String    @default("") @db.VarChar(300)
+  content       String
+  isAiGenerated Boolean   @default(true) @map("is_ai_generated")
+  status        String    @default("draft") @db.VarChar(20)
+  generatedAt   DateTime  @default(now()) @map("generated_at")
+  approvedBy    String    @default("") @map("approved_by") @db.VarChar(200)
+  approvedAt    DateTime? @map("approved_at")
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_weeklyreport")
+}
+
+model Uc3MeetingMinutes {
+  id               Int      @id @default(autoincrement())
+  projectId        Int      @map("project_id")
+  tenantId         Int      @map("tenant_id")
+  meetingDate      DateTime @map("meeting_date") @db.Date
+  title            String   @default("") @db.VarChar(300)
+  attendees        String   @default("") @db.VarChar(500)
+  rawMinutes       String   @map("raw_minutes")
+  extractedActions String   @default("[]") @map("extracted_actions")
+  actionsCount     Int      @default(0) @map("actions_count")
+  status           String   @default("raw") @db.VarChar(30)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("uc3_msme_meetingminutes")
+}
