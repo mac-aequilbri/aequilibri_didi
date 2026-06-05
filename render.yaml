@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: aequilibri-next
+    runtime: node
+    region: singapore       # change to your preferred region
+    plan: starter           # upgrade to standard for production
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+
+    envVars:
+      # ── Database (required) ────────────────────────────────────────────────
+      - key: DATABASE_URL
+        sync: false           # set manually in Render dashboard
+
+      # ── AI (required for live responses; omit for demo mode) ───────────────
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+      # ── Google APIs (UC1 only — omit if only deploying UC2/UC3) ───────────
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GOOGLE_SOLAR_API_KEY
+        sync: false
+
+      # ── Geoscape (UC1 only) ────────────────────────────────────────────────
+      - key: GEOSCAPE_CONSUMER_KEY
+        sync: false
+
+      # ── Runtime ────────────────────────────────────────────────────────────
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
