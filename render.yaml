@@ -3,7 +3,7 @@ services:
     name: aequilibri-next
     runtime: node
     region: singapore       # change to your preferred region
-    plan: starter           # upgrade to standard for production
+    plan: free              # free tier (no card needed); upgrade to starter/standard for always-on production
     # NOTE on the build command:
     #   --include=dev  → NODE_ENV=production (set below) makes npm skip
     #                    devDependencies, but the build toolchain (prisma CLI,
