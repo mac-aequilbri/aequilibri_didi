@@ -1,7 +1,19 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
+import { useFormStatus } from "react-dom";
 import { confirmProposal, rejectProposal, sendMessage, resetSession } from "../actions";
+
+// Submit button with a pending state. Without this, the Send action (a slow
+// Claude call) gives no feedback and looks broken / invites double-submits.
+function SendButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className="btn-ae" disabled={pending} aria-busy={pending}>
+      {pending ? "Sending…" : "Send"}
+    </button>
+  );
+}
 
 interface Message {
   id: number;
@@ -38,6 +50,7 @@ export default function ChatClient({
   sessionKey,
 }: ChatClientProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -127,7 +140,14 @@ export default function ChatClient({
 
         {/* Input area */}
         <div className="border-t pt-3">
-          <form action={sendMessage} className="flex flex-col gap-2">
+          <form
+            ref={formRef}
+            action={async (fd) => {
+              await sendMessage(fd);
+              formRef.current?.reset();
+            }}
+            className="flex flex-col gap-2"
+          >
             <textarea
               name="message"
               rows={3}
@@ -137,9 +157,7 @@ export default function ChatClient({
             />
             <input type="hidden" name="sessionKey" value={sessionKey} />
             <div className="flex justify-end">
-              <button type="submit" className="btn-ae">
-                Send
-              </button>
+              <SendButton />
             </div>
           </form>
         </div>
