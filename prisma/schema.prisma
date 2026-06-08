@@ -86,6 +86,9 @@ model Uc1Quote {
   stormLeads       Uc1StormLead[]
   conditionReports Uc1RoofConditionReport[]
   executionLogs    Uc1ExecutionLog[]
+  measurementSnapshots Uc1MeasurementSnapshot[]
+  measurementUpdates   Uc1MeasurementUpdate[]
+  quoteSnapshots       Uc1QuoteSnapshot[]
 
   @@index([createdAt])
   @@map("uc1_roofing_quote")
@@ -421,6 +424,104 @@ model Uc1RoofAnalysisCache {
 
   @@index([address, createdAt])
   @@map("uc1_roofing_roofanalysiscache")
+}
+
+// ── Measurement memory (UC1) ─────────────────────────────────────────
+// Structured roof-measurement snapshots captured during quote creation,
+// the user-applied update events linked to them, and immutable quote-
+// generation snapshots for later variance analysis. Ported from the
+// Django MeasurementSnapshot / MeasurementUpdate / QuoteSnapshot models.
+
+model Uc1MeasurementSnapshot {
+  id              Int      @id @default(autoincrement())
+  quoteId         Int?     @map("quote_id")
+  snapshotType    String   @default("use_measurements") @map("snapshot_type") @db.VarChar(40)
+  source          String   @default("") @db.VarChar(80)
+  address         String   @default("")
+  addressKey      String   @default("") @map("address_key") @db.VarChar(255)
+  lat             Float?
+  lng             Float?
+  totalAreaM2     Decimal  @default(0) @map("total_area_m2") @db.Decimal(10, 2)
+  footprintAreaM2 Decimal  @default(0) @map("footprint_area_m2") @db.Decimal(10, 2)
+  pitchDeg        Decimal  @default(0) @map("pitch_deg") @db.Decimal(5, 1)
+  pitchFactor     Decimal  @default(1) @map("pitch_factor") @db.Decimal(6, 3)
+  eaveLm          Decimal  @default(0) @map("eave_lm") @db.Decimal(8, 2)
+  perimeterM      Decimal  @default(0) @map("perimeter_m") @db.Decimal(8, 2)
+  ridgeLm         Decimal  @default(0) @map("ridge_lm") @db.Decimal(8, 2)
+  valleyLm        Decimal  @default(0) @map("valley_lm") @db.Decimal(8, 2)
+  hipLm           Decimal  @default(0) @map("hip_lm") @db.Decimal(8, 2)
+  rakeLm          Decimal  @default(0) @map("rake_lm") @db.Decimal(8, 2)
+  storeys         Int      @default(1) @db.SmallInt
+  material        String   @default("") @db.VarChar(80)
+  roofColour      String   @default("") @map("roof_colour") @db.VarChar(80)
+  sectionCount    Int      @default(0) @map("section_count") @db.SmallInt
+  outlineVertices Int      @default(0) @map("outline_vertices") @db.SmallInt
+  equipmentJson   String   @default("[]") @map("equipment_json")
+  polygonJson     String   @default("[]") @map("polygon_json")
+  sectionsJson    String   @default("[]") @map("sections_json")
+  payloadJson     String   @default("{}") @map("payload_json")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  quote   Uc1Quote?              @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  updates Uc1MeasurementUpdate[]
+  quoteSnapshots Uc1QuoteSnapshot[]
+
+  @@index([addressKey, createdAt])
+  @@index([snapshotType, createdAt])
+  @@map("uc1_roofing_measurementsnapshot")
+}
+
+model Uc1MeasurementUpdate {
+  id                  Int      @id @default(autoincrement())
+  snapshotId          Int      @map("snapshot_id")
+  quoteId             Int?     @map("quote_id")
+  updateType          String   @default("use_measurements") @map("update_type") @db.VarChar(40)
+  address             String   @default("")
+  addressKey          String   @default("") @map("address_key") @db.VarChar(255)
+  lat                 Float?
+  lng                 Float?
+  previousTotalAreaM2 Decimal  @default(0) @map("previous_total_area_m2") @db.Decimal(10, 2)
+  newTotalAreaM2      Decimal  @default(0) @map("new_total_area_m2") @db.Decimal(10, 2)
+  deltaAreaM2         Decimal  @default(0) @map("delta_area_m2") @db.Decimal(10, 2)
+  changedFieldsJson   String   @default("[]") @map("changed_fields_json")
+  payloadJson         String   @default("{}") @map("payload_json")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  snapshot Uc1MeasurementSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  quote    Uc1Quote?              @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  @@index([addressKey, createdAt])
+  @@index([updateType, createdAt])
+  @@map("uc1_roofing_measurementupdate")
+}
+
+model Uc1QuoteSnapshot {
+  id                   Int      @id @default(autoincrement())
+  quoteId              Int      @map("quote_id")
+  measurementSnapshotId Int?    @map("measurement_snapshot_id")
+  address              String   @default("")
+  addressKey           String   @default("") @map("address_key") @db.VarChar(255)
+  pricingMechanism     String   @default("") @map("pricing_mechanism") @db.VarChar(30)
+  pricingMode          String   @default("") @map("pricing_mode") @db.VarChar(30)
+  packageTier          String   @default("") @map("package_tier") @db.VarChar(30)
+  roofType             String   @default("") @map("roof_type") @db.VarChar(30)
+  roofAreaM2           Decimal  @default(0) @map("roof_area_m2") @db.Decimal(10, 2)
+  eaveLm               Decimal  @default(0) @map("eave_lm") @db.Decimal(8, 2)
+  markupPct            Decimal  @default(0) @map("markup_pct") @db.Decimal(6, 4)
+  subtotalExGst        Decimal  @default(0) @map("subtotal_ex_gst") @db.Decimal(12, 2)
+  gstAmount            Decimal  @default(0) @map("gst_amount") @db.Decimal(12, 2)
+  totalIncGst          Decimal  @default(0) @map("total_inc_gst") @db.Decimal(12, 2)
+  inputsJson           String   @default("{}") @map("inputs_json")
+  lineItemsJson        String   @default("[]") @map("line_items_json")
+  pricingBreakdownJson String   @default("{}") @map("pricing_breakdown_json")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  quote               Uc1Quote                @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  measurementSnapshot Uc1MeasurementSnapshot? @relation(fields: [measurementSnapshotId], references: [id], onDelete: SetNull)
+
+  @@index([addressKey, createdAt])
+  @@index([quoteId, createdAt])
+  @@map("uc1_roofing_quotesnapshot")
 }
 
 // ── Memory architecture / learning loop (UC1) ────────────────────────

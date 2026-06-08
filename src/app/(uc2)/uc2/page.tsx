@@ -31,6 +31,15 @@ export default async function Uc2Dashboard() {
   }[] = [];
 
   try {
+    // Auto-mark stale open/in-progress actions overdue on load (parity with the
+    // Django dashboard). Scoped to past-due dates so it's idempotent day-to-day.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    await prisma.uc2ActionHub.updateMany({
+      where: { status: { in: ["open", "in_progress"] }, dueDate: { lt: today } },
+      data: { status: "overdue" },
+    });
+
     const [
       openActionsCount,
       overdueActionsCount,

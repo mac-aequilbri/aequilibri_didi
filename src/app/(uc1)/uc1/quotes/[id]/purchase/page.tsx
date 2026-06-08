@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { currency } from "@/lib/format";
 import { materialDisplay } from "@/services/uc1/constants";
 import { PageHeader } from "@/components/PageHeader";
+import { createPurchaseOrder } from "../../../purchase-orders/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function PurchaseCompare({ params }: { params: Promise<{ id
         ) : (
           <div className="ae-card overflow-hidden">
             <table className="ae-table">
-              <thead><tr><th>Vendor</th><th>Item</th><th className="text-right">Price ex GST</th><th>Unit</th><th className="text-right">Lead days</th></tr></thead>
+              <thead><tr><th>Vendor</th><th>Item</th><th className="text-right">Price ex GST</th><th>Unit</th><th className="text-right">Lead days</th><th></th></tr></thead>
               <tbody>
                 {prices.map((p, i) => (
                   <tr key={p.id}>
@@ -36,6 +37,13 @@ export default async function PurchaseCompare({ params }: { params: Promise<{ id
                     <td className="text-right">{currency(p.unitPriceExGst)}</td>
                     <td>{p.unit}</td>
                     <td className="text-right">{p.leadDays}</td>
+                    <td className="text-right">
+                      <form action={createPurchaseOrder}>
+                        <input type="hidden" name="quote_id" value={quoteId} />
+                        <input type="hidden" name="vendor_id" value={p.vendorId} />
+                        <button type="submit" className="btn-ae-outline text-xs">Raise PO</button>
+                      </form>
+                    </td>
                   </tr>
                 ))}
               </tbody>

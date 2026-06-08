@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { currency, formatDate } from "@/lib/format";
 import { incGst } from "@/lib/money";
@@ -32,7 +33,7 @@ export default async function ConditionReports() {
               ) : (
                 rows.map((r) => (
                   <tr key={r.id}>
-                    <td className="font-semibold">{r.reportNumber}</td><td>{r.clientName || "—"}</td>
+                    <td className="font-semibold"><Link href={`/uc1/condition-reports/${r.id}`} className="text-blue-600 hover:underline">{r.reportNumber}</Link></td><td>{r.clientName || "—"}</td>
                     <td>{r.grade}</td><td>{r.urgency}</td><td><StatusBadge status={r.status} /></td>
                     <td className="text-right">{currency(r.price)}</td><td>{formatDate(r.generatedAt)}</td>
                   </tr>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
@@ -26,7 +27,7 @@ export default async function StormDashboard() {
               ) : (
                 rows.map((e) => (
                   <tr key={e.id}>
-                    <td className="font-medium">{e.name}</td><td>{e.eventType}</td><td>{e.state}</td>
+                    <td className="font-medium"><Link href={`/uc1/storm/${e.id}`} className="text-blue-600 hover:underline">{e.name}</Link></td><td>{e.eventType}</td><td>{e.state}</td>
                     <td className="text-right">{e.leads}</td><td>{formatDate(e.eventDate)}</td>
                   </tr>
                 ))

@@ -5,7 +5,7 @@ import { currency, toNum, formatDate } from "@/lib/format";
 import { gst as gstOf, incGst } from "@/lib/money";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { PITCH_FACTORS, materialDisplay } from "@/services/uc1/constants";
-import { updateQuoteStatus, addLineItem, deleteLineItem, deleteQuote, repriceQuote } from "./actions";
+import { updateQuoteStatus, addLineItem, deleteLineItem, deleteQuote, repriceQuote, autoAddGuttering } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +50,7 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
         actions={[
           { href: `/uc1/quotes/new?address=${encodeURIComponent(quote.propertyAddress)}`, label: "🗺️ Re-analyse on Map", variant: "outline" },
           { href: `/uc1/quotes/${quote.id}/purchase`, label: "📦 Purchase Materials" },
+          { href: `/uc1/quotes/${quote.id}/condition-report`, label: "📋 Condition Report", variant: "outline" },
           { href: `/uc1/quotes/${quote.id}/print`, label: "🖨 Export PDF" },
           { href: "/uc1/quotes", label: "← Back", variant: "outline" },
         ]}
@@ -133,7 +134,13 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
 
           {/* Line items */}
           <div className="ae-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h6 className="font-bold">Line Items</h6></div>
+            <div className="px-5 py-3 border-b border-[var(--ae-earth)] flex items-center justify-between">
+              <h6 className="font-bold">Line Items</h6>
+              <form action={autoAddGuttering}>
+                <input type="hidden" name="id" value={quote.id} />
+                <button className="btn-ae-outline text-xs" title="Auto-calculate guttering from LiDAR perimeter">🪣 Auto-add Guttering</button>
+              </form>
+            </div>
             <table className="ae-table">
               <thead><tr><th>Description</th><th className="text-right">Qty</th><th>Unit</th><th className="text-right">Unit Price</th><th className="text-right">Total ex GST</th><th></th></tr></thead>
               <tbody>

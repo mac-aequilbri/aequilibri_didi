@@ -89,6 +89,9 @@ model Uc1Quote {
   stormLeads       Uc1StormLead[]
   conditionReports Uc1RoofConditionReport[]
   executionLogs    Uc1ExecutionLog[]
+  measurementSnapshots Uc1MeasurementSnapshot[]
+  measurementUpdates   Uc1MeasurementUpdate[]
+  quoteSnapshots       Uc1QuoteSnapshot[]
 
   @@index([createdAt])
   @@map("uc1_roofing_quote")
@@ -424,6 +427,104 @@ model Uc1RoofAnalysisCache {
 
   @@index([address, createdAt])
   @@map("uc1_roofing_roofanalysiscache")
+}
+
+// ── Measurement memory (UC1) ─────────────────────────────────────────
+// Structured roof-measurement snapshots captured during quote creation,
+// the user-applied update events linked to them, and immutable quote-
+// generation snapshots for later variance analysis. Ported from the
+// Django MeasurementSnapshot / MeasurementUpdate / QuoteSnapshot models.
+
+model Uc1MeasurementSnapshot {
+  id              Int      @id @default(autoincrement())
+  quoteId         Int?     @map("quote_id")
+  snapshotType    String   @default("use_measurements") @map("snapshot_type")
+  source          String   @default("")
+  address         String   @default("")
+  addressKey      String   @default("") @map("address_key")
+  lat             Float?
+  lng             Float?
+  totalAreaM2     Float  @default(0) @map("total_area_m2")
+  footprintAreaM2 Float  @default(0) @map("footprint_area_m2")
+  pitchDeg        Float  @default(0) @map("pitch_deg")
+  pitchFactor     Float  @default(1) @map("pitch_factor")
+  eaveLm          Float  @default(0) @map("eave_lm")
+  perimeterM      Float  @default(0) @map("perimeter_m")
+  ridgeLm         Float  @default(0) @map("ridge_lm")
+  valleyLm        Float  @default(0) @map("valley_lm")
+  hipLm           Float  @default(0) @map("hip_lm")
+  rakeLm          Float  @default(0) @map("rake_lm")
+  storeys         Int      @default(1)
+  material        String   @default("")
+  roofColour      String   @default("") @map("roof_colour")
+  sectionCount    Int      @default(0) @map("section_count")
+  outlineVertices Int      @default(0) @map("outline_vertices")
+  equipmentJson   String   @default("[]") @map("equipment_json")
+  polygonJson     String   @default("[]") @map("polygon_json")
+  sectionsJson    String   @default("[]") @map("sections_json")
+  payloadJson     String   @default("{}") @map("payload_json")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  quote   Uc1Quote?              @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  updates Uc1MeasurementUpdate[]
+  quoteSnapshots Uc1QuoteSnapshot[]
+
+  @@index([addressKey, createdAt])
+  @@index([snapshotType, createdAt])
+  @@map("uc1_roofing_measurementsnapshot")
+}
+
+model Uc1MeasurementUpdate {
+  id                  Int      @id @default(autoincrement())
+  snapshotId          Int      @map("snapshot_id")
+  quoteId             Int?     @map("quote_id")
+  updateType          String   @default("use_measurements") @map("update_type")
+  address             String   @default("")
+  addressKey          String   @default("") @map("address_key")
+  lat                 Float?
+  lng                 Float?
+  previousTotalAreaM2 Float  @default(0) @map("previous_total_area_m2")
+  newTotalAreaM2      Float  @default(0) @map("new_total_area_m2")
+  deltaAreaM2         Float  @default(0) @map("delta_area_m2")
+  changedFieldsJson   String   @default("[]") @map("changed_fields_json")
+  payloadJson         String   @default("{}") @map("payload_json")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  snapshot Uc1MeasurementSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  quote    Uc1Quote?              @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  @@index([addressKey, createdAt])
+  @@index([updateType, createdAt])
+  @@map("uc1_roofing_measurementupdate")
+}
+
+model Uc1QuoteSnapshot {
+  id                   Int      @id @default(autoincrement())
+  quoteId              Int      @map("quote_id")
+  measurementSnapshotId Int?    @map("measurement_snapshot_id")
+  address              String   @default("")
+  addressKey           String   @default("") @map("address_key")
+  pricingMechanism     String   @default("") @map("pricing_mechanism")
+  pricingMode          String   @default("") @map("pricing_mode")
+  packageTier          String   @default("") @map("package_tier")
+  roofType             String   @default("") @map("roof_type")
+  roofAreaM2           Float  @default(0) @map("roof_area_m2")
+  eaveLm               Float  @default(0) @map("eave_lm")
+  markupPct            Float  @default(0) @map("markup_pct")
+  subtotalExGst        Float  @default(0) @map("subtotal_ex_gst")
+  gstAmount            Float  @default(0) @map("gst_amount")
+  totalIncGst          Float  @default(0) @map("total_inc_gst")
+  inputsJson           String   @default("{}") @map("inputs_json")
+  lineItemsJson        String   @default("[]") @map("line_items_json")
+  pricingBreakdownJson String   @default("{}") @map("pricing_breakdown_json")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  quote               Uc1Quote                @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  measurementSnapshot Uc1MeasurementSnapshot? @relation(fields: [measurementSnapshotId], references: [id], onDelete: SetNull)
+
+  @@index([addressKey, createdAt])
+  @@index([quoteId, createdAt])
+  @@map("uc1_roofing_quotesnapshot")
 }
 
 // ── Memory architecture / learning loop (UC1) ────────────────────────

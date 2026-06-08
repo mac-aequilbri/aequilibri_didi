@@ -10,6 +10,8 @@ const SECTIONS: NavSection[] = [
       { href: "/uc1/rate-cards", label: "Rate Cards" },
       { href: "/uc1/contacts", label: "Contacts" },
       { href: "/uc1/purchase-orders", label: "Purchase Orders" },
+      { href: "/uc1/price-check-log", label: "Price Check Log" },
+      { href: "/uc1/measurement-history", label: "Measurement History" },
     ],
   },
   {

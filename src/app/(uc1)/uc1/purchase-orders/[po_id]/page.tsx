@@ -3,8 +3,16 @@ import { prisma } from "@/lib/db";
 import { currency, toNum, formatDate } from "@/lib/format";
 import { gst as gstOf, incGst } from "@/lib/money";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { updatePoStatus } from "../actions";
 
 export const dynamic = "force-dynamic";
+
+const PO_STATUS: [string, string][] = [
+  ["draft", "Draft"],
+  ["sent", "Sent to Vendor"],
+  ["confirmed", "Confirmed"],
+  ["cancelled", "Cancelled"],
+];
 
 export default async function PoDetail({ params }: { params: Promise<{ po_id: string }> }) {
   const { po_id } = await params;
@@ -20,7 +28,7 @@ export default async function PoDetail({ params }: { params: Promise<{ po_id: st
 
   return (
     <div>
-      <PageHeader title={po.poNumber} subtitle={`Vendor: ${po.vendor.name}`} actions={[{ href: "/uc1/purchase-orders", label: "Back", variant: "outline" }]} />
+      <PageHeader title={po.poNumber} subtitle={`Vendor: ${po.vendor.name}`} actions={[{ href: `/uc1/purchase-orders/${po.id}/print`, label: "Print" }, { href: "/uc1/purchase-orders", label: "Back", variant: "outline" }]} />
       <div className="px-8 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 ae-card overflow-hidden">
           <table className="ae-table">
@@ -47,6 +55,15 @@ export default async function PoDetail({ params }: { params: Promise<{ po_id: st
             <div className="flex justify-between"><dt className="text-neutral-500">Status</dt><dd><StatusBadge status={po.status} /></dd></div>
             <div className="flex justify-between"><dt className="text-neutral-500">Created</dt><dd>{formatDate(po.createdAt)}</dd></div>
           </dl>
+          <form action={updatePoStatus} className="mt-4 flex items-center gap-2">
+            <input type="hidden" name="id" value={po.id} />
+            <select name="status" defaultValue={po.status} className="ae-input text-sm flex-1">
+              {PO_STATUS.map(([v, label]) => (
+                <option key={v} value={v}>{label}</option>
+              ))}
+            </select>
+            <button type="submit" className="btn-ae-outline text-xs">Update</button>
+          </form>
         </div>
       </div>
     </div>

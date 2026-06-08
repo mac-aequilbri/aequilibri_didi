@@ -1316,3 +1316,195 @@ export async function analyzeDelayCascade(formData: FormData) {
 
   redirect(`/uc3/delay-cascade?project=${projectId}&log=${log.id}`);
 }
+
+// ── Phase approval / review ─────────────────────────────────────────────────────
+// AI-drafted phases (isAiDraft=true) require a human to approve or reject them.
+
+export async function approvePhase(idOrFormData: number | FormData, formData?: FormData) {
+  const tenantId = await getTenantId();
+  if (!tenantId) redirect("/uc3/select-tenant");
+
+  const fd = formData ?? (idOrFormData as FormData);
+  const id = typeof idOrFormData === "number" ? idOrFormData : Number(fd.get("id"));
+  const approvedBy = (fd.get("approvedBy") as string)?.trim() || "Project Manager";
+  if (!id) redirect("/uc3/phases/approvals");
+
+  const phase = await db.uc3Phase.findFirst({ where: { id, tenantId } });
+  if (!phase) redirect("/uc3/phases/approvals");
+
+  await db.uc3Phase.updateMany({
+    where: { id, tenantId },
+    data: { isAiDraft: false, approvedBy },
+  });
+
+  await db.uc3ExecutionLog.create({
+    data: {
+      tenantId,
+      projectId: phase!.projectId,
+      toolName: "phase_approve",
+      payload: JSON.stringify({ phase_id: id, phase_name: phase!.name }),
+      result: JSON.stringify({ status: "approved", approved_by: approvedBy }),
+      status: "success",
+      aiAuthority: "approval_required",
+    },
+  });
+
+  revalidatePath("/uc3/phases/approvals");
+  redirect(`/uc3/projects/${phase!.projectId}`);
+}
+
+export async function rejectPhase(idOrFormData: number | FormData, formData?: FormData) {
+  const tenantId = await getTenantId();
+  if (!tenantId) redirect("/uc3/select-tenant");
+
+  const fd = formData ?? (idOrFormData as FormData);
+  const id = typeof idOrFormData === "number" ? idOrFormData : Number(fd.get("id"));
+  const reason = (fd.get("reason") as string)?.trim() || "Rejected by reviewer";
+  if (!id) redirect("/uc3/phases/approvals");
+
+  const phase = await db.uc3Phase.findFirst({ where: { id, tenantId } });
+  if (!phase) redirect("/uc3/phases/approvals");
+
+  // Keep it flagged as a draft; record the rejection reason on the approver field.
+  await db.uc3Phase.updateMany({
+    where: { id, tenantId },
+    data: { isAiDraft: true, approvedBy: `REJECTED: ${reason}` },
+  });
+
+  await db.uc3ExecutionLog.create({
+    data: {
+      tenantId,
+      projectId: phase!.projectId,
+      toolName: "phase_reject",
+      payload: JSON.stringify({ phase_id: id, phase_name: phase!.name }),
+      result: JSON.stringify({ status: "rejected", reason }),
+      status: "success",
+      aiAuthority: "approval_required",
+    },
+  });
+
+  revalidatePath("/uc3/phases/approvals");
+  redirect("/uc3/phases/approvals");
+}
+
+// ── Decisions ───────────────────────────────────────────────────────────────────
+// AI drafts a decision; a human confirms (or supersedes) it. Mirrors the
+// draft → confirmed → superseded lifecycle of the Django Uc3Decision model.
+
+export async function createDecision(formData: FormData) {
+  const tenantId = await getTenantId();
+  if (!tenantId) redirect("/uc3/select-tenant");
+
+  const description = (formData.get("description") as string)?.trim();
+  const rationale = (formData.get("rationale") as string)?.trim() || "";
+  const projectIdRaw = formData.get("projectId") as string;
+
+  if (!description) redirect("/uc3/decisions/new?error=description_required");
+  if (!projectIdRaw) redirect("/uc3/decisions/new?error=project_required");
+  const projectId = Number(projectIdRaw);
+
+  await db.uc3Decision.create({
+    data: {
+      tenantId,
+      projectId,
+      description,
+      rationale,
+      status: "draft",
+      isAiDraft: false,
+      draftedBy: "Project Manager",
+    },
+  });
+
+  redirect("/uc3/decisions");
+}
+
+export async function aiDraftDecision(formData: FormData) {
+  const tenantId = await getTenantId();
+  if (!tenantId) redirect("/uc3/select-tenant");
+
+  const projectIdRaw = formData.get("projectId") as string;
+  const prompt = (formData.get("prompt") as string)?.trim();
+
+  if (!prompt) redirect("/uc3/decisions/new?error=prompt_required");
+  if (!projectIdRaw) redirect("/uc3/decisions/new?error=project_required");
+  const projectId = Number(projectIdRaw);
+
+  const systemPrompt =
+    "You are a construction project decision drafter. Return ONLY a JSON object with these exact keys: " +
+    "{description, rationale}. description is a one-sentence decision statement. " +
+    "rationale is a short paragraph justifying it.";
+
+  const result = await callClaude(systemPrompt, prompt, { maxTokens: 1024 });
+
+  let parsed: { description?: string; rationale?: string } = {};
+  try {
+    const cleaned = result.content
+      .replace(/^```(?:json)?\n?/i, "")
+      .replace(/\n?```$/i, "")
+      .trim();
+    parsed = JSON.parse(cleaned);
+  } catch {
+    parsed = { description: prompt, rationale: "Pending review" };
+  }
+
+  await db.uc3Decision.create({
+    data: {
+      tenantId,
+      projectId,
+      description: parsed.description ?? prompt,
+      rationale: parsed.rationale ?? "",
+      status: "draft",
+      isAiDraft: true,
+      draftedBy: "AI",
+    },
+  });
+
+  await db.uc3ExecutionLog.create({
+    data: {
+      tenantId,
+      projectId,
+      toolName: "decision_draft",
+      payload: JSON.stringify({ prompt }),
+      result: result.content,
+      status: result.demo_mode ? "demo" : "success",
+      aiAuthority: "approval_required",
+    },
+  });
+
+  redirect("/uc3/decisions");
+}
+
+export async function confirmDecision(idOrFormData: number | FormData, formData?: FormData) {
+  const tenantId = await getTenantId();
+  if (!tenantId) redirect("/uc3/select-tenant");
+
+  const fd = formData ?? (idOrFormData as FormData);
+  const id = typeof idOrFormData === "number" ? idOrFormData : Number(fd.get("id"));
+  const confirmedBy = (fd.get("confirmedBy") as string)?.trim() || "Project Manager";
+  if (!id) redirect("/uc3/decisions");
+
+  await db.uc3Decision.updateMany({
+    where: { id, tenantId },
+    data: { status: "confirmed", confirmedBy, confirmedAt: new Date() },
+  });
+
+  revalidatePath("/uc3/decisions");
+  revalidatePath(`/uc3/decisions/${id}`);
+}
+
+export async function supersedeDecision(idOrFormData: number | FormData, formData?: FormData) {
+  const tenantId = await getTenantId();
+  if (!tenantId) redirect("/uc3/select-tenant");
+
+  const fd = formData ?? (idOrFormData as FormData);
+  const id = typeof idOrFormData === "number" ? idOrFormData : Number(fd.get("id"));
+  if (!id) redirect("/uc3/decisions");
+
+  await db.uc3Decision.updateMany({
+    where: { id, tenantId },
+    data: { status: "superseded" },
+  });
+
+  revalidatePath("/uc3/decisions");
+  revalidatePath(`/uc3/decisions/${id}`);
+}

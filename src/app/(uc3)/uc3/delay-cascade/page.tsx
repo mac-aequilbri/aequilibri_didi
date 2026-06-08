@@ -1,6 +1,6 @@
-import { cookies } from "next/headers";
 import { prisma as db } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { getTenantId } from "@/lib/uc3-tenant";
 import { analyzeDelayCascade } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -15,23 +15,7 @@ export default async function DelayCascadePage({
   const logId = sp.log ? Number(sp.log) : null;
 
   // ── Resolve tenant ───────────────────────────────────────────────────────────
-  let tenantId: number | null = null;
-  try {
-    const cookieStore = await cookies();
-    const val = cookieStore.get("uc3_tenant_id")?.value;
-    if (val) {
-      tenantId = Number(val);
-    } else {
-      const fallback = await db.uc3Tenant.findFirst({
-        where: { isActive: true },
-        orderBy: { id: "asc" },
-        select: { id: true },
-      });
-      tenantId = fallback?.id ?? null;
-    }
-  } catch {
-    tenantId = null;
-  }
+  const tenantId: number | null = await getTenantId();
 
   // ── Load projects list ───────────────────────────────────────────────────────
   type ProjectRow = { id: number; name: string; client: string | null; status: string };

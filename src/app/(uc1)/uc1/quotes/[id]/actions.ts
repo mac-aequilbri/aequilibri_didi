@@ -7,6 +7,62 @@ import { round2 } from "@/lib/money";
 
 const STATUSES = new Set(["draft", "sent", "accepted", "declined"]);
 
+/** Auto-calculate guttering line items from the quote's LiDAR perimeter and the
+ *  active GutteringRate table. Mirrors Django uc1_roofing.views.auto_add_guttering. */
+export async function autoAddGuttering(formData: FormData) {
+  const id = Number(formData.get("id"));
+  if (!id) return;
+
+  // Don't double-add.
+  const existing = await prisma.uc1QuoteItem.count({
+    where: { quoteId: id, description: { contains: "gutter" } },
+  });
+  if (existing > 0) {
+    redirect(`/uc1/quotes/${id}?error=guttering_exists`);
+  }
+
+  const lidar = await prisma.uc1RoofLidarAnalysis.findUnique({ where: { quoteId: id } });
+  const perimeter = lidar?.perimeterM ?? 0;
+  if (!perimeter) {
+    redirect(`/uc1/quotes/${id}?error=no_lidar_perimeter`);
+  }
+
+  const rates = await prisma.uc1GutteringRate.findMany({ where: { isActive: true } });
+  if (rates.length === 0) {
+    redirect("/uc1/guttering-rates?error=no_rates");
+  }
+
+  const rate = (t: string) => rates.find((r) => r.itemType === t);
+  const items: { quoteId: number; description: string; quantity: number; unit: string; unitPriceExGst: number; sortOrder: number }[] = [];
+
+  const gutter = rate("gutter");
+  if (gutter) items.push({ quoteId: id, description: `Guttering — ${gutter.description}`, quantity: round2(perimeter), unit: "lm", unitPriceExGst: Number(gutter.rateExGst), sortOrder: 100 });
+
+  const downpipe = rate("downpipe");
+  if (downpipe) items.push({ quoteId: id, description: `Downpipes — ${downpipe.description}`, quantity: Math.max(2, Math.ceil(perimeter / 15)), unit: "each", unitPriceExGst: Number(downpipe.rateExGst), sortOrder: 101 });
+
+  const valley = rate("valley");
+  if (valley) items.push({ quoteId: id, description: `Valley Iron — ${valley.description}`, quantity: round2(perimeter * 0.2), unit: "lm", unitPriceExGst: Number(valley.rateExGst), sortOrder: 102 });
+
+  const ridge = rate("ridge_cap");
+  if (ridge) items.push({ quoteId: id, description: `Ridge Cap — ${ridge.description}`, quantity: round2(perimeter * 0.3), unit: "lm", unitPriceExGst: Number(ridge.rateExGst), sortOrder: 103 });
+
+  if (items.length) await prisma.uc1QuoteItem.createMany({ data: items });
+
+  await prisma.uc1ExecutionLog.create({
+    data: {
+      toolName: "auto_guttering",
+      payload: JSON.stringify({ perimeter_m: perimeter, items: items.length }),
+      result: JSON.stringify({ status: "success" }),
+      status: "success",
+      quoteId: id,
+    },
+  });
+
+  revalidatePath(`/uc1/quotes/${id}`);
+  redirect(`/uc1/quotes/${id}`);
+}
+
 export async function updateQuoteStatus(formData: FormData) {
   const id = Number(formData.get("id"));
   const status = String(formData.get("status") ?? "");

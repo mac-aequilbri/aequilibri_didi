@@ -1,6 +1,6 @@
-import { cookies } from "next/headers";
 import { prisma as db } from "@/lib/db";
 import { PageHeader, MetricCard, StatusBadge } from "@/components/PageHeader";
+import { getTenantId } from "@/lib/uc3-tenant";
 import { escalateRisk, escalateAllRisks } from "@/app/(uc3)/uc3/actions";
 
 export const dynamic = "force-dynamic";
@@ -21,17 +21,7 @@ export default async function RiskEscalationPage() {
   let risks: RiskWithProject[] = [];
 
   try {
-    const cookieStore = await cookies();
-    const val = cookieStore.get("uc3_tenant_id")?.value;
-    let tenantId: number | null = val ? Number(val) : null;
-    if (!tenantId) {
-      const fallback = await db.uc3Tenant.findFirst({
-        where: { isActive: true },
-        orderBy: { id: "asc" },
-        select: { id: true },
-      });
-      tenantId = fallback?.id ?? null;
-    }
+    const tenantId = await getTenantId();
     if (tenantId) {
       risks = (await db.uc3Risk.findMany({
         where: { tenantId },
