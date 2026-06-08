@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 // UC1 (Roofing) is temporarily disabled while the focus is on UC2 + UC3.
 // To re-enable: set UC1_ENABLED = true here, and restore the UC1 nav link
 // (src/app/layout.tsx) + landing card (src/app/page.tsx).
-const UC1_ENABLED = false;
+const UC1_ENABLED = true;
 
 export function proxy(request: NextRequest) {
   if (UC1_ENABLED) return NextResponse.next();

@@ -25,11 +25,9 @@ export default function RootLayout({
             <Link href="/" className="ae-brand">
               æquilibri
             </Link>
-            {/* UC1 (Roofing) temporarily disabled — focus is UC2 + UC3. Restore via the middleware flag.
             <Link href="/uc1" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
               <span className="uc-badge uc1-badge mr-1">UC1</span> Roofing
             </Link>
-            */}
             <Link href="/uc2" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
               <span className="uc-badge uc2-badge mr-1">UC2</span> Didi
             </Link>
