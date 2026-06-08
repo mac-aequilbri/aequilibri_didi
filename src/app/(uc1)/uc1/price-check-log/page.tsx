@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { currency, formatDate } from "@/lib/format";
+import { currency, formatDate, toNum } from "@/lib/format";
 import { PageHeader, MetricCard, StatusBadge } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,10 @@ export default async function PriceCheckLogPage() {
   }[] = [];
 
   try {
-    [logs, recentChanges] = await Promise.all([
+    // Map Decimal fields through toNum so the typed arrays hold plain numbers.
+    // (The prod Postgres client returns Prisma Decimal; the dev SQLite client
+    // returns number — converting here keeps this correct on both.)
+    const [logRows, priceRows] = await Promise.all([
       prisma.uc1PriceCheckLog.findMany({ orderBy: { runAt: "desc" }, take: 50 }),
       prisma.uc1VendorMaterialPrice.findMany({
         where: { previousPrice: { not: null } },
@@ -34,6 +37,15 @@ export default async function PriceCheckLogPage() {
         take: 20,
       }),
     ]);
+    logs = logRows;
+    recentChanges = priceRows.map((p) => ({
+      id: p.id,
+      description: p.description,
+      unitPriceExGst: toNum(p.unitPriceExGst),
+      previousPrice: p.previousPrice == null ? null : toNum(p.previousPrice),
+      updatedAt: p.updatedAt,
+      vendor: { name: p.vendor.name },
+    }));
   } catch {
     // graceful empty state
   }
