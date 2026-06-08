@@ -13,7 +13,9 @@ services:
     #                    There are no migration files yet, so we push the schema
     #                    directly. Safe on a fresh DB; switch to
     #                    `prisma migrate deploy` once you start tracking migrations.
-    buildCommand: npm ci --include=dev && npx prisma generate && npx prisma db push && npm run build
+    #   seed.mjs       → idempotent + fail-safe demo data (skips tables that
+    #                    already have rows; always exits 0 so it can't break a deploy).
+    buildCommand: npm ci --include=dev && npx prisma generate && npx prisma db push && node prisma/seed.mjs && npm run build
     startCommand: npm start
     healthCheckPath: /
 
