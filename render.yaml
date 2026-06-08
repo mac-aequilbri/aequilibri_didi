@@ -4,14 +4,25 @@ services:
     runtime: node
     region: singapore       # change to your preferred region
     plan: starter           # upgrade to standard for production
-    buildCommand: npm ci && npx prisma generate && npm run build
+    # NOTE on the build command:
+    #   --include=dev  → NODE_ENV=production (set below) makes npm skip
+    #                    devDependencies, but the build toolchain (prisma CLI,
+    #                    typescript, tailwind) lives there. Without this the
+    #                    build fails with "prisma: not found" / missing types.
+    #   prisma db push → creates/syncs the schema on the managed Postgres.
+    #                    There are no migration files yet, so we push the schema
+    #                    directly. Safe on a fresh DB; switch to
+    #                    `prisma migrate deploy` once you start tracking migrations.
+    buildCommand: npm ci --include=dev && npx prisma generate && npx prisma db push && npm run build
     startCommand: npm start
     healthCheckPath: /
 
     envVars:
-      # ── Database (required) ────────────────────────────────────────────────
+      # ── Database (auto-wired from the managed Postgres below) ──────────────
       - key: DATABASE_URL
-        sync: false           # set manually in Render dashboard
+        fromDatabase:
+          name: aequilibri-next-db
+          property: connectionString
 
       # ── AI (required for live responses; omit for demo mode) ───────────────
       - key: ANTHROPIC_API_KEY
@@ -34,3 +45,11 @@ services:
         value: production
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
+
+# Managed PostgreSQL — provisioned together with the web service when you
+# create the Blueprint. (Renamed from the Django blueprint's `aequilibri-db`
+# so the two don't collide if both briefly exist.)
+databases:
+  - name: aequilibri-next-db
+    plan: free              # free Postgres expires after ~30 days — upgrade for production
+    region: singapore
