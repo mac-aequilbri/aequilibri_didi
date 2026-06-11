@@ -94,10 +94,14 @@ async function seedDulongDowns(prisma) {
     ].map((p) => prisma.platConPhase.create({ data: { orgId: org.id, jobId: job.id, ...p } })),
   );
 
+  // Foundation actual deliberately left at the estimate; the seeded pending
+  // proposal below updates it to 131,500 when approved (demo of the gate).
+  const foundationLine = await prisma.platConBudgetLine.create({
+    data: { orgId: org.id, jobId: job.id, phaseId: phases[1].id, category: "Foundation", description: "Slab + retaining", budgetAmount: 120000, committedAmount: 120000, actualAmount: 120000 },
+  });
   await prisma.platConBudgetLine.createMany({
     data: [
       { orgId: org.id, jobId: job.id, phaseId: phases[0].id, category: "Site Works", description: "Clearing, cut & fill", budgetAmount: 45000, committedAmount: 45000, actualAmount: 43800 },
-      { orgId: org.id, jobId: job.id, phaseId: phases[1].id, category: "Foundation", description: "Slab + retaining", budgetAmount: 120000, committedAmount: 120000, actualAmount: 131500 },
       { orgId: org.id, jobId: job.id, phaseId: phases[2].id, category: "Framing", description: "Structural timber + steel", budgetAmount: 180000, committedAmount: 142000, actualAmount: 96000 },
       { orgId: org.id, jobId: job.id, phaseId: phases[3].id, category: "Roofing", description: "Colorbond roof + gutters", budgetAmount: 90000, committedAmount: 0, actualAmount: 0 },
       { orgId: org.id, jobId: job.id, phaseId: phases[4].id, category: "Fitout", description: "Kitchen, bathrooms, floors", budgetAmount: 260000, committedAmount: 31000, actualAmount: 0 },
@@ -196,7 +200,8 @@ async function seedDulongDowns(prisma) {
   });
   await prisma.platExecutionLog.createMany({
     data: [
-      { orgId: org.id, jobId: job.id, actorType: "ai", actorName: "Didi", operation: "update", targetTable: "plat_con_budgetline", payload: J({ category: "Foundation", actualAmount: 131500 }), status: "proposed", sourceMessageId: assistantMsg.id },
+      // Payload uses the recordWriter proposal shape so approval executes it.
+      { orgId: org.id, jobId: job.id, actorType: "ai", actorName: "Didi", operation: "update", targetTable: "plat_con_budgetline", targetId: foundationLine.id, payload: J({ table: "budget_line", op: "update", recordId: foundationLine.id, data: { actualAmount: 131500 } }), status: "proposed", sourceMessageId: assistantMsg.id },
       { orgId: org.id, jobId: job.id, actorType: "human", actorName: "Antonio", operation: "update", targetTable: "plat_con_procurement", payload: J({ item: "Structural LVL beams 300x63", status: "delivered" }), status: "executed", executedAt: new Date("2026-05-21T03:10:00Z"), result: "Marked delivered" },
       { orgId: org.id, jobId: job.id, actorType: "system", actorName: "off_system_change", operation: "update", targetTable: "plat_con_cashflow", payload: J({ period: "2026-04", actual: 91200 }), status: "executed", executedAt: new Date("2026-05-01T22:00:00Z"), result: "Imported from bank export" },
     ],

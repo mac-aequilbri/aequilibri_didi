@@ -24,6 +24,8 @@ export interface VisionImage {
 export interface ToolUse {
   name: string;
   input: unknown;
+  /** Block id from the API — needed to send tool_result blocks back. */
+  id?: string;
 }
 
 export interface ChatResult {
@@ -166,7 +168,8 @@ export async function callClaudeConversation(
     const toolUses: ToolUse[] = [];
     for (const block of response.content) {
       if (block.type === "text") textParts.push(block.text);
-      else if (block.type === "tool_use") toolUses.push({ name: block.name, input: block.input });
+      else if (block.type === "tool_use")
+        toolUses.push({ name: block.name, input: block.input, id: block.id });
     }
     return { content: textParts.join("\n"), tool_uses: toolUses, demo_mode: false };
   } catch (e) {
