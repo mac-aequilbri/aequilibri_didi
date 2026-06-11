@@ -1,0 +1,64 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { formToObject } from "@/lib/platform/forms";
+import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
+import { orgPath } from "@/lib/platform/paths";
+import { writeRecord } from "@/lib/platform/recordWriter";
+import {
+  aiDraftVariation,
+  approveVariation,
+  rejectVariation,
+} from "@/services/platform/construction/variations";
+
+export async function createVariation(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  const user = await getCurrentUser(ctx);
+  const data = formToObject(formData);
+  data.submittedBy = user.name;
+  data.status = "submitted";
+  await writeRecord(ctx, {
+    table: "variation_order",
+    op: "create",
+    data,
+    actor: { type: "human", name: user.name },
+  });
+  revalidatePath(orgPath(ctx.orgSlug, "/variations"));
+  redirect(orgPath(ctx.orgSlug, "/variations"));
+}
+
+export async function aiDraftVariationAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  const jobId = Number(formData.get("jobId"));
+  const brief = String(formData.get("brief") ?? "").trim();
+  if (!jobId || !brief) return;
+  const { id } = await aiDraftVariation(ctx, ctx.config.assistant.name, jobId, brief);
+  revalidatePath(orgPath(ctx.orgSlug, "/variations"));
+  redirect(orgPath(ctx.orgSlug, id ? `/variations/${id}` : "/variations"));
+}
+
+export async function approveVariationAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  const user = await getCurrentUser(ctx);
+  const id = Number(formData.get("recordId"));
+  if (!id) return;
+  const costRaw = formData.get("costImpact");
+  const daysRaw = formData.get("timeImpactDays");
+  await approveVariation(ctx, user.name, id, {
+    costImpact: costRaw !== null && costRaw !== "" ? Number(costRaw) : undefined,
+    timeImpactDays: daysRaw !== null && daysRaw !== "" ? Number(daysRaw) : undefined,
+  });
+  revalidatePath(orgPath(ctx.orgSlug, `/variations/${id}`));
+  revalidatePath(orgPath(ctx.orgSlug, "/variations"));
+}
+
+export async function rejectVariationAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  const user = await getCurrentUser(ctx);
+  const id = Number(formData.get("recordId"));
+  if (!id) return;
+  await rejectVariation(ctx, user.name, id);
+  revalidatePath(orgPath(ctx.orgSlug, `/variations/${id}`));
+  revalidatePath(orgPath(ctx.orgSlug, "/variations"));
+}

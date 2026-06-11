@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { isAllowedBimxEmbedUrl, normalizeBimxEmbedUrl } from "./uc3-bimx";
+﻿import { describe, it, expect } from "vitest";
+import { isAllowedBimxEmbedUrl, normalizeBimxEmbedUrl } from "./bimx";
 
 describe("isAllowedBimxEmbedUrl", () => {
   it("accepts the BIMx Model Transfer host over https", () => {
