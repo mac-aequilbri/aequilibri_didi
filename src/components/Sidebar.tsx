@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 export interface NavItem {
   href: string;
   label: string;
+  /** Highlight only on exact match (root/dashboard items). */
+  exact?: boolean;
 }
 
 export interface NavSection {
@@ -16,8 +18,13 @@ export interface NavSection {
 export function Sidebar({ sections }: { sections: NavSection[] }) {
   const pathname = usePathname();
 
-  const isActive = (href: string) =>
-    pathname === href || (href !== "/uc1" && href !== "/uc2" && href !== "/uc3" && pathname.startsWith(href));
+  const isActive = (item: NavItem) =>
+    pathname === item.href ||
+    (!item.exact &&
+      item.href !== "/uc1" &&
+      item.href !== "/uc2" &&
+      item.href !== "/uc3" &&
+      pathname.startsWith(item.href));
 
   return (
     <aside className="sidebar w-56 shrink-0 py-4 min-h-[calc(100vh-3.5rem)]">
@@ -30,7 +37,7 @@ export function Sidebar({ sections }: { sections: NavSection[] }) {
           )}
           <nav className="px-2">
             {section.items.map((item) => (
-              <Link key={item.href} href={item.href} className={isActive(item.href) ? "active" : ""}>
+              <Link key={item.href} href={item.href} className={isActive(item) ? "active" : ""}>
                 {item.label}
               </Link>
             ))}

@@ -1428,3 +1428,736 @@ model Uc3MeetingMinutes {
 
   @@map("uc3_msme_meetingminutes")
 }
+
+// =====================================================================
+// PLATFORM — three-tier architecture (Platform Architecture doc, June 2026)
+// Core tier (plat_core_*):   identical schema for every customer instance.
+// Domain tier (plat_con_*):  construction vertical extension.
+// Config tier (plat_cfg_*):  customer-specific configuration.
+// JSON payloads are String columns (app JSON-encodes) so the SQLite dev
+// schema generator keeps working; money is Decimal as elsewhere.
+// =====================================================================
+
+// ── Core tier ────────────────────────────────────────────────────────
+
+model PlatOrganisation {
+  id                     Int      @id @default(autoincrement())
+  slug                   String   @unique @db.VarChar(100)
+  name                   String   @db.VarChar(200)
+  vertical               String   @default("construction") @db.VarChar(50)
+  defaultEngagementType  String   @default("long_project") @map("default_engagement_type") @db.VarChar(30)
+  allowedEngagementTypes String   @default("[]") @map("allowed_engagement_types")
+  aiAuthority            String   @default("approve_required") @map("ai_authority") @db.VarChar(30)
+  settings               String   @default("{}")
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  contacts        PlatContact[]
+  jobs            PlatJob[]
+  workstreams     PlatWorkstream[]
+  actions         PlatActionHub[]
+  decisions       PlatDecision[]
+  learningRules   PlatLearningRule[]
+  hypotheses      PlatHypothesis[]
+  corrections     PlatCorrection[]
+  execLogs        PlatExecutionLog[]
+  documents       PlatDocument[]
+  snapshots       PlatIntelligenceSnapshot[]
+  chatSessions    PlatChatSession[]
+  chatMessages    PlatChatMessage[]
+  conPhases       PlatConPhase[]
+  conBudgetLines  PlatConBudgetLine[]
+  conCashflows    PlatConCashflow[]
+  conRisks        PlatConRisk[]
+  conVariations   PlatConVariationOrder[]
+  conVendors      PlatConVendor[]
+  conProcurement  PlatConProcurement[]
+  conRooms        PlatConRoomMatrix[]
+  conMinutes      PlatConMeetingMinutes[]
+  conReports      PlatConWeeklyReport[]
+  conBimModels    PlatConBimModel[]
+  conPortalTokens PlatConPortalToken[]
+  conAccounting   PlatConAccountingConnection[]
+  cfgTeam         PlatCfgTeamMember[]
+  cfgRegions      PlatCfgRegion[]
+  cfgReferences   PlatCfgReference[]
+  cfgNomenclature PlatCfgNomenclature[]
+  cfgSettings     PlatCfgSetting[]
+
+  @@map("plat_core_organisation")
+}
+
+model PlatContact {
+  id        Int      @id @default(autoincrement())
+  orgId     Int      @map("org_id")
+  name      String   @db.VarChar(200)
+  type      String   @default("client") @map("contact_type") @db.VarChar(30)
+  role      String   @default("") @db.VarChar(100)
+  email     String   @default("") @db.VarChar(254)
+  phone     String   @default("") @db.VarChar(30)
+  company   String   @default("") @db.VarChar(200)
+  notes     String   @default("")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org  PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  jobs PlatJob[]
+
+  @@index([orgId, isActive])
+  @@map("plat_core_contact")
+}
+
+model PlatJob {
+  id              Int       @id @default(autoincrement())
+  orgId           Int       @map("org_id")
+  code            String    @db.VarChar(50)
+  name            String    @db.VarChar(300)
+  engagementType  String    @default("long_project") @map("engagement_type") @db.VarChar(30)
+  status          String    @default("intake") @db.VarChar(30)
+  clientContactId Int?      @map("client_contact_id")
+  address         String    @default("") @db.VarChar(400)
+  suburb          String    @default("") @db.VarChar(100)
+  lat             Float?
+  lng             Float?
+  startDate       DateTime? @map("start_date") @db.Date
+  targetEndDate   DateTime? @map("target_end_date") @db.Date
+  completionPct   Int       @default(0) @map("completion_pct")
+  healthScore     Int       @default(50) @map("health_score")
+  budgetTotal     Decimal   @default(0) @map("budget_total") @db.Decimal(14, 2)
+  summary         String    @default("")
+  meta            String    @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  org           PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  clientContact PlatContact?     @relation(fields: [clientContactId], references: [id], onDelete: SetNull)
+
+  workstreams     PlatWorkstream[]
+  actions         PlatActionHub[]
+  decisions       PlatDecision[]
+  corrections     PlatCorrection[]
+  execLogs        PlatExecutionLog[]
+  documents       PlatDocument[]
+  chatSessions    PlatChatSession[]
+  conPhases       PlatConPhase[]
+  conBudgets      PlatConBudgetLine[]
+  conCashflows    PlatConCashflow[]
+  conRisks        PlatConRisk[]
+  conVariations   PlatConVariationOrder[]
+  conProcurement  PlatConProcurement[]
+  conRooms        PlatConRoomMatrix[]
+  conMinutes      PlatConMeetingMinutes[]
+  conReports      PlatConWeeklyReport[]
+  conBimModels    PlatConBimModel[]
+  conPortalTokens PlatConPortalToken[]
+
+  @@unique([orgId, code])
+  @@index([orgId, status])
+  @@map("plat_core_job")
+}
+
+model PlatWorkstream {
+  id          Int      @id @default(autoincrement())
+  orgId       Int      @map("org_id")
+  jobId       Int?     @map("job_id")
+  name        String   @db.VarChar(200)
+  description String   @default("")
+  milestone   String   @default("") @db.VarChar(300)
+  status      String   @default("active") @db.VarChar(30)
+  notes       String   @default("")
+  lastUpdated DateTime @updatedAt @map("last_updated")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  org     PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job     PlatJob?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  actions PlatActionHub[]
+
+  @@index([orgId, status])
+  @@map("plat_core_workstream")
+}
+
+model PlatActionHub {
+  id           Int       @id @default(autoincrement())
+  orgId        Int       @map("org_id")
+  jobId        Int?      @map("job_id")
+  workstreamId Int?      @map("workstream_id")
+  title        String    @db.VarChar(300)
+  detail       String    @default("")
+  priority     String    @default("P2") @db.VarChar(5)
+  status       String    @default("open") @db.VarChar(30)
+  owner        String    @default("") @db.VarChar(200)
+  dueDate      DateTime? @map("due_date") @db.Date
+  sourceType   String    @default("manual") @map("source_type") @db.VarChar(30)
+  sourceId     Int?      @map("source_id")
+  context      String    @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  org        PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job        PlatJob?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  workstream PlatWorkstream?  @relation(fields: [workstreamId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, status, dueDate])
+  @@map("plat_core_actionhub")
+}
+
+model PlatDecision {
+  id           Int       @id @default(autoincrement())
+  orgId        Int       @map("org_id")
+  jobId        Int?      @map("job_id")
+  description  String
+  rationale    String    @default("")
+  alternatives String    @default("")
+  category     String    @default("") @db.VarChar(100)
+  status       String    @default("proposed") @db.VarChar(30)
+  madeBy       String    @default("") @map("made_by") @db.VarChar(200)
+  sourceType   String    @default("manual") @map("source_type") @db.VarChar(30)
+  sourceId     Int?      @map("source_id")
+  decidedAt    DateTime? @map("decided_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, status])
+  @@map("plat_core_decision")
+}
+
+model PlatLearningRule {
+  id                 Int       @id @default(autoincrement())
+  orgId              Int       @map("org_id")
+  ruleCode           String    @map("rule_code") @db.VarChar(20)
+  kind               String    @default("guidance") @db.VarChar(20)
+  description        String
+  category           String    @default("") @db.VarChar(100)
+  dimension          String    @default("") @db.VarChar(100)
+  triggerCondition   String    @default("{}") @map("trigger_condition")
+  adjustment         String    @default("{}")
+  priority           Int       @default(0)
+  confidence         Int       @default(50)
+  timesTriggered     Int       @default(0) @map("times_triggered")
+  isActive           Boolean   @default(true) @map("is_active")
+  autoApply          Boolean   @default(false) @map("auto_apply")
+  cannotOverride     Boolean   @default(false) @map("cannot_override")
+  sourceHypothesisId Int?      @map("source_hypothesis_id")
+  notes              String    @default("")
+  dateActivated      DateTime? @map("date_activated")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  org              PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sourceHypothesis PlatHypothesis?  @relation(fields: [sourceHypothesisId], references: [id], onDelete: SetNull)
+  corrections      PlatCorrection[]
+
+  @@unique([orgId, ruleCode])
+  @@index([orgId, isActive])
+  @@map("plat_core_learningrule")
+}
+
+model PlatHypothesis {
+  id               Int       @id @default(autoincrement())
+  orgId            Int       @map("org_id")
+  description      String
+  dimension        String    @default("") @db.VarChar(100)
+  rootCausePattern String    @default("") @map("root_cause_pattern") @db.VarChar(300)
+  triggerCondition String    @default("{}") @map("trigger_condition")
+  sampleCount      Int       @default(0) @map("sample_count")
+  avgVariancePct   Float     @default(0) @map("avg_variance_pct")
+  confidence       Int       @default(0)
+  status           String    @default("pending") @db.VarChar(30)
+  sourceType       String    @default("correction") @map("source_type") @db.VarChar(30)
+  sourceId         Int?      @map("source_id")
+  reviewedAt       DateTime? @map("reviewed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  org           PlatOrganisation   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  promotedRules PlatLearningRule[]
+  corrections   PlatCorrection[]
+
+  @@index([orgId, status])
+  @@map("plat_core_hypothesis")
+}
+
+model PlatCorrection {
+  id             Int      @id @default(autoincrement())
+  orgId          Int      @map("org_id")
+  jobId          Int?     @map("job_id")
+  entityType     String   @default("") @map("entity_type") @db.VarChar(50)
+  entityId       Int?     @map("entity_id")
+  dimension      String   @db.VarChar(100)
+  aiValue        Float?   @map("ai_value")
+  humanValue     Float?   @map("human_value")
+  aiValueText    String   @default("") @map("ai_value_text")
+  humanValueText String   @default("") @map("human_value_text")
+  variancePct    Float?   @map("variance_pct")
+  rootCause      String   @map("root_cause") @db.VarChar(300)
+  context        String   @default("{}")
+  correctedBy    String   @default("") @map("corrected_by") @db.VarChar(200)
+  hypothesisId   Int?     @map("hypothesis_id")
+  ruleId         Int?     @map("rule_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  org        PlatOrganisation  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job        PlatJob?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  hypothesis PlatHypothesis?   @relation(fields: [hypothesisId], references: [id], onDelete: SetNull)
+  rule       PlatLearningRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, dimension, createdAt])
+  @@map("plat_core_correction")
+}
+
+model PlatExecutionLog {
+  id              Int       @id @default(autoincrement())
+  orgId           Int       @map("org_id")
+  jobId           Int?      @map("job_id")
+  actorType       String    @default("system") @map("actor_type") @db.VarChar(20)
+  actorName       String    @default("") @map("actor_name") @db.VarChar(200)
+  operation       String    @default("") @db.VarChar(30)
+  targetTable     String    @default("") @map("target_table") @db.VarChar(100)
+  targetId        Int?      @map("target_id")
+  payload         String    @default("{}")
+  result          String    @default("")
+  status          String    @default("executed") @db.VarChar(20)
+  sourceMessageId Int?      @map("source_message_id")
+  approvedBy      String    @default("") @map("approved_by") @db.VarChar(200)
+  executedAt      DateTime? @map("executed_at")
+  error           String    @default("")
+  promptVersion   String    @default("") @map("prompt_version") @db.VarChar(50)
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, status, createdAt])
+  @@map("plat_core_executionlog")
+}
+
+model PlatDocument {
+  id               Int       @id @default(autoincrement())
+  orgId            Int       @map("org_id")
+  jobId            Int?      @map("job_id")
+  title            String    @db.VarChar(300)
+  kind             String    @default("file") @db.VarChar(20)
+  docType          String    @default("") @map("doc_type") @db.VarChar(50)
+  classification   String    @default("") @db.VarChar(50)
+  storageProvider  String    @default("local") @map("storage_provider") @db.VarChar(20)
+  storageRef       String    @default("") @map("storage_ref") @db.VarChar(800)
+  mimeType         String    @default("") @map("mime_type") @db.VarChar(100)
+  sizeBytes        Int       @default(0) @map("size_bytes")
+  version          Int       @default(1)
+  parentDocumentId Int?      @map("parent_document_id")
+  textContent      String    @default("") @map("text_content")
+  aiSummary        String    @default("") @map("ai_summary")
+  aiAnalysis       String    @default("{}") @map("ai_analysis")
+  confidence       Int?
+  status           String    @default("uploaded") @db.VarChar(30)
+  uploadedBy       String    @default("") @map("uploaded_by") @db.VarChar(200)
+  analyzedAt       DateTime? @map("analyzed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  org            PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job            PlatJob?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  parentDocument PlatDocument?    @relation("PlatDocumentVersions", fields: [parentDocumentId], references: [id], onDelete: SetNull)
+  versions       PlatDocument[]   @relation("PlatDocumentVersions")
+
+  @@index([orgId, status])
+  @@map("plat_core_document")
+}
+
+model PlatIntelligenceSnapshot {
+  id              Int      @id @default(autoincrement())
+  orgId           Int      @map("org_id")
+  capturedAt      DateTime @default(now()) @map("captured_at")
+  totalJobs       Int      @default(0) @map("total_jobs")
+  completedJobs   Int      @default(0) @map("completed_jobs")
+  accuracyRatePct Float?   @map("accuracy_rate_pct")
+  activeRules     Int      @default(0) @map("active_rules")
+  autoApplyRules  Int      @default(0) @map("auto_apply_rules")
+  avgConfidence   Float    @default(0) @map("avg_confidence")
+  topRules        String   @default("[]") @map("top_rules")
+  gaps            String   @default("[]")
+  metrics         String   @default("{}")
+  notes           String   @default("")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, capturedAt])
+  @@map("plat_core_intelligencesnapshot")
+}
+
+model PlatChatSession {
+  id        Int       @id @default(autoincrement())
+  orgId     Int       @map("org_id")
+  jobId     Int?      @map("job_id")
+  title     String    @default("") @db.VarChar(300)
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  summary   String    @default("")
+
+  org      PlatOrganisation  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job      PlatJob?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  messages PlatChatMessage[]
+
+  @@index([orgId, startedAt])
+  @@map("plat_core_chatsession")
+}
+
+model PlatChatMessage {
+  id        Int      @id @default(autoincrement())
+  orgId     Int      @map("org_id")
+  sessionId Int      @map("session_id")
+  role      String   @db.VarChar(20)
+  content   String
+  toolCalls String   @default("[]") @map("tool_calls")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org     PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  session PlatChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("plat_core_chatmessage")
+}
+
+// ── Domain extension tier — construction ─────────────────────────────
+
+model PlatConPhase {
+  id            Int       @id @default(autoincrement())
+  orgId         Int       @map("org_id")
+  jobId         Int       @map("job_id")
+  name          String    @db.VarChar(200)
+  status        String    @default("pending") @db.VarChar(30)
+  completionPct Int       @default(0) @map("completion_pct")
+  sortOrder     Int       @default(0) @map("sort_order")
+  startDate     DateTime? @map("start_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+  isAiDraft     Boolean   @default(false) @map("is_ai_draft")
+  approvedBy    String    @default("") @map("approved_by") @db.VarChar(200)
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  org         PlatOrganisation    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job         PlatJob             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  budgetLines PlatConBudgetLine[]
+
+  @@index([jobId, sortOrder])
+  @@map("plat_con_phase")
+}
+
+model PlatConBudgetLine {
+  id              Int      @id @default(autoincrement())
+  orgId           Int      @map("org_id")
+  jobId           Int      @map("job_id")
+  phaseId         Int?     @map("phase_id")
+  category        String   @default("") @db.VarChar(100)
+  description     String   @default("") @db.VarChar(300)
+  budgetAmount    Decimal  @default(0) @map("budget_amount") @db.Decimal(14, 2)
+  committedAmount Decimal  @default(0) @map("committed_amount") @db.Decimal(14, 2)
+  actualAmount    Decimal  @default(0) @map("actual_amount") @db.Decimal(14, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  org   PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job   PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  phase PlatConPhase?    @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+
+  @@index([jobId, category])
+  @@map("plat_con_budgetline")
+}
+
+model PlatConCashflow {
+  id        Int      @id @default(autoincrement())
+  orgId     Int      @map("org_id")
+  jobId     Int      @map("job_id")
+  period    String   @db.VarChar(7)
+  projected Decimal  @default(0) @db.Decimal(14, 2)
+  actual    Decimal  @default(0) @db.Decimal(14, 2)
+  notes     String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, period])
+  @@map("plat_con_cashflow")
+}
+
+model PlatConRisk {
+  id             Int       @id @default(autoincrement())
+  orgId          Int       @map("org_id")
+  jobId          Int       @map("job_id")
+  description    String
+  likelihood     Int       @default(3)
+  impact         Int       @default(3)
+  mitigation     String    @default("")
+  status         String    @default("open") @db.VarChar(30)
+  owner          String    @default("") @db.VarChar(200)
+  escalatedAt    DateTime? @map("escalated_at")
+  escalationNote String    @default("") @map("escalation_note")
+  createdByAi    Boolean   @default(false) @map("created_by_ai")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, status])
+  @@map("plat_con_risk")
+}
+
+model PlatConVariationOrder {
+  id             Int       @id @default(autoincrement())
+  orgId          Int       @map("org_id")
+  jobId          Int       @map("job_id")
+  refNumber      String    @default("") @map("ref_number") @db.VarChar(30)
+  title          String    @db.VarChar(300)
+  description    String    @default("")
+  scopeChange    String    @default("") @map("scope_change")
+  costImpact     Decimal   @default(0) @map("cost_impact") @db.Decimal(14, 2)
+  timeImpactDays Int       @default(0) @map("time_impact_days")
+  status         String    @default("draft") @db.VarChar(30)
+  isAiDrafted    Boolean   @default(false) @map("is_ai_drafted")
+  aiDraft        String    @default("{}") @map("ai_draft")
+  submittedBy    String    @default("") @map("submitted_by") @db.VarChar(200)
+  approvedBy     String    @default("") @map("approved_by") @db.VarChar(200)
+  approvedAt     DateTime? @map("approved_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, status])
+  @@map("plat_con_variationorder")
+}
+
+model PlatConVendor {
+  id           Int      @id @default(autoincrement())
+  orgId        Int      @map("org_id")
+  name         String   @db.VarChar(200)
+  category     String   @default("") @db.VarChar(100)
+  contactName  String   @default("") @map("contact_name") @db.VarChar(200)
+  contactEmail String   @default("") @map("contact_email") @db.VarChar(254)
+  contactPhone String   @default("") @map("contact_phone") @db.VarChar(30)
+  rating       Int      @default(5)
+  notes        String   @default("")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  org          PlatOrganisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  procurements PlatConProcurement[]
+
+  @@index([orgId, isActive])
+  @@map("plat_con_vendor")
+}
+
+model PlatConProcurement {
+  id         Int       @id @default(autoincrement())
+  orgId      Int       @map("org_id")
+  jobId      Int       @map("job_id")
+  item       String    @db.VarChar(300)
+  category   String    @default("") @db.VarChar(100)
+  vendorId   Int?      @map("vendor_id")
+  vendorName String    @default("") @map("vendor_name") @db.VarChar(200)
+  qty        Float     @default(1)
+  unitPrice  Decimal   @default(0) @map("unit_price") @db.Decimal(12, 2)
+  total      Decimal   @default(0) @db.Decimal(14, 2)
+  status     String    @default("pending") @db.VarChar(30)
+  dueDate    DateTime? @map("due_date") @db.Date
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  org    PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job    PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  vendor PlatConVendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  @@index([jobId, status])
+  @@map("plat_con_procurement")
+}
+
+model PlatConRoomMatrix {
+  id            Int      @id @default(autoincrement())
+  orgId         Int      @map("org_id")
+  jobId         Int      @map("job_id")
+  zone          String   @default("") @db.VarChar(100)
+  name          String   @db.VarChar(200)
+  areaSqm       Float?   @map("area_sqm")
+  ceilingHeight String   @default("") @map("ceiling_height") @db.VarChar(50)
+  finishes      String   @default("{}")
+  notes         String   @default("")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, zone])
+  @@map("plat_con_roommatrix")
+}
+
+model PlatConMeetingMinutes {
+  id               Int       @id @default(autoincrement())
+  orgId            Int       @map("org_id")
+  jobId            Int       @map("job_id")
+  meetingDate      DateTime  @map("meeting_date") @db.Date
+  title            String    @default("") @db.VarChar(300)
+  attendees        String    @default("") @db.VarChar(500)
+  rawMinutes       String    @map("raw_minutes")
+  extractedActions String    @default("[]") @map("extracted_actions")
+  actionsCount     Int       @default(0) @map("actions_count")
+  status           String    @default("raw") @db.VarChar(30)
+  confirmedAt      DateTime? @map("confirmed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, status])
+  @@map("plat_con_meetingminutes")
+}
+
+model PlatConWeeklyReport {
+  id            Int       @id @default(autoincrement())
+  orgId         Int       @map("org_id")
+  jobId         Int       @map("job_id")
+  weekEnding    DateTime  @map("week_ending") @db.Date
+  title         String    @default("") @db.VarChar(300)
+  content       String    @default("")
+  isAiGenerated Boolean   @default(false) @map("is_ai_generated")
+  status        String    @default("draft") @db.VarChar(30)
+  generatedAt   DateTime  @default(now()) @map("generated_at")
+  approvedBy    String    @default("") @map("approved_by") @db.VarChar(200)
+  approvedAt    DateTime? @map("approved_at")
+  sentAt        DateTime? @map("sent_at")
+  documentId    Int?      @map("document_id")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, weekEnding])
+  @@map("plat_con_weeklyreport")
+}
+
+model PlatConBimModel {
+  id            Int      @id @default(autoincrement())
+  orgId         Int      @map("org_id")
+  jobId         Int      @map("job_id")
+  name          String   @db.VarChar(200)
+  provider      String   @default("bimx") @db.VarChar(30)
+  embedUrl      String   @map("embed_url") @db.VarChar(800)
+  clientVisible Boolean  @default(false) @map("client_visible")
+  addedBy       String   @default("") @map("added_by") @db.VarChar(200)
+  notes         String   @default("")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("plat_con_bimmodel")
+}
+
+model PlatConPortalToken {
+  id         Int       @id @default(autoincrement())
+  orgId      Int       @map("org_id")
+  jobId      Int       @map("job_id")
+  token      String    @unique @db.VarChar(64)
+  label      String    @default("") @db.VarChar(200)
+  isActive   Boolean   @default(true) @map("is_active")
+  viewsCount Int       @default(0) @map("views_count")
+  expiresAt  DateTime? @map("expires_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, isActive])
+  @@map("plat_con_portaltoken")
+}
+
+model PlatConAccountingConnection {
+  id            Int       @id @default(autoincrement())
+  orgId         Int       @map("org_id")
+  provider      String    @default("demo") @db.VarChar(20)
+  status        String    @default("disconnected") @db.VarChar(30)
+  orgName       String    @default("") @map("org_name") @db.VarChar(200)
+  accessToken   String    @default("") @map("access_token") @db.VarChar(500)
+  lastSync      DateTime? @map("last_sync")
+  syncLog       String    @default("") @map("sync_log")
+  recordsSynced Int       @default(0) @map("records_synced")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("plat_con_accountingconnection")
+}
+
+// ── Customer configuration tier ──────────────────────────────────────
+
+model PlatCfgTeamMember {
+  id        Int      @id @default(autoincrement())
+  orgId     Int      @map("org_id")
+  name      String   @db.VarChar(200)
+  role      String   @default("editor") @db.VarChar(30)
+  email     String   @default("") @db.VarChar(254)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, isActive])
+  @@map("plat_cfg_teammember")
+}
+
+model PlatCfgRegion {
+  id         Int      @id @default(autoincrement())
+  orgId      Int      @map("org_id")
+  name       String   @db.VarChar(200)
+  postcodes  String   @default("") @db.VarChar(500)
+  travelDays Int      @default(0) @map("travel_days")
+  premiumPct Float    @default(0) @map("premium_pct")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, isActive])
+  @@map("plat_cfg_region")
+}
+
+model PlatCfgReference {
+  id        Int      @id @default(autoincrement())
+  orgId     Int      @map("org_id")
+  type      String   @map("ref_type") @db.VarChar(50)
+  code      String   @db.VarChar(100)
+  name      String   @db.VarChar(200)
+  value     String   @default("{}")
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, type, code])
+  @@map("plat_cfg_reference")
+}
+
+model PlatCfgNomenclature {
+  id           Int      @id @default(autoincrement())
+  orgId        Int      @map("org_id")
+  customerTerm String   @map("customer_term") @db.VarChar(200)
+  standardTerm String   @map("standard_term") @db.VarChar(200)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, customerTerm])
+  @@map("plat_cfg_nomenclature")
+}
+
+model PlatCfgSetting {
+  id        Int      @id @default(autoincrement())
+  orgId     Int      @map("org_id")
+  key       String   @map("setting_key") @db.VarChar(100)
+  value     String   @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  org PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, key])
+  @@map("plat_cfg_setting")
+}

@@ -44,9 +44,9 @@ export async function callClaudeVision(
   systemPrompt: string,
   userText: string,
   imageB64: string,
-  opts: { mediaType?: string; maxTokens?: number; temperature?: number | null } = {},
+  opts: { mediaType?: string; maxTokens?: number; temperature?: number | null; model?: string } = {},
 ): Promise<VisionResult> {
-  const { mediaType = "image/png", maxTokens = 2048, temperature = null } = opts;
+  const { mediaType = "image/png", maxTokens = 2048, temperature = null, model = MODEL } = opts;
   const apiKey = getApiKey();
   if (!apiKey) {
     return {
@@ -57,7 +57,7 @@ export async function callClaudeVision(
   try {
     const client = new Anthropic({ apiKey });
     const params: Anthropic.MessageCreateParamsNonStreaming = {
-      model: MODEL,
+      model,
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [
@@ -128,18 +128,37 @@ export async function callClaudeVisionMulti(
 export async function callClaude(
   systemPrompt: string,
   userMessage: string,
-  opts: { tools?: Anthropic.Tool[]; maxTokens?: number } = {},
+  opts: { tools?: Anthropic.Tool[]; maxTokens?: number; model?: string } = {},
 ): Promise<ChatResult> {
-  const { tools, maxTokens = 1024 } = opts;
+  return callClaudeConversation(systemPrompt, [{ role: "user", content: userMessage }], opts);
+}
+
+/** Multi-turn variant used by the platform assistant: pass prior turns
+ *  (including tool_result blocks) verbatim. Same demo-mode contract. */
+export async function callClaudeConversation(
+  systemPrompt: string,
+  messages: Anthropic.MessageParam[],
+  opts: { tools?: Anthropic.Tool[]; maxTokens?: number; model?: string } = {},
+): Promise<ChatResult> {
+  const { tools, maxTokens = 1024, model = MODEL } = opts;
   const apiKey = getApiKey();
-  if (!apiKey) return demoResponse(userMessage);
+  if (!apiKey) {
+    const last = messages[messages.length - 1];
+    const lastText =
+      typeof last?.content === "string"
+        ? last.content
+        : (last?.content ?? [])
+            .map((b) => (typeof b === "object" && "text" in b ? (b as { text: string }).text : ""))
+            .join(" ");
+    return demoResponse(lastText);
+  }
   try {
     const client = new Anthropic({ apiKey });
     const params: Anthropic.MessageCreateParamsNonStreaming = {
-      model: MODEL,
+      model,
       max_tokens: maxTokens,
       system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
+      messages,
     };
     if (tools?.length) params.tools = tools;
     const response = await client.messages.create(params);

@@ -9,6 +9,7 @@
 // Run locally with the dev client:  node prisma/seed.mjs
 
 import { PrismaClient } from "@prisma/client";
+import { seedPlatform } from "./seed-platform.mjs";
 
 const prisma = new PrismaClient();
 
@@ -158,6 +159,9 @@ async function main() {
   } catch (err) {
     console.log(`  ! uc3 demo data: skipped (${err?.message ?? err})`);
   }
+
+  // ── Platform (Plat*) — three demo organisations on the shared core ─────────
+  await seedPlatform(prisma);
 
   console.log("Seed complete.");
 }
