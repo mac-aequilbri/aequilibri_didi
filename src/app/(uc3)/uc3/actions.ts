@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { prisma as db } from "@/lib/db";
 import { callClaude } from "@/lib/claude";
+import { normalizeBimxEmbedUrl } from "@/lib/uc3-bimx";
 
 async function getTenantId(): Promise<number | null> {
   try {
@@ -1507,4 +1508,91 @@ export async function supersedeDecision(idOrFormData: number | FormData, formDat
 
   revalidatePath("/uc3/decisions");
   revalidatePath(`/uc3/decisions/${id}`);
+}
+
+// ── BIM models (BIMx embed viewer) ──────────────────────────────────────────────
+// Human-initiated CRUD — no Uc3ExecutionLog entry (consistent with createDocument).
+// The pasted embed URL is validated against a graphisoft.com allowlist before
+// storage; see src/lib/uc3-bimx.ts for the security rationale and provider seam.
+
+export async function addBimModel(formData: FormData) {
+  const tenantId = await getTenantId();
+  if (!tenantId) redirect("/uc3/select-tenant");
+
+  const projectId = Number(formData.get("projectId"));
+  const name = (formData.get("name") as string)?.trim();
+  const rawUrl = formData.get("embedUrl") as string;
+  const clientVisible = formData.get("clientVisible") === "on";
+  const addedBy = (formData.get("addedBy") as string)?.trim() || undefined;
+  const notes = (formData.get("notes") as string)?.trim() || undefined;
+
+  const base = `/uc3/projects/${projectId}/models/new`;
+  if (!projectId) redirect("/uc3/projects");
+  if (!name) redirect(`${base}?error=name_required`);
+
+  const embedUrl = normalizeBimxEmbedUrl(rawUrl);
+  if (!embedUrl) redirect(`${base}?error=invalid_url`);
+
+  // Confirm the project belongs to this tenant before attaching anything.
+  const project = await db.uc3Project.findFirst({
+    where: { id: projectId, tenantId },
+    select: { id: true },
+  });
+  if (!project) redirect("/uc3/projects");
+
+  await db.uc3BimModel.create({
+    data: { tenantId, projectId, name, embedUrl, clientVisible, addedBy, notes },
+  });
+
+  revalidatePath(`/uc3/projects/${projectId}/models`);
+  redirect(`/uc3/projects/${projectId}/models`);
+}
+
+export async function updateBimModel(formData: FormData) {
+  const tenantId = await getTenantId();
+  if (!tenantId) redirect("/uc3/select-tenant");
+
+  const id = Number(formData.get("id"));
+  const projectId = Number(formData.get("projectId"));
+  if (!id || !projectId) redirect("/uc3/projects");
+
+  const name = (formData.get("name") as string)?.trim();
+  const clientVisible = formData.get("clientVisible") === "on";
+  const notes = (formData.get("notes") as string)?.trim() ?? "";
+
+  const data: { name?: string; clientVisible: boolean; notes: string } = {
+    clientVisible,
+    notes,
+  };
+  if (name) data.name = name;
+
+  // A new embed URL is optional on update; only replace it if a valid one is given.
+  const rawUrl = formData.get("embedUrl") as string | null;
+  let embedUrl: string | null = null;
+  if (rawUrl && rawUrl.trim()) {
+    embedUrl = normalizeBimxEmbedUrl(rawUrl);
+    if (!embedUrl) redirect(`/uc3/projects/${projectId}/models?error=invalid_url`);
+  }
+
+  await db.uc3BimModel.updateMany({
+    where: { id, tenantId },
+    data: embedUrl ? { ...data, embedUrl } : data,
+  });
+
+  revalidatePath(`/uc3/projects/${projectId}/models`);
+  redirect(`/uc3/projects/${projectId}/models`);
+}
+
+export async function deleteBimModel(formData: FormData) {
+  const tenantId = await getTenantId();
+  if (!tenantId) redirect("/uc3/select-tenant");
+
+  const id = Number(formData.get("id"));
+  const projectId = Number(formData.get("projectId"));
+  if (!id || !projectId) redirect("/uc3/projects");
+
+  await db.uc3BimModel.deleteMany({ where: { id, tenantId } });
+
+  revalidatePath(`/uc3/projects/${projectId}/models`);
+  redirect(`/uc3/projects/${projectId}/models`);
 }

@@ -1077,6 +1077,7 @@ model Uc3Tenant {
   accountingConnections  Uc3AccountingConnection[]
   weeklyReports          Uc3WeeklyReport[]
   meetingMinutes         Uc3MeetingMinutes[]
+  bimModels              Uc3BimModel[]
 
   @@map("uc3_msme_tenant")
 }
@@ -1108,6 +1109,7 @@ model Uc3Project {
   meetingMinutes Uc3MeetingMinutes[]
   execLogs       Uc3ExecutionLog[]
   chatMessages   Uc3ChatMessage[]
+  bimModels      Uc3BimModel[]
 
   @@index([createdAt])
   @@map("uc3_msme_project")
@@ -1247,6 +1249,26 @@ model Uc3Document {
   tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("uc3_msme_document")
+}
+
+model Uc3BimModel {
+  id            Int      @id @default(autoincrement())
+  projectId     Int      @map("project_id")
+  tenantId      Int      @map("tenant_id")
+  name          String
+  provider      String   @default("bimx")
+  embedUrl      String   @map("embed_url")
+  clientVisible Boolean  @default(false) @map("client_visible")
+  addedBy       String   @default("") @map("added_by")
+  notes         String   @default("")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("uc3_msme_bimmodel")
 }
 
 model Uc3Cashflow {

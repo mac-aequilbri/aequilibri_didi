@@ -152,6 +152,7 @@ export default async function ProjectDetailPage({
         title={project!.name}
         subtitle={`Client: ${project!.client}`}
         actions={[
+          { href: `/uc3/projects/${projectId}/models`, label: "3D Models" },
           { href: `/uc3/projects/${projectId}/edit`, label: "Edit Project", variant: "outline" },
           { href: "/uc3/projects", label: "All Projects", variant: "outline" },
         ]}

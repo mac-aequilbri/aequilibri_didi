@@ -1,5 +1,6 @@
 import { prisma as db } from "@/lib/db";
 import { formatDate } from "@/lib/format";
+import { BimxViewer } from "@/components/BimxViewer";
 
 export const dynamic = "force-dynamic";
 
@@ -141,6 +142,18 @@ export default async function PublicPortalPage({
   }
 
   if (!project) return <ExpiredPage />;
+
+  // Client-visible BIMx models only (internal-only models are never exposed here).
+  let bimModels: { id: number; name: string; embedUrl: string }[] = [];
+  try {
+    bimModels = await db.uc3BimModel.findMany({
+      where: { projectId: tokenRecord.projectId, tenantId: tokenRecord.tenantId, clientVisible: true },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true, embedUrl: true },
+    });
+  } catch {
+    // graceful empty state
+  }
 
   const STATUS_LABEL: Record<string, string> = {
     planning: "Planning",
@@ -288,6 +301,23 @@ export default async function PublicPortalPage({
                   </div>
                 );
               })}
+            </div>
+          </section>
+        )}
+
+        {/* 3D models (client-visible only) */}
+        {bimModels.length > 0 && (
+          <section>
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-neutral-400 mb-3">
+              3D Model
+            </h2>
+            <div className="space-y-6">
+              {bimModels.map((m) => (
+                <div key={m.id}>
+                  <p className="text-sm font-medium text-neutral-700 mb-2">{m.name}</p>
+                  <BimxViewer src={m.embedUrl} title={m.name} height={520} />
+                </div>
+              ))}
             </div>
           </section>
         )}
