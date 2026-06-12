@@ -1,7 +1,7 @@
 // AUTO-GENERATED from schema.prisma by scripts/gen-sqlite-schema.mjs — do not edit.
 // Local-dev SQLite variant pointed at the existing Django db.sqlite3.
 
-// Æquilibri — Prisma schema
+// Ã†quilibri â€” Prisma schema
 // Ported from the Django models of uc1_roofing, uc2_didi, uc3_msme.
 // Table names are pinned with @@map to the Django defaults (`<app_label>_<model>`)
 // so this schema can run against the EXISTING Postgres database with zero data loss.
@@ -18,7 +18,7 @@ datasource db {
 }
 
 // =====================================================================
-// UC1 — ROOFING
+// UC1 â€” ROOFING
 // =====================================================================
 
 model Uc1Contact {
@@ -41,7 +41,7 @@ model Uc1RateCard {
   material    String
   pitchType   String   @map("pitch_type")
   description String   @default("")
-  unit        String   @default("m²")
+  unit        String   @default("mÂ²")
   rateExGst   Float  @map("rate_ex_gst")
   isActive    Boolean  @default(true) @map("is_active")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -102,7 +102,7 @@ model Uc1QuoteItem {
   quoteId        Int     @map("quote_id")
   description    String
   quantity       Float
-  unit           String  @default("m²")
+  unit           String  @default("mÂ²")
   unitPriceExGst Float @map("unit_price_ex_gst")
   sortOrder      Int     @default(0) @map("sort_order")
 
@@ -188,7 +188,7 @@ model Uc1VendorMaterialPrice {
   material       String
   itemCode       String    @default("") @map("item_code")
   description    String
-  unit           String    @default("m²")
+  unit           String    @default("mÂ²")
   unitPriceExGst Float   @map("unit_price_ex_gst")
   leadDays       Int       @default(3) @map("lead_days")
   priceSourceUrl String    @default("") @map("price_source_url")
@@ -228,7 +228,7 @@ model Uc1PurchaseOrderItem {
   description     String
   itemCode        String  @default("") @map("item_code")
   quantity        Float
-  unit            String  @default("m²")
+  unit            String  @default("mÂ²")
   unitPriceExGst  Float @map("unit_price_ex_gst")
   sortOrder       Int     @default(0) @map("sort_order")
 
@@ -429,7 +429,7 @@ model Uc1RoofAnalysisCache {
   @@map("uc1_roofing_roofanalysiscache")
 }
 
-// ── Measurement memory (UC1) ─────────────────────────────────────────
+// â”€â”€ Measurement memory (UC1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Structured roof-measurement snapshots captured during quote creation,
 // the user-applied update events linked to them, and immutable quote-
 // generation snapshots for later variance analysis. Ported from the
@@ -527,8 +527,8 @@ model Uc1QuoteSnapshot {
   @@map("uc1_roofing_quotesnapshot")
 }
 
-// ── Memory architecture / learning loop (UC1) ────────────────────────
-// Episodic: Job + Correction. Hypothesis → LearningRule promotion.
+// â”€â”€ Memory architecture / learning loop (UC1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Episodic: Job + Correction. Hypothesis â†’ LearningRule promotion.
 // Contextual Intelligence snapshot. See aequilibri Memory Architecture doc.
 
 model Uc1Job {
@@ -581,7 +581,7 @@ model Uc1Correction {
   aiValue      Float     @default(0) @map("ai_value")
   humanValue   Float     @default(0) @map("human_value")
   variancePct  Float     @default(0) @map("variance_pct")
-  rootCause    String    @default("") @map("root_cause") // REQUIRED — never blank
+  rootCause    String    @default("") @map("root_cause") // REQUIRED â€” never blank
   estimatorId  Int?      @map("estimator_id")
   hypothesisId Int?      @map("hypothesis_id")
   ruleId       Int?      @map("rule_id") // set if this correction led to a rule
@@ -657,13 +657,13 @@ model Uc1IntelligenceSnapshot {
   @@map("uc1_roofing_intelligencesnapshot")
 }
 
-// ── Customer configuration (Port City Roofing) ──────────────────────
+// â”€â”€ Customer configuration (Port City Roofing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Uc1TeamMember {
   id              Int      @id @default(autoincrement())
   name            String
   role            String   @default("estimator") // estimator | director | admin | technician
-  accuracyProfile String   @default("") @map("accuracy_profile") // free text — known tendencies
+  accuracyProfile String   @default("") @map("accuracy_profile") // free text â€” known tendencies
   isActive        Boolean  @default(true) @map("is_active")
   dateJoined      DateTime @default(now()) @map("date_joined")
 
@@ -699,7 +699,7 @@ model Uc1Workstream {
   @@map("uc1_roofing_workstream")
 }
 
-// ── Domain extension ────────────────────────────────────────────────
+// â”€â”€ Domain extension â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Uc1ReferenceData {
   id          Int     @id @default(autoincrement())
@@ -718,7 +718,7 @@ model Uc1MaterialsCatalogue {
   sku         String  @unique
   name        String
   category    String  @default("")
-  unit        String  @default("m²")
+  unit        String  @default("mÂ²")
   description String  @default("")
   isActive    Boolean @default(true) @map("is_active")
 
@@ -763,677 +763,9 @@ model Uc1ActionHub {
   @@map("uc1_roofing_actionhub")
 }
 
-// =====================================================================
-// UC2 — DIDI (Dulong Downs project coordinator)
-// =====================================================================
-
-model Uc2RefBudget {
-  id              Int     @id @default(autoincrement())
-  category        String  @unique
-  budgetAllocated Float @default(0) @map("budget_allocated")
-  notes           String  @default("")
-
-  budgets Uc2Budget[]
-
-  @@map("uc2_didi_refbudget")
-}
-
-model Uc2RefCategory {
-  id          Int     @id @default(autoincrement())
-  name        String  @unique
-  type        String  @default("")
-  description String  @default("")
-
-  actions      Uc2ActionHub[]
-  decisions    Uc2Decision[]
-  procurements Uc2Procurement[]
-
-  @@map("uc2_didi_refcategory")
-}
-
-model Uc2RefZone {
-  id          Int     @id @default(autoincrement())
-  name        String  @unique
-  description String  @default("")
-  areaSqm     Float @default(0) @map("area_sqm")
-
-  actions   Uc2ActionHub[]
-  documents Uc2Document[]
-  rooms     Uc2RoomMatrix[]
-
-  @@map("uc2_didi_refzone")
-}
-
-model Uc2Metadata {
-  id        Int      @id @default(autoincrement())
-  key       String   @unique
-  value     String
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("uc2_didi_metadata")
-}
-
-model Uc2ActionHub {
-  id         Int       @id @default(autoincrement())
-  action     String
-  owner      String
-  dueDate    DateTime? @map("due_date")
-  status     String    @default("open")
-  priority   String    @default("medium")
-  categoryId Int?      @map("category_id")
-  zoneId     Int?      @map("zone_id")
-  notes      String    @default("")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-
-  category Uc2RefCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  zone     Uc2RefZone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
-
-  @@map("uc2_didi_actionhub")
-}
-
-model Uc2Budget {
-  id          Int      @id @default(autoincrement())
-  categoryId  Int?     @map("category_id")
-  phase       String   @default("")
-  description String   @default("")
-  estimated   Float  @default(0)
-  actual      Float  @default(0)
-  committed   Float  @default(0)
-
-  category Uc2RefBudget? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  @@map("uc2_didi_budget")
-}
-
-model Uc2Cashflow {
-  id        Int     @id @default(autoincrement())
-  period    String
-  projected Float @default(0)
-  actual    Float @default(0)
-  notes     String  @default("")
-
-  @@map("uc2_didi_cashflow")
-}
-
-model Uc2ChangeLog {
-  id          Int      @id @default(autoincrement())
-  tableName   String   @map("table_name")
-  recordId    String   @map("record_id")
-  field       String
-  oldValue    String   @default("") @map("old_value")
-  newValue    String   @default("") @map("new_value")
-  changedBy   String   @default("Didi AI") @map("changed_by")
-  confirmedBy String   @default("") @map("confirmed_by")
-  timestamp   DateTime @default(now())
-
-  @@map("uc2_didi_changelog")
-}
-
-model Uc2Decision {
-  id          Int       @id @default(autoincrement())
-  description String
-  madeBy      String    @map("made_by")
-  date        DateTime?
-  status      String    @default("confirmed")
-  rationale   String    @default("")
-  categoryId  Int?      @map("category_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
-
-  category Uc2RefCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  @@map("uc2_didi_decision")
-}
-
-model Uc2Document {
-  id         Int       @id @default(autoincrement())
-  name       String
-  docType    String    @default("") @map("doc_type")
-  version    String    @default("1.0")
-  zoneId     Int?      @map("zone_id")
-  url        String    @default("")
-  uploadDate DateTime? @map("upload_date")
-  notes      String    @default("")
-
-  zone Uc2RefZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
-
-  @@map("uc2_didi_document")
-}
-
-model Uc2Procurement {
-  id         Int       @id @default(autoincrement())
-  item       String
-  vendorName String    @map("vendor_name")
-  quantity   Float   @default(1)
-  unitPrice  Float   @default(0) @map("unit_price")
-  total      Float   @default(0)
-  status     String    @default("pending")
-  dueDate    DateTime? @map("due_date")
-  categoryId Int?      @map("category_id")
-  notes      String    @default("")
-  createdAt  DateTime  @default(now()) @map("created_at")
-
-  category Uc2RefCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  @@map("uc2_didi_procurement")
-}
-
-model Uc2ProjectPhase {
-  id             Int       @id @default(autoincrement())
-  name           String
-  status         String    @default("not_started")
-  startDate      DateTime? @map("start_date")
-  endDate        DateTime? @map("end_date")
-  completionPct  Int       @default(0) @map("completion_pct")
-  budgetEstimate Float   @default(0) @map("budget_estimate")
-  order          Int       @default(0)
-  notes          String    @default("")
-
-  projectPlans Uc2ProjectPlan[]
-
-  @@map("uc2_didi_projectphase")
-}
-
-model Uc2ProjectPlan {
-  id          Int       @id @default(autoincrement())
-  task        String
-  phaseId     Int?      @map("phase_id")
-  owner       String    @default("")
-  startDate   DateTime? @map("start_date")
-  endDate     DateTime? @map("end_date")
-  status      String    @default("not_started")
-  pctComplete Int       @default(0) @map("pct_complete")
-  notes       String    @default("")
-
-  phase Uc2ProjectPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
-
-  @@map("uc2_didi_projectplan")
-}
-
-model Uc2RoomMatrix {
-  id            Int     @id @default(autoincrement())
-  zoneId        Int?    @map("zone_id")
-  roomName      String  @map("room_name")
-  areaSqm       Float @default(0) @map("area_sqm")
-  floorFinish   String  @default("") @map("floor_finish")
-  wallFinish    String  @default("") @map("wall_finish")
-  ceilingHeight Float @default(2.7) @map("ceiling_height")
-  notes         String  @default("")
-
-  zone Uc2RefZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
-
-  @@map("uc2_didi_roommatrix")
-}
-
-model Uc2Vendor {
-  id       Int     @id @default(autoincrement())
-  name     String  @unique
-  category String  @default("")
-  contact  String  @default("")
-  email    String  @default("")
-  phone    String  @default("")
-  rating   Float @default(5.0)
-  notes    String  @default("")
-  isActive Boolean @default(true) @map("is_active")
-
-  @@map("uc2_didi_vendor")
-}
-
-model Uc2ExecutionLog {
-  id         Int      @id @default(autoincrement())
-  toolName   String   @map("tool_name")
-  payload    String
-  result     String
-  status     String   @default("success")
-  durationMs Int      @default(0) @map("duration_ms")
-  sessionId  String   @default("") @map("session_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  @@map("uc2_didi_executionlog")
-}
-
-model Uc2Hypothesis {
-  id            Int       @id @default(autoincrement())
-  description   String
-  sourceSession String    @default("") @map("source_session")
-  evidence      String    @default("")
-  status        String    @default("pending")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  reviewedAt    DateTime? @map("reviewed_at")
-  reviewedBy    String    @default("") @map("reviewed_by")
-
-  rules Uc2LearningRule[]
-
-  @@map("uc2_didi_hypothesis")
-}
-
-model Uc2LearningRule {
-  id             Int      @id @default(autoincrement())
-  ruleCode       String   @unique @map("rule_code")
-  description    String
-  category       String   @default("")
-  isActive       Boolean  @default(true) @map("is_active")
-  cannotOverride Boolean  @default(false) @map("cannot_override")
-  sourceId       Int?     @map("source_id")
-  createdAt      DateTime @default(now()) @map("created_at")
-
-  source Uc2Hypothesis? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-
-  @@map("uc2_didi_learningrule")
-}
-
-model Uc2ChatSession {
-  id        Int       @id @default(autoincrement())
-  sessionId String    @unique @map("session_id")
-  startedAt DateTime  @default(now()) @map("started_at")
-  closedAt  DateTime? @map("closed_at")
-  summary   String    @default("")
-
-  messages Uc2ChatMessage[]
-
-  @@map("uc2_didi_chatsession")
-}
-
-model Uc2ChatMessage {
-  id                Int      @id @default(autoincrement())
-  sessionId         Int      @map("session_id")
-  role              String
-  content           String
-  toolCalls         String   @default("[]") @map("tool_calls")
-  hasProposal       Boolean  @default(false) @map("has_proposal")
-  proposalConfirmed Boolean  @default(false) @map("proposal_confirmed")
-  createdAt         DateTime @default(now()) @map("created_at")
-
-  session Uc2ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@map("uc2_didi_chatmessage")
-}
 
 // =====================================================================
-// UC3 — MSME (multi-tenant construction project coordinator)
-// =====================================================================
-
-model Uc3Tenant {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  orgId     String   @unique @map("org_id")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  projects               Uc3Project[]
-  phases                 Uc3Phase[]
-  actions                Uc3ActionItem[]
-  risks                  Uc3Risk[]
-  budgets                Uc3Budget[]
-  vendors                Uc3Vendor[]
-  decisions              Uc3Decision[]
-  documents              Uc3Document[]
-  cashflows              Uc3Cashflow[]
-  users                  Uc3TenantUser[]
-  execLogs               Uc3ExecutionLog[]
-  chatMessages           Uc3ChatMessage[]
-  variations             Uc3VariationOrder[]
-  portalTokens           Uc3ClientPortalToken[]
-  accountingConnections  Uc3AccountingConnection[]
-  weeklyReports          Uc3WeeklyReport[]
-  meetingMinutes         Uc3MeetingMinutes[]
-  bimModels              Uc3BimModel[]
-
-  @@map("uc3_msme_tenant")
-}
-
-model Uc3Project {
-  id          Int       @id @default(autoincrement())
-  tenantId    Int       @map("tenant_id")
-  name        String
-  client      String    @default("")
-  status      String    @default("planning")
-  startDate   DateTime? @map("start_date")
-  endDate     DateTime? @map("end_date")
-  description String    @default("")
-  healthScore Int       @default(50) @map("health_score")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  tenant         Uc3Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  phases         Uc3Phase[]
-  actions        Uc3ActionItem[]
-  risks          Uc3Risk[]
-  budgets        Uc3Budget[]
-  decisions      Uc3Decision[]
-  documents      Uc3Document[]
-  cashflows      Uc3Cashflow[]
-  variations     Uc3VariationOrder[]
-  portalTokens   Uc3ClientPortalToken[]
-  weeklyReports  Uc3WeeklyReport[]
-  meetingMinutes Uc3MeetingMinutes[]
-  execLogs       Uc3ExecutionLog[]
-  chatMessages   Uc3ChatMessage[]
-  bimModels      Uc3BimModel[]
-
-  @@index([createdAt])
-  @@map("uc3_msme_project")
-}
-
-model Uc3Phase {
-  id            Int       @id @default(autoincrement())
-  projectId     Int       @map("project_id")
-  tenantId      Int       @map("tenant_id")
-  name          String
-  status        String    @default("not_started")
-  completionPct Int       @default(0) @map("completion_pct")
-  startDate     DateTime? @map("start_date")
-  endDate       DateTime? @map("end_date")
-  order         Int       @default(0)
-  isAiDraft     Boolean   @default(false) @map("is_ai_draft")
-  approvedBy    String    @default("") @map("approved_by")
-
-  project Uc3Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  actions Uc3ActionItem[]
-  budgets Uc3Budget[]
-
-  @@map("uc3_msme_phase")
-}
-
-model Uc3ActionItem {
-  id          Int       @id @default(autoincrement())
-  projectId   Int       @map("project_id")
-  phaseId     Int?      @map("phase_id")
-  tenantId    Int       @map("tenant_id")
-  title       String
-  description String    @default("")
-  owner       String    @default("")
-  dueDate     DateTime? @map("due_date")
-  priority    String    @default("medium")
-  status      String    @default("open")
-  createdByAi Boolean   @default(false) @map("created_by_ai")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  phase   Uc3Phase?  @relation(fields: [phaseId], references: [id], onDelete: SetNull)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_actionitem")
-}
-
-model Uc3Risk {
-  id             Int       @id @default(autoincrement())
-  projectId      Int       @map("project_id")
-  tenantId       Int       @map("tenant_id")
-  description    String
-  likelihood     Int
-  impact         Int
-  mitigation     String    @default("")
-  status         String    @default("open")
-  owner          String    @default("")
-  createdByAi    Boolean   @default(false) @map("created_by_ai")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  escalatedAt    DateTime? @map("escalated_at")
-  escalationNote String    @default("") @map("escalation_note")
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_risk")
-}
-
-model Uc3Budget {
-  id          Int     @id @default(autoincrement())
-  projectId   Int     @map("project_id")
-  phaseId     Int?    @map("phase_id")
-  tenantId    Int     @map("tenant_id")
-  description String
-  estimated   Float @default(0)
-  actual      Float @default(0)
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  phase   Uc3Phase?  @relation(fields: [phaseId], references: [id], onDelete: SetNull)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_budget")
-}
-
-model Uc3Vendor {
-  id           Int     @id @default(autoincrement())
-  tenantId     Int     @map("tenant_id")
-  name         String
-  category     String  @default("")
-  contactName  String  @default("") @map("contact_name")
-  contactEmail String  @default("") @map("contact_email")
-  contactPhone String  @default("") @map("contact_phone")
-  rating       Int     @default(8)
-  notes        String  @default("")
-  isActive     Boolean @default(true) @map("is_active")
-
-  tenant Uc3Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_vendor")
-}
-
-model Uc3Decision {
-  id          Int       @id @default(autoincrement())
-  projectId   Int       @map("project_id")
-  tenantId    Int       @map("tenant_id")
-  description String
-  rationale   String    @default("")
-  status      String    @default("draft")
-  isAiDraft   Boolean   @default(false) @map("is_ai_draft")
-  draftedBy   String    @default("AI") @map("drafted_by")
-  confirmedBy String    @default("") @map("confirmed_by")
-  confirmedAt DateTime? @map("confirmed_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_decision")
-}
-
-model Uc3Document {
-  id          Int       @id @default(autoincrement())
-  projectId   Int       @map("project_id")
-  tenantId    Int       @map("tenant_id")
-  name        String
-  docType     String    @default("") @map("doc_type")
-  version     String    @default("1.0")
-  uploadDate  DateTime? @map("upload_date")
-  uploadedBy  String    @default("") @map("uploaded_by")
-  notes       String    @default("")
-  fileContent String    @default("") @map("file_content")
-  aiAnalysis  String    @default("") @map("ai_analysis")
-  analyzedAt  DateTime? @map("analyzed_at")
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_document")
-}
-
-model Uc3BimModel {
-  id            Int      @id @default(autoincrement())
-  projectId     Int      @map("project_id")
-  tenantId      Int      @map("tenant_id")
-  name          String
-  provider      String   @default("bimx")
-  embedUrl      String   @map("embed_url")
-  clientVisible Boolean  @default(false) @map("client_visible")
-  addedBy       String   @default("") @map("added_by")
-  notes         String   @default("")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@map("uc3_msme_bimmodel")
-}
-
-model Uc3Cashflow {
-  id        Int     @id @default(autoincrement())
-  projectId Int     @map("project_id")
-  tenantId  Int     @map("tenant_id")
-  period    String
-  projected Float @default(0)
-  actual    Float @default(0)
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_cashflow")
-}
-
-model Uc3TenantUser {
-  id         Int      @id @default(autoincrement())
-  tenantId   Int      @map("tenant_id")
-  email      String
-  name       String
-  role       String   @default("readonly")
-  mfaEnabled Boolean  @default(false) @map("mfa_enabled")
-  isActive   Boolean  @default(true) @map("is_active")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  tenant Uc3Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, email])
-  @@map("uc3_msme_tenantuser")
-}
-
-model Uc3ExecutionLog {
-  id          Int      @id @default(autoincrement())
-  tenantId    Int?     @map("tenant_id")
-  projectId   Int?     @map("project_id")
-  toolName    String   @map("tool_name")
-  payload     String
-  result      String
-  status      String   @default("success")
-  aiAuthority String   @default("") @map("ai_authority")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  tenant  Uc3Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project Uc3Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-
-  @@index([createdAt])
-  @@map("uc3_msme_executionlog")
-}
-
-model Uc3ChatMessage {
-  id              Int      @id @default(autoincrement())
-  tenantId        Int?     @map("tenant_id")
-  projectId       Int?     @map("project_id")
-  role            String
-  content         String
-  requiresApproval Boolean @default(false) @map("requires_approval")
-  approved        Boolean  @default(false)
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  tenant  Uc3Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project Uc3Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-
-  @@map("uc3_msme_chatmessage")
-}
-
-model Uc3VariationOrder {
-  id            Int       @id @default(autoincrement())
-  projectId     Int       @map("project_id")
-  tenantId      Int       @map("tenant_id")
-  refNumber     String    @default("") @map("ref_number")
-  title         String
-  description   String
-  scopeChange   String    @default("") @map("scope_change")
-  costImpact    Float   @default(0) @map("cost_impact")
-  timeImpactDays Int      @default(0) @map("time_impact_days")
-  status        String    @default("draft")
-  isAiDrafted   Boolean   @default(false) @map("is_ai_drafted")
-  submittedBy   String    @default("") @map("submitted_by")
-  approvedBy    String    @default("") @map("approved_by")
-  approvedAt    DateTime? @map("approved_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_variationorder")
-}
-
-model Uc3ClientPortalToken {
-  id         Int       @id @default(autoincrement())
-  projectId  Int       @map("project_id")
-  tenantId   Int       @map("tenant_id")
-  token      String    @unique
-  label      String    @default("")
-  isActive   Boolean   @default(true) @map("is_active")
-  viewsCount Int       @default(0) @map("views_count")
-  expiresAt  DateTime? @map("expires_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_clientportaltoken")
-}
-
-model Uc3AccountingConnection {
-  id             Int       @id @default(autoincrement())
-  tenantId       Int       @map("tenant_id")
-  provider       String    @default("xero")
-  status         String    @default("disconnected")
-  orgName        String    @default("") @map("org_name")
-  accessToken    String    @default("") @map("access_token")
-  lastSync       DateTime? @map("last_sync")
-  syncLog        String    @default("") @map("sync_log")
-  recordsSynced  Int       @default(0) @map("records_synced")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-
-  tenant Uc3Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_accountingconnection")
-}
-
-model Uc3WeeklyReport {
-  id            Int       @id @default(autoincrement())
-  projectId     Int       @map("project_id")
-  tenantId      Int       @map("tenant_id")
-  weekEnding    DateTime  @map("week_ending")
-  title         String    @default("")
-  content       String
-  isAiGenerated Boolean   @default(true) @map("is_ai_generated")
-  status        String    @default("draft")
-  generatedAt   DateTime  @default(now()) @map("generated_at")
-  approvedBy    String    @default("") @map("approved_by")
-  approvedAt    DateTime? @map("approved_at")
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_weeklyreport")
-}
-
-model Uc3MeetingMinutes {
-  id               Int      @id @default(autoincrement())
-  projectId        Int      @map("project_id")
-  tenantId         Int      @map("tenant_id")
-  meetingDate      DateTime @map("meeting_date")
-  title            String   @default("")
-  attendees        String   @default("")
-  rawMinutes       String   @map("raw_minutes")
-  extractedActions String   @default("[]") @map("extracted_actions")
-  actionsCount     Int      @default(0) @map("actions_count")
-  status           String   @default("raw")
-  createdAt        DateTime @default(now()) @map("created_at")
-
-  project Uc3Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant  Uc3Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("uc3_msme_meetingminutes")
-}
-
-// =====================================================================
-// PLATFORM — three-tier architecture (Platform Architecture doc, June 2026)
+// PLATFORM â€” three-tier architecture (Platform Architecture doc, June 2026)
 // Core tier (plat_core_*):   identical schema for every customer instance.
 // Domain tier (plat_con_*):  construction vertical extension.
 // Config tier (plat_cfg_*):  customer-specific configuration.
@@ -1441,7 +773,7 @@ model Uc3MeetingMinutes {
 // schema generator keeps working; money is Decimal as elsewhere.
 // =====================================================================
 
-// ── Core tier ────────────────────────────────────────────────────────
+// â”€â”€ Core tier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model PlatOrganisation {
   id                     Int      @id @default(autoincrement())
@@ -1820,7 +1152,7 @@ model PlatChatMessage {
   @@map("plat_core_chatmessage")
 }
 
-// ── Domain extension tier — construction ─────────────────────────────
+// â”€â”€ Domain extension tier â€” construction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model PlatConPhase {
   id            Int       @id @default(autoincrement())
@@ -2089,7 +1421,7 @@ model PlatConAccountingConnection {
   @@map("plat_con_accountingconnection")
 }
 
-// ── Customer configuration tier ──────────────────────────────────────
+// â”€â”€ Customer configuration tier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model PlatCfgTeamMember {
   id        Int      @id @default(autoincrement())
