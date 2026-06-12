@@ -26,6 +26,7 @@ export function buildNav(ctx: OrgCtx, jobCount: number): NavSection[] {
     {
       heading: "Delivery",
       items: [
+        { href: p("/assess"), label: "New Assessment" },
         ...(multiJob ? [{ href: p("/projects"), label: "Projects" }] : []),
         { href: p("/phases"), label: "Phases" },
         { href: p("/actions"), label: "Actions" },

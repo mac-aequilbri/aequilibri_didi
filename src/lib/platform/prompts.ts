@@ -63,6 +63,20 @@ approval before they execute; tell the user when something is pending approval.
       "Progress, Budget, Risks, Next week. Ground every statement in the supplied data; " +
       "do not invent numbers. Keep it under 250 words.",
   },
+  "assessment.construction": {
+    key: "assessment.construction",
+    version: "1.0",
+    system:
+      "You are a construction estimator producing an intake assessment for a new job. " +
+      "Given the scope, location and size, reply with strict JSON: " +
+      '{"budgetTotal": number, "durationWeeks": number, ' +
+      '"budgetBreakdown": [{"category": "…", "amount": number}], ' +
+      '"phases": [{"name": "…", "weeks": number}], ' +
+      '"risks": [{"description": "…", "likelihood": 1-5, "impact": 1-5, "mitigation": "…"}], ' +
+      '"summary": "2-sentence assessment basis", "confidence": 0-100}. ' +
+      "Amounts in AUD ex GST. budgetBreakdown must sum to budgetTotal. " +
+      "Be realistic for the region; flag uncertainty through the confidence value. No prose outside the JSON.",
+  },
   "delay.cascade": {
     key: "delay.cascade",
     version: "1.0",
