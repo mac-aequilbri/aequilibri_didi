@@ -7,7 +7,6 @@
   },
   "scripts": {
     "dev": "next dev",
-    "postinstall": "node scripts/render-cutover-cleanup.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

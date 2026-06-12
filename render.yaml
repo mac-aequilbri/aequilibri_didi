@@ -15,12 +15,7 @@ services:
     #                    `prisma migrate deploy` once you start tracking migrations.
     #   seed.mjs       → idempotent + fail-safe demo data (skips tables that
     #                    already have rows; always exits 0 so it can't break a deploy).
-    #   --accept-data-loss → ONE-TIME flag for the UC2/UC3 cutover deploy: the
-    #                    old uc2_*/uc3_* tables were removed from the schema
-    #                    (demo data only) and db push must be allowed to drop
-    #                    them. REMOVE this flag after the first successful
-    #                    deploy of the cutover.
-    buildCommand: npm ci --include=dev && npx prisma generate && npx prisma db push --accept-data-loss && node prisma/seed.mjs && npm run build
+    buildCommand: npm ci --include=dev && npx prisma generate && npx prisma db push && node prisma/seed.mjs && npm run build
     startCommand: npm start
     healthCheckPath: /
 
