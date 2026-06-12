@@ -8,6 +8,7 @@ import { currency } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { getAssessment } from "@/services/platform/construction/assess";
 import { acceptAssessmentAction, runAssessmentAction } from "./actions";
+import { AcceptAssessmentButton, RunAssessmentButton } from "./SubmitButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function AssessPage({
       />
 
       {!assessment && (
-        <form action={runAssessmentAction} className="ae-card p-5 space-y-4">
+        <form action={runAssessmentAction} className="ae-card p-5 space-y-4 relative">
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <label className="block text-sm">
             <span className="text-neutral-600">Job name *</span>
@@ -73,9 +74,7 @@ export default async function AssessPage({
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
             />
           </label>
-          <button type="submit" className="btn-ae">
-            Run assessment
-          </button>
+          <RunAssessmentButton />
         </form>
       )}
 
@@ -187,7 +186,7 @@ export default async function AssessPage({
             </div>
           </section>
 
-          <section className="ae-card p-5">
+          <section className="ae-card p-5 relative">
             <form action={acceptAssessmentAction} className="flex flex-wrap items-end gap-4">
               <input type="hidden" name="org" value={ctx.orgSlug} />
               <input type="hidden" name="assessmentId" value={run} />
@@ -201,9 +200,7 @@ export default async function AssessPage({
                   className="mt-1 w-48 rounded border border-neutral-300 px-3 py-2"
                 />
               </label>
-              <button type="submit" className="btn-ae">
-                Accept — create job
-              </button>
+              <AcceptAssessmentButton />
               <a href={`/app/${ctx.orgSlug}/assess`} className="btn-ae-outline">
                 Discard / start over
               </a>
