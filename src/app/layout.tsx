@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Montserrat } from "next/font/google";
 import Link from "next/link";
+import { ClerkProvider, Show, UserButton } from "@clerk/nextjs";
+import { clerkEnabled } from "@/lib/platform/authConfig";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -17,7 +19,8 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return (
+  const withAuth = clerkEnabled();
+  const body = (
     <html lang="en" className={`${montserrat.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         <nav className="ae-navbar">
@@ -34,6 +37,13 @@ export default function RootLayout({
             <Link href="/app" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
               <span className="uc-badge uc3-badge mr-1">UC3</span> MSME
             </Link>
+            {withAuth && (
+              <div className="ml-auto">
+                <Show when="signed-in">
+                  <UserButton />
+                </Show>
+              </div>
+            )}
           </div>
         </nav>
         <div className="flex-1">{children}</div>
@@ -41,4 +51,5 @@ export default function RootLayout({
       </body>
     </html>
   );
+  return withAuth ? <ClerkProvider>{body}</ClerkProvider> : body;
 }

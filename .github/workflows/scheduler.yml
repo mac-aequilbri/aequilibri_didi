@@ -1,0 +1,36 @@
+# Platform automation heartbeat — fills the architecture doc's n8n role with
+# zero extra infrastructure: hourly trigger of the scheduler endpoint, which
+# runs the correction-processing pipeline, periodic Intelligence Snapshots,
+# and (opt-in per org) Monday weekly-report drafts.
+#
+# Setup (one-time):
+#   1. Set CRON_SECRET on the Render service (any long random string).
+#   2. Add the same value as a GitHub Actions secret named CRON_SECRET.
+# Until both exist, runs no-op gracefully (endpoint answers 503).
+
+name: platform-scheduler
+
+on:
+  schedule:
+    - cron: "17 * * * *" # hourly, off the whole-hour rush
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger scheduler endpoint
+        run: |
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "CRON_SECRET not configured — skipping."
+            exit 0
+          fi
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            --max-time 280 \
+            "https://aequilibri-next.onrender.com/api/platform/scheduler" || {
+              echo "Scheduler call failed (free-tier cold start is the usual cause; next hourly run retries)."
+              exit 0
+            }
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

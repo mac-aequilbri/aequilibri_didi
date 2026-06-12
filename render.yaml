@@ -30,6 +30,16 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
 
+      # ── Auth (Clerk; omit BOTH for open demo mode) ─────────────────────────
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+
+      # ── Automation (scheduler endpoint token; omit to disable) ─────────────
+      - key: CRON_SECRET
+        sync: false
+
       # ── Google APIs (UC1 only — omit if only deploying UC2/UC3) ───────────
       - key: GOOGLE_MAPS_API_KEY
         sync: false

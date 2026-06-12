@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { clerkEnabled } from "@/lib/platform/authConfig";
 import { AiAuthority, DEFAULT_FEATURES, EngagementType } from "@/lib/platform/types";
 import { provisionOrganisation } from "@/services/platform/onboarding";
 
@@ -24,6 +25,17 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
       .map((l) => l.trim())
       .filter(Boolean);
 
+  // With Clerk active, default the first admin to the signing-in user so the
+  // creator is a member of (and can access) the org they just provisioned.
+  let adminName = String(formData.get("adminName") ?? "");
+  let adminEmail = String(formData.get("adminEmail") ?? "");
+  if (clerkEnabled() && !adminEmail.trim()) {
+    const { currentUser } = await import("@clerk/nextjs/server");
+    const user = await currentUser();
+    adminEmail = user?.primaryEmailAddress?.emailAddress ?? "";
+    adminName = adminName.trim() || user?.fullName || adminEmail.split("@")[0] || "Admin";
+  }
+
   const result = await provisionOrganisation({
     slug: String(formData.get("slug") ?? ""),
     name: String(formData.get("name") ?? ""),
@@ -37,8 +49,8 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
     assistantName: String(formData.get("assistantName") ?? ""),
     assistantPersona: String(formData.get("assistantPersona") ?? ""),
     features,
-    adminName: String(formData.get("adminName") ?? ""),
-    adminEmail: String(formData.get("adminEmail") ?? ""),
+    adminName,
+    adminEmail,
     budgetCategories: lines("budgetCategories"),
     initialRules: lines("initialRules"),
   });
