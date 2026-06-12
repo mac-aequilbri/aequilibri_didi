@@ -809,6 +809,7 @@ model PlatOrganisation {
   conReports      PlatConWeeklyReport[]
   conBimModels    PlatConBimModel[]
   conPortalTokens PlatConPortalToken[]
+  conPhaseEvidence PlatConPhaseEvidence[]
   conAccounting   PlatConAccountingConnection[]
   cfgTeam         PlatCfgTeamMember[]
   cfgRegions      PlatCfgRegion[]
@@ -936,6 +937,7 @@ model PlatJob {
   conReports      PlatConWeeklyReport[]
   conBimModels    PlatConBimModel[]
   conPortalTokens PlatConPortalToken[]
+  conPhaseEvidence PlatConPhaseEvidence[]
 
   @@unique([orgId, code])
   @@index([orgId, status])
@@ -1144,6 +1146,7 @@ model PlatDocument {
   job            PlatJob?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
   parentDocument PlatDocument?    @relation("PlatDocumentVersions", fields: [parentDocumentId], references: [id], onDelete: SetNull)
   versions       PlatDocument[]   @relation("PlatDocumentVersions")
+  phaseEvidence  PlatConPhaseEvidence[]
 
   @@index([orgId, status])
   @@map("plat_core_document")
@@ -1217,14 +1220,40 @@ model PlatConPhase {
   endDate       DateTime? @map("end_date") @db.Date
   isAiDraft     Boolean   @default(false) @map("is_ai_draft")
   approvedBy    String    @default("") @map("approved_by") @db.VarChar(200)
+  // AI-suggested completion from site evidence (JSON annotation). Never
+  // applied to completionPct directly — a human approves/adjusts/dismisses.
+  evidenceSuggestion String @default("{}") @map("evidence_suggestion")
   createdAt     DateTime  @default(now()) @map("created_at")
 
   org         PlatOrganisation    @relation(fields: [orgId], references: [id], onDelete: Cascade)
   job         PlatJob             @relation(fields: [jobId], references: [id], onDelete: Cascade)
   budgetLines PlatConBudgetLine[]
+  evidence    PlatConPhaseEvidence[]
 
   @@index([jobId, sortOrder])
   @@map("plat_con_phase")
+}
+
+// Site evidence (photos, documents, videos) attached to a phase — the inputs
+// the evidence-review AI reads when suggesting a completion percentage.
+model PlatConPhaseEvidence {
+  id         Int      @id @default(autoincrement())
+  orgId      Int      @map("org_id")
+  jobId      Int      @map("job_id")
+  phaseId    Int      @map("phase_id")
+  documentId Int      @map("document_id")
+  note       String   @default("") @db.VarChar(300)
+  addedBy    String   @default("") @map("added_by") @db.VarChar(200)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  org      PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job      PlatJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  phase    PlatConPhase     @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  document PlatDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([phaseId, documentId])
+  @@index([jobId])
+  @@map("plat_con_phaseevidence")
 }
 
 model PlatConBudgetLine {

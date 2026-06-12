@@ -191,6 +191,15 @@ const phaseSchema = z.object({
   endDate: optDate,
   isAiDraft: bool.default(false),
   approvedBy: str(200).default(""),
+  evidenceSuggestion: jsonStr.default("{}"),
+});
+
+const phaseEvidenceSchema = z.object({
+  jobId: id,
+  phaseId: id,
+  documentId: id,
+  note: str(300).default(""),
+  addedBy: str(200).default(""),
 });
 
 const budgetLineSchema = z.object({
@@ -327,6 +336,7 @@ const REGISTRY = {
   learning_rule: { physical: "plat_core_learningrule", delegate: d(prisma.platLearningRule), create: learningRuleSchema, update: upd(learningRuleSchema) },
   document: { physical: "plat_core_document", delegate: d(prisma.platDocument), create: documentSchema, update: upd(documentSchema) },
   phase: { physical: "plat_con_phase", delegate: d(prisma.platConPhase), create: phaseSchema, update: upd(phaseSchema) },
+  phase_evidence: { physical: "plat_con_phaseevidence", delegate: d(prisma.platConPhaseEvidence), create: phaseEvidenceSchema, update: upd(phaseEvidenceSchema) },
   budget_line: { physical: "plat_con_budgetline", delegate: d(prisma.platConBudgetLine), create: budgetLineSchema, update: upd(budgetLineSchema) },
   cashflow: { physical: "plat_con_cashflow", delegate: d(prisma.platConCashflow), create: cashflowSchema, update: upd(cashflowSchema) },
   risk: { physical: "plat_con_risk", delegate: d(prisma.platConRisk), create: riskSchema, update: upd(riskSchema) },

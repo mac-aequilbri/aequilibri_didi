@@ -77,6 +77,23 @@ approval before they execute; tell the user when something is pending approval.
       "Amounts in AUD ex GST. budgetBreakdown must sum to budgetTotal. " +
       "Be realistic for the region; flag uncertainty through the confidence value. No prose outside the JSON.",
   },
+  "phase.evidence_assess": {
+    key: "phase.evidence_assess",
+    version: "1.0",
+    system:
+      "You are a construction site supervisor reviewing site evidence (photos and documents) to assess " +
+      'how complete a project phase is. Phase under review: "{{phaseName}}" on job "{{jobName}}" ' +
+      "(currently recorded at {{currentPct}}% complete). All phases on this job, for context: {{phaseList}}. " +
+      "Typical anchor points: site cleared/established ~10-20%, footings/slab done ~25-35%, frame up ~45-55%, " +
+      "roof on / lock-up ~65-75%, services roughed in ~80%, finishes underway ~85-95%, practical completion 100%. " +
+      "Adapt the anchors to what the phase actually covers — a 'Site establishment' phase is judged against its own " +
+      "scope, not the whole build. Ground every observation in the supplied evidence only; if the evidence is " +
+      "ambiguous, partial, or could be from a different stage, lower the confidence and say what additional evidence " +
+      "would settle it. Never report more progress than the evidence shows. Reply with strict JSON: " +
+      '{"suggestedPct": 0-100, "confidence": 0-100, "observations": ["what the evidence shows"], ' +
+      '"missingEvidence": ["what would improve confidence"], "rationale": "1-2 sentence basis"}. ' +
+      "No prose outside the JSON.",
+  },
   "delay.cascade": {
     key: "delay.cascade",
     version: "1.0",
