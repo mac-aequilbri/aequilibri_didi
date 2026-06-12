@@ -3,6 +3,7 @@
 // Intelligence Snapshots make the accumulated understanding auditable.
 
 import { prisma } from "@/lib/db";
+import { TrendChart } from "@/components/charts";
 import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -32,9 +33,10 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
     prisma.platIntelligenceSnapshot.findMany({
       where: { orgId: ctx.orgId },
       orderBy: { capturedAt: "desc" },
-      take: 5,
+      take: 24,
     }),
   ]);
+  const trajectory = [...snapshots].reverse();
 
   const active = rules.filter((r) => r.isActive);
   const avgConfidence = active.length
@@ -159,6 +161,36 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
         </table>
       </section>
 
+      {trajectory.length >= 2 && (
+        <section className="ae-card p-5 mb-6">
+          <h2 className="font-semibold mb-3">Confidence trajectory</h2>
+          <TrendChart
+            series={[
+              {
+                name: "Avg rule confidence",
+                points: trajectory.map((s) => ({
+                  label: s.capturedAt.toISOString().slice(5, 10),
+                  value: s.avgConfidence,
+                })),
+              },
+              ...(trajectory.some((s) => s.accuracyRatePct != null)
+                ? [
+                    {
+                      name: "Accuracy %",
+                      points: trajectory
+                        .filter((s) => s.accuracyRatePct != null)
+                        .map((s) => ({
+                          label: s.capturedAt.toISOString().slice(5, 10),
+                          value: s.accuracyRatePct!,
+                        })),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </section>
+      )}
+
       <section className="ae-card p-5">
         <h2 className="font-semibold mb-3">Intelligence snapshots</h2>
         <table className="w-full text-sm">
@@ -172,7 +204,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
             </tr>
           </thead>
           <tbody>
-            {snapshots.map((s) => {
+            {snapshots.slice(0, 8).map((s) => {
               let gaps: string[] = [];
               try {
                 gaps = JSON.parse(s.gaps);

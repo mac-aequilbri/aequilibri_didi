@@ -1,6 +1,7 @@
 // Budget vs actual per job, with inline actual updates (human-only writes).
 
 import { prisma } from "@/lib/db";
+import { BarsCompare } from "@/components/charts";
 import { MetricCard, PageHeader } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -36,6 +37,33 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
         <MetricCard value={currency(totCommitted)} label="Committed" />
         <MetricCard value={currency(totActual)} label="Actual" />
       </div>
+
+      {(() => {
+        const byCategory = new Map<string, { primary: number; secondary: number }>();
+        for (const b of all) {
+          const key = b.category || b.description || "Other";
+          const agg = byCategory.get(key) ?? { primary: 0, secondary: 0 };
+          agg.primary += toNum(b.budgetAmount);
+          agg.secondary += toNum(b.actualAmount);
+          byCategory.set(key, agg);
+        }
+        const rows = [...byCategory.entries()]
+          .map(([label, v]) => ({ label, ...v }))
+          .sort((a, b) => b.primary - a.primary)
+          .slice(0, 10);
+        if (!rows.length) return null;
+        return (
+          <section className="ae-card p-5 mb-6">
+            <h2 className="font-semibold mb-3">Budget vs actual by category</h2>
+            <BarsCompare
+              rows={rows}
+              primaryLabel="Budget"
+              secondaryLabel="Actual"
+              formatValue={(n) => currency(n)}
+            />
+          </section>
+        );
+      })()}
 
       {jobs.map((job) => {
         const lines = job.conBudgets;

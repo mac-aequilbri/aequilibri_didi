@@ -1,6 +1,7 @@
 // Cashflow — projected vs actual per period per job.
 
 import { prisma } from "@/lib/db";
+import { TrendChart } from "@/components/charts";
 import { PageHeader } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -24,6 +25,39 @@ export default async function CashflowPage({ params }: { params: Promise<{ org: 
         subtitle="Projected vs actual by month."
         actions={[{ href: orgPath(ctx.orgSlug, "/cashflow/new"), label: "+ New period" }]}
       />
+
+      {(() => {
+        const byPeriod = new Map<string, { projected: number; actual: number }>();
+        for (const job of jobs) {
+          for (const c of job.conCashflows) {
+            const agg = byPeriod.get(c.period) ?? { projected: 0, actual: 0 };
+            agg.projected += toNum(c.projected);
+            agg.actual += toNum(c.actual);
+            byPeriod.set(c.period, agg);
+          }
+        }
+        const periods = [...byPeriod.entries()].sort(([a], [b]) => a.localeCompare(b));
+        if (periods.length < 2) return null;
+        return (
+          <section className="ae-card p-5 mb-6">
+            <h2 className="font-semibold mb-3">Organisation cashflow</h2>
+            <TrendChart
+              series={[
+                {
+                  name: "Projected",
+                  points: periods.map(([label, v]) => ({ label, value: v.projected })),
+                },
+                {
+                  name: "Actual",
+                  points: periods.map(([label, v]) => ({ label, value: v.actual })),
+                },
+              ]}
+              formatValue={(n) => `$${Math.round(n / 1000)}k`}
+            />
+          </section>
+        );
+      })()}
+
       {jobs.map((job) => {
         if (!job.conCashflows.length) return null;
         return (

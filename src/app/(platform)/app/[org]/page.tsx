@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { TrendChart } from "@/components/charts";
 import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -48,6 +49,19 @@ export default async function OrgDashboard({
       prisma.platLearningRule.count({ where: { orgId: ctx.orgId, isActive: true } }),
     ]);
 
+  const cashflows = await prisma.platConCashflow.findMany({
+    where: { orgId: ctx.orgId },
+    select: { period: true, projected: true, actual: true },
+  });
+  const byPeriod = new Map<string, { projected: number; actual: number }>();
+  for (const c of cashflows) {
+    const agg = byPeriod.get(c.period) ?? { projected: 0, actual: 0 };
+    agg.projected += Number(c.projected);
+    agg.actual += Number(c.actual);
+    byPeriod.set(c.period, agg);
+  }
+  const periods = [...byPeriod.entries()].sort(([a], [b]) => a.localeCompare(b));
+
   const budget = Number(budgetAgg._sum.budgetAmount ?? 0);
   const actual = Number(budgetAgg._sum.actualAmount ?? 0);
   const variancePct = budget > 0 ? Math.round(((actual - budget) / budget) * 1000) / 10 : 0;
@@ -69,6 +83,19 @@ export default async function OrgDashboard({
         <MetricCard value={pendingProposals} label="AI proposals awaiting approval" />
         <MetricCard value={activeRules} label="Active learning rules" />
       </div>
+
+      {periods.length >= 2 && (
+        <section className="ae-card p-5 mb-6">
+          <h2 className="font-semibold mb-3">Cashflow — projected vs actual</h2>
+          <TrendChart
+            series={[
+              { name: "Projected", points: periods.map(([label, v]) => ({ label, value: v.projected })) },
+              { name: "Actual", points: periods.map(([label, v]) => ({ label, value: v.actual })) },
+            ]}
+            formatValue={(n) => `$${Math.round(n / 1000)}k`}
+          />
+        </section>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="ae-card p-5">
