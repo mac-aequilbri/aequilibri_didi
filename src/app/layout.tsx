@@ -28,10 +28,10 @@ export default function RootLayout({
             <Link href="/uc1" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
               <span className="uc-badge uc1-badge mr-1">UC1</span> Roofing
             </Link>
-            <Link href="/uc2" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
+            <Link href="/app/dulong-downs" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
               <span className="uc-badge uc2-badge mr-1">UC2</span> Didi
             </Link>
-            <Link href="/uc3" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
+            <Link href="/app" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
               <span className="uc-badge uc3-badge mr-1">UC3</span> MSME
             </Link>
           </div>

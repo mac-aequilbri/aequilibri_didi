@@ -16,9 +16,24 @@ const nextConfig: NextConfig = {
       value: "frame-src 'self' https://graphisoft.com https://*.graphisoft.com",
     };
     return [
-      { source: "/uc3/:path*", headers: [bimxCsp] },
       { source: "/app/:path*", headers: [bimxCsp] },
       { source: "/portal/:path*", headers: [bimxCsp] },
+    ];
+  },
+
+  // Cutover: UC2/UC3 were rebuilt onto the shared platform core under
+  // /app/[org]. Old URLs redirect — UC2 was the single Dulong Downs
+  // instance (1:1 path mapping); UC3 was cookie-tenant based, so its deep
+  // links land on the org picker. Old public portal links keep working.
+  async redirects() {
+    return [
+      { source: "/uc2/chat", destination: "/app/dulong-downs/assistant", permanent: false },
+      { source: "/uc2/change-log", destination: "/app/dulong-downs/exec-log", permanent: false },
+      { source: "/uc2", destination: "/app/dulong-downs", permanent: false },
+      { source: "/uc2/:path*", destination: "/app/dulong-downs/:path*", permanent: false },
+      { source: "/uc3/portal/public/:token", destination: "/portal/:token", permanent: false },
+      { source: "/uc3", destination: "/app", permanent: false },
+      { source: "/uc3/:path*", destination: "/app", permanent: false },
     ];
   },
 };
