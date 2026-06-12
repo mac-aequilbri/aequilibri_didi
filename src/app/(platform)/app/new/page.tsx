@@ -1,0 +1,175 @@
+// Customer Onboarding Engine (module 1) — provision a new customer instance:
+// Instance Setup (configuration, persona, authority, features, first admin)
+// + Domain Knowledge Initialisation (expert rules captured before any jobs).
+
+import { PageHeader } from "@/components/PageHeader";
+import { DEFAULT_FEATURES } from "@/lib/platform/types";
+import { provisionOrgAction } from "./actions";
+
+export const dynamic = "force-dynamic";
+
+const FEATURE_LABELS: Record<string, string> = {
+  risks: "Risk register",
+  variations: "Variation orders",
+  reports: "Weekly reports",
+  meeting_minutes: "Meeting minutes",
+  documents: "Documents",
+  portal: "Client portal",
+  accounting: "Accounting (stub)",
+  bim: "BIMx 3D models",
+  delay_cascade: "Delay cascade",
+  procurement: "Procurement",
+  room_matrix: "Room matrix",
+  project_plan: "Project plan",
+  vendors: "Vendors",
+  learning_rules: "Learning rules",
+};
+
+const ENGAGEMENTS = [
+  ["long_project", "Long project (phases, budget vs actual, variations)"],
+  ["short_job", "Short job (scheduling, materials, invoice)"],
+  ["ongoing", "Ongoing lifecycle"],
+  ["seasonal", "Seasonal cycle"],
+] as const;
+
+export default async function NewOrganisationPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
+  return (
+    <main className="max-w-2xl mx-auto px-6 py-10">
+      <PageHeader
+        title="Onboard a new customer"
+        subtitle="Provisions a configured, ready-to-learn instance: Core tables are shared, so a new customer is configuration — not new infrastructure."
+        actions={[{ href: "/app", label: "Back to organisations", variant: "outline" }]}
+      />
+      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+
+      <form action={provisionOrgAction} className="space-y-8">
+        <section className="ae-card p-5 space-y-4">
+          <h2 className="font-semibold text-sm">1 · Instance setup</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block text-sm">
+              <span className="text-neutral-600">Customer name *</span>
+              <input name="name" required placeholder="New Builder Co" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600">URL slug *</span>
+              <input
+                name="slug"
+                required
+                pattern="[a-z0-9][a-z0-9-]+"
+                placeholder="new-builder-co"
+                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs"
+              />
+              <span className="block mt-1 text-xs text-neutral-500">Becomes /app/&lt;slug&gt; — lowercase, hyphens.</span>
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600">Default engagement type</span>
+              <select name="defaultEngagementType" defaultValue="long_project" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+                {ENGAGEMENTS.map(([value]) => (
+                  <option key={value} value={value}>
+                    {value.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600">AI write authority</span>
+              <select name="aiAuthority" defaultValue="approve_required" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+                <option value="propose_only">Propose only — every AI write needs approval</option>
+                <option value="approve_required">Approval required — every AI write needs approval</option>
+                <option value="auto_low_risk">Auto low-risk — actions/decisions apply, big writes need approval</option>
+              </select>
+            </label>
+          </div>
+          <fieldset className="text-sm">
+            <legend className="text-neutral-600 mb-1">Allowed engagement types</legend>
+            <div className="grid grid-cols-2 gap-1">
+              {ENGAGEMENTS.map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" name={`engagement_${value}`} defaultChecked={value === "long_project" || value === "short_job"} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block text-sm">
+              <span className="text-neutral-600">First admin name</span>
+              <input name="adminName" placeholder="Pat Builder" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600">Admin email</span>
+              <input type="email" name="adminEmail" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            </label>
+          </div>
+        </section>
+
+        <section className="ae-card p-5 space-y-4">
+          <h2 className="font-semibold text-sm">2 · Assistant & features</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block text-sm">
+              <span className="text-neutral-600">Assistant name</span>
+              <input name="assistantName" placeholder="Site Assistant" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            </label>
+          </div>
+          <label className="block text-sm">
+            <span className="text-neutral-600">Assistant persona</span>
+            <textarea
+              name="assistantPersona"
+              rows={2}
+              placeholder="You are the AI project coordinator for New Builder Co. Be concise and practical."
+              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+            />
+          </label>
+          <fieldset className="text-sm">
+            <legend className="text-neutral-600 mb-1">Enabled screens</legend>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+              {Object.keys(DEFAULT_FEATURES).map((key) => (
+                <label key={key} className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" name={`feature_${key}`} defaultChecked={DEFAULT_FEATURES[key]} />
+                  {FEATURE_LABELS[key] ?? key}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        </section>
+
+        <section className="ae-card p-5 space-y-4">
+          <h2 className="font-semibold text-sm">3 · Domain knowledge initialisation</h2>
+          <p className="text-xs text-neutral-500">
+            Encode the customer&apos;s expertise before any jobs run — these become active guidance
+            rules the assistant follows from the first session, and the learning loop refines them
+            from there.
+          </p>
+          <label className="block text-sm">
+            <span className="text-neutral-600">Initial rules of thumb (one per line)</span>
+            <textarea
+              name="initialRules"
+              rows={4}
+              placeholder={"Always allow 10% contingency on coastal sites\nNever schedule concrete pours on Fridays without a backup pump"}
+              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-xs font-mono"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-neutral-600">Budget categories (one per line)</span>
+            <textarea
+              name="budgetCategories"
+              rows={3}
+              placeholder={"Preliminaries\nStructure\nServices\nFinishes"}
+              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-xs font-mono"
+            />
+          </label>
+        </section>
+
+        <button type="submit" className="btn-ae">
+          Provision customer instance
+        </button>
+      </form>
+    </main>
+  );
+}

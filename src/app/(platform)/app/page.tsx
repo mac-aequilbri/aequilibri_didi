@@ -15,10 +15,17 @@ export default async function OrgPickerPage() {
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-16">
-      <h1 className="text-3xl font-bold mb-2">Choose an organisation</h1>
-      <p className="text-neutral-600 mb-10">
-        Each organisation is an isolated customer instance on the shared platform core.
-      </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Choose an organisation</h1>
+          <p className="text-neutral-600 mb-10">
+            Each organisation is an isolated customer instance on the shared platform core.
+          </p>
+        </div>
+        <Link href="/app/new" className="btn-ae">
+          + Onboard new customer
+        </Link>
+      </div>
       {orgs.length === 0 ? (
         <p className="text-sm text-neutral-500">
           No organisations found — run <code>node prisma/seed.mjs</code> to load the demo data.

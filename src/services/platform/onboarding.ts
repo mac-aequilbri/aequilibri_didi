@@ -1,0 +1,161 @@
+// Customer Onboarding Engine (module 1) — provisions a configured,
+// ready-to-learn customer instance in one transaction. Covers both
+// sub-processes from the architecture doc:
+//   Instance Setup: org row (the "clone" — Core schema is shared, so a new
+//     instance is configuration, not new tables), customer-config defaults,
+//     first admin.
+//   Domain Knowledge Initialisation: the customer's rules of thumb encoded
+//     as guidance learning rules before any jobs run, so the assistant
+//     starts with something to work from.
+
+import { prisma } from "@/lib/db";
+import { DEFAULT_FEATURES, EngagementType, AiAuthority } from "@/lib/platform/types";
+
+export interface ProvisionInput {
+  slug: string;
+  name: string;
+  vertical?: string;
+  defaultEngagementType: EngagementType;
+  allowedEngagementTypes: EngagementType[];
+  aiAuthority: AiAuthority;
+  assistantName: string;
+  assistantPersona: string;
+  features: Record<string, boolean>;
+  adminName: string;
+  adminEmail: string;
+  /** One per line from the form: budget categories for the cfg reference tier. */
+  budgetCategories: string[];
+  /** Domain knowledge init: expert rules of thumb, one per line. */
+  initialRules: string[];
+}
+
+export const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,98}$/;
+/** Slugs that collide with static routes or would be confusing. */
+const RESERVED_SLUGS = new Set(["new", "app", "portal", "api", "uc1", "uc2", "uc3"]);
+
+export function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+export type ProvisionResult =
+  | { ok: true; orgId: number; slug: string }
+  | { ok: false; error: string };
+
+export async function provisionOrganisation(input: ProvisionInput): Promise<ProvisionResult> {
+  const slug = input.slug.trim().toLowerCase();
+  if (!SLUG_RE.test(slug) || RESERVED_SLUGS.has(slug)) {
+    return { ok: false, error: "Slug must be lowercase letters/numbers/hyphens (and not a reserved word)." };
+  }
+  if (!input.name.trim()) return { ok: false, error: "Organisation name is required." };
+  if (await prisma.platOrganisation.findFirst({ where: { slug } })) {
+    return { ok: false, error: `An organisation with slug "${slug}" already exists.` };
+  }
+  const allowed = input.allowedEngagementTypes.length
+    ? input.allowedEngagementTypes
+    : [input.defaultEngagementType];
+
+  const orgId = await prisma.$transaction(async (tx) => {
+    // ── Instance Setup ──────────────────────────────────────────────
+    const org = await tx.platOrganisation.create({
+      data: {
+        slug,
+        name: input.name.trim(),
+        vertical: input.vertical ?? "construction",
+        defaultEngagementType: input.defaultEngagementType,
+        allowedEngagementTypes: JSON.stringify(allowed),
+        aiAuthority: input.aiAuthority,
+        settings: JSON.stringify({
+          assistant: {
+            name: input.assistantName.trim() || "Assistant",
+            persona:
+              input.assistantPersona.trim() ||
+              `You are the AI project coordinator for ${input.name.trim()}. Be precise, data-driven, and flag risks proactively.`,
+          },
+          features: { ...DEFAULT_FEATURES, ...input.features },
+        }),
+      },
+    });
+
+    if (input.adminName.trim()) {
+      await tx.platCfgTeamMember.create({
+        data: {
+          orgId: org.id,
+          name: input.adminName.trim(),
+          role: "admin",
+          email: input.adminEmail.trim(),
+        },
+      });
+    }
+
+    const categories = input.budgetCategories.map((c) => c.trim()).filter(Boolean);
+    if (categories.length) {
+      await tx.platCfgReference.createMany({
+        data: categories.map((name, i) => ({
+          orgId: org.id,
+          type: "budget_category",
+          code: name.toLowerCase().replace(/\s+/g, "_").slice(0, 100),
+          name,
+          sortOrder: i,
+        })),
+      });
+    }
+
+    await tx.platCfgSetting.createMany({
+      data: [
+        { orgId: org.id, key: "learning.hypothesis_min_samples", value: "3" },
+        { orgId: org.id, key: "learning.rule_min_samples", value: "5" },
+        { orgId: org.id, key: "learning.auto_apply_min_confidence", value: "85" },
+        { orgId: org.id, key: "learning.auto_apply_min_triggers", value: "50" },
+      ],
+    });
+
+    // ── Domain Knowledge Initialisation ─────────────────────────────
+    const rules = input.initialRules.map((r) => r.trim()).filter(Boolean);
+    let seq = 0;
+    for (const description of rules) {
+      seq += 1;
+      await tx.platLearningRule.create({
+        data: {
+          orgId: org.id,
+          ruleCode: `LRN-${String(seq).padStart(4, "0")}`,
+          kind: "guidance",
+          description,
+          category: "Onboarding",
+          confidence: 80, // taught directly by the customer's expert
+          isActive: true,
+          notes: "Captured during domain knowledge initialisation.",
+          dateActivated: new Date(),
+        },
+      });
+    }
+
+    await tx.platExecutionLog.create({
+      data: {
+        orgId: org.id,
+        actorType: "human",
+        actorName: input.adminName.trim() || "onboarding",
+        operation: "create",
+        targetTable: "plat_core_organisation",
+        targetId: org.id,
+        payload: JSON.stringify({
+          slug,
+          engagementTypes: allowed,
+          aiAuthority: input.aiAuthority,
+          initialRules: rules.length,
+          budgetCategories: categories.length,
+        }),
+        status: "executed",
+        executedAt: new Date(),
+        result: "Organisation provisioned (instance setup + domain knowledge init)",
+      },
+    });
+
+    return org.id;
+  });
+
+  return { ok: true, orgId, slug };
+}
