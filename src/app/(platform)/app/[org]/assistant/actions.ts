@@ -31,12 +31,12 @@ export async function resetSessionAction(formData: FormData): Promise<void> {
 export async function approveFromChatAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const execLogId = Number(formData.get("execLogId"));
-  if (execLogId) {
+  const proposalId = Number(formData.get("proposalId"));
+  if (proposalId) {
     try {
-      await executeProposal(ctx, execLogId, user.name);
+      await executeProposal(ctx, proposalId, user.name);
     } catch {
-      /* recorded as failed on the log row */
+      /* recorded as failed/expired on the pending row */
     }
   }
   revalidatePath(orgPath(ctx.orgSlug, "/assistant"));
@@ -45,10 +45,10 @@ export async function approveFromChatAction(formData: FormData): Promise<void> {
 export async function rejectFromChatAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const execLogId = Number(formData.get("execLogId"));
-  if (execLogId) {
+  const proposalId = Number(formData.get("proposalId"));
+  if (proposalId) {
     try {
-      await rejectProposal(ctx, execLogId, user.name);
+      await rejectProposal(ctx, proposalId, user.name);
     } catch {
       /* already resolved */
     }

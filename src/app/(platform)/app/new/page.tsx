@@ -2,7 +2,9 @@
 // Instance Setup (configuration, persona, authority, features, first admin)
 // + Domain Knowledge Initialisation (expert rules captured before any jobs).
 
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { DEFAULT_FEATURES } from "@/lib/platform/types";
 import { provisionOrgAction } from "./actions";
 
@@ -38,6 +40,7 @@ export default async function NewOrganisationPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+  if (!(await isPlatformAdmin())) redirect("/app?denied=admin");
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-10">

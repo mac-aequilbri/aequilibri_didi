@@ -11,8 +11,16 @@ import { Actor, OrgCtx } from "@/lib/platform/types";
 import { toNum } from "@/lib/format";
 
 async function nextRefNumber(orgId: number, jobId: number): Promise<string> {
-  const seq = (await prisma.platConVariationOrder.count({ where: { orgId, jobId } })) + 1;
-  return `VO-${String(jobId).padStart(3, "0")}-${String(seq).padStart(3, "0")}`;
+  // Max existing suffix + 1 — count-based numbering duplicates after deletes.
+  const existing = await prisma.platConVariationOrder.findMany({
+    where: { orgId, jobId },
+    select: { refNumber: true },
+  });
+  const max = existing.reduce((m, v) => {
+    const match = /-(\d+)$/.exec(v.refNumber);
+    return match ? Math.max(m, Number(match[1])) : m;
+  }, 0);
+  return `VO-${String(jobId).padStart(3, "0")}-${String(max + 1).padStart(3, "0")}`;
 }
 
 export async function aiDraftVariation(

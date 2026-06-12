@@ -9,7 +9,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { clerkEnabled } from "./authConfig";
+import { clerkEnabled, platformAdminEmails } from "./authConfig";
 import {
   AiAuthority,
   DEFAULT_FEATURES,
@@ -123,4 +123,14 @@ export async function requireAdmin(ctx: OrgCtx): Promise<CurrentUser> {
     throw new Error("This operation requires the admin role.");
   }
   return user;
+}
+
+/** Platform-operator gate: provisioning new customer organisations is an
+ *  internal operation (doc module 1), not something any signed-in user may
+ *  do. Demo mode is open by definition; with auth on, the user's email must
+ *  be in PLATFORM_ADMIN_EMAILS. */
+export async function isPlatformAdmin(): Promise<boolean> {
+  if (!clerkEnabled()) return true; // demo mode (already gated fail-closed by the proxy)
+  const email = await getAuthEmail();
+  return !!email && platformAdminEmails().includes(email);
 }

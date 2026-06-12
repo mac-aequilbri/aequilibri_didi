@@ -190,7 +190,7 @@ export default async function AssessPage({
           <section className="ae-card p-5">
             <form action={acceptAssessmentAction} className="flex flex-wrap items-end gap-4">
               <input type="hidden" name="org" value={ctx.orgSlug} />
-              <input type="hidden" name="execLogId" value={run} />
+              <input type="hidden" name="assessmentId" value={run} />
               <label className="block text-sm">
                 <span className="text-neutral-600">Final budget total (edit to correct the AI)</span>
                 <input

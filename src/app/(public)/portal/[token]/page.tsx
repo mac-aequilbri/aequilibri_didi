@@ -2,7 +2,7 @@
 // by the token (64-char, unique, expirable, deactivatable); every query below
 // is scoped to the token's org + job, never to a session. No financial data.
 
-import { prisma } from "@/lib/db";
+import { prisma, prismaUnscoped } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { BimxViewer } from "@/components/BimxViewer";
 
@@ -39,7 +39,9 @@ export default async function PublicPortalPage({
   const { token } = await params;
   if (!token || token.length < 32) return <ExpiredPage />;
 
-  const tokenRecord = await prisma.platConPortalToken
+  // Deliberate cross-org lookup: the token itself is the credential, so this
+  // is the one read that cannot be org-scoped (hence prismaUnscoped).
+  const tokenRecord = await prismaUnscoped.platConPortalToken
     .findFirst({ where: { token } })
     .catch(() => null);
   if (!tokenRecord || !tokenRecord.isActive) return <ExpiredPage />;

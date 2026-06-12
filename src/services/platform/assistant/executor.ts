@@ -1,14 +1,13 @@
 // Executes assistant tool calls. Reads run directly (org-scoped); writes go
 // through recordWriter under the org's aiAuthority policy — executed
-// immediately or persisted as a "proposed" ExecutionLog row for human
-// approval. This is the step UC2/UC3 never had: tagged chat outputs become
-// real database rows.
+// immediately or queued as a PlatPendingWrite proposal for human approval.
+// This is the step UC2/UC3 never had: tagged chat outputs become real
+// database rows.
 
 import { prisma } from "@/lib/db";
 import type { ToolUse } from "@/lib/claude";
 import { writeRecord, WritableTable } from "@/lib/platform/recordWriter";
 import { Actor, AiAuthority, OrgCtx } from "@/lib/platform/types";
-import { nextRuleCode } from "../learning";
 import { TOOL_POLICY } from "./tools";
 
 export interface ToolOutcome {
@@ -17,11 +16,12 @@ export interface ToolOutcome {
   /** Sent back to the model as the tool_result content. */
   summary: string;
   status?: "executed" | "proposed";
-  execLogId?: number;
+  proposalId?: number;
   recordId?: number;
 }
 
-function requiresApproval(authority: AiAuthority, risk: string): boolean {
+/** The aiAuthority policy matrix — exported so it can be tested directly. */
+export function requiresApproval(authority: AiAuthority, risk: string): boolean {
   if (risk === "read") return false;
   if (authority === "auto_low_risk") return risk === "high_write";
   return true; // propose_only / approve_required
@@ -97,7 +97,9 @@ async function toWriteData(
       break;
     case "propose_rule":
       data.kind = "guidance";
-      data.ruleCode = await nextRuleCode(ctx.orgId);
+      // Allocated at write time by recordWriter (deferred approval would
+      // invalidate a code allocated now).
+      data.ruleCode = "AUTO";
       data.notes = "Proposed by the assistant in chat.";
       break;
   }
@@ -137,9 +139,9 @@ export async function executeToolUse(
     });
     const summary =
       result.status === "proposed"
-        ? `Proposal #${result.execLogId} recorded — a human must approve before the ${op} on ${table} is applied. Tell the user it is pending approval.`
+        ? `Proposal #${result.proposalId} recorded — a human must approve before the ${op} on ${table} is applied. Tell the user it is pending approval.`
         : `${op} on ${table} executed (record id ${result.recordId}).`;
-    return { toolName: tu.name, ok: true, summary, status: result.status, execLogId: result.execLogId, recordId: result.recordId };
+    return { toolName: tu.name, ok: true, summary, status: result.status, proposalId: result.proposalId, recordId: result.recordId };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { toolName: tu.name, ok: false, summary: `Write rejected: ${message.slice(0, 400)}` };

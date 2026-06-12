@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { emitCorrection } from "@/lib/platform/corrections";
 import { geocodeProviders } from "@/lib/platform/geocode";
+import { mulMoney } from "@/lib/platform/money";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
 import { writeRecord } from "@/lib/platform/recordWriter";
@@ -193,33 +194,51 @@ export async function runConstructionAssessment(
     demoMode: res.demo_mode,
   };
 
-  const log = await prisma.platExecutionLog.create({
+  const assessment = await prisma.platAssessment.create({
     data: {
       orgId: ctx.orgId,
-      actorType: "ai",
-      actorName: "Assessment Engine",
-      operation: "generate",
-      targetTable: "assessment",
-      payload: JSON.stringify({ ...input, by: userName }),
+      name: input.name,
+      engagementType: input.engagementType,
+      address: input.address,
+      suburb,
+      sizeSqm: input.sizeSqm,
+      scope: input.scope,
       result: JSON.stringify(stored),
-      status: "executed",
-      executedAt: new Date(),
+      status: "draft",
       promptVersion: version,
+      createdBy: userName,
     },
   });
-  return log.id;
+  await prisma.platExecutionLog
+    .create({
+      data: {
+        orgId: ctx.orgId,
+        actorType: "ai",
+        actorName: "Assessment Engine",
+        operation: "generate",
+        targetTable: "plat_core_assessment",
+        targetId: assessment.id,
+        payload: JSON.stringify({ ...input, by: userName }),
+        result: `Assessment #${assessment.id} drafted (confidence ${stored.overallConfidence})`,
+        status: "executed",
+        executedAt: new Date(),
+        promptVersion: version,
+      },
+    })
+    .catch(() => {});
+  return assessment.id;
 }
 
 export async function getAssessment(
   ctx: OrgCtx,
-  execLogId: number,
+  assessmentId: number,
 ): Promise<StoredAssessment | null> {
-  const log = await prisma.platExecutionLog.findFirst({
-    where: { id: execLogId, orgId: ctx.orgId, targetTable: "assessment" },
+  const row = await prisma.platAssessment.findFirst({
+    where: { id: assessmentId, orgId: ctx.orgId },
   });
-  if (!log) return null;
+  if (!row) return null;
   try {
-    return JSON.parse(log.result) as StoredAssessment;
+    return JSON.parse(row.result) as StoredAssessment;
   } catch {
     return null;
   }
@@ -227,42 +246,68 @@ export async function getAssessment(
 
 /** Acceptance gate: creates the job + phases + budget lines + risks from the
  *  assessment. An edited budget total emits a correction for the loop. */
+/** Next JOB-### code from the max existing suffix (count-based numbering
+ *  duplicates after deletions); creation retries on the per-org unique. */
+async function createJobWithCode(
+  ctx: OrgCtx,
+  userName: string,
+  data: Record<string, unknown>,
+): Promise<number> {
+  const jobs = await prisma.platJob.findMany({
+    where: { orgId: ctx.orgId },
+    select: { code: true },
+  });
+  const max = jobs.reduce((m, j) => {
+    const match = /^JOB-(\d+)$/.exec(j.code);
+    return match ? Math.max(m, Number(match[1])) : m;
+  }, 0);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const result = await writeRecord(ctx, {
+        table: "job",
+        op: "create",
+        data: { ...data, code: `JOB-${String(max + 1 + attempt).padStart(3, "0")}` },
+        actor: { type: "human", name: userName },
+      });
+      return result.recordId!;
+    } catch (err) {
+      if ((err as { code?: string }).code !== "P2002" || attempt === 2) throw err;
+    }
+  }
+  throw new Error("unreachable");
+}
+
 export async function acceptAssessment(
   ctx: OrgCtx,
   userName: string,
-  execLogId: number,
+  assessmentId: number,
   edits: { budgetTotal?: number } = {},
 ): Promise<number> {
-  const assessment = await getAssessment(ctx, execLogId);
-  if (!assessment) throw new Error("Assessment not found");
+  const row = await prisma.platAssessment.findFirst({
+    where: { id: assessmentId, orgId: ctx.orgId, status: "draft" },
+  });
+  if (!row) throw new Error("Assessment not found (already accepted or discarded?)");
+  const assessment = JSON.parse(row.result) as StoredAssessment;
 
   const aiBudget = Number(assessment.fields.budget_total?.value) || 0;
   const finalBudget = edits.budgetTotal ?? aiBudget;
-  const seq = (await prisma.platJob.count({ where: { orgId: ctx.orgId } })) + 1;
 
-  const jobResult = await writeRecord(ctx, {
-    table: "job",
-    op: "create",
-    data: {
-      code: `JOB-${String(seq).padStart(3, "0")}`,
-      name: assessment.input.name,
-      engagementType: assessment.input.engagementType,
-      status: "active",
-      address: assessment.input.address,
-      suburb: assessment.input.suburb,
-      lat: assessment.geocode.value?.lat,
-      lng: assessment.geocode.value?.lng,
-      budgetTotal: finalBudget,
-      summary: assessment.detail.summary,
-      meta: JSON.stringify({
-        assessmentExecLogId: execLogId,
-        overallConfidence: assessment.overallConfidence,
-        appliedRules: assessment.appliedRules.map((r) => r.ruleCode),
-      }),
-    },
-    actor: { type: "human", name: userName },
+  const jobId = await createJobWithCode(ctx, userName, {
+    name: assessment.input.name,
+    engagementType: assessment.input.engagementType,
+    status: "active",
+    address: assessment.input.address,
+    suburb: assessment.input.suburb,
+    lat: assessment.geocode.value?.lat,
+    lng: assessment.geocode.value?.lng,
+    budgetTotal: finalBudget,
+    summary: assessment.detail.summary,
+    meta: JSON.stringify({
+      assessmentId,
+      overallConfidence: assessment.overallConfidence,
+      appliedRules: assessment.appliedRules.map((r) => r.ruleCode),
+    }),
   });
-  const jobId = jobResult.recordId!;
 
   const scale = aiBudget > 0 ? finalBudget / aiBudget : 1;
   let sortOrder = 0;
@@ -283,7 +328,7 @@ export async function acceptAssessment(
         jobId,
         category: line.category,
         description: "From intake assessment",
-        budgetAmount: Math.round(line.amount * scale * 100) / 100,
+        budgetAmount: mulMoney(line.amount, scale),
       },
       actor: { type: "ai", name: "Assessment Engine" },
     });
@@ -298,6 +343,11 @@ export async function acceptAssessment(
     });
   }
 
+  await prisma.platAssessment.update({
+    where: { id: row.id },
+    data: { status: "accepted", jobId },
+  });
+
   if (finalBudget !== aiBudget && aiBudget > 0) {
     await emitCorrection(
       ctx,
@@ -305,7 +355,7 @@ export async function acceptAssessment(
       {
         jobId,
         entityType: "assessment",
-        entityId: execLogId,
+        entityId: assessmentId,
         dimension: "budget.total",
         aiValue: aiBudget,
         humanValue: finalBudget,

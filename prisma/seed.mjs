@@ -28,6 +28,12 @@ async function seedIfEmpty(label, model, rows) {
 }
 
 async function main() {
+  // Demo data must never land in a database holding real customer data:
+  // seeding is opt-in (locally NODE_ENV is unset, so dev still seeds freely).
+  if (process.env.NODE_ENV === "production" && process.env.SEED_DEMO_DATA !== "true") {
+    console.log("Seed skipped (SEED_DEMO_DATA not set).");
+    return;
+  }
   console.log("Seeding demo data (idempotent)…");
 
   // ── UC1 — config tables ────────────────────────────────────────────────────

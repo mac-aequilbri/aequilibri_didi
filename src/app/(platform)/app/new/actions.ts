@@ -9,6 +9,9 @@ const ENGAGEMENT_TYPES: EngagementType[] = ["short_job", "long_project", "ongoin
 const AUTHORITIES: AiAuthority[] = ["propose_only", "approve_required", "auto_low_risk"];
 
 export async function provisionOrgAction(formData: FormData): Promise<void> {
+  const { isPlatformAdmin } = await import("@/lib/platform/org-context");
+  if (!(await isPlatformAdmin())) redirect("/app?denied=admin");
+
   const defaultEngagementType = String(formData.get("defaultEngagementType") ?? "long_project");
   const aiAuthority = String(formData.get("aiAuthority") ?? "approve_required");
 

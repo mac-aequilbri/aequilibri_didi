@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { clerkEnabled } from "@/lib/platform/authConfig";
+import { clerkEnabled, demoModeAllowed } from "@/lib/platform/authConfig";
 
 // Next 16 renamed Middleware → Proxy (same behavior).
 //
@@ -39,6 +39,17 @@ const withClerk = clerkMiddleware(async (auth, request) => {
 
 export function proxy(request: NextRequest, event: NextFetchEvent) {
   if (clerkEnabled()) return withClerk(request, event);
+
+  // Fail CLOSED: without working auth, the platform routes only serve when
+  // open demo mode was explicitly opted into (ALLOW_DEMO_MODE=true) — a
+  // missing or mistyped Clerk key must never silently open the platform.
+  if (isPlatformRoute(request) && !demoModeAllowed()) {
+    return new NextResponse(
+      "Authentication is not configured. Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and " +
+        "CLERK_SECRET_KEY, or explicitly set ALLOW_DEMO_MODE=true for an open demo deployment.",
+      { status: 503, headers: { "content-type": "text/plain" } },
+    );
+  }
   return uc1Gate(request);
 }
 

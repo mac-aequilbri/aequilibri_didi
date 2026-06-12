@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { formToObject } from "@/lib/platform/forms";
+import { mulMoney } from "@/lib/platform/money";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { writeRecord } from "@/lib/platform/recordWriter";
@@ -11,9 +12,7 @@ export async function createProcurement(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
   const data = formToObject(formData);
-  const qty = Number(data.qty) || 1;
-  const unitPrice = Number(data.unitPrice) || 0;
-  data.total = Math.round(qty * unitPrice * 100) / 100;
+  data.total = mulMoney(Number(data.qty) || 1, Number(data.unitPrice) || 0);
   await writeRecord(ctx, {
     table: "procurement",
     op: "create",

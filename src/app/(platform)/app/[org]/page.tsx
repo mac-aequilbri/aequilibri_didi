@@ -36,7 +36,7 @@ export default async function OrgDashboard({
           dueDate: { lt: new Date() },
         },
       }),
-      prisma.platExecutionLog.count({ where: { orgId: ctx.orgId, status: "proposed" } }),
+      prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed" } }),
       prisma.platConBudgetLine.aggregate({
         where: { orgId: ctx.orgId },
         _sum: { budgetAmount: true, actualAmount: true },

@@ -16,7 +16,7 @@ export default async function AssistantPage({ params }: { params: Promise<{ org:
   const [rows, rules, proposals] = await Promise.all([
     listMessages(ctx, sessionId),
     getActiveRules(ctx),
-    prisma.platExecutionLog.findMany({
+    prisma.platPendingWrite.findMany({
       where: { orgId: ctx.orgId, status: "proposed" },
       orderBy: { createdAt: "desc" },
       take: 10,
@@ -52,8 +52,8 @@ export default async function AssistantPage({ params }: { params: Promise<{ org:
           messages={messages}
           pendingProposals={proposals.map((p) => ({
             id: p.id,
-            operation: p.operation,
-            targetTable: p.targetTable,
+            operation: p.op,
+            targetTable: p.tableKey,
             payload: p.payload,
           }))}
         />

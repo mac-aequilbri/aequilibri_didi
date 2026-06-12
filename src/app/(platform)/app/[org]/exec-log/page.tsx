@@ -24,12 +24,12 @@ export default async function ExecLogPage({ params }: { params: Promise<{ org: s
   const ctx = await requireOrgCtx((await params).org);
 
   const [proposals, logs] = await Promise.all([
-    prisma.platExecutionLog.findMany({
+    prisma.platPendingWrite.findMany({
       where: { orgId: ctx.orgId, status: "proposed" },
       orderBy: { createdAt: "desc" },
     }),
     prisma.platExecutionLog.findMany({
-      where: { orgId: ctx.orgId, status: { not: "proposed" } },
+      where: { orgId: ctx.orgId },
       orderBy: { createdAt: "desc" },
       take: 100,
     }),
@@ -56,30 +56,31 @@ export default async function ExecLogPage({ params }: { params: Promise<{ org: s
               </tr>
             </thead>
             <tbody>
-              {proposals.map((log) => (
-                <tr key={log.id} className="border-t border-neutral-100 align-top">
+              {proposals.map((p) => (
+                <tr key={p.id} className="border-t border-neutral-100 align-top">
                   <td className="py-2 pr-2 whitespace-nowrap">
                     <span className="font-medium">
-                      {log.operation} {tableLabel(log.targetTable)}
+                      {p.op} {p.tableKey.replace(/_/g, " ")}
                     </span>
                     <span className="block text-xs text-neutral-500">
-                      #{log.id} · {log.actorName || log.actorType}
+                      #{p.id} · {p.actorName || p.actorType} · expires{" "}
+                      {p.expiresAt.toISOString().slice(0, 10)}
                     </span>
                   </td>
                   <td className="py-2 pr-2">
-                    <Payload raw={log.payload} />
+                    <Payload raw={p.payload} />
                   </td>
                   <td className="py-2 whitespace-nowrap text-right">
                     <form action={approveProposalAction} className="inline">
                       <input type="hidden" name="org" value={ctx.orgSlug} />
-                      <input type="hidden" name="execLogId" value={log.id} />
+                      <input type="hidden" name="proposalId" value={p.id} />
                       <button className="btn-ae text-xs" type="submit">
                         Approve
                       </button>
                     </form>{" "}
                     <form action={rejectProposalAction} className="inline">
                       <input type="hidden" name="org" value={ctx.orgSlug} />
-                      <input type="hidden" name="execLogId" value={log.id} />
+                      <input type="hidden" name="proposalId" value={p.id} />
                       <button className="btn-ae-outline text-xs" type="submit">
                         Reject
                       </button>

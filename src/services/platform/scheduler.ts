@@ -112,25 +112,35 @@ export async function runScheduledTasks(now = new Date()): Promise<SchedulerRunR
     }
   }
 
-  await prisma.platExecutionLog
-    .createMany({
-      data: orgs.map((org) => ({
-        orgId: org.id,
-        actorType: "system",
-        actorName: "scheduler",
-        operation: "generate",
-        targetTable: "scheduler_run",
-        payload: JSON.stringify({
-          snapshots: result.snapshots,
-          hypotheses: result.hypotheses,
-          reportsDrafted: result.reportsDrafted,
-        }),
-        status: result.errors.length ? "failed" : "executed",
-        executedAt: now,
-        error: result.errors.filter((e) => e.startsWith(org.slug)).join("; ").slice(0, 900),
-      })),
-    })
-    .catch(() => {});
+  // Log only orgs where the run actually did something (or failed) — hourly
+  // no-op heartbeats would drown the audit log.
+  const didWork =
+    result.snapshots > 0 ||
+    result.reportsDrafted > 0 ||
+    result.hypotheses.created + result.hypotheses.updated > 0;
+  if (didWork || result.errors.length) {
+    await prisma.platExecutionLog
+      .createMany({
+        data: orgs
+          .filter((org) => result.errors.some((e) => e.startsWith(org.slug)) || didWork)
+          .map((org) => ({
+            orgId: org.id,
+            actorType: "system",
+            actorName: "scheduler",
+            operation: "generate",
+            targetTable: "scheduler_run",
+            payload: JSON.stringify({
+              snapshots: result.snapshots,
+              hypotheses: result.hypotheses,
+              reportsDrafted: result.reportsDrafted,
+            }),
+            status: result.errors.length ? "failed" : "executed",
+            executedAt: now,
+            error: result.errors.filter((e) => e.startsWith(org.slug)).join("; ").slice(0, 900),
+          })),
+      })
+      .catch(() => {});
+  }
 
   return result;
 }

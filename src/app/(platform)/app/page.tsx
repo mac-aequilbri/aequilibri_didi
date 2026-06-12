@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { getAuthEmail } from "@/lib/platform/org-context";
+import { getAuthEmail, isPlatformAdmin } from "@/lib/platform/org-context";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,7 @@ export default async function OrgPickerPage({
 }) {
   const { denied } = await searchParams;
   const email = await getAuthEmail();
+  const canProvision = await isPlatformAdmin();
 
   const orgs = await prisma.platOrganisation.findMany({
     where: { isActive: true },
@@ -39,15 +40,21 @@ export default async function OrgPickerPage({
             Each organisation is an isolated customer instance on the shared platform core.
           </p>
         </div>
-        <Link href="/app/new" className="btn-ae">
-          + Onboard new customer
-        </Link>
+        {canProvision && (
+          <Link href="/app/new" className="btn-ae">
+            + Onboard new customer
+          </Link>
+        )}
       </div>
-      {denied && (
+      {denied === "admin" ? (
+        <p className="mb-6 text-sm text-red-600">
+          Provisioning new organisations requires a platform operator (PLATFORM_ADMIN_EMAILS).
+        </p>
+      ) : denied ? (
         <p className="mb-6 text-sm text-red-600">
           You are not a member of that organisation. Ask its admin to add your email to the team.
         </p>
-      )}
+      ) : null}
       {visible.length === 0 ? (
         <p className="text-sm text-neutral-500">
           {email === null ? (

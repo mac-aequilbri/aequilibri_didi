@@ -15,7 +15,7 @@ export interface ChatMessageView {
   id: number;
   role: string;
   content: string;
-  toolCalls: { tool: string; ok: boolean; status?: string; execLogId?: number }[];
+  toolCalls: { tool: string; ok: boolean; status?: string; proposalId?: number }[];
 }
 
 export interface PendingProposalView {
@@ -147,14 +147,14 @@ export default function AssistantClient({
                 </span>
                 <form action={approveFromChatAction}>
                   <input type="hidden" name="org" value={orgSlug} />
-                  <input type="hidden" name="execLogId" value={prop.id} />
+                  <input type="hidden" name="proposalId" value={prop.id} />
                   <button className="btn-ae text-xs" type="submit">
                     Approve
                   </button>
                 </form>
                 <form action={rejectFromChatAction}>
                   <input type="hidden" name="org" value={orgSlug} />
-                  <input type="hidden" name="execLogId" value={prop.id} />
+                  <input type="hidden" name="proposalId" value={prop.id} />
                   <button className="btn-ae-outline text-xs" type="submit">
                     Reject
                   </button>

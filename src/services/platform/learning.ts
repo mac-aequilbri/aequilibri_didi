@@ -160,7 +160,7 @@ export async function runHypothesisEngine(
       created++;
     }
     await prisma.platCorrection.updateMany({
-      where: { id: { in: group.map((c) => c.id) } },
+      where: { orgId: ctx.orgId, id: { in: group.map((c) => c.id) } },
       data: { hypothesisId },
     });
   }
@@ -180,18 +180,37 @@ export async function setHypothesisStatus(
   });
 }
 
-/** Allocate the next LRN-#### code for this org (transactional). */
-export async function nextRuleCode(orgId: number): Promise<string> {
-  return prisma.$transaction(async (tx) => {
-    const last = await tx.platLearningRule.findFirst({
-      where: { orgId },
-      orderBy: { id: "desc" },
-      select: { ruleCode: true },
-    });
-    const lastNum = last ? Number(last.ruleCode.replace(/\D/g, "")) || 0 : 0;
-    const count = await tx.platLearningRule.count({ where: { orgId } });
-    return `LRN-${String(Math.max(lastNum, count) + 1).padStart(4, "0")}`;
+/** Next LRN-#### code for this org: max existing suffix + 1 (count-based
+ *  numbering duplicates after deletions). Concurrent allocations can still
+ *  collide — callers create under the @@unique([orgId, ruleCode]) constraint
+ *  and retry via createRuleWithCode. */
+export async function nextRuleCode(orgId: number, bump = 0): Promise<string> {
+  const rules = await prisma.platLearningRule.findMany({
+    where: { orgId },
+    select: { ruleCode: true },
   });
+  const max = rules.reduce((m, r) => Math.max(m, Number(r.ruleCode.replace(/\D/g, "")) || 0), 0);
+  return `LRN-${String(max + 1 + bump).padStart(4, "0")}`;
+}
+
+/** Create a rule with a freshly allocated code, retrying on a unique-code
+ *  collision (two concurrent promotions). */
+export async function createRuleWithCode(
+  orgId: number,
+  data: Omit<Parameters<typeof prisma.platLearningRule.create>[0]["data"], "ruleCode" | "orgId">,
+): Promise<{ id: number; ruleCode: string }> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const ruleCode = await nextRuleCode(orgId, attempt);
+    try {
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+      const rule = await prisma.platLearningRule.create({ data: { ...(data as any), orgId, ruleCode } });
+      return { id: rule.id, ruleCode };
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code !== "P2002" || attempt === 2) throw err;
+    }
+  }
+  throw new Error("unreachable");
 }
 
 export async function promoteHypothesisToRule(
@@ -202,13 +221,12 @@ export async function promoteHypothesisToRule(
   const h = await prisma.platHypothesis.findFirst({ where: { id, orgId: ctx.orgId } });
   if (!h) return null;
 
-  const ruleCode = await nextRuleCode(ctx.orgId);
   const effectiveKind = h.avgVariancePct !== 0 && kind === "adjustment" ? "adjustment" : "guidance";
 
   let adjustment = "{}";
   if (effectiveKind === "adjustment") {
     const corrections = await prisma.platCorrection.findMany({
-      where: { hypothesisId: h.id, variancePct: { not: null } },
+      where: { orgId: ctx.orgId, hypothesisId: h.id, variancePct: { not: null } },
       select: { variancePct: true },
     });
     const signed = corrections.length
@@ -222,22 +240,18 @@ export async function promoteHypothesisToRule(
     adjustment = JSON.stringify(adj);
   }
 
-  const rule = await prisma.platLearningRule.create({
-    data: {
-      orgId: ctx.orgId,
-      ruleCode,
-      kind: effectiveKind,
-      description: h.description,
-      dimension: h.dimension,
-      triggerCondition: h.triggerCondition,
-      adjustment,
-      priority: 3,
-      confidence: Math.max(72, h.confidence),
-      isActive: true,
-      autoApply: false,
-      sourceHypothesisId: h.id,
-      dateActivated: new Date(),
-    },
+  const rule = await createRuleWithCode(ctx.orgId, {
+    kind: effectiveKind,
+    description: h.description,
+    dimension: h.dimension,
+    triggerCondition: h.triggerCondition,
+    adjustment,
+    priority: 3,
+    confidence: Math.max(72, h.confidence),
+    isActive: true,
+    autoApply: false,
+    sourceHypothesisId: h.id,
+    dateActivated: new Date(),
   });
   await prisma.platHypothesis.update({ where: { id: h.id }, data: { status: "promoted" } });
   return rule.id;

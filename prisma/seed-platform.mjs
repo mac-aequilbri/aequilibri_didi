@@ -198,10 +198,18 @@ async function seedDulongDowns(prisma) {
       toolCalls: J([{ tool: "update_budget_line", input: { category: "Foundation", actualAmount: 131500 } }]),
     },
   });
+  // Pending proposal lives in the approval queue (PlatPendingWrite); the
+  // execution log stays append-only audit events.
+  await prisma.platPendingWrite.create({
+    data: {
+      orgId: org.id, jobId: job.id, tableKey: "budget_line", op: "update",
+      recordId: foundationLine.id, payload: J({ actualAmount: 131500 }),
+      actorType: "ai", actorName: "Didi", sourceMessageId: assistantMsg.id,
+      status: "proposed", expiresAt: new Date("2026-07-15"),
+    },
+  });
   await prisma.platExecutionLog.createMany({
     data: [
-      // Payload uses the recordWriter proposal shape so approval executes it.
-      { orgId: org.id, jobId: job.id, actorType: "ai", actorName: "Didi", operation: "update", targetTable: "plat_con_budgetline", targetId: foundationLine.id, payload: J({ table: "budget_line", op: "update", recordId: foundationLine.id, data: { actualAmount: 131500 } }), status: "proposed", sourceMessageId: assistantMsg.id },
       { orgId: org.id, jobId: job.id, actorType: "human", actorName: "Antonio", operation: "update", targetTable: "plat_con_procurement", payload: J({ item: "Structural LVL beams 300x63", status: "delivered" }), status: "executed", executedAt: new Date("2026-05-21T03:10:00Z"), result: "Marked delivered" },
       { orgId: org.id, jobId: job.id, actorType: "system", actorName: "off_system_change", operation: "update", targetTable: "plat_con_cashflow", payload: J({ period: "2026-04", actual: 91200 }), status: "executed", executedAt: new Date("2026-05-01T22:00:00Z"), result: "Imported from bank export" },
     ],

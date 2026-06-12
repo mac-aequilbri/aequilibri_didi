@@ -15,7 +15,7 @@ export async function runAssessmentAction(formData: FormData): Promise<void> {
   const scope = String(formData.get("scope") ?? "").trim();
   if (!name || !scope) return;
   const sizeRaw = Number(formData.get("sizeSqm"));
-  const execLogId = await runConstructionAssessment(ctx, user.name, {
+  const assessmentId = await runConstructionAssessment(ctx, user.name, {
     name,
     engagementType: String(formData.get("engagementType") ?? ctx.defaultEngagementType),
     address: String(formData.get("address") ?? "").trim(),
@@ -23,16 +23,16 @@ export async function runAssessmentAction(formData: FormData): Promise<void> {
     sizeSqm: Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : undefined,
     scope,
   });
-  redirect(orgPath(ctx.orgSlug, `/assess?run=${execLogId}`));
+  redirect(orgPath(ctx.orgSlug, `/assess?run=${assessmentId}`));
 }
 
 export async function acceptAssessmentAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const execLogId = Number(formData.get("execLogId"));
-  if (!execLogId) return;
+  const assessmentId = Number(formData.get("assessmentId"));
+  if (!assessmentId) return;
   const budgetRaw = Number(formData.get("budgetTotal"));
-  const jobId = await acceptAssessment(ctx, user.name, execLogId, {
+  const jobId = await acceptAssessment(ctx, user.name, assessmentId, {
     budgetTotal: Number.isFinite(budgetRaw) && budgetRaw > 0 ? budgetRaw : undefined,
   });
   redirect(orgPath(ctx.orgSlug, `/projects/${jobId}`));

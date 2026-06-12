@@ -1,10 +1,11 @@
 // Record writer with typecast (Platform Architecture doc utility layer).
 // Every platform mutation goes through writeRecord: input is Zod-validated and
 // type-coerced, orgId is force-stamped, and a PlatExecutionLog row is written.
-// With requireApproval the write is NOT performed — a "proposed" ExecutionLog
-// row is persisted instead, and executeProposal() performs the deferred write
-// once a human approves it. This is the single mechanism behind both the
-// assistant's approval gates and the human-facing CRUD audit trail.
+// With requireApproval the write is NOT performed — a PlatPendingWrite
+// proposal is queued instead, and executeProposal() performs the deferred
+// write once a human approves it (proposals expire after 7 days). The
+// execution log itself is append-only: workflow state lives on the pending
+// row, audit events only ever get added.
 
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -359,8 +360,14 @@ export interface WriteRequest {
 export interface WriteResult {
   status: "executed" | "proposed";
   recordId?: number;
-  execLogId: number;
+  /** Audit row id (executed writes). */
+  execLogId?: number;
+  /** Approval-queue row id (proposed writes). */
+  proposalId?: number;
 }
+
+/** Proposals not resolved within this window expire (stale data risk). */
+const PROPOSAL_TTL_DAYS = 7;
 
 function validated(def: TableDef, op: WriteRequest["op"], data: unknown): Record<string, unknown> {
   if (op === "delete") return {};
@@ -386,6 +393,15 @@ async function performWrite(
 ): Promise<number | undefined> {
   const delegate = def.delegate();
   if (op === "create") {
+    // Learning-rule codes are allocated at WRITE time (deferred proposals
+    // would otherwise collide on codes pre-allocated at propose time).
+    if (def.physical === "plat_core_learningrule" && data.ruleCode === "AUTO") {
+      const { createRuleWithCode } = await import("@/services/platform/learning");
+      const { ruleCode: _auto, ...rest } = data;
+      void _auto;
+      const rule = await createRuleWithCode(ctx.orgId, rest as never);
+      return rule.id;
+    }
     const row = await delegate.create({ data: { ...data, orgId: ctx.orgId } });
     return row.id;
   }
@@ -407,21 +423,22 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
   const jobId = typeof data.jobId === "number" ? data.jobId : undefined;
 
   if (req.requireApproval) {
-    const log = await prisma.platExecutionLog.create({
+    const pending = await prisma.platPendingWrite.create({
       data: {
         orgId: ctx.orgId,
         jobId,
+        tableKey: req.table,
+        op: req.op,
+        recordId: req.recordId,
+        payload: JSON.stringify(data),
         actorType: req.actor.type,
         actorName: req.actor.name,
-        operation: req.op,
-        targetTable: def.physical,
-        targetId: req.recordId,
-        payload: JSON.stringify({ table: req.table, op: req.op, recordId: req.recordId, data }),
-        status: "proposed",
         sourceMessageId: req.actor.sourceMessageId,
+        status: "proposed",
+        expiresAt: new Date(Date.now() + PROPOSAL_TTL_DAYS * 86_400_000),
       },
     });
-    return { status: "proposed", execLogId: log.id };
+    return { status: "proposed", proposalId: pending.id };
   }
 
   try {
@@ -464,44 +481,70 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
   }
 }
 
-/** Perform the deferred write behind a "proposed" execution-log row. */
+async function resolvePending(ctx: OrgCtx, proposalId: number) {
+  const pending = await prisma.platPendingWrite.findFirst({
+    where: { id: proposalId, orgId: ctx.orgId, status: "proposed" },
+  });
+  if (!pending) throw new Error("Proposal not found (already resolved?)");
+  return pending;
+}
+
+/** Perform the deferred write behind a pending proposal. The execution log
+ *  stays append-only: execution/rejection each ADD a row; only the pending
+ *  row's workflow status mutates. */
 export async function executeProposal(
   ctx: OrgCtx,
-  execLogId: number,
+  proposalId: number,
   approvedBy: string,
 ): Promise<WriteResult> {
-  const log = await prisma.platExecutionLog.findFirst({
-    where: { id: execLogId, orgId: ctx.orgId, status: "proposed" },
-  });
-  if (!log) throw new Error("Proposal not found (already resolved?)");
+  const pending = await resolvePending(ctx, proposalId);
 
-  const payload = JSON.parse(log.payload) as {
-    table: WritableTable;
-    op: WriteRequest["op"];
-    recordId?: number;
-    data: Record<string, unknown>;
-  };
-  const def: TableDef = REGISTRY[payload.table];
-  if (!def) throw new Error(`Unknown table in proposal: ${payload.table}`);
+  if (pending.expiresAt < new Date()) {
+    await prisma.platPendingWrite.update({
+      where: { id: pending.id },
+      data: { status: "expired", resolvedBy: approvedBy, resolvedAt: new Date() },
+    });
+    throw new Error(
+      `Proposal #${pending.id} expired on ${pending.expiresAt.toISOString().slice(0, 10)} — the underlying data may have changed. Ask the assistant to re-propose.`,
+    );
+  }
+
+  const def: TableDef | undefined = REGISTRY[pending.tableKey as WritableTable];
+  if (!def) throw new Error(`Unknown table in proposal: ${pending.tableKey}`);
+  const op = pending.op as WriteRequest["op"];
 
   try {
-    // Re-validate: the schema may have tightened since the proposal was stored,
-    // and stored dates revive as ISO strings.
-    const data = validated(def, payload.op, payload.data);
-    const recordId = await performWrite(ctx, def, payload.op, payload.recordId, data);
-    await prisma.platExecutionLog.update({
-      where: { id: log.id },
-      data: { status: "executed", approvedBy, executedAt: new Date(), targetId: recordId },
-    });
-    return { status: "executed", recordId, execLogId: log.id };
-  } catch (err) {
-    await prisma.platExecutionLog.update({
-      where: { id: log.id },
+    // Re-validate: the schema may have tightened since the proposal was
+    // stored, and stored dates revive as ISO strings.
+    const data = validated(def, op, JSON.parse(pending.payload));
+    const recordId = await performWrite(ctx, def, op, pending.recordId ?? undefined, data);
+    const log = await prisma.platExecutionLog.create({
       data: {
-        status: "failed",
+        orgId: ctx.orgId,
+        jobId: pending.jobId,
+        actorType: pending.actorType,
+        actorName: pending.actorName,
+        operation: op,
+        targetTable: def.physical,
+        targetId: recordId,
+        payload: pending.payload,
+        status: "executed",
         approvedBy,
-        error: String(err instanceof Error ? err.message : err).slice(0, 1000),
+        executedAt: new Date(),
+        sourceMessageId: pending.sourceMessageId,
+        result: `Deferred write approved (proposal #${pending.id})`,
       },
+    });
+    await prisma.platPendingWrite.update({
+      where: { id: pending.id },
+      data: { status: "executed", resolvedBy: approvedBy, resolvedAt: new Date(), execLogId: log.id },
+    });
+    return { status: "executed", recordId, execLogId: log.id, proposalId: pending.id };
+  } catch (err) {
+    const message = String(err instanceof Error ? err.message : err).slice(0, 1000);
+    await prisma.platPendingWrite.update({
+      where: { id: pending.id },
+      data: { status: "failed", resolvedBy: approvedBy, resolvedAt: new Date(), error: message },
     });
     throw err;
   }
@@ -510,16 +553,30 @@ export async function executeProposal(
 /** Reject a pending proposal; the write is never performed. */
 export async function rejectProposal(
   ctx: OrgCtx,
-  execLogId: number,
+  proposalId: number,
   rejectedBy: string,
   reason = "",
 ): Promise<void> {
-  const log = await prisma.platExecutionLog.findFirst({
-    where: { id: execLogId, orgId: ctx.orgId, status: "proposed" },
+  const pending = await resolvePending(ctx, proposalId);
+  await prisma.platPendingWrite.update({
+    where: { id: pending.id },
+    data: { status: "rejected", resolvedBy: rejectedBy, resolvedAt: new Date(), error: reason },
   });
-  if (!log) throw new Error("Proposal not found (already resolved?)");
-  await prisma.platExecutionLog.update({
-    where: { id: log.id },
-    data: { status: "rejected", approvedBy: rejectedBy, error: reason },
-  });
+  await prisma.platExecutionLog
+    .create({
+      data: {
+        orgId: ctx.orgId,
+        jobId: pending.jobId,
+        actorType: "human",
+        actorName: rejectedBy,
+        operation: "reject",
+        targetTable: REGISTRY[pending.tableKey as WritableTable]?.physical ?? pending.tableKey,
+        payload: pending.payload,
+        status: "rejected",
+        executedAt: new Date(),
+        sourceMessageId: pending.sourceMessageId,
+        result: reason || `Proposal #${pending.id} rejected`,
+      },
+    })
+    .catch(() => {});
 }

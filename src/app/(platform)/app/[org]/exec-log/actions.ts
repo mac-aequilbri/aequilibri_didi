@@ -11,27 +11,27 @@ import { executeProposal, rejectProposal } from "@/lib/platform/recordWriter";
 async function ctxFrom(formData: FormData) {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const execLogId = Number(formData.get("execLogId"));
-  return { ctx, user, execLogId };
+  const proposalId = Number(formData.get("proposalId"));
+  return { ctx, user, proposalId };
 }
 
 export async function approveProposalAction(formData: FormData): Promise<void> {
-  const { ctx, user, execLogId } = await ctxFrom(formData);
-  if (!execLogId) return;
+  const { ctx, user, proposalId } = await ctxFrom(formData);
+  if (!proposalId) return;
   try {
-    await executeProposal(ctx, execLogId, user.name);
+    await executeProposal(ctx, proposalId, user.name);
   } catch {
-    // Failure is recorded on the log row itself (status "failed").
+    // Failure/expiry is recorded on the pending row itself.
   }
   revalidatePath(orgPath(ctx.orgSlug, "/exec-log"));
   revalidatePath(orgPath(ctx.orgSlug));
 }
 
 export async function rejectProposalAction(formData: FormData): Promise<void> {
-  const { ctx, user, execLogId } = await ctxFrom(formData);
-  if (!execLogId) return;
+  const { ctx, user, proposalId } = await ctxFrom(formData);
+  if (!proposalId) return;
   try {
-    await rejectProposal(ctx, execLogId, user.name, String(formData.get("reason") ?? ""));
+    await rejectProposal(ctx, proposalId, user.name, String(formData.get("reason") ?? ""));
   } catch {
     /* already resolved */
   }

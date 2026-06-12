@@ -63,7 +63,7 @@ async function dataContext(ctx: OrgCtx): Promise<string> {
     prisma.platActionHub.count({
       where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] } },
     }),
-    prisma.platExecutionLog.count({ where: { orgId: ctx.orgId, status: "proposed" } }),
+    prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed" } }),
   ]);
   return [
     `Jobs: ${JSON.stringify(jobs, (_k, v) => (typeof v === "bigint" ? Number(v) : v))}`,
@@ -168,8 +168,8 @@ export async function sendChatMessage(
   }
 
   const pendingApprovals = outcomes
-    .filter((o) => o.status === "proposed" && o.execLogId)
-    .map((o) => o.execLogId!);
+    .filter((o) => o.status === "proposed" && o.proposalId)
+    .map((o) => o.proposalId!);
 
   await prisma.platChatMessage.create({
     data: {
@@ -182,7 +182,7 @@ export async function sendChatMessage(
           tool: o.toolName,
           ok: o.ok,
           status: o.status,
-          execLogId: o.execLogId,
+          proposalId: o.proposalId,
           recordId: o.recordId,
         })),
       ),
