@@ -40,6 +40,20 @@ services:
       - key: CRON_SECRET
         sync: false
 
+      # ── Google Drive document storage (omit all three for local storage) ───
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        sync: false
+
+      # ── Xero read integration (Custom Connection; omit for demo ledger) ────
+      - key: XERO_CLIENT_ID
+        sync: false
+      - key: XERO_CLIENT_SECRET
+        sync: false
+
       # ── Google APIs (UC1 only — omit if only deploying UC2/UC3) ───────────
       - key: GOOGLE_MAPS_API_KEY
         sync: false

@@ -51,10 +51,35 @@ class LocalFsStorer implements DriveStorer {
   }
 }
 
-let storer: DriveStorer | null = null;
+let localStorer: DriveStorer | null = null;
+let driveStorer: DriveStorer | null = null;
 
-/** Factory — switches on env when a Drive adapter exists. */
+function local(): DriveStorer {
+  if (!localStorer) localStorer = new LocalFsStorer();
+  return localStorer;
+}
+
+/** Factory — Google Drive when the service-account env is configured
+ *  (lib/platform/gdrive.ts), local filesystem otherwise. */
 export function getStorer(): DriveStorer {
-  if (!storer) storer = new LocalFsStorer();
-  return storer;
+  // Lazy require avoids a cycle (gdrive imports the interface from here).
+  /* eslint-disable-next-line @typescript-eslint/no-require-imports */
+  const gdrive = require("./gdrive") as typeof import("./gdrive");
+  if (gdrive.gdriveEnabled()) {
+    if (!driveStorer) driveStorer = new gdrive.GoogleDriveStorer();
+    return driveStorer;
+  }
+  return local();
+}
+
+/** Resolve the storer that wrote a given document (downloads must work even
+ *  after the default provider changes). */
+export function getStorerFor(provider: string): DriveStorer {
+  if (provider === "gdrive") {
+    /* eslint-disable-next-line @typescript-eslint/no-require-imports */
+    const gdrive = require("./gdrive") as typeof import("./gdrive");
+    if (!driveStorer) driveStorer = new gdrive.GoogleDriveStorer();
+    return driveStorer;
+  }
+  return local();
 }

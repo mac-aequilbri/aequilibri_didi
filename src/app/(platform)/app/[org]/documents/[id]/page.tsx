@@ -49,6 +49,19 @@ export default async function DocumentDetailPage({
           )}
         </div>
 
+        {doc.storageProvider === "gdrive" && doc.storageRef && (
+          <p className="text-sm">
+            <a
+              href={`https://drive.google.com/file/d/${encodeURIComponent(doc.storageRef)}/view`}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline font-medium"
+            >
+              Open in Google Drive ↗
+            </a>
+          </p>
+        )}
+
         {doc.aiSummary && (
           <p className="text-sm">
             <span className="font-semibold">Summary:</span> {doc.aiSummary}
