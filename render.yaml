@@ -9,16 +9,15 @@ services:
     #                    devDependencies, but the build toolchain (prisma CLI,
     #                    typescript, tailwind) lives there. Without this the
     #                    build fails with "prisma: not found" / missing types.
-    #   migrate deploy → applies tracked migrations (prisma/migrations). On a
-    #                    DB created before migrations were introduced, the
-    #                    first deploy fails P3005 — the fallback marks the
-    #                    baseline as applied, then deploys the rest. Fresh DBs
-    #                    apply the full history. db push is no longer used in
-    #                    production.
+    #   migrate-deploy.mjs → tracked migrations via `prisma migrate deploy`,
+    #                    self-healing for the db-push-era transition states
+    #                    (unbaselined DB, objects that already exist, recorded
+    #                    failed migrations). Unknown failures still fail the
+    #                    build. db push is no longer used in production.
     #   seed.mjs       → DEMO data; only runs when SEED_DEMO_DATA=true (below).
     #                    Remove that env var the moment real customer data
     #                    lives in this database.
-    buildCommand: npm ci --include=dev && npx prisma generate && (npx prisma migrate deploy || (npx prisma migrate resolve --applied 20260612000000_baseline && npx prisma migrate deploy)) && node prisma/seed.mjs && npm run build
+    buildCommand: npm ci --include=dev && npx prisma generate && node scripts/migrate-deploy.mjs && node prisma/seed.mjs && npm run build
     startCommand: npm start
     healthCheckPath: /
 
