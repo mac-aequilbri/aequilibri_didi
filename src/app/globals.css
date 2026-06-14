@@ -92,6 +92,10 @@ footer.ae-footer { background: var(--ae-ink); color: var(--ae-earth); text-align
 .journey-progress-track { height: 8px; background: #eef0f3; border-radius: 999px; overflow: hidden; margin-bottom: 12px; }
 .journey-progress-fill { height: 100%; background: var(--ae-space); border-radius: 999px; transition: width .3s; }
 .quote-journey { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+/* The 4-across step tracker crushes on narrow/landscape phones — give each
+   step room by dropping to 2 columns, then 1 on the smallest screens. */
+@media (max-width: 900px) { .quote-journey { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 480px) { .quote-journey { grid-template-columns: 1fr; } }
 .qj-step { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 12px 12px 12px 50px; min-height: 92px; position: relative; opacity: .7; }
 .qj-step::before { content: attr(data-step); position: absolute; left: 13px; top: 14px; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #eef0f3; color: #6b7280; font-size: .78rem; font-weight: 900; }
 .qj-step.active { border: 2px solid var(--ae-space); background: #fffaf7; box-shadow: 0 10px 22px rgba(220,159,130,.16); opacity: 1; }
@@ -104,7 +108,9 @@ footer.ae-footer { background: var(--ae-ink); color: var(--ae-earth); text-align
 .qj-status { display: inline-flex; align-items: center; margin-top: 8px; border-radius: 999px; padding: 3px 8px; font-size: .62rem; font-weight: 800; background: #f3f4f6; color: #6b7280; }
 .qj-step.active .qj-status { background: rgba(220,159,130,.18); color: #8f4b2d; }
 .qj-step.complete .qj-status { background: #dff4e7; color: #155724; }
-.journey-action { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 2px solid var(--ae-space); border-left-width: 7px; background: #fffaf7; border-radius: 8px; padding: 16px 18px; margin: 8px 0 18px; box-shadow: 0 8px 18px rgba(26,26,46,.08); }
+/* Layout (flex-direction / alignment) is set via Tailwind utilities on the
+   element so it can stack responsively; this rule only carries the styling. */
+.journey-action { display: flex; gap: 16px; border: 2px solid var(--ae-space); border-left-width: 7px; background: #fffaf7; border-radius: 8px; padding: 16px 18px; margin: 8px 0 18px; box-shadow: 0 8px 18px rgba(26,26,46,.08); }
 .journey-action-title { font-size: .96rem; font-weight: 900; color: #1a1a2e; }
 .journey-action-note { font-size: .78rem; color: #555; line-height: 1.35; margin-top: 2px; }
 .quote-side-panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }

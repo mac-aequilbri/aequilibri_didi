@@ -166,7 +166,7 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
   })();
 
   return (
-    <div className="px-8">
+    <div className="px-3 sm:px-8">
       <div className="journey-shell">
         <div className="journey-shell-head">
           <div>
@@ -188,12 +188,12 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
         </div>
       </div>
 
-      <div className="journey-action">
+      <div className="journey-action flex-col items-stretch sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="journey-action-title">{action.title}</div>
           <div className="journey-action-note">{action.note}</div>
         </div>
-        {action.cta && <button type="button" className="btn-ae disabled:opacity-40" disabled={!action.enabled} onClick={action.run}>{action.cta}</button>}
+        {action.cta && <button type="button" className="btn-ae disabled:opacity-40 w-full sm:w-auto shrink-0" disabled={!action.enabled} onClick={action.run}>{action.cta}</button>}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -245,7 +245,7 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
               {/* Client Details */}
               <div className="ae-card p-5">
                 <h6 className="font-bold mb-3">Client Details</h6>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="Client Name *"><input value={clientName} onChange={(e) => setClientName(e.target.value)} className="w-full border border-[var(--ae-earth)] rounded px-3 py-2" /></Field>
                   <Field label="Company"><input value={clientCompany} onChange={(e) => setClientCompany(e.target.value)} className="w-full border border-[var(--ae-earth)] rounded px-3 py-2" /></Field>
                   <Field label="Email"><input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} className="w-full border border-[var(--ae-earth)] rounded px-3 py-2" /></Field>
@@ -256,7 +256,7 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
               {/* Roof Setup */}
               <div className="ae-card p-5">
                 <div className="flex items-center justify-between mb-2"><h6 className="font-bold">Roof Setup</h6><span className="det-badge det-geoscape">ROOF INPUT</span></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="Roof Type">
                     <select value={roofTypeSel} onChange={(e) => setRoofTypeSel(e.target.value)} className="w-full border border-[var(--ae-earth)] rounded px-3 py-2">
                       <option value="gable">Gable — $120/m² (simple, single ridge)</option>
@@ -279,7 +279,7 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
               {analysis && (
                 <details className="ae-card p-5" open>
                   <summary className="font-bold cursor-pointer">Roof measurements</summary>
-                  <div className="grid grid-cols-3 gap-3 mt-3 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 text-sm">
                     <Stat label="Perimeter" value={`${analysis.perimeterM} m`} />
                     <Stat label="Sections" value={String(analysis.sectionCount)} />
                     <Stat label="Roof type (AI)" value={analysis.roofType} />
@@ -293,7 +293,7 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
               {/* Material / Colour */}
               <div className="ae-card p-5">
                 <div className="flex items-center justify-between mb-2"><h6 className="font-bold">Material / Colour</h6><span className="det-badge det-solar">SCOPE WORDING ONLY</span></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="Material"><select value={material} onChange={(e) => setMaterial(e.target.value)} className="w-full border border-[var(--ae-earth)] rounded px-3 py-2">{MATERIAL_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
                   <Field label="Waste factor (%)"><input type="number" step="0.1" value={waste} onChange={(e) => setWaste(e.target.value)} className="w-full border border-[var(--ae-earth)] rounded px-3 py-2" /></Field>
                 </div>
