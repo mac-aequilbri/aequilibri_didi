@@ -42,6 +42,11 @@ h1, h2, h3, h4, h5 {
 .uc3-badge { background: var(--ae-air); color: var(--ae-ink); }
 
 .ae-card { border: none; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08); border-radius: 10px; background: #fff; }
+/* On small screens, let a card scroll a too-wide child (data tables) inside
+   itself instead of forcing the whole page to scroll horizontally. */
+@media (max-width: 640px) {
+  .ae-card { overflow-x: auto; }
+}
 
 .btn-ae { background: var(--ae-space); border: none; color: #fff; font-weight: 600; padding: 8px 16px; border-radius: 6px; display: inline-block; cursor: pointer; }
 .btn-ae:hover { background: #c8876e; color: #fff; }
@@ -59,6 +64,9 @@ h1, h2, h3, h4, h5 {
 .sidebar a.active { background: rgba(220, 159, 130, 0.18); color: var(--ae-ink); font-weight: 600; border-left: 3px solid var(--ae-space); padding-left: 13px; }
 
 .page-header { background: #fff; padding: 24px 32px 16px; border-bottom: 1px solid var(--ae-earth); margin-bottom: 24px; }
+@media (max-width: 640px) {
+  .page-header { padding: 16px 16px 12px; margin-bottom: 16px; }
+}
 
 .metric-card { background: #fff; border-radius: 10px; padding: 20px; text-align: center; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.07); }
 .metric-card .value { font-size: 2rem; font-weight: 700; font-family: "Montserrat", sans-serif; color: var(--ae-space); }

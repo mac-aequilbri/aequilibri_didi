@@ -45,9 +45,9 @@ const SECTIONS: NavSection[] = [
 
 export default function Uc1Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex">
-      <Sidebar sections={SECTIONS} />
-      <div className="flex-1 min-w-0">{children}</div>
+    <div className="flex flex-col lg:flex-row min-h-screen">
+      <Sidebar sections={SECTIONS} menuLabel="UC1 Roofing" />
+      <div className="flex-1 min-w-0 overflow-auto">{children}</div>
     </div>
   );
 }

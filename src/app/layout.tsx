@@ -24,21 +24,24 @@ export default function RootLayout({
     <html lang="en" className={`${montserrat.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         <nav className="ae-navbar">
-          <div className="px-6 h-14 flex items-center gap-6">
-            <Link href="/" className="ae-brand">
+          <div className="px-4 sm:px-6 h-14 flex items-center gap-3 sm:gap-6 overflow-x-auto">
+            <Link href="/" className="ae-brand shrink-0">
               æquilibri
             </Link>
-            <Link href="/uc1" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
-              <span className="uc-badge uc1-badge mr-1">UC1</span> Roofing
+            <Link href="/uc1" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)] whitespace-nowrap shrink-0">
+              <span className="uc-badge uc1-badge mr-1">UC1</span>
+              <span className="hidden sm:inline">Roofing</span>
             </Link>
-            <Link href="/app/dulong-downs" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
-              <span className="uc-badge uc2-badge mr-1">UC2</span> Didi
+            <Link href="/app/dulong-downs" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)] whitespace-nowrap shrink-0">
+              <span className="uc-badge uc2-badge mr-1">UC2</span>
+              <span className="hidden sm:inline">Didi</span>
             </Link>
-            <Link href="/app" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)]">
-              <span className="uc-badge uc3-badge mr-1">UC3</span> MSME
+            <Link href="/app" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)] whitespace-nowrap shrink-0">
+              <span className="uc-badge uc3-badge mr-1">UC3</span>
+              <span className="hidden sm:inline">MSME</span>
             </Link>
             {withAuth && (
-              <div className="ml-auto">
+              <div className="ml-auto shrink-0">
                 <Show when="signed-in">
                   <UserButton />
                 </Show>

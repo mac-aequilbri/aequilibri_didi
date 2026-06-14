@@ -41,7 +41,7 @@ export default async function PhasesPage({
   const drafts = jobs.flatMap((j) => j.conPhases.filter((p) => p.isAiDraft));
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Phases"
         subtitle="Lifecycle milestones per job; AI-suggested phases wait below until approved. Attach site evidence to a phase and the AI suggests a completion % — you decide whether it sticks."
@@ -84,7 +84,8 @@ export default async function PhasesPage({
           <h2 className="font-semibold mb-3">
             {job.name} <span className="text-xs font-normal text-neutral-500">{job.code}</span>
           </h2>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[34rem]">
             <tbody>
               {job.conPhases
                 .filter((p) => !p.isAiDraft)
@@ -244,6 +245,7 @@ export default async function PhasesPage({
               )}
             </tbody>
           </table>
+          </div>
         </section>
       ))}
     </div>
