@@ -276,6 +276,19 @@ export async function getActiveRules(ctx: OrgCtx) {
   });
 }
 
+/** Read-only: the org's active GUIDANCE rules matching a context, without
+ *  firing them (no counter bumps). Used to make AI analysis learning-aware
+ *  before the call, complementing the adjustment rules applied afterwards. */
+export async function getMatchingGuidance(
+  ctx: OrgCtx,
+  context: Record<string, string>,
+): Promise<{ ruleCode: string; description: string }[]> {
+  const rules = await getActiveRules(ctx);
+  return rules
+    .filter((r) => r.kind === "guidance" && ruleMatches(r.triggerCondition, context))
+    .map((r) => ({ ruleCode: r.ruleCode, description: r.description }));
+}
+
 export interface AppliedRule {
   ruleCode: string;
   description: string;

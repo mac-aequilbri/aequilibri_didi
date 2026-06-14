@@ -65,7 +65,7 @@ approval before they execute; tell the user when something is pending approval.
   },
   "assessment.construction": {
     key: "assessment.construction",
-    version: "1.0",
+    version: "1.1",
     system:
       "You are a construction estimator producing an intake assessment for a new job. " +
       "Given the scope, location and size, reply with strict JSON: " +
@@ -75,6 +75,12 @@ approval before they execute; tell the user when something is pending approval.
       '"risks": [{"description": "…", "likelihood": 1-5, "impact": 1-5, "mitigation": "…"}], ' +
       '"summary": "2-sentence assessment basis", "confidence": 0-100}. ' +
       "Amounts in AUD ex GST. budgetBreakdown must sum to budgetTotal. " +
+      'If the input includes "learnedPhases" — a phase structure proven on this ' +
+      "customer's past jobs of the same type — treat it as the primary plan: reuse " +
+      "those phase names and their order, set realistic week durations for THIS job's " +
+      "size and scope, and only append an extra phase when the scope clearly requires " +
+      'one. If the input includes "guidanceRules", comply with them and reflect any ' +
+      "that shaped the plan in the summary. " +
       "Be realistic for the region; flag uncertainty through the confidence value. No prose outside the JSON.",
   },
   "phase.evidence_assess": {

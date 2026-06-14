@@ -19,6 +19,12 @@ import { resolveField, CascadeOutcome } from "@/lib/platform/sourceCascade";
 import { OrgCtx } from "@/lib/platform/types";
 import type { GeocodeResult } from "@/lib/platform/geocode";
 import { runAssessment } from "../assessment";
+import { getMatchingGuidance } from "../learning";
+import {
+  applyTemplateWeeks,
+  derivePhaseTemplate,
+  type PhaseInput,
+} from "./phaseTemplates";
 
 export interface AssessmentIntakeInput {
   name: string;
@@ -51,6 +57,16 @@ export interface StoredAssessment {
   appliedRules: Awaited<ReturnType<typeof runAssessment>>["appliedRules"];
   overallConfidence: number;
   detail: Pick<AiEstimate, "budgetBreakdown" | "phases" | "risks" | "summary">;
+  /** Where the phase plan came from — learnings (prior jobs) take priority. */
+  phaseSource: "learnings" | "ai";
+  /** Provenance when phases were learned from history. */
+  phaseLearning?: { sampleCount: number; sourceJobCodes: string[] };
+  /** Immutable snapshot of the generated phases, so refinements can be diffed. */
+  phasesGenerated: PhaseInput[];
+  /** Set once a human edits the phase plan before acceptance. */
+  phasesRefined?: boolean;
+  /** Guidance rules that informed the AI analysis. */
+  guidanceApplied?: string[];
   demoMode: boolean;
 }
 
@@ -95,6 +111,16 @@ export async function runConstructionAssessment(
   const geo = await resolveField(geocodeProviders(fullAddress));
   const suburb = geo.value?.suburb || input.suburb;
 
+  // 1b. Known learnings — primary source for the phase structure. If this
+  //     customer has prior jobs of the same engagement type, reuse their
+  //     proven phase plan; the AI only adapts durations. Guidance rules make
+  //     the whole analysis learning-aware.
+  const ruleContext = { suburb, engagement_type: input.engagementType };
+  const [phaseTemplate, guidance] = await Promise.all([
+    derivePhaseTemplate(ctx, input.engagementType),
+    getMatchingGuidance(ctx, ruleContext),
+  ]);
+
   // 2. AI analysis.
   const { system, version } = getPrompt("assessment.construction");
   const res = await callClaude(
@@ -105,6 +131,8 @@ export async function runConstructionAssessment(
       location: geo.value?.formatted ?? `${input.address} ${input.suburb}`.trim(),
       suburb,
       sizeSqm: input.sizeSqm ?? null,
+      learnedPhases: phaseTemplate ? phaseTemplate.phases.map((p) => p.name) : undefined,
+      guidanceRules: guidance.length ? guidance.map((g) => g.description) : undefined,
     }),
     { model: modelFor("complex_reasoning"), maxTokens: 1500 },
   );
@@ -152,6 +180,19 @@ export async function runConstructionAssessment(
     }
   }
 
+  // 2b. Resolve the phase plan with learnings as the primary source: when a
+  //     template exists, names/order come from it and the AI only supplies
+  //     durations; otherwise the AI's phases stand.
+  let phases: PhaseInput[];
+  let phaseSource: "learnings" | "ai";
+  if (phaseTemplate) {
+    phaseSource = "learnings";
+    phases = applyTemplateWeeks(phaseTemplate, estimate.phases, estimate.durationWeeks);
+  } else {
+    phaseSource = "ai";
+    phases = estimate.phases;
+  }
+
   // 3+4. Judgment application + structured output: the generic engine applies
   // the org's adjustment rules to the numeric fields and scores confidence.
   const engineResult = await runAssessment(ctx, {
@@ -187,10 +228,16 @@ export async function runConstructionAssessment(
     overallConfidence: engineResult.overallConfidence,
     detail: {
       budgetBreakdown: estimate.budgetBreakdown,
-      phases: estimate.phases,
+      phases,
       risks: estimate.risks,
       summary: estimate.summary,
     },
+    phaseSource,
+    phaseLearning: phaseTemplate
+      ? { sampleCount: phaseTemplate.sampleCount, sourceJobCodes: phaseTemplate.sourceJobCodes }
+      : undefined,
+    phasesGenerated: phases,
+    guidanceApplied: guidance.length ? guidance.map((g) => g.ruleCode) : undefined,
     demoMode: res.demo_mode,
   };
 
@@ -242,6 +289,33 @@ export async function getAssessment(
   } catch {
     return null;
   }
+}
+
+/** Refine the draft assessment's phase plan before acceptance — rename,
+ *  re-time, add, remove or reorder. Persisted onto the working set; the
+ *  generated snapshot is kept so acceptance can diff and emit a correction. */
+export async function refineAssessmentPhases(
+  ctx: OrgCtx,
+  assessmentId: number,
+  phases: PhaseInput[],
+): Promise<void> {
+  const row = await prisma.platAssessment.findFirst({
+    where: { id: assessmentId, orgId: ctx.orgId, status: "draft" },
+  });
+  if (!row) throw new Error("Assessment not found (already accepted or discarded?)");
+  const stored = JSON.parse(row.result) as StoredAssessment;
+
+  const clean = phases
+    .map((p) => ({ name: String(p.name ?? "").trim().slice(0, 200), weeks: Math.max(0, Math.round(Number(p.weeks) || 0)) }))
+    .filter((p) => p.name.length > 0);
+  if (clean.length === 0) throw new Error("A job needs at least one phase.");
+
+  stored.detail.phases = clean;
+  stored.phasesRefined = true;
+  await prisma.platAssessment.update({
+    where: { id: row.id },
+    data: { result: JSON.stringify(stored) },
+  });
 }
 
 /** Acceptance gate: creates the job + phases + budget lines + risks from the
@@ -360,6 +434,33 @@ export async function acceptAssessment(
         aiValue: aiBudget,
         humanValue: finalBudget,
         rootCause: "estimator adjusted intake assessment budget",
+        context: {
+          suburb: assessment.input.suburb,
+          engagement_type: assessment.input.engagementType,
+        },
+      },
+    );
+  }
+
+  // Phase plan refined before acceptance → record a correction. The next
+  // template derivation already reads this job's saved phases, so the
+  // refinement also feeds the learnings structurally.
+  const generatedNames = (assessment.phasesGenerated ?? assessment.detail.phases)
+    .map((p) => p.name)
+    .join(" → ");
+  const finalNames = assessment.detail.phases.map((p) => p.name).join(" → ");
+  if (generatedNames !== finalNames) {
+    await emitCorrection(
+      ctx,
+      { type: "human", name: userName },
+      {
+        jobId,
+        entityType: "assessment",
+        entityId: assessmentId,
+        dimension: "schedule.phases",
+        aiValueText: generatedNames,
+        humanValueText: finalNames,
+        rootCause: `estimator refined the ${assessment.phaseSource === "learnings" ? "learned" : "AI-suggested"} phase plan`,
         context: {
           suburb: assessment.input.suburb,
           engagement_type: assessment.input.engagementType,

@@ -9,6 +9,7 @@ import { requireOrgCtx } from "@/lib/platform/org-context";
 import { getAssessment } from "@/services/platform/construction/assess";
 import { acceptAssessmentAction, runAssessmentAction } from "./actions";
 import { AcceptAssessmentButton, RunAssessmentButton } from "./SubmitButtons";
+import { PhaseRefiner } from "./PhaseRefiner";
 
 export const dynamic = "force-dynamic";
 
@@ -148,6 +149,38 @@ export default async function AssessPage({
             </details>
           </section>
 
+          <section className="ae-card p-5">
+            <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+              <h3 className="font-semibold text-sm">Project phases</h3>
+              {assessment.phaseSource === "learnings" && assessment.phaseLearning ? (
+                <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  ✓ Learned from {assessment.phaseLearning.sampleCount} prior{" "}
+                  {assessment.input.engagementType.replace("_", " ")} job
+                  {assessment.phaseLearning.sampleCount === 1 ? "" : "s"}
+                  {assessment.phaseLearning.sourceJobCodes.length
+                    ? ` (${assessment.phaseLearning.sourceJobCodes.join(", ")})`
+                    : ""}
+                  {assessment.phasesRefined ? " · refined" : ""}
+                </span>
+              ) : (
+                <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 text-neutral-600">
+                  AI-suggested — no prior {assessment.input.engagementType.replace("_", " ")} jobs to learn from
+                  {assessment.phasesRefined ? " · refined" : ""}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-neutral-500 mb-3">
+              {assessment.phaseSource === "learnings"
+                ? "These follow how this customer structures similar jobs. Refine them for this job — changes are saved before you accept, and feed future plans."
+                : "Refine the AI-suggested plan for this job. Once accepted, it becomes the template the next similar job learns from."}
+            </p>
+            <PhaseRefiner
+              orgSlug={ctx.orgSlug}
+              assessmentId={Number(run)}
+              initial={assessment.detail.phases}
+            />
+          </section>
+
           <section className="ae-card p-5 grid gap-6 sm:grid-cols-2">
             <div>
               <h3 className="font-semibold text-sm mb-2">Budget breakdown</h3>
@@ -157,17 +190,6 @@ export default async function AssessPage({
                     <tr key={i} className="border-t border-neutral-100">
                       <td className="py-1.5 pr-2">{b.category}</td>
                       <td className="py-1.5 text-right whitespace-nowrap">{currency(b.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <h3 className="font-semibold text-sm mb-2 mt-4">Phases</h3>
-              <table className="w-full text-sm">
-                <tbody>
-                  {assessment.detail.phases.map((p, i) => (
-                    <tr key={i} className="border-t border-neutral-100">
-                      <td className="py-1.5 pr-2">{p.name}</td>
-                      <td className="py-1.5 text-right text-xs">{p.weeks} wk</td>
                     </tr>
                   ))}
                 </tbody>

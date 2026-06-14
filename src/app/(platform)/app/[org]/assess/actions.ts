@@ -5,8 +5,10 @@ import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import {
   acceptAssessment,
+  refineAssessmentPhases,
   runConstructionAssessment,
 } from "@/services/platform/construction/assess";
+import type { PhaseInput } from "@/services/platform/construction/phaseTemplates";
 
 export async function runAssessmentAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
@@ -23,6 +25,25 @@ export async function runAssessmentAction(formData: FormData): Promise<void> {
     sizeSqm: Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : undefined,
     scope,
   });
+  redirect(orgPath(ctx.orgSlug, `/assess?run=${assessmentId}`));
+}
+
+export async function refinePhasesAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  await getCurrentUser(ctx);
+  const assessmentId = Number(formData.get("assessmentId"));
+  if (!assessmentId) return;
+  let phases: PhaseInput[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get("phases") ?? "[]"));
+    if (Array.isArray(parsed)) {
+      phases = parsed.map((p) => ({ name: String(p?.name ?? ""), weeks: Number(p?.weeks) || 0 }));
+    }
+  } catch {
+    return;
+  }
+  if (phases.length === 0) return;
+  await refineAssessmentPhases(ctx, assessmentId, phases);
   redirect(orgPath(ctx.orgSlug, `/assess?run=${assessmentId}`));
 }
 
