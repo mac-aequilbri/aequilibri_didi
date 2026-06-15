@@ -1,13 +1,27 @@
 // Construction job-category catalog — curated industry reference data used by
 // the Assessment Engine. Each category carries the engagement type it usually
 // runs as, a scope hint to prime the intake, and an industry-standard phase
-// sequence (AU residential/commercial practice).
+// sequence.
 //
 // How it feeds the assessment: the phase plan is resolved learnings-first —
 // prior jobs of the same category/engagement type take priority; this
 // catalog is the EXPERT DEFAULT that fills the cold-start gap before an org
 // has history; the AI only originates phases when neither exists. Either way
 // the AI fits the week durations to the specific job.
+//
+// Phase sequences are grounded in Australian industry practice and standards:
+//   • Residential builds map to the recognised progress-payment stages
+//     (Base/Slab → Frame → Lock-up → Fixing → Practical Completion) used in
+//     HIA/Master Builders contracts and defined by the QBCC.
+//   • Wet areas place waterproofing AFTER screed/sheeting and BEFORE tiling,
+//     per AS 3740 (internal) / AS 4654 (external), with a flood test.
+//   • Solar/battery follow the CEC-accredited workflow with DNSP grid
+//     approval gates (AS/NZS 5033 PV, AS/NZS 5139 battery).
+//   • Electrical/plumbing/HVAC follow rough-in → fit-off → test → certify
+//     (AS/NZS 3000 wiring, AS/NZS 3500 plumbing, ARCtick for refrigerant).
+//   • Pools include the mandatory safety-barrier certificate before fill
+//     (AS 1926.1); demolition surveys/removes asbestos before structural work
+//     (WHS). Slabs/footings to AS 2870; concrete to AS 3600.
 
 export type EngagementType = "short_job" | "long_project" | "ongoing" | "seasonal";
 
@@ -30,16 +44,14 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "New build",
     engagementType: "long_project",
     scopeHint: "New detached dwelling — slab on ground, timber/steel frame, mid-range finishes.",
+    // Recognised AU residential progress-payment stages (HIA/MBA/QBCC).
     phases: [
-      "Design, approvals & site survey",
-      "Site preparation & earthworks",
-      "Slab & footings",
-      "Frame & roof structure",
-      "Lock-up (roofing, cladding, windows)",
-      "Rough-in (plumbing, electrical, HVAC)",
-      "Internal linings & fit-out",
-      "Finishes & external works",
-      "Final inspections, defects & handover",
+      "Pre-construction & approvals",
+      "Base / slab (footings, under-slab services, slab pour)",
+      "Frame (wall frames, roof trusses, tie-downs)",
+      "Lock-up (roof, external cladding, windows, doors)",
+      "Fixing & fit-out (linings, cabinetry, wet-area tiling)",
+      "Practical completion & handover",
     ],
   },
   {
@@ -49,15 +61,13 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "long_project",
     scopeHint: "Two or more attached dwellings on one site.",
     phases: [
-      "Design & approvals",
-      "Bulk earthworks & site services",
-      "Slabs & footings",
-      "Frame & roof",
-      "Lock-up",
-      "Services rough-in",
-      "Linings & fit-out",
-      "Finishes & landscaping",
-      "Occupation certificate & handover",
+      "Pre-construction & approvals",
+      "Site preparation & earthworks",
+      "Base / slab",
+      "Frame",
+      "Lock-up (enclosed)",
+      "Fixing & fit-out",
+      "Practical completion & per-dwelling handover",
     ],
   },
   {
@@ -67,15 +77,14 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "long_project",
     scopeHint: "Multi-storey residential building.",
     phases: [
-      "Design & DA approval",
-      "Demolition & excavation",
+      "Pre-construction & DA approval",
+      "Site preparation & bulk excavation",
       "Substructure & basement",
-      "Superstructure (per level)",
-      "Façade & roof",
-      "Services rough-in",
-      "Fit-out",
-      "Common areas & external works",
-      "Commissioning & handover",
+      "Superstructure (level-by-level)",
+      "Façade & external envelope",
+      "Services rough-in & fit-out",
+      "Commissioning & essential-services certification",
+      "Defects & occupation certificate",
     ],
   },
   {
@@ -85,14 +94,15 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "long_project",
     scopeHint: "Tenancy fit-out — office, retail or hospitality.",
     phases: [
-      "Design & permits",
-      "Demolition & strip-out",
+      "Design & documentation",
+      "Approvals & landlord consent",
+      "Demolition / strip-out",
+      "Services rough-in (mechanical, electrical, hydraulic, fire, data)",
       "Partitions & ceilings",
-      "Services (mechanical, electrical, hydraulic, fire)",
-      "Joinery & finishes",
-      "FF&E installation",
-      "Commissioning & defects",
-      "Handover",
+      "Finishes",
+      "FF&E & joinery",
+      "Commissioning",
+      "Defects & handover",
     ],
   },
   {
@@ -102,14 +112,12 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "long_project",
     scopeHint: "Self-contained secondary dwelling.",
     phases: [
-      "Design & approvals",
-      "Site preparation & slab",
-      "Frame & roof",
+      "Approvals & site preparation",
+      "Base / slab",
+      "Frame",
       "Lock-up",
-      "Rough-in",
-      "Lining & fit-out",
-      "Finishes & connection",
-      "Final inspection & handover",
+      "Fixing & fit-out",
+      "Completion & occupation certificate",
     ],
   },
   {
@@ -117,14 +125,14 @@ export const JOB_CATALOG: JobCategory[] = [
     label: "Shed / garage / outbuilding",
     group: "New build",
     engagementType: "short_job",
-    scopeHint: "Detached shed, garage or carport.",
+    scopeHint: "Detached shed, garage or carport (Class 10a).",
     phases: [
-      "Permit & site set-out",
+      "Approval & site set-out",
       "Footings & slab",
-      "Frame & cladding erection",
-      "Roofing",
-      "Doors & fit-off",
-      "Final check",
+      "Frame erection",
+      "Frame inspection",
+      "Roof & cladding",
+      "Finishing trades (gutters, doors, fit-off)",
     ],
   },
   {
@@ -134,12 +142,11 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "short_job",
     scopeHint: "Outdoor deck, pergola or patio structure.",
     phases: [
-      "Design & permit",
-      "Footings & posts",
-      "Framing",
-      "Decking / roofing",
-      "Balustrade & finish",
-      "Final check",
+      "Planning & approval",
+      "Footings (posts/stumps in concrete)",
+      "Posts & frame (bearers, joists)",
+      "Decking / roof structure",
+      "Balustrades, stairs & finishing",
     ],
   },
 
@@ -150,15 +157,17 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Renovation & extension",
     engagementType: "short_job",
     scopeHint: "Kitchen refurbishment — cabinetry, benchtops, appliances.",
+    // Hard dependency chain: cabinets → benchtop template → benchtop → splashback.
     phases: [
-      "Design & selections",
-      "Strip-out",
+      "Design, selections & cabinetry order",
+      "Demolition / strip-out",
       "Rough-in (plumbing & electrical)",
-      "Plastering & prep",
-      "Cabinetry & benchtops",
+      "Plaster & wall prep",
+      "Floor tiling",
+      "Cabinetry install",
+      "Benchtop template & install",
       "Splashback & tiling",
-      "Fit-off (appliances, tapware)",
-      "Final clean & handover",
+      "Fit-off (appliances, tapware, fixtures)",
     ],
   },
   {
@@ -167,14 +176,16 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Renovation & extension",
     engagementType: "short_job",
     scopeHint: "Bathroom refurbishment — waterproofing, tiling, fixtures.",
+    // Waterproofing sits after screed/sheeting and strictly before tiling (AS 3740).
     phases: [
       "Design & selections",
-      "Strip-out & demolition",
+      "Demolition / strip-out",
       "Rough-in (plumbing & electrical)",
-      "Waterproofing",
+      "Wall sheeting & floor screed (falls)",
+      "Waterproofing membrane & certificate (AS 3740)",
       "Wall & floor tiling",
-      "Fit-off (vanity, toilet, screens)",
-      "Final clean & handover",
+      "Fit-off (vanity, toilet, tapware, screen)",
+      "Final clean & inspection",
     ],
   },
   {
@@ -184,14 +195,14 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "long_project",
     scopeHint: "Full internal renovation of an existing dwelling.",
     phases: [
-      "Design & approvals",
-      "Strip-out & demolition",
+      "Design, approvals & strip-out",
       "Structural works",
-      "Rough-in services",
-      "Plastering & linings",
-      "Joinery & tiling",
-      "Finishes & painting",
-      "Fit-off & handover",
+      "Rough-in services & inspection",
+      "Insulation",
+      "Lock-up (cladding, windows, doors)",
+      "Fixing (plaster, joinery, internal doors)",
+      "Wet areas (waterproofing & tiling)",
+      "Fit-off, paint & handover",
     ],
   },
   {
@@ -201,14 +212,15 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "long_project",
     scopeHint: "Ground-floor extension or addition tied into the existing structure.",
     phases: [
-      "Design & approvals",
-      "Demolition & site prep",
-      "Footings & slab",
+      "Design, engineering & approvals",
+      "Site preparation & set-out",
+      "Footings & slab (tie-in to existing, AS 2870)",
       "Frame & roof",
-      "Tie-in & lock-up",
-      "Services rough-in",
-      "Linings & fit-out",
-      "Finishes & handover",
+      "Roof & external cladding",
+      "Lock-up (windows & doors)",
+      "Rough-in services & insulation",
+      "Fixing & break-through to existing",
+      "Fit-off, finishes & handover",
     ],
   },
   {
@@ -218,14 +230,15 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "long_project",
     scopeHint: "Adding a storey over an existing dwelling.",
     phases: [
-      "Design & approvals",
-      "Propping & roof removal",
+      "Structural assessment, design & approvals",
+      "Site prep, scaffold & strengthening",
+      "Propping & roof removal (temporary weatherproofing)",
       "New floor structure",
-      "Frame & roof",
-      "Lock-up",
-      "Rough-in",
-      "Linings & fit-out",
-      "Finishes & handover",
+      "Wall & roof framing",
+      "External cladding & roofing (lock-up)",
+      "Rough-in, insulation & linings",
+      "Wet areas, staircase & fit-off",
+      "Final inspections & handover",
     ],
   },
   {
@@ -234,14 +247,16 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Renovation & extension",
     engagementType: "short_job",
     scopeHint: "Convert an existing space into habitable rooms.",
+    // Driven by NCC habitability (2.4 m ceiling, 10% glazing, insulation); Class 1a.
     phases: [
-      "Design & permit",
-      "Strip-out",
-      "Framing & insulation",
-      "Rough-in",
-      "Lining & flooring",
-      "Finishes & fit-off",
-      "Handover",
+      "Design, drafting & council approval (Class 1a)",
+      "Demolition / strip-out & door removal",
+      "Structural & compliance works (ceiling, glazing, wall)",
+      "Rough-in (plumbing & electrical)",
+      "Insulation & thermal upgrade",
+      "Floor preparation & finish",
+      "Lining, plaster & fixing",
+      "Fit-off, finishes & occupancy sign-off",
     ],
   },
 
@@ -252,12 +267,15 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Energy & services",
     engagementType: "short_job",
     scopeHint: "Rooftop solar photovoltaic system — panels, inverter, grid connection.",
+    // CEC-accredited workflow; DNSP pre-approval before install, energisation after.
     phases: [
-      "Site assessment & system design",
-      "Approvals & grid application",
+      "Site assessment & system design (AS/NZS 5033)",
+      "Approvals & DNSP pre-approval",
       "Mounting & panel installation",
-      "Inverter & electrical",
-      "Inspection, commissioning & connection",
+      "Inverter & DC/AC electrical",
+      "Inspection & commissioning",
+      "Metering & grid connection",
+      "STC paperwork & claim",
     ],
   },
   {
@@ -267,11 +285,12 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "short_job",
     scopeHint: "Home/commercial battery energy storage system.",
     phases: [
-      "Load assessment & design",
-      "Approvals",
+      "Site assessment & system design (AS/NZS 5139)",
+      "Approvals & DNSP notification",
       "Mounting & installation",
       "Electrical integration",
-      "Commissioning & handover",
+      "Commissioning & testing",
+      "Grid sign-off & rebate claim",
     ],
   },
   {
@@ -281,11 +300,12 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "short_job",
     scopeHint: "Split-system, ducted or VRF air-conditioning install.",
     phases: [
-      "Heat-load assessment & design",
-      "Equipment procurement",
-      "Mounting & ducting",
+      "Heat-load assessment & sizing",
+      "Design & zone layout",
+      "First fix — mounting & ductwork",
       "Electrical & refrigerant",
-      "Commissioning & handover",
+      "Vacuum, charge & commissioning (ARCtick)",
+      "Handover & controller setup",
     ],
   },
   {
@@ -295,10 +315,12 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "short_job",
     scopeHint: "Replace or upgrade a hot water unit (gas, electric, heat pump or solar).",
     phases: [
-      "Assessment & sizing",
-      "Removal of old unit",
-      "Installation & connection",
-      "Commissioning & handover",
+      "Assessment & selection",
+      "Isolation & removal of old unit",
+      "Site preparation",
+      "Positioning & plumbing connection (tempering valve)",
+      "Energy connection (gas / electric / solar)",
+      "Commissioning & compliance certificate",
     ],
   },
   {
@@ -308,11 +330,12 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "short_job",
     scopeHint: "Rewire and/or switchboard and meter upgrade.",
     phases: [
-      "Inspection & design",
+      "Assessment & design (AS/NZS 3000)",
       "Isolation & make-safe",
-      "Cabling & rough-in",
-      "Switchboard & fit-off",
-      "Testing & certification",
+      "Rough-in (cabling & conduits)",
+      "Switchboard & fit-off (RCDs / MCBs)",
+      "Testing & verification",
+      "Certificate of Compliance & reconnection",
     ],
   },
   {
@@ -322,11 +345,12 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "short_job",
     scopeHint: "Replace or reroute water/waste pipework.",
     phases: [
-      "Assessment & design",
-      "Access & demolition",
-      "Pipework installation",
-      "Pressure test & connection",
-      "Reinstatement & handover",
+      "Assessment & design (AS/NZS 3500)",
+      "Isolation & make-safe",
+      "Rough-in pipework",
+      "Fit-off & connection",
+      "Pressure test & inspection",
+      "Commissioning & compliance certificate",
     ],
   },
 
@@ -339,12 +363,12 @@ export const JOB_CATALOG: JobCategory[] = [
     scopeHint: "Strip and replace an existing roof (tile or metal).",
     phases: [
       "Inspection & measure",
-      "Material procurement",
       "Strip existing roof",
-      "Battens & sarking",
-      "New roof installation",
-      "Flashings & gutters",
-      "Clean & final check",
+      "Structure repair & battens",
+      "Sarking & insulation",
+      "Install roofing (tiles / sheets)",
+      "Flashings, cappings, gutters & downpipes",
+      "Clean-up & final inspection",
     ],
   },
   {
@@ -353,7 +377,13 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Roofing & exterior",
     engagementType: "short_job",
     scopeHint: "Localised roof repair or leak rectification.",
-    phases: ["Inspection & diagnosis", "Make-safe", "Repair & reseal", "Test & verify"],
+    phases: [
+      "Inspection & leak diagnosis",
+      "Access set-up (safety / scaffold)",
+      "Repair & reseal",
+      "Cure",
+      "Water / hose test & verify",
+    ],
   },
   {
     key: "recladding",
@@ -361,14 +391,15 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Roofing & exterior",
     engagementType: "short_job",
     scopeHint: "Replace external wall cladding or façade.",
+    // AU combustible-cladding context — non-combustible replacement per NCC.
     phases: [
-      "Inspection & design",
+      "Façade assessment & fire-engineering design",
       "Scaffold & access",
-      "Remove existing cladding",
-      "Wrap & batten",
-      "New cladding installation",
-      "Flashings & finish",
-      "Clean & inspect",
+      "Strip existing cladding",
+      "Wall wrap / sarking & junction prep",
+      "Install non-combustible cladding (NCC)",
+      "Flashings, penetrations & sealing",
+      "Inspection & scaffold strike",
     ],
   },
   {
@@ -378,10 +409,11 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "short_job",
     scopeHint: "Replace gutters, fascia and downpipes.",
     phases: [
-      "Measure & procurement",
-      "Remove old guttering",
+      "Measure & mark fall line",
+      "Remove old gutters (replace fascia if needed)",
+      "Fit brackets to fall",
       "Install gutters & downpipes",
-      "Test drainage & finish",
+      "Seal joints & test flow",
     ],
   },
   {
@@ -390,12 +422,14 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Roofing & exterior",
     engagementType: "short_job",
     scopeHint: "Repaint interior and/or exterior surfaces.",
+    // Prep-first discipline, to AS 2311.
     phases: [
-      "Preparation & protection",
-      "Repairs & filling",
-      "Priming / undercoat",
-      "Top coats",
-      "Detailing & clean-up",
+      "Surface prep (clean, scrape, sand)",
+      "Repairs, filling & caulking",
+      "Prime / undercoat",
+      "First top coat",
+      "Second top coat",
+      "Inspect & touch-up",
     ],
   },
   {
@@ -404,13 +438,15 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Roofing & exterior",
     engagementType: "short_job",
     scopeHint: "Remediate failed waterproofing (balcony, wet area, basement).",
+    // 24-hr flood test before re-tiling is the compliance gate (AS 3740 / AS 4654).
     phases: [
-      "Inspection & moisture test",
-      "Strip-out",
-      "Substrate preparation",
-      "Membrane application",
-      "Flood test",
-      "Reinstatement",
+      "Strip finishes & expose substrate",
+      "Substrate repair & establish falls",
+      "Prime",
+      "Apply membrane (multi-coat, AS 4654 / 3740)",
+      "Cure",
+      "24-hr flood test & record",
+      "Re-tile / reinstate",
     ],
   },
 
@@ -422,10 +458,12 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "short_job",
     scopeHint: "New or replacement fencing and gates.",
     phases: [
-      "Set-out & permit",
-      "Post holes & footings",
-      "Panel / rail installation",
-      "Gates & hardware",
+      "Set out & mark posts",
+      "Dig post holes",
+      "Set posts in concrete (cure)",
+      "Install rails & plinth",
+      "Fix palings / infill",
+      "Hang gate & hardware",
       "Final check",
     ],
   },
@@ -436,11 +474,13 @@ export const JOB_CATALOG: JobCategory[] = [
     engagementType: "short_job",
     scopeHint: "Concrete or paved driveway, path or slab.",
     phases: [
-      "Set-out & excavation",
-      "Base preparation",
-      "Formwork & reinforcement",
-      "Pour / lay & finish",
-      "Cure & seal",
+      "Excavate to subgrade",
+      "Base prep (crushed rock & compaction)",
+      "Formwork",
+      "Reinforcement (mesh / rebar)",
+      "Pour, screed & finish (control joints)",
+      "Cure (~7 days)",
+      "Seal",
     ],
   },
   {
@@ -449,13 +489,14 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Outdoor & civil",
     engagementType: "short_job",
     scopeHint: "Soft and hard landscaping works.",
+    // Hard-before-soft so planting isn't damaged by finishing works.
     phases: [
-      "Design & plan",
-      "Site clearing & earthworks",
-      "Hardscaping",
-      "Irrigation",
-      "Planting & turf",
-      "Final clean",
+      "Design & site clearance",
+      "Earthworks, grading & drainage",
+      "Irrigation rough-in",
+      "Hardscaping (paving, paths, structures)",
+      "Softscaping (soil, planting, turf)",
+      "Mulch, finish & maintenance handover",
     ],
   },
   {
@@ -464,14 +505,16 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Outdoor & civil",
     engagementType: "long_project",
     scopeHint: "In-ground concrete or fibreglass swimming pool.",
+    // Safety barrier must be installed & certified before fill / handover (AS 1926.1).
     phases: [
-      "Design & approvals",
+      "Design, approval & set-out",
       "Excavation",
-      "Shell (concrete / fibreglass)",
+      "Shell (steel & shotcrete / fibreglass craned-in)",
       "Plumbing & equipment",
-      "Coping & tiling",
-      "Fencing & compliance",
-      "Commissioning & handover",
+      "Coping, tiling & interior finish",
+      "Backfill",
+      "Pool barrier & compliance certificate (AS 1926.1)",
+      "Fill, commission & handover",
     ],
   },
   {
@@ -480,12 +523,15 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Outdoor & civil",
     engagementType: "short_job",
     scopeHint: "Engineered retaining wall.",
+    // Drainage behind the wall is the critical engineered element.
     phases: [
-      "Design & engineering",
-      "Excavation",
-      "Footings & drainage",
-      "Wall construction",
-      "Backfill & finish",
+      "Engineering design & set-out",
+      "Excavate & prepare base",
+      "Footings (cure)",
+      "Build wall",
+      "Drainage behind wall (agi-pipe & gravel)",
+      "Layered backfill & compaction",
+      "Finish & inspect",
     ],
   },
   {
@@ -494,9 +540,12 @@ export const JOB_CATALOG: JobCategory[] = [
     group: "Outdoor & civil",
     engagementType: "short_job",
     scopeHint: "Full or partial demolition and site clearance.",
+    // Asbestos surveyed & licensed-removed before structural demolition (WHS).
     phases: [
-      "Permits & disconnections",
-      "Asbestos / hazmat survey",
+      "Permits & WHS notification",
+      "Service disconnections",
+      "Hazmat / asbestos survey & licensed removal",
+      "Site set-up (hoarding, fencing)",
       "Soft strip",
       "Structural demolition",
       "Waste removal & site clearance",
@@ -520,7 +569,7 @@ export const JOB_CATALOG: JobCategory[] = [
     scopeHint: "Make-safe and repair of storm or water damage (often insurance).",
     phases: [
       "Make-safe & assessment",
-      "Insurance scope",
+      "Insurance scope & approval",
       "Repairs",
       "Restoration & sign-off",
     ],
@@ -535,8 +584,8 @@ export const JOB_CATALOG: JobCategory[] = [
       "Inspection & report",
       "Treatment plan",
       "Treatment & barrier",
-      "Repairs",
-      "Re-inspection",
+      "Structural repairs",
+      "Re-inspection & warranty",
     ],
   },
 ];
