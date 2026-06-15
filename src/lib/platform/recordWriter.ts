@@ -318,6 +318,35 @@ const bimModelSchema = z.object({
   notes: z.string().default(""),
 });
 
+const quoteSchema = z.object({
+  jobId: id,
+  refNumber: str(30).default(""),
+  title: str(300).min(1),
+  clientName: str(200).default(""),
+  status: z.enum(["draft", "sent", "accepted", "rejected", "expired"]).default("draft"),
+  gstRate: num.default(10),
+  subtotal: num.default(0),
+  gstAmount: num.default(0),
+  total: num.default(0),
+  notes: z.string().default(""),
+  validUntil: optDate,
+  isAiDrafted: bool.default(false),
+  createdBy: str(200).default(""),
+  sentAt: optDate,
+  decidedAt: optDate,
+});
+
+const quoteLineSchema = z.object({
+  quoteId: id,
+  description: str(300).min(1),
+  category: str(100).default(""),
+  qty: num.default(1),
+  unit: str(20).default("item"),
+  unitPrice: num.default(0),
+  lineTotal: num.default(0),
+  sortOrder: int.default(0),
+});
+
 const portalTokenSchema = z.object({
   jobId: id,
   token: z.string().trim().min(32).max(64),
@@ -348,6 +377,8 @@ const REGISTRY = {
   weekly_report: { physical: "plat_con_weeklyreport", delegate: d(prisma.platConWeeklyReport), create: weeklyReportSchema, update: upd(weeklyReportSchema) },
   bim_model: { physical: "plat_con_bimmodel", delegate: d(prisma.platConBimModel), create: bimModelSchema, update: upd(bimModelSchema) },
   portal_token: { physical: "plat_con_portaltoken", delegate: d(prisma.platConPortalToken), create: portalTokenSchema, update: upd(portalTokenSchema) },
+  quote: { physical: "plat_con_quote", delegate: d(prisma.platConQuote), create: quoteSchema, update: upd(quoteSchema) },
+  quote_line: { physical: "plat_con_quoteline", delegate: d(prisma.platConQuoteLine), create: quoteLineSchema, update: upd(quoteLineSchema) },
 } satisfies Record<string, TableDef>;
 
 export type WritableTable = keyof typeof REGISTRY;

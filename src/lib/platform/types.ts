@@ -40,6 +40,7 @@ export interface Actor {
 export const DEFAULT_FEATURES: Record<string, boolean> = {
   risks: true,
   variations: true,
+  quotes: true,
   reports: true,
   meeting_minutes: true,
   documents: true,

@@ -810,6 +810,8 @@ model PlatOrganisation {
   conBimModels    PlatConBimModel[]
   conPortalTokens PlatConPortalToken[]
   conPhaseEvidence PlatConPhaseEvidence[]
+  conQuotes       PlatConQuote[]
+  conQuoteLines   PlatConQuoteLine[]
   conAccounting   PlatConAccountingConnection[]
   cfgTeam         PlatCfgTeamMember[]
   cfgRegions      PlatCfgRegion[]
@@ -938,6 +940,7 @@ model PlatJob {
   conBimModels    PlatConBimModel[]
   conPortalTokens PlatConPortalToken[]
   conPhaseEvidence PlatConPhaseEvidence[]
+  conQuotes       PlatConQuote[]
 
   @@unique([orgId, code])
   @@index([orgId, status])
@@ -1339,6 +1342,57 @@ model PlatConVariationOrder {
 
   @@index([jobId, status])
   @@map("plat_con_variationorder")
+}
+
+// Client-facing priced quote for a job. Lines hold the priced scope; totals
+// (subtotal, GST, total) are computed by the service whenever lines change.
+model PlatConQuote {
+  id          Int       @id @default(autoincrement())
+  orgId       Int       @map("org_id")
+  jobId       Int       @map("job_id")
+  refNumber   String    @default("") @map("ref_number") @db.VarChar(30)
+  title       String    @db.VarChar(300)
+  clientName  String    @default("") @map("client_name") @db.VarChar(200)
+  status      String    @default("draft") @db.VarChar(30) // draft | sent | accepted | rejected | expired
+  gstRate     Decimal   @default(10) @map("gst_rate") @db.Decimal(5, 2)
+  subtotal    Decimal   @default(0) @db.Decimal(14, 2)
+  gstAmount   Decimal   @default(0) @map("gst_amount") @db.Decimal(14, 2)
+  total       Decimal   @default(0) @db.Decimal(14, 2)
+  notes       String    @default("")
+  validUntil  DateTime? @map("valid_until") @db.Date
+  isAiDrafted Boolean   @default(false) @map("is_ai_drafted")
+  createdBy   String    @default("") @map("created_by") @db.VarChar(200)
+  sentAt      DateTime? @map("sent_at")
+  decidedAt   DateTime? @map("decided_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  org   PlatOrganisation   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job   PlatJob            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  lines PlatConQuoteLine[]
+
+  @@index([jobId, status])
+  @@map("plat_con_quote")
+}
+
+model PlatConQuoteLine {
+  id          Int      @id @default(autoincrement())
+  orgId       Int      @map("org_id")
+  quoteId     Int      @map("quote_id")
+  description String   @db.VarChar(300)
+  category    String   @default("") @db.VarChar(100)
+  qty         Decimal  @default(1) @db.Decimal(12, 2)
+  unit        String   @default("item") @db.VarChar(20)
+  unitPrice   Decimal  @default(0) @map("unit_price") @db.Decimal(14, 2)
+  lineTotal   Decimal  @default(0) @map("line_total") @db.Decimal(14, 2)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  org   PlatOrganisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  quote PlatConQuote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId, sortOrder])
+  @@map("plat_con_quoteline")
 }
 
 model PlatConVendor {

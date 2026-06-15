@@ -42,6 +42,7 @@ export function buildNav(ctx: OrgCtx, jobCount: number): NavSection[] {
     {
       heading: "Finance",
       items: [
+        ...(f.quotes ? [{ href: p("/quotes"), label: "Quotes" }] : []),
         { href: p("/budget"), label: "Budget" },
         { href: p("/cashflow"), label: "Cashflow" },
       ],
