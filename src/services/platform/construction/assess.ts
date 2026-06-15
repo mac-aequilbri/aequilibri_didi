@@ -19,6 +19,7 @@ import { resolveField, CascadeOutcome } from "@/lib/platform/sourceCascade";
 import { OrgCtx } from "@/lib/platform/types";
 import type { GeocodeResult } from "@/lib/platform/geocode";
 import { runAssessment } from "../assessment";
+import { getCategory } from "@/lib/platform/jobCatalog";
 import { getMatchingGuidance } from "../learning";
 import {
   applyTemplateWeeks,
@@ -33,6 +34,8 @@ export interface AssessmentIntakeInput {
   suburb: string;
   sizeSqm?: number;
   scope: string;
+  /** Job-category catalog key (industry reference); optional. */
+  category?: string;
 }
 
 interface AiEstimate {
@@ -57,8 +60,11 @@ export interface StoredAssessment {
   appliedRules: Awaited<ReturnType<typeof runAssessment>>["appliedRules"];
   overallConfidence: number;
   detail: Pick<AiEstimate, "budgetBreakdown" | "phases" | "risks" | "summary">;
-  /** Where the phase plan came from — learnings (prior jobs) take priority. */
-  phaseSource: "learnings" | "ai";
+  /** Chosen job-category catalog key, and its label for display. */
+  category?: string;
+  categoryLabel?: string;
+  /** Where the phase plan came from — learnings → catalog default → AI. */
+  phaseSource: "learnings" | "catalog" | "ai";
   /** Provenance when phases were learned from history. */
   phaseLearning?: { sampleCount: number; sourceJobCodes: string[] };
   /** Immutable snapshot of the generated phases, so refinements can be diffed. */
@@ -111,13 +117,19 @@ export async function runConstructionAssessment(
   const geo = await resolveField(geocodeProviders(fullAddress));
   const suburb = geo.value?.suburb || input.suburb;
 
-  // 1b. Known learnings — primary source for the phase structure. If this
-  //     customer has prior jobs of the same engagement type, reuse their
-  //     proven phase plan; the AI only adapts durations. Guidance rules make
-  //     the whole analysis learning-aware.
-  const ruleContext = { suburb, engagement_type: input.engagementType };
+  // 1b. Known learnings + industry catalog — the phase structure is resolved
+  //     learnings-first: prior jobs of the same category/engagement type take
+  //     priority; the chosen catalog category is the expert default that
+  //     fills the cold-start gap; the AI only adapts durations. Guidance rules
+  //     make the whole analysis learning-aware.
+  const category = getCategory(input.category);
+  const ruleContext = {
+    suburb,
+    engagement_type: input.engagementType,
+    ...(category ? { category: category.key } : {}),
+  };
   const [phaseTemplate, guidance] = await Promise.all([
-    derivePhaseTemplate(ctx, input.engagementType),
+    derivePhaseTemplate(ctx, { engagementType: input.engagementType, category: category?.key }),
     getMatchingGuidance(ctx, ruleContext),
   ]);
 
@@ -127,11 +139,13 @@ export async function runConstructionAssessment(
     system,
     JSON.stringify({
       scope: input.scope,
+      jobCategory: category?.label,
       engagementType: input.engagementType,
       location: geo.value?.formatted ?? `${input.address} ${input.suburb}`.trim(),
       suburb,
       sizeSqm: input.sizeSqm ?? null,
       learnedPhases: phaseTemplate ? phaseTemplate.phases.map((p) => p.name) : undefined,
+      catalogPhases: category ? category.phases : undefined,
       guidanceRules: guidance.length ? guidance.map((g) => g.description) : undefined,
     }),
     { model: modelFor("complex_reasoning"), maxTokens: 1500 },
@@ -180,14 +194,21 @@ export async function runConstructionAssessment(
     }
   }
 
-  // 2b. Resolve the phase plan with learnings as the primary source: when a
-  //     template exists, names/order come from it and the AI only supplies
-  //     durations; otherwise the AI's phases stand.
+  // 2b. Resolve the phase plan: learnings (prior jobs) → catalog (industry
+  //     default for the chosen category) → AI. Whatever supplies the names,
+  //     the AI supplies the week durations.
   let phases: PhaseInput[];
-  let phaseSource: "learnings" | "ai";
+  let phaseSource: "learnings" | "catalog" | "ai";
   if (phaseTemplate) {
     phaseSource = "learnings";
     phases = applyTemplateWeeks(phaseTemplate, estimate.phases, estimate.durationWeeks);
+  } else if (category) {
+    phaseSource = "catalog";
+    phases = applyTemplateWeeks(
+      { phases: category.phases.map((name) => ({ name })), sampleCount: 0, sourceJobCodes: [] },
+      estimate.phases,
+      estimate.durationWeeks,
+    );
   } else {
     phaseSource = "ai";
     phases = estimate.phases;
@@ -232,6 +253,8 @@ export async function runConstructionAssessment(
       risks: estimate.risks,
       summary: estimate.summary,
     },
+    category: category?.key,
+    categoryLabel: category?.label,
     phaseSource,
     phaseLearning: phaseTemplate
       ? { sampleCount: phaseTemplate.sampleCount, sourceJobCodes: phaseTemplate.sourceJobCodes }
@@ -378,6 +401,7 @@ export async function acceptAssessment(
     summary: assessment.detail.summary,
     meta: JSON.stringify({
       assessmentId,
+      category: assessment.category,
       overallConfidence: assessment.overallConfidence,
       appliedRules: assessment.appliedRules.map((r) => r.ruleCode),
     }),

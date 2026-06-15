@@ -22,14 +22,16 @@ export interface PhaseTemplate {
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
-/** Build a phase template from this org's prior jobs of the same engagement
- *  type. Returns null when there's no history to learn from. */
+/** Build a phase template from this org's prior jobs. Prior jobs of the same
+ *  job CATEGORY take priority (most specific learning); failing that, jobs of
+ *  the same engagement type. Returns null when there's no history to learn
+ *  from. */
 export async function derivePhaseTemplate(
   ctx: OrgCtx,
-  engagementType: string,
+  opts: { engagementType: string; category?: string },
 ): Promise<PhaseTemplate | null> {
   const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId, engagementType },
+    where: { orgId: ctx.orgId, engagementType: opts.engagementType },
     orderBy: { createdAt: "desc" },
     include: {
       conPhases: {
@@ -39,7 +41,23 @@ export async function derivePhaseTemplate(
       },
     },
   });
-  const withPhases = jobs.filter((j) => j.conPhases.length > 0);
+  let withPhases = jobs.filter((j) => j.conPhases.length > 0);
+
+  // When a category is given, learn ONLY from prior jobs of that same category
+  // (stored on PlatJob.meta at acceptance) — a same-engagement job of a
+  // different category is no guide (a deck rebuild can't shape a solar plan).
+  // With no same-category history we return null so the industry catalog
+  // default takes over. Without a category we keep the broader
+  // same-engagement-type behaviour.
+  if (opts.category) {
+    withPhases = withPhases.filter((j) => {
+      try {
+        return (JSON.parse(j.meta || "{}") as { category?: string }).category === opts.category;
+      } catch {
+        return false;
+      }
+    });
+  }
   if (withPhases.length === 0) return null;
 
   // Thin history: reuse the most recent similar job's coherent sequence rather

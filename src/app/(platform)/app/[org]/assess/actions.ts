@@ -24,6 +24,7 @@ export async function runAssessmentAction(formData: FormData): Promise<void> {
     suburb: String(formData.get("suburb") ?? "").trim(),
     sizeSqm: Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : undefined,
     scope,
+    category: String(formData.get("category") ?? "").trim() || undefined,
   });
   redirect(orgPath(ctx.orgSlug, `/assess?run=${assessmentId}`));
 }

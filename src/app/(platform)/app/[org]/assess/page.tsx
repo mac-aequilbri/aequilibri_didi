@@ -7,8 +7,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { currency } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { getAssessment } from "@/services/platform/construction/assess";
-import { acceptAssessmentAction, runAssessmentAction } from "./actions";
-import { AcceptAssessmentButton, RunAssessmentButton } from "./SubmitButtons";
+import { acceptAssessmentAction } from "./actions";
+import { AcceptAssessmentButton } from "./SubmitButtons";
+import { IntakeForm } from "./IntakeForm";
 import { PhaseRefiner } from "./PhaseRefiner";
 
 export const dynamic = "force-dynamic";
@@ -35,48 +36,11 @@ export default async function AssessPage({
       />
 
       {!assessment && (
-        <form action={runAssessmentAction} className="ae-card p-5 space-y-4 relative">
-          <input type="hidden" name="org" value={ctx.orgSlug} />
-          <label className="block text-sm">
-            <span className="text-neutral-600">Job name *</span>
-            <input name="name" required placeholder="Seaview Duplex" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <label className="block text-sm">
-              <span className="text-neutral-600">Address</span>
-              <input name="address" placeholder="12 Ocean Parade" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-            </label>
-            <label className="block text-sm">
-              <span className="text-neutral-600">Suburb</span>
-              <input name="suburb" placeholder="Maroochydore" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-            </label>
-            <label className="block text-sm">
-              <span className="text-neutral-600">Engagement type</span>
-              <select name="engagementType" defaultValue={ctx.defaultEngagementType} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
-                {ctx.allowedEngagementTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace("_", " ")}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="text-neutral-600">Approx. size (m²)</span>
-              <input type="number" name="sizeSqm" min={1} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-            </label>
-          </div>
-          <label className="block text-sm">
-            <span className="text-neutral-600">Scope description *</span>
-            <textarea
-              name="scope"
-              required
-              rows={4}
-              placeholder="Two-storey duplex, concrete slab, timber frame, mid-range finishes, sloping coastal block…"
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
-            />
-          </label>
-          <RunAssessmentButton />
-        </form>
+        <IntakeForm
+          orgSlug={ctx.orgSlug}
+          allowedEngagementTypes={ctx.allowedEngagementTypes}
+          defaultEngagementType={ctx.defaultEngagementType}
+        />
       )}
 
       {assessment && (
@@ -155,16 +119,22 @@ export default async function AssessPage({
               {assessment.phaseSource === "learnings" && assessment.phaseLearning ? (
                 <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   ✓ Learned from {assessment.phaseLearning.sampleCount} prior{" "}
-                  {assessment.input.engagementType.replace("_", " ")} job
+                  {assessment.categoryLabel ?? assessment.input.engagementType.replace("_", " ")} job
                   {assessment.phaseLearning.sampleCount === 1 ? "" : "s"}
                   {assessment.phaseLearning.sourceJobCodes.length
                     ? ` (${assessment.phaseLearning.sourceJobCodes.join(", ")})`
                     : ""}
                   {assessment.phasesRefined ? " · refined" : ""}
                 </span>
+              ) : assessment.phaseSource === "catalog" ? (
+                <span className="text-xs px-2 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                  ⌂ Industry standard for {assessment.categoryLabel ?? "this category"} — first of its
+                  kind here
+                  {assessment.phasesRefined ? " · refined" : ""}
+                </span>
               ) : (
                 <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 text-neutral-600">
-                  AI-suggested — no prior {assessment.input.engagementType.replace("_", " ")} jobs to learn from
+                  AI-suggested — no category chosen
                   {assessment.phasesRefined ? " · refined" : ""}
                 </span>
               )}
@@ -172,7 +142,9 @@ export default async function AssessPage({
             <p className="text-xs text-neutral-500 mb-3">
               {assessment.phaseSource === "learnings"
                 ? "These follow how this customer structures similar jobs. Refine them for this job — changes are saved before you accept, and feed future plans."
-                : "Refine the AI-suggested plan for this job. Once accepted, it becomes the template the next similar job learns from."}
+                : assessment.phaseSource === "catalog"
+                  ? "Industry-standard phases for this job category. Refine them for this job — once accepted, your own jobs become the template the next one learns from."
+                  : "Refine the AI-suggested plan for this job. Once accepted, it becomes the template the next similar job learns from."}
             </p>
             <PhaseRefiner
               orgSlug={ctx.orgSlug}
