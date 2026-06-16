@@ -125,10 +125,11 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
   const applyRoofPlan = (rp: RoofPlan, m: RoofMeasurement, edited: { outline: number[][]; sections: RoofPlan["sections"] }) => {
     // Keep the user's edited outline/sections so reopening the review shows them.
     setSavedPlan({ ...rp, ai_outline_pct: edited.outline, sections: edited.sections });
-    const aiOutline = (Array.isArray(rp.ai_footprint) && rp.ai_footprint.length >= 3 ? rp.ai_footprint : []) as LatLng[];
+    // Keep the trusted building footprint already on the map — the AI draw only
+    // contributes measurements/sections, it must NOT replace the map outline
+    // (the AI footprint is re-derived independently and can be wrong).
     setAnalysis((prev) => prev && ({
       ...prev,
-      outline: aiOutline.length ? aiOutline : prev.outline,
       roofType: m.roof_type, confidence: rp.confidence ?? prev.confidence,
       sectionCount: m.section_count, areaM2: m.area_m2,
       perimeterM: m.perimeter_m, ridgeLm: m.ridge_lm, hipLm: m.hip_lm,
