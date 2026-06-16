@@ -365,6 +365,7 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
               <input type="hidden" name="roof_area_m2" value={effectiveArea} />
               <input type="hidden" name="perimeter_m" value={analysis?.perimeterM ?? ""} />
               <input type="hidden" name="eave_lm" value={analysis?.perimeterM ?? ""} />
+              <input type="hidden" name="roof_polygon_json" value={analysis?.outline?.length ? JSON.stringify(analysis.outline) : ""} />
               <input type="hidden" name="roof_type" value={roofTypeSel} />
               <input type="hidden" name="storeys" value={storeys} />
               <input type="hidden" name="pitch_type" value={pitch} />

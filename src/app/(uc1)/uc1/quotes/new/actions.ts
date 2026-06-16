@@ -119,6 +119,7 @@ export async function createQuote(formData: FormData) {
         perimeterM: num("perimeter_m"),
         storeys: Math.round(num("storeys", 1)),
         roofColour: str("roof_colour"),
+        roofPolygonJson: str("roof_polygon_json") || null,
         notes: [str("notes"), ruleNote].filter(Boolean).join("\n"),
         pricingMechanism: mechanism,
         packageTier: mechanism === "packages" ? packageTier : "",
