@@ -8,7 +8,7 @@ const RoofModel3D = dynamic(() => import("./RoofModel3D"), {
   loading: () => <div className="text-neutral-400 text-sm p-8">Loading 3D model…</div>,
 });
 
-interface RoofSection { polygon?: number[][]; color?: string; facing?: string; area_m2?: number; label?: string; pitch_est?: number }
+export interface RoofSection { polygon?: number[][]; color?: string; facing?: string; area_m2?: number; label?: string; pitch_est?: number }
 export interface RoofPlan {
   ok: boolean; image_b64: string; ai_outline_pct?: number[][]; footprint_pct?: number[][];
   sections?: RoofSection[]; roof_type?: string; confidence?: string; ridge_lm?: number; hip_lm?: number;
@@ -24,22 +24,23 @@ export interface RoofMeasurement {
 
 type Pt = [number, number];
 
-export default function RoofPlanDialog({ plan, onClose, onApply }: { plan: RoofPlan; onClose: () => void; onApply: (m: RoofMeasurement) => void }) {
+export default function RoofPlanDialog({ plan, onClose, onApply }: { plan: RoofPlan; onClose: () => void; onApply: (m: RoofMeasurement, edited: { outline: number[][]; sections: RoofSection[] }) => void }) {
   const W = plan.width ?? 640;
   const H = plan.height ?? 640;
   const mpp = plan.scale?.meters_per_px ?? 0.1;
   const initial = (plan.ai_outline_pct?.length ?? 0) >= 3 ? plan.ai_outline_pct! : plan.footprint_pct ?? [];
 
+  type Snapshot = { outline: Pt[]; sections: RoofSection[] };
   const [outline, setOutline] = useState<Pt[]>(initial.map((p) => [p[0], p[1]]));
-  const [history, setHistory] = useState<Pt[][]>([]);
-  const [redo, setRedo] = useState<Pt[][]>([]);
+  const [sections, setSections] = useState<RoofSection[]>((plan.sections ?? []).map((s) => ({ ...s, polygon: s.polygon?.map((p) => [...p]) })));
+  const [history, setHistory] = useState<Snapshot[]>([]);
+  const [redo, setRedo] = useState<Snapshot[]>([]);
   const [zoom, setZoom] = useState(1);
   const [showLabels, setShowLabels] = useState(true);
   const [view, setView] = useState<"edit" | "plan" | "3d">("edit");
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  // drag.si === null → an outline vertex; otherwise the vi-th vertex of section si.
+  const [drag, setDrag] = useState<{ si: number | null; vi: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-
-  const sections = plan.sections ?? [];
   const avgPitch = useMemo(() => {
     const ps = sections.map((s) => s.pitch_est ?? 0).filter((p) => p > 1);
     return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : 20;
@@ -65,31 +66,36 @@ export default function RoofPlanDialog({ plan, onClose, onApply }: { plan: RoofP
     return { footprint: Math.round(footprint * 10) / 10, total: Math.round(total * 10) / 10, perim: Math.round(perim * 10) / 10, edges, centroid: [cx, cy] as Pt };
   }, [outline, W, H, mpp, avgPitch]);
 
-  const pushHistory = () => { setHistory((h) => [...h, outline.map((p) => [...p] as Pt)]); setRedo([]); };
+  const snapshot = (): Snapshot => ({ outline: outline.map((p) => [...p] as Pt), sections: sections.map((s) => ({ ...s, polygon: s.polygon?.map((p) => [...p]) })) });
+  const pushHistory = () => { setHistory((h) => [...h, snapshot()]); setRedo([]); };
 
-  // Drag handling.
+  // Drag handling — outline vertices and section vertices share one path.
   useEffect(() => {
-    if (dragIdx === null) return;
+    if (!drag) return;
     const move = (e: PointerEvent) => {
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-      const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
-      setOutline((o) => o.map((p, i) => (i === dragIdx ? [Math.round(x * 100) / 100, Math.round(y * 100) / 100] : p)));
+      const x = Math.round(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)) * 100) / 100;
+      const y = Math.round(Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)) * 100) / 100;
+      if (drag.si === null) {
+        setOutline((o) => o.map((p, i) => (i === drag.vi ? [x, y] : p)));
+      } else {
+        setSections((ss) => ss.map((s, si) => (si === drag.si ? { ...s, polygon: s.polygon?.map((p, vi) => (vi === drag.vi ? [x, y] : p)) } : s)));
+      }
     };
-    const up = () => setDragIdx(null);
+    const up = () => setDrag(null);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
-  }, [dragIdx]);
+  }, [drag]);
 
-  const undo = () => setHistory((h) => { if (!h.length) return h; const prev = h[h.length - 1]; setRedo((r) => [...r, outline]); setOutline(prev); return h.slice(0, -1); });
-  const redoFn = () => setRedo((r) => { if (!r.length) return r; const next = r[r.length - 1]; setHistory((hh) => [...hh, outline]); setOutline(next); return r.slice(0, -1); });
+  const undo = () => setHistory((h) => { if (!h.length) return h; const prev = h[h.length - 1]; setRedo((r) => [...r, snapshot()]); setOutline(prev.outline); setSections(prev.sections); return h.slice(0, -1); });
+  const redoFn = () => setRedo((r) => { if (!r.length) return r; const next = r[r.length - 1]; setHistory((hh) => [...hh, snapshot()]); setOutline(next.outline); setSections(next.sections); return r.slice(0, -1); });
 
   const apply = () => onApply({
     area_m2: geom.total, footprint_m2: geom.footprint, perimeter_m: geom.perim, avg_pitch: Math.round(avgPitch),
     section_count: sections.length, roof_type: plan.roof_type ?? "unknown", ridge_lm: plan.ridge_lm ?? 0, hip_lm: plan.hip_lm ?? 0,
-  });
+  }, { outline: outline.map((p) => [...p]), sections });
 
   const conf = (plan.confidence ?? "low").toUpperCase();
   const ptsStr = (pts: number[][]) => pts.map((p) => `${p[0]},${p[1]}`).join(" ");
@@ -146,12 +152,13 @@ export default function RoofPlanDialog({ plan, onClose, onApply }: { plan: RoofP
             <div className="text-xs font-bold uppercase tracking-wide text-neutral-500 mb-2">Review measurements</div>
             <div className="ae-card p-3" style={{ background: "#f3fbf6", border: "1px solid #bfe6cc" }}>
               <strong className="block text-[#155724]">Touch what looks wrong</strong>
-              <span className="block text-sm text-neutral-600 mt-1 mb-3">Drag a green point to adjust the outline; areas, perimeter and pitch recalculate live.</span>
+              <span className="block text-sm text-neutral-600 mt-1 mb-3">Drag a green point to reshape the outline, or a coloured point to adjust a section. Areas, perimeter and pitch recalculate live.</span>
               <button onClick={apply} className="btn-ae w-full mb-2" style={{ background: "#1e8e4e" }}>Use these measurements</button>
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={undo} disabled={!history.length} className="btn-ae-outline text-sm disabled:opacity-40">Undo</button>
                 <button onClick={redoFn} disabled={!redo.length} className="btn-ae-outline text-sm disabled:opacity-40">Redo</button>
               </div>
+              <button onClick={() => { pushHistory(); setSections([]); }} disabled={!sections.length} className="btn-ae-outline w-full text-sm mt-2 disabled:opacity-40" style={{ color: "#b91c1c", borderColor: "#f0c5c5" }}>Delete all sections</button>
             </div>
           </div>
         </aside>
@@ -212,8 +219,11 @@ export default function RoofPlanDialog({ plan, onClose, onApply }: { plan: RoofP
                       <text x={geom.centroid[0]} y={geom.centroid[1] + 3} fontSize={2.4} textAnchor="middle" fill="#dff4e7">{Math.round(avgPitch)} deg</text>
                     </g>
                   )}
+                  {sections.map((s, si) => (s.polygon ?? []).map((p, vi) => (
+                    <circle key={`s${si}-${vi}`} cx={p[0]} cy={p[1]} r={1.3} fill="#fff" stroke={s.color ?? "#2563eb"} strokeWidth={0.6} style={{ cursor: "grab" }} onPointerDown={(e) => { e.preventDefault(); pushHistory(); setDrag({ si, vi }); }} />
+                  )))}
                   {outline.map((p, i) => (
-                    <circle key={i} cx={p[0]} cy={p[1]} r={1.6} fill="#fff" stroke="#1e8e4e" strokeWidth={0.7} style={{ cursor: "grab" }} onPointerDown={(e) => { e.preventDefault(); pushHistory(); setDragIdx(i); }} />
+                    <circle key={i} cx={p[0]} cy={p[1]} r={1.6} fill="#fff" stroke="#1e8e4e" strokeWidth={0.7} style={{ cursor: "grab" }} onPointerDown={(e) => { e.preventDefault(); pushHistory(); setDrag({ si: null, vi: i }); }} />
                   ))}
                 </svg>
                 {/* North arrow + scale + legend overlays */}

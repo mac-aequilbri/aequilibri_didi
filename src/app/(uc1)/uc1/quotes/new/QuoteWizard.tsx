@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import GoogleMap, { type LatLng } from "@/components/GoogleMap";
 import RoofPlanDialog, { type RoofPlan, type RoofMeasurement } from "./RoofPlanDialog";
 import { createQuote, recordRoofCorrectionAction } from "./actions";
@@ -82,6 +82,8 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
 
   const [aiBusy, setAiBusy] = useState(false);
   const [roofPlan, setRoofPlan] = useState<RoofPlan | null>(null);
+  // Last reviewed/edited plan, kept so reopening shows the user's edits (not a fresh AI fetch).
+  const [savedPlan, setSavedPlan] = useState<RoofPlan | null>(null);
 
   // Map click → fast building-footprint measurement (instant), like the Python app.
   const analyze = useCallback(async (lat: number, lng: number) => {
@@ -107,15 +109,22 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
   // Opens a dialog showing the satellite image with the AI-drawn outline + sections.
   const runAiRoof = useCallback(async () => {
     if (!clickPoint) return;
+    // Reopen the user's reviewed/edited plan rather than re-fetching a fresh AI read.
+    if (savedPlan) { setRoofPlan(savedPlan); return; }
     setAiBusy(true);
     try {
       const roof = await fetch("/api/uc1/roof-drawing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lat: clickPoint[0], lng: clickPoint[1], address }) }).then((r) => r.json()).catch(() => null);
-      if (roof?.ok) setRoofPlan(roof as RoofPlan);
+      if (roof?.ok) { setRoofPlan(roof as RoofPlan); setSavedPlan(roof as RoofPlan); }
     } finally { setAiBusy(false); }
-  }, [clickPoint, address]);
+  }, [clickPoint, address, savedPlan]);
+
+  // A new map pin invalidates the saved plan so the next review fetches fresh.
+  useEffect(() => { setSavedPlan(null); }, [clickPoint]);
 
   // Apply the reviewed/edited AI roof measurement to the working quote.
-  const applyRoofPlan = (rp: RoofPlan, m: RoofMeasurement) => {
+  const applyRoofPlan = (rp: RoofPlan, m: RoofMeasurement, edited: { outline: number[][]; sections: RoofPlan["sections"] }) => {
+    // Keep the user's edited outline/sections so reopening the review shows them.
+    setSavedPlan({ ...rp, ai_outline_pct: edited.outline, sections: edited.sections });
     const aiOutline = (Array.isArray(rp.ai_footprint) && rp.ai_footprint.length >= 3 ? rp.ai_footprint : []) as LatLng[];
     setAnalysis((prev) => prev && ({
       ...prev,
@@ -453,7 +462,7 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
         </div>
       </div>
 
-      {roofPlan && <RoofPlanDialog plan={roofPlan} onClose={() => setRoofPlan(null)} onApply={(m) => applyRoofPlan(roofPlan, m)} />}
+      {roofPlan && <RoofPlanDialog plan={roofPlan} onClose={() => setRoofPlan(null)} onApply={(m, edited) => applyRoofPlan(roofPlan, m, edited)} />}
     </div>
   );
 }
