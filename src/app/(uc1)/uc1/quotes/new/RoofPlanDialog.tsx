@@ -13,6 +13,7 @@ export interface RoofPlan {
   ok: boolean; image_b64: string; ai_outline_pct?: number[][]; footprint_pct?: number[][];
   sections?: RoofSection[]; roof_type?: string; confidence?: string; ridge_lm?: number; hip_lm?: number;
   valley_lm?: number; rake_lm?: number; ai_footprint?: number[][]; width?: number; height?: number;
+  center?: { lat: number; lng: number };
   scale?: { meters_per_px?: number; zoom?: number };
   quality?: { quality_score?: number | null; needs_review?: boolean }; notes?: string;
 }
@@ -24,7 +25,7 @@ export interface RoofMeasurement {
 
 type Pt = [number, number];
 
-export default function RoofPlanDialog({ plan, onClose, onApply }: { plan: RoofPlan; onClose: () => void; onApply: (m: RoofMeasurement, edited: { outline: number[][]; sections: RoofSection[] }) => void }) {
+export default function RoofPlanDialog({ plan, onClose, onApply }: { plan: RoofPlan; onClose: () => void; onApply: (m: RoofMeasurement, edited: { outline: number[][]; sections: RoofSection[]; outlineChanged: boolean }) => void }) {
   const W = plan.width ?? 640;
   const H = plan.height ?? 640;
   const mpp = plan.scale?.meters_per_px ?? 0.1;
@@ -92,10 +93,15 @@ export default function RoofPlanDialog({ plan, onClose, onApply }: { plan: RoofP
   const undo = () => setHistory((h) => { if (!h.length) return h; const prev = h[h.length - 1]; setRedo((r) => [...r, snapshot()]); setOutline(prev.outline); setSections(prev.sections); return h.slice(0, -1); });
   const redoFn = () => setRedo((r) => { if (!r.length) return r; const next = r[r.length - 1]; setHistory((hh) => [...hh, snapshot()]); setOutline(next.outline); setSections(next.sections); return r.slice(0, -1); });
 
-  const apply = () => onApply({
-    area_m2: geom.total, footprint_m2: geom.footprint, perimeter_m: geom.perim, avg_pitch: Math.round(avgPitch),
-    section_count: sections.length, roof_type: plan.roof_type ?? "unknown", ridge_lm: plan.ridge_lm ?? 0, hip_lm: plan.hip_lm ?? 0,
-  }, { outline: outline.map((p) => [...p]), sections });
+  const apply = () => {
+    // Did the estimator actually move/delete an outline vertex? Only then should
+    // the corrected outline replace the trusted map outline.
+    const outlineChanged = JSON.stringify(outline) !== JSON.stringify(initial.map((p) => [p[0], p[1]]));
+    onApply({
+      area_m2: geom.total, footprint_m2: geom.footprint, perimeter_m: geom.perim, avg_pitch: Math.round(avgPitch),
+      section_count: sections.length, roof_type: plan.roof_type ?? "unknown", ridge_lm: plan.ridge_lm ?? 0, hip_lm: plan.hip_lm ?? 0,
+    }, { outline: outline.map((p) => [...p]), sections, outlineChanged });
+  };
 
   const conf = (plan.confidence ?? "low").toUpperCase();
   const ptsStr = (pts: number[][]) => pts.map((p) => `${p[0]},${p[1]}`).join(" ");

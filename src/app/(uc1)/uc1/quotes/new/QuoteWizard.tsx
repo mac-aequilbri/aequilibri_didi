@@ -14,6 +14,22 @@ interface Analysis {
   qualityScore: number | null; needsReview: boolean; source: string; sourceLabel: string;
 }
 
+// Inverse Web-Mercator: roof-dialog image-percent coords → [lat, lng], matching
+// the static-map projection the roof-drawing endpoint used to build the image.
+function pctOutlineToGeo(pct: number[][], center: { lat: number; lng: number }, zoom: number, W: number, H: number): LatLng[] {
+  const scale = 256 * 2 ** zoom;
+  const siny = Math.max(-0.9999, Math.min(0.9999, Math.sin((center.lat * Math.PI) / 180)));
+  const centerX = ((center.lng + 180) / 360) * scale;
+  const centerY = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * scale;
+  return pct.map(([xPct, yPct]) => {
+    const worldX = centerX + (xPct / 100) * W - W / 2;
+    const worldY = centerY + (yPct / 100) * H - H / 2;
+    const lng = (worldX / scale) * 360 - 180;
+    const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * worldY) / scale))) * 180) / Math.PI;
+    return [Math.round(lat * 1e7) / 1e7, Math.round(lng * 1e7) / 1e7] as LatLng;
+  });
+}
+
 const PITCH_OPTIONS = [["flat", "Flat 0°"], ["low", "Low 10°"], ["standard", "Standard 22°"], ["steep", "Steep 35°"], ["very_steep", "Very Steep 45°"]];
 const MATERIAL_OPTIONS = [["colorbond", "Colorbond Steel"], ["terracotta", "Terracotta Tiles"], ["concrete", "Concrete Tiles"], ["zincalume", "Zincalume"], ["slate", "Natural Slate"], ["asphalt", "Asphalt Shingles"]];
 const AREA_PRESETS = [["", "Select only if needed"], ["90", "Small unit — 90 m²"], ["140", "Small house — 140 m²"], ["180", "Medium house — 180 m²"], ["240", "Large house — 240 m²"], ["320", "XL / acreage — 320 m²"]];
@@ -122,14 +138,20 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
   useEffect(() => { setSavedPlan(null); }, [clickPoint]);
 
   // Apply the reviewed/edited AI roof measurement to the working quote.
-  const applyRoofPlan = (rp: RoofPlan, m: RoofMeasurement, edited: { outline: number[][]; sections: RoofPlan["sections"] }) => {
+  const applyRoofPlan = (rp: RoofPlan, m: RoofMeasurement, edited: { outline: number[][]; sections: RoofPlan["sections"]; outlineChanged: boolean }) => {
     // Keep the user's edited outline/sections so reopening the review shows them.
     setSavedPlan({ ...rp, ai_outline_pct: edited.outline, sections: edited.sections });
-    // Keep the trusted building footprint already on the map — the AI draw only
-    // contributes measurements/sections, it must NOT replace the map outline
-    // (the AI footprint is re-derived independently and can be wrong).
+    // The raw AI footprint must NEVER replace the map outline (it's re-derived
+    // independently and is usually wrong). ONLY when the estimator deliberately
+    // corrects the outline do we convert their corrected polygon (image-percent
+    // coords) back to lat/lng and adopt it for the map + quote PDF.
+    const corrected =
+      edited.outlineChanged && rp.center && edited.outline.length >= 3
+        ? pctOutlineToGeo(edited.outline, rp.center, rp.scale?.zoom ?? 20, rp.width ?? 640, rp.height ?? 640)
+        : null;
     setAnalysis((prev) => prev && ({
       ...prev,
+      ...(corrected ? { outline: corrected } : {}),
       roofType: m.roof_type, confidence: rp.confidence ?? prev.confidence,
       sectionCount: m.section_count, areaM2: m.area_m2,
       perimeterM: m.perimeter_m, ridgeLm: m.ridge_lm, hipLm: m.hip_lm,
