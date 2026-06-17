@@ -7,7 +7,7 @@ export type LatLng = [number, number];
 // Load the Google Maps JS API once (with the Places library) — same API the
 // Django app used. The script is injected client-side; the key is passed in.
 let loaderPromise: Promise<typeof google> | null = null;
-function loadGoogleMaps(apiKey: string): Promise<typeof google> {
+export function loadGoogleMaps(apiKey: string): Promise<typeof google> {
   if (typeof window !== "undefined" && (window as { google?: typeof google }).google?.maps) {
     return Promise.resolve(google);
   }
@@ -60,9 +60,14 @@ export default function GoogleMap({
   const clickCb = useRef(onMapClick);
   const placeCb = useRef(onPlaceSelected);
   const clickableRef = useRef(clickable);
-  clickCb.current = onMapClick;
-  placeCb.current = onPlaceSelected;
-  clickableRef.current = clickable;
+  // Keep the latest callbacks/flags without re-initialising the map. Written in
+  // an effect (not during render) so the listeners read current values at call
+  // time — they only fire on user interaction, after the effect has run.
+  useEffect(() => {
+    clickCb.current = onMapClick;
+    placeCb.current = onPlaceSelected;
+    clickableRef.current = clickable;
+  });
 
   const [satellite, setSatellite] = useState(true);
   const [ready, setReady] = useState(false);

@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { catalogByGroup, getCategory } from "@/lib/platform/jobCatalog";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { runAssessmentAction } from "./actions";
 import { RunAssessmentButton } from "./SubmitButtons";
 
@@ -13,15 +14,18 @@ export function IntakeForm({
   orgSlug,
   allowedEngagementTypes,
   defaultEngagementType,
+  mapsApiKey = "",
 }: {
   orgSlug: string;
   allowedEngagementTypes: string[];
   defaultEngagementType: string;
+  mapsApiKey?: string;
 }) {
   const groups = catalogByGroup();
   const [category, setCategory] = useState("");
   const [engagementType, setEngagementType] = useState(defaultEngagementType);
   const [scope, setScope] = useState("");
+  const [suburb, setSuburb] = useState("");
   // Track whether the user has hand-edited scope, so we don't clobber it.
   const [scopeTouched, setScopeTouched] = useState(false);
 
@@ -82,16 +86,22 @@ export function IntakeForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="block text-sm">
           <span className="text-neutral-600">Address</span>
-          <input
+          <AddressAutocomplete
+            apiKey={mapsApiKey}
             name="address"
-            placeholder="12 Ocean Parade"
+            placeholder="Start typing — e.g. 12 Ocean Parade"
             className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+            onSelect={({ suburb: s }) => {
+              if (s) setSuburb(s);
+            }}
           />
         </label>
         <label className="block text-sm">
           <span className="text-neutral-600">Suburb</span>
           <input
             name="suburb"
+            value={suburb}
+            onChange={(e) => setSuburb(e.target.value)}
             placeholder="Maroochydore"
             className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
           />
