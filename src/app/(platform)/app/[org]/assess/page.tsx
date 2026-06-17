@@ -11,6 +11,7 @@ import { acceptAssessmentAction } from "./actions";
 import { AcceptAssessmentButton } from "./SubmitButtons";
 import { IntakeForm } from "./IntakeForm";
 import { PhaseRefiner } from "./PhaseRefiner";
+import { RoofAssessmentModule } from "./RoofAssessmentModule";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,22 @@ export default async function AssessPage({
             </details>
           </section>
 
+          {(assessment.category === "reroof" || assessment.category === "roof_repair") && (
+            <RoofAssessmentModule
+              orgSlug={ctx.orgSlug}
+              assessmentId={Number(run)}
+              address={assessment.input.address}
+              geocode={{
+                lat: assessment.geocode.value?.lat,
+                lng: assessment.geocode.value?.lng,
+                formatted: assessment.geocode.value?.formatted,
+                suburb: assessment.geocode.value?.suburb,
+                source: assessment.geocode.source,
+                confidence: assessment.geocode.confidence,
+              }}
+            />
+          )}
+
           <section className="ae-card p-5">
             <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
               <h3 className="font-semibold text-sm">Project phases</h3>
@@ -150,6 +167,10 @@ export default async function AssessPage({
               orgSlug={ctx.orgSlug}
               assessmentId={Number(run)}
               initial={assessment.detail.phases}
+              categoryLabel={assessment.categoryLabel}
+              engagementType={assessment.input.engagementType}
+              scope={assessment.input.scope}
+              sizeSqm={assessment.input.sizeSqm}
             />
           </section>
 
