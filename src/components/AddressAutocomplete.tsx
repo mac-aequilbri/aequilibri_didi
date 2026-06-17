@@ -24,6 +24,7 @@ export function AddressAutocomplete({
   placeholder,
   className,
   onSelect,
+  onTextChange,
 }: {
   apiKey: string;
   name: string;
@@ -31,6 +32,9 @@ export function AddressAutocomplete({
   placeholder?: string;
   className?: string;
   onSelect?: (parts: AddressParts) => void;
+  /** Fires on each keystroke so the parent can mirror the value (e.g. to keep
+   *  it when switching to a manual-entry input). */
+  onTextChange?: (value: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const onSelectRef = useRef(onSelect);
@@ -85,6 +89,7 @@ export function AddressAutocomplete({
       placeholder={placeholder}
       autoComplete="off"
       className={className}
+      onChange={(e) => onTextChange?.(e.target.value)}
     />
   );
 }

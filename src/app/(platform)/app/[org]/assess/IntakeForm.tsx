@@ -25,7 +25,11 @@ export function IntakeForm({
   const [category, setCategory] = useState("");
   const [engagementType, setEngagementType] = useState(defaultEngagementType);
   const [scope, setScope] = useState("");
+  const [address, setAddress] = useState("");
   const [suburb, setSuburb] = useState("");
+  // New builds / subdivisions may have an address Google doesn't list yet —
+  // let the user opt out of suggestions and type it freely.
+  const [manualAddress, setManualAddress] = useState(false);
   // Track whether the user has hand-edited scope, so we don't clobber it.
   const [scopeTouched, setScopeTouched] = useState(false);
 
@@ -84,18 +88,39 @@ export function IntakeForm({
       </label>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="block text-sm">
+        <div className="block text-sm">
           <span className="text-neutral-600">Address</span>
-          <AddressAutocomplete
-            apiKey={mapsApiKey}
-            name="address"
-            placeholder="Start typing — e.g. 12 Ocean Parade"
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
-            onSelect={({ suburb: s }) => {
-              if (s) setSuburb(s);
-            }}
-          />
-        </label>
+          {manualAddress ? (
+            <input
+              name="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="e.g. Lot 42, Seaview Estate"
+              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+            />
+          ) : (
+            <AddressAutocomplete
+              apiKey={mapsApiKey}
+              name="address"
+              defaultValue={address}
+              placeholder="Start typing — e.g. 12 Ocean Parade"
+              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              onTextChange={setAddress}
+              onSelect={({ address: a, suburb: s }) => {
+                setAddress(a);
+                if (s) setSuburb(s);
+              }}
+            />
+          )}
+          <label className="mt-1.5 flex items-center gap-1.5 text-xs text-neutral-500">
+            <input
+              type="checkbox"
+              checked={manualAddress}
+              onChange={(e) => setManualAddress(e.target.checked)}
+            />
+            New or unlisted address — enter manually (no suggestions)
+          </label>
+        </div>
         <label className="block text-sm">
           <span className="text-neutral-600">Suburb</span>
           <input
