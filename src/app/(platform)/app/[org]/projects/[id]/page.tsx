@@ -39,7 +39,7 @@ export default async function ProjectDetailPage({
         title={job.name}
         subtitle={`${job.code} · ${job.engagementType.replace("_", " ")} · ${job.address || "no address"}${job.suburb ? `, ${job.suburb}` : ""}`}
         actions={[
-          { href: p(`/projects/${job.id}/models`), label: `3D Models (${job._count.conBimModels})` },
+          { href: p(`/projects/${job.id}/models`), label: `3D Model & Walkthrough${job._count.conBimModels ? ` (${job._count.conBimModels})` : ""}` },
           { href: p(`/projects/${job.id}/edit`), label: "Edit", variant: "outline" },
         ]}
       />

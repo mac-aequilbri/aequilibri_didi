@@ -29,9 +29,20 @@ export default async function NewBimModelPage({
     <div className="p-6 max-w-xl">
       <PageHeader
         title="Add 3D model"
-        subtitle={`Attach a BIMx hyper-model to ${job.name}`}
+        subtitle={`Attach an interactive 3D model & interior walkthrough to ${job.name}`}
         actions={[{ href: orgPath(ctx.orgSlug, `/projects/${jobId}/models`), label: "Back", variant: "outline" }]}
       />
+      <div className="mb-5 ae-card p-4 text-xs text-neutral-600 dark:text-neutral-300">
+        <p className="font-medium text-neutral-800 dark:text-neutral-100 mb-1">
+          From Archicad to a browser walkthrough
+        </p>
+        <p>
+          Design the new home with its interiors and fixtures in Archicad, then publish a
+          BIMx hyper-model (<span className="font-medium">File → Publish → BIMx Hyper-model</span>)
+          and upload it to bimx.graphisoft.com. Paste its share link — or the full{" "}
+          <code>&lt;iframe&gt;</code> embed snippet — below.
+        </p>
+      </div>
       {error === "invalid_url" && (
         <p className="text-red-600 text-sm mb-3">
           That embed link was rejected — only HTTPS graphisoft.com share/embed links are allowed.

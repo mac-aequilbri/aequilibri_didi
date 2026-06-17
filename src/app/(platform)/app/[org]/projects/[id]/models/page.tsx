@@ -37,10 +37,10 @@ export default async function ProjectModelsPage({
   return (
     <div className="pb-16">
       <PageHeader
-        title="3D Models"
-        subtitle={`BIMx hyper-models for ${job.name}`}
+        title="3D Model & Interior Walkthrough"
+        subtitle={`Explorable 3D model — floor plan, interiors and fixtures — for ${job.name}`}
         actions={[
-          { href: p(`/projects/${jobId}/models/new`), label: "Add Model" },
+          { href: p(`/projects/${jobId}/models/new`), label: "Add 3D Model" },
           { href: p(`/projects/${jobId}`), label: "Back to Project", variant: "outline" },
         ]}
       />
@@ -53,10 +53,25 @@ export default async function ProjectModelsPage({
         )}
 
         {models.length === 0 ? (
-          <div className="ae-card p-8 text-center text-neutral-500 text-sm">
-            No models attached yet. Upload a hyper-model to the BIMx Model Transfer site
-            (bimx.graphisoft.com), copy its share or embed link, then click{" "}
-            <span className="font-medium">Add Model</span>.
+          <div className="ae-card p-8 text-sm text-neutral-600 dark:text-neutral-300 max-w-2xl mx-auto">
+            <p className="font-medium text-neutral-800 dark:text-neutral-100 mb-3">
+              No 3D model attached yet
+            </p>
+            <p className="mb-3">
+              Give this new build an interactive 3D model the client can walk through —
+              floor plan, rooms, interior fixtures and finishes, all explorable in the browser.
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-neutral-500">
+              <li>Design the home in Archicad with its interiors and fixtures.</li>
+              <li>
+                Publish a BIMx hyper-model (<span className="font-medium">File → Publish → BIMx Hyper-model</span>)
+                and upload it to the BIMx Model Transfer site (bimx.graphisoft.com).
+              </li>
+              <li>Copy its share or embed link.</li>
+              <li>
+                Click <span className="font-medium">Add 3D Model</span> and paste the link.
+              </li>
+            </ol>
           </div>
         ) : (
           models.map((m) => (
