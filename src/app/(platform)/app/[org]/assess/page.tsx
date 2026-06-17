@@ -41,6 +41,7 @@ export default async function AssessPage({
           orgSlug={ctx.orgSlug}
           allowedEngagementTypes={ctx.allowedEngagementTypes}
           defaultEngagementType={ctx.defaultEngagementType}
+          mapsApiKey={process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY || ""}
         />
       )}
 
@@ -119,6 +120,7 @@ export default async function AssessPage({
               orgSlug={ctx.orgSlug}
               assessmentId={Number(run)}
               address={assessment.input.address}
+              mapsApiKey={process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY || ""}
               geocode={{
                 lat: assessment.geocode.value?.lat,
                 lng: assessment.geocode.value?.lng,

@@ -1,129 +1,109 @@
-// Mini UC1 module surfaced on the assessment review screen for roof-replacement
-// jobs. It confirms the building (validated address + map coordinates) and
-// auto-detects the roof outline via the UC1 roof-drawing endpoint, so the
-// estimator can verify the right roof before the plan is accepted. The detected
-// roof area can be pushed back into the assessment to inform budget & duration.
+// Mini UC1 module on the assessment review screen for roof-replacement jobs.
+// It confirms the building the way UC1 does — the authoritative Geoscape /
+// Microsoft building FOOTPRINT (from /api/uc1/building) drawn on a Google
+// satellite map — rather than the AI roof trace, which UC1 itself treats as
+// unreliable. Click or search to re-locate the building; the measured footprint
+// area can be pushed into the assessment to inform budget & duration. The
+// optional AI roof editor (RoofPlanDialog) is available for section/pitch detail.
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import RoofPlanDialog, {
-  type RoofPlan,
-  type RoofMeasurement,
-} from "@/app/(uc1)/uc1/quotes/new/RoofPlanDialog";
+import GoogleMap, { type LatLng } from "@/components/GoogleMap";
+import RoofPlanDialog, { type RoofPlan } from "@/app/(uc1)/uc1/quotes/new/RoofPlanDialog";
 import { reestimateWithRoofAreaAction } from "./actions";
 
-type Pt = [number, number];
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
+interface BuildingInfo {
+  outline: LatLng[];
+  areaM2: number;
+  source: string;
+  sourceLabel: string;
 }
 
-/** Footprint area + perimeter from a percentage-coordinate polygon. */
-function polygonMetrics(pct: number[][], W: number, H: number, mpp: number): { footprint: number; perimeter: number } {
-  if (!pct || pct.length < 3) return { footprint: 0, perimeter: 0 };
-  const px: Pt[] = pct.map(([x, y]) => [(x / 100) * W, (y / 100) * H]);
-  let area2 = 0;
-  let perim = 0;
-  for (let i = 0; i < px.length; i++) {
-    const a = px[i];
-    const b = px[(i + 1) % px.length];
-    area2 += a[0] * b[1] - b[0] * a[1];
-    perim += Math.hypot(b[0] - a[0], b[1] - a[1]) * mpp;
-  }
-  return { footprint: (Math.abs(area2) / 2) * mpp * mpp, perimeter: perim };
-}
-
-function measurementFromPlan(plan: RoofPlan): RoofMeasurement {
-  const W = plan.width ?? 640;
-  const H = plan.height ?? 640;
-  const mpp = plan.scale?.meters_per_px ?? 0.1;
-  const outline = (plan.ai_outline_pct?.length ?? 0) >= 3 ? plan.ai_outline_pct! : plan.footprint_pct ?? [];
-  const pitches = (plan.sections ?? []).map((s) => s.pitch_est ?? 0).filter((p) => p > 1);
-  const avgPitch = pitches.length ? pitches.reduce((a, b) => a + b, 0) / pitches.length : 20;
-  const { footprint, perimeter } = polygonMetrics(outline, W, H, mpp);
-  const slope = 1 / Math.max(Math.cos((avgPitch * Math.PI) / 180), 0.2);
-  return {
-    area_m2: round1(footprint * slope),
-    footprint_m2: round1(footprint),
-    perimeter_m: round1(perimeter),
-    avg_pitch: Math.round(avgPitch),
-    section_count: plan.sections?.length ?? 0,
-    roof_type: plan.roof_type ?? "unknown",
-    ridge_lm: plan.ridge_lm ?? 0,
-    hip_lm: plan.hip_lm ?? 0,
-  };
-}
-
-const ptsStr = (pts: number[][]) => pts.map((p) => `${p[0]},${p[1]}`).join(" ");
+const DEFAULT_CENTER: LatLng = [-27.47, 153.02]; // QLD fallback when no coords
 
 export function RoofAssessmentModule({
   orgSlug,
   assessmentId,
   address,
+  mapsApiKey,
   geocode,
 }: {
   orgSlug: string;
   assessmentId: number;
   address: string;
+  mapsApiKey: string;
   geocode: { lat?: number; lng?: number; formatted?: string; suburb?: string; source: string; confidence: number };
 }) {
   const hasCoords = typeof geocode.lat === "number" && typeof geocode.lng === "number";
 
-  const [plan, setPlan] = useState<RoofPlan | null>(null);
-  // Auto-detect on mount when we have coordinates, so start in the loading state
-  // rather than flipping it on synchronously inside the effect.
+  const [center, setCenter] = useState<LatLng>(hasCoords ? [geocode.lat!, geocode.lng!] : DEFAULT_CENTER);
+  const [clickPoint, setClickPoint] = useState<LatLng | null>(hasCoords ? [geocode.lat!, geocode.lng!] : null);
+  const [building, setBuilding] = useState<BuildingInfo | null>(null);
   const [loading, setLoading] = useState(hasCoords);
   const [error, setError] = useState<string | null>(null);
-  const [measurement, setMeasurement] = useState<RoofMeasurement | null>(null);
+
+  // Optional AI roof detail (sections + pitch), fetched lazily like UC1.
+  const [roofPlan, setRoofPlan] = useState<RoofPlan | null>(null);
   const [editing, setEditing] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [reviewedArea, setReviewedArea] = useState<number | null>(null);
 
-  // Fetch only — no state writes, so it's safe to await from both the mount
-  // effect and the button handlers.
-  const fetchRoof = useCallback(async () => {
-    const res = await fetch("/api/uc1/roof-drawing", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lat: geocode.lat, lng: geocode.lng, address }),
-    });
-    return res.json();
-  }, [geocode.lat, geocode.lng, address]);
+  // Fetch only — no state writes — so it's safe to await from the mount effect
+  // and from handlers without tripping the set-state-in-effect rule.
+  const fetchBuilding = useCallback(
+    async (lat: number, lng: number) => {
+      return fetch(`/api/uc1/building?lat=${lat}&lon=${lng}&address=${encodeURIComponent(address)}`)
+        .then((r) => r.json())
+        .catch(() => ({}));
+    },
+    [address],
+  );
 
-  const applyResult = useCallback((data: { ok?: boolean; error?: string }) => {
-    if (!data?.ok) {
-      setPlan(null);
-      setError(data?.error || "Roof detection is unavailable (check Google Maps API key).");
+  const applyBuilding = useCallback((b: { geometry?: unknown; area_sqm?: number; source?: string; source_label?: string }) => {
+    const outline = Array.isArray(b?.geometry) ? (b.geometry as LatLng[]) : [];
+    if (outline.length < 3) {
+      setBuilding(null);
+      setError("No building footprint found here — click the roof on the map to locate it.");
       return;
     }
-    setPlan(data as RoofPlan);
-    setMeasurement(measurementFromPlan(data as RoofPlan));
+    setError(null);
+    setBuilding({
+      outline,
+      areaM2: Math.round((b.area_sqm || 0) * 10) / 10,
+      source: b.source ?? "none",
+      sourceLabel: b.source_label || (b.source === "geoscape" ? "Geoscape" : b.source === "microsoft" ? "Microsoft ML" : "estimate"),
+    });
   }, []);
 
-  // Button-triggered (event handler) — synchronous setState here is fine.
-  const detect = useCallback(async () => {
-    if (!hasCoords) {
-      setError("No coordinates — the address didn't geocode, so the roof can't be located.");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      applyResult(await fetchRoof());
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [hasCoords, fetchRoof, applyResult]);
+  // Re-locate from a map click or in-map search (event handlers — sync setState ok).
+  const analyze = useCallback(
+    async (lat: number, lng: number) => {
+      setClickPoint([lat, lng]);
+      setCenter([lat, lng]);
+      setReviewedArea(null);
+      setRoofPlan(null);
+      setLoading(true);
+      setError(null);
+      try {
+        applyBuilding(await fetchBuilding(lat, lng));
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [fetchBuilding, applyBuilding],
+  );
 
-  // Mount auto-detect. The first statement is an await, so no setState fires
-  // synchronously inside the effect body.
+  // Mount auto-detect at the geocoded point. First statement awaits, so no
+  // setState fires synchronously inside the effect body.
   useEffect(() => {
     if (!hasCoords) return;
     let cancelled = false;
     (async () => {
       try {
-        const data = await fetchRoof();
-        if (!cancelled) applyResult(data);
+        const b = await fetchBuilding(geocode.lat!, geocode.lng!);
+        if (!cancelled) applyBuilding(b);
       } catch (e) {
         if (!cancelled) setError(String(e));
       } finally {
@@ -133,12 +113,35 @@ export function RoofAssessmentModule({
     return () => {
       cancelled = true;
     };
-  }, [hasCoords, fetchRoof, applyResult]);
+  }, [hasCoords, geocode.lat, geocode.lng, fetchBuilding, applyBuilding]);
 
-  const W = plan?.width ?? 640;
-  const H = plan?.height ?? 640;
-  const outline = plan ? ((plan.ai_outline_pct?.length ?? 0) >= 3 ? plan.ai_outline_pct! : plan.footprint_pct ?? []) : [];
-  const conf = (plan?.confidence ?? "").toUpperCase();
+  const openEditor = useCallback(async () => {
+    if (!clickPoint) return;
+    if (roofPlan) {
+      setEditing(true);
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const roof = await fetch("/api/uc1/roof-drawing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: clickPoint[0], lng: clickPoint[1], address }),
+      })
+        .then((r) => r.json())
+        .catch(() => null);
+      if (roof?.ok) {
+        setRoofPlan(roof as RoofPlan);
+        setEditing(true);
+      } else {
+        setError(roof?.error || "Detailed roof view is unavailable (check Google Maps API key).");
+      }
+    } finally {
+      setAiBusy(false);
+    }
+  }, [clickPoint, roofPlan, address]);
+
+  const appliedArea = reviewedArea ?? building?.areaM2 ?? 0;
 
   return (
     <section className="ae-card p-5">
@@ -146,21 +149,18 @@ export function RoofAssessmentModule({
         <div>
           <h3 className="font-semibold text-sm">Roof check</h3>
           <p className="text-xs text-neutral-500">
-            Confirm the building and roof before accepting — measured from satellite imagery (UC1).
+            Confirm the building before accepting. Click the roof or search to re-locate.
           </p>
         </div>
-        {plan && conf && (
-          <span
-            className="text-[11px] font-semibold uppercase tracking-wide text-white px-2 py-0.5 rounded-full"
-            style={{ background: conf === "HIGH" ? "#1e8e4e" : conf === "MEDIUM" ? "#e6a700" : "#b06a4a" }}
-          >
-            {conf[0] + conf.slice(1).toLowerCase()} confidence
+        {building && (
+          <span className="text-[11px] text-neutral-500">
+            Footprint via {building.sourceLabel}
           </span>
         )}
       </div>
 
       {/* Validated address */}
-      <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm mb-4">
+      <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm mb-3">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
             {geocode.confidence > 0 ? "✓ Validated address" : "Address"}
@@ -173,90 +173,64 @@ export function RoofAssessmentModule({
           )}
         </div>
         <p className="mt-1 font-medium">{geocode.formatted || address || "—"}</p>
-        {hasCoords && (
-          <p className="text-xs text-neutral-500">
-            {geocode.lat!.toFixed(5)}, {geocode.lng!.toFixed(5)}
-          </p>
-        )}
       </div>
 
-      {/* Roof preview */}
-      {loading && <p className="text-sm text-neutral-500">Detecting roof…</p>}
+      {/* Map with authoritative building footprint */}
+      <GoogleMap
+        apiKey={mapsApiKey}
+        center={center}
+        zoom={20}
+        clickPoint={clickPoint}
+        outline={building?.outline ?? []}
+        showSearch
+        searchPlaceholder="Search property address"
+        onMapClick={(lat, lng) => void analyze(lat, lng)}
+        onPlaceSelected={(lat, lng) => void analyze(lat, lng)}
+        height={380}
+      >
+        {building && (
+          <div className="absolute top-2 right-2 rounded-lg bg-black/70 text-white px-3 py-1.5 text-sm font-bold">
+            {building.areaM2} m²
+          </div>
+        )}
+      </GoogleMap>
 
+      {loading && <p className="text-sm text-neutral-500 mt-2">Locating building…</p>}
       {error && !loading && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          {error}
-          {hasCoords && (
-            <button type="button" onClick={() => void detect()} className="btn-ae-outline text-xs ml-3">
-              Retry
-            </button>
-          )}
-        </div>
+        <p className="text-sm text-amber-700 mt-2">{error}</p>
       )}
 
-      {plan && !loading && (
-        <>
-          <div className="relative w-full max-w-md mx-auto rounded overflow-hidden border border-neutral-200" style={{ aspectRatio: `${W} / ${H}` }}>
-            {plan.image_b64 ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={`data:image/png;base64,${plan.image_b64}`} alt="Roof satellite view" className="block w-full h-full" />
-            ) : (
-              <div className="w-full h-full bg-neutral-800" />
-            )}
-            {outline.length >= 3 && (
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
-                <polygon points={ptsStr(outline)} fill="#27ae60" fillOpacity={0.28} stroke="#27ae60" strokeWidth={0.8} strokeLinejoin="round" />
-              </svg>
-            )}
-          </div>
-
-          {measurement && (
-            <div className="grid grid-cols-4 gap-2 mt-3">
-              {[
-                [`${measurement.area_m2} m²`, "Roof area"],
-                [`${measurement.footprint_m2} m²`, "Footprint"],
-                [`${measurement.perimeter_m} m`, "Perimeter"],
-                [`${measurement.avg_pitch}°`, "Avg pitch"],
-              ].map(([big, label]) => (
-                <div key={label} className="border border-neutral-100 rounded p-2 text-center">
-                  <div className="font-bold text-sm">{big}</div>
-                  <div className="text-[11px] text-neutral-500">{label}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between flex-wrap gap-2 mt-4">
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setEditing(true)} className="btn-ae-outline text-sm">
-                Open roof editor
-              </button>
-              <button type="button" onClick={() => void detect()} className="btn-ae-outline text-sm">
-                Re-detect
-              </button>
-            </div>
-            <form action={reestimateWithRoofAreaAction}>
-              <input type="hidden" name="org" value={orgSlug} />
-              <input type="hidden" name="assessmentId" value={assessmentId} />
-              <input type="hidden" name="areaSqm" value={measurement?.area_m2 ?? ""} />
-              <button type="submit" disabled={!measurement?.area_m2} className="btn-ae text-sm disabled:opacity-40">
-                Apply roof area &amp; re-estimate
-              </button>
-            </form>
-          </div>
-          <p className="text-[11px] text-neutral-500 mt-2">
-            Re-estimating regenerates the budget, duration and phases from the measured roof area
-            ({measurement?.area_m2 ?? "—"} m²).
-          </p>
-        </>
+      <div className="flex items-center justify-between flex-wrap gap-2 mt-4">
+        <button
+          type="button"
+          onClick={() => void openEditor()}
+          disabled={!clickPoint || aiBusy}
+          className="btn-ae-outline text-sm disabled:opacity-40"
+        >
+          {aiBusy ? "Loading roof detail…" : "Open roof editor (sections & pitch)"}
+        </button>
+        <form action={reestimateWithRoofAreaAction}>
+          <input type="hidden" name="org" value={orgSlug} />
+          <input type="hidden" name="assessmentId" value={assessmentId} />
+          <input type="hidden" name="areaSqm" value={appliedArea || ""} />
+          <button type="submit" disabled={!appliedArea} className="btn-ae text-sm disabled:opacity-40">
+            Apply roof area &amp; re-estimate
+          </button>
+        </form>
+      </div>
+      {appliedArea > 0 && (
+        <p className="text-[11px] text-neutral-500 mt-2">
+          Re-estimating regenerates the budget, duration and phases from the measured roof
+          footprint ({appliedArea} m²).
+        </p>
       )}
 
-      {editing && plan && (
+      {editing && roofPlan && (
         <RoofPlanDialog
-          plan={plan}
+          plan={roofPlan}
           onClose={() => setEditing(false)}
           onApply={(m) => {
-            setMeasurement(m);
+            setReviewedArea(m.footprint_m2 || m.area_m2 || null);
             setEditing(false);
           }}
         />
