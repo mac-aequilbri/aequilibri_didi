@@ -22,6 +22,10 @@ export async function runAssessmentAction(formData: FormData): Promise<void> {
   const scope = String(formData.get("scope") ?? "").trim();
   if (!name || !scope) return;
   const sizeRaw = Number(formData.get("sizeSqm"));
+  const latStr = String(formData.get("lat") ?? "").trim();
+  const lngStr = String(formData.get("lng") ?? "").trim();
+  const lat = latStr ? Number(latStr) : NaN;
+  const lng = lngStr ? Number(lngStr) : NaN;
   const assessmentId = await runConstructionAssessment(ctx, user.name, {
     name,
     engagementType: String(formData.get("engagementType") ?? ctx.defaultEngagementType),
@@ -30,6 +34,7 @@ export async function runAssessmentAction(formData: FormData): Promise<void> {
     sizeSqm: Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : undefined,
     scope,
     category: String(formData.get("category") ?? "").trim() || undefined,
+    ...(Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : {}),
   });
   redirect(orgPath(ctx.orgSlug, `/assess?run=${assessmentId}`));
 }
@@ -102,6 +107,7 @@ export async function reestimateWithRoofAreaAction(formData: FormData): Promise<
     sizeSqm: Math.round(areaSqm),
     scope: input.scope,
     category: stored.category,
+    ...(Number.isFinite(input.lat) && Number.isFinite(input.lng) ? { lat: input.lat, lng: input.lng } : {}),
   });
   redirect(orgPath(ctx.orgSlug, `/assess?run=${newId}`));
 }

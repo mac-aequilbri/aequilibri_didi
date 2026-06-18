@@ -36,6 +36,11 @@ export interface AssessmentIntakeInput {
   scope: string;
   /** Job-category catalog key (industry reference); optional. */
   category?: string;
+  /** Precise rooftop point chosen from Google Places autocomplete at intake.
+   *  When present it's preferred over the geocoder cascade so the roof check
+   *  locates the right building. */
+  lat?: number;
+  lng?: number;
 }
 
 interface AiEstimate {
@@ -114,7 +119,18 @@ export async function runConstructionAssessment(
 ): Promise<number> {
   // 1. Data collection cascade — geocode the address through real providers.
   const fullAddress = [input.address, input.suburb].filter(Boolean).join(" ");
-  const geo = await resolveField(geocodeProviders(fullAddress));
+  // Prefer the precise rooftop point picked from Google Places at intake (same
+  // coordinate UC1 uses) — it lands on the dwelling, not a shed/parcel point.
+  // Otherwise fall back to the geocoder cascade.
+  const geo: CascadeOutcome<GeocodeResult> =
+    Number.isFinite(input.lat) && Number.isFinite(input.lng)
+      ? {
+          value: { lat: input.lat!, lng: input.lng!, suburb: input.suburb, formatted: fullAddress },
+          source: "google_places",
+          confidence: 95,
+          attempts: [],
+        }
+      : await resolveField(geocodeProviders(fullAddress));
   const suburb = geo.value?.suburb || input.suburb;
 
   // 1b. Known learnings + industry catalog — the phase structure is resolved

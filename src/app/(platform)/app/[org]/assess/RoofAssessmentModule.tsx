@@ -149,7 +149,8 @@ export function RoofAssessmentModule({
         <div>
           <h3 className="font-semibold text-sm">Roof check</h3>
           <p className="text-xs text-neutral-500">
-            Confirm the building before accepting. Click the roof or search to re-locate.
+            Confirm the building before accepting. If the pin is on the wrong building,
+            click the correct roof on the map.
           </p>
         </div>
         {building && (
@@ -182,10 +183,7 @@ export function RoofAssessmentModule({
         zoom={20}
         clickPoint={clickPoint}
         outline={building?.outline ?? []}
-        showSearch
-        searchPlaceholder="Search property address"
         onMapClick={(lat, lng) => void analyze(lat, lng)}
-        onPlaceSelected={(lat, lng) => void analyze(lat, lng)}
         height={380}
       >
         {building && (

@@ -27,6 +27,10 @@ export function IntakeForm({
   const [scope, setScope] = useState("");
   const [address, setAddress] = useState("");
   const [suburb, setSuburb] = useState("");
+  // Precise rooftop point from a Google Places selection — submitted so the
+  // roof check locates the right building. Cleared whenever the address text
+  // changes by hand (the point no longer matches what's typed).
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   // New builds / subdivisions may have an address Google doesn't list yet —
   // let the user opt out of suggestions and type it freely.
   const [manualAddress, setManualAddress] = useState(false);
@@ -48,6 +52,8 @@ export function IntakeForm({
   return (
     <form action={runAssessmentAction} className="ae-card p-5 space-y-4 relative">
       <input type="hidden" name="org" value={orgSlug} />
+      <input type="hidden" name="lat" value={coords?.lat ?? ""} />
+      <input type="hidden" name="lng" value={coords?.lng ?? ""} />
 
       <label className="block text-sm">
         <span className="text-neutral-600">Job category</span>
@@ -94,7 +100,10 @@ export function IntakeForm({
             <input
               name="address"
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              onChange={(e) => {
+                setAddress(e.target.value);
+                setCoords(null);
+              }}
               placeholder="e.g. Lot 42, Seaview Estate"
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
             />
@@ -105,10 +114,14 @@ export function IntakeForm({
               defaultValue={address}
               placeholder="Start typing — e.g. 12 Ocean Parade"
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
-              onTextChange={setAddress}
-              onSelect={({ address: a, suburb: s }) => {
+              onTextChange={(v) => {
+                setAddress(v);
+                setCoords(null);
+              }}
+              onSelect={({ address: a, suburb: s, lat, lng }) => {
                 setAddress(a);
                 if (s) setSuburb(s);
+                setCoords(Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null);
               }}
             />
           )}
@@ -116,7 +129,10 @@ export function IntakeForm({
             <input
               type="checkbox"
               checked={manualAddress}
-              onChange={(e) => setManualAddress(e.target.checked)}
+              onChange={(e) => {
+                setManualAddress(e.target.checked);
+                setCoords(null);
+              }}
             />
             New or unlisted address — enter manually (no suggestions)
           </label>
