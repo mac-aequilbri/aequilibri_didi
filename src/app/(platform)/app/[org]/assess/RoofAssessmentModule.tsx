@@ -50,14 +50,16 @@ export function RoofAssessmentModule({
 
   // Fetch only — no state writes — so it's safe to await from the mount effect
   // and from handlers without tripping the set-state-in-effect rule.
-  const fetchBuilding = useCallback(
-    async (lat: number, lng: number) => {
-      return fetch(`/api/uc1/building?lat=${lat}&lon=${lng}&address=${encodeURIComponent(address)}`)
-        .then((r) => r.json())
-        .catch(() => ({}));
-    },
-    [address],
-  );
+  // NB: point-based lookup ONLY (no address). Passing a street-only address
+  // sends Geoscape down its address→building path, which mis-geocodes an
+  // incomplete address to the wrong town (e.g. "11 Ahern Street" → a 12.5 m²
+  // building in Brisbane). The Places coordinate is trustworthy, so findByPoint
+  // is both correct and unambiguous.
+  const fetchBuilding = useCallback(async (lat: number, lng: number) => {
+    return fetch(`/api/uc1/building?lat=${lat}&lon=${lng}`)
+      .then((r) => r.json())
+      .catch(() => ({}));
+  }, []);
 
   const applyBuilding = useCallback((b: { geometry?: unknown; area_sqm?: number; source?: string; source_label?: string }) => {
     const outline = Array.isArray(b?.geometry) ? (b.geometry as LatLng[]) : [];
@@ -126,7 +128,7 @@ export function RoofAssessmentModule({
       const roof = await fetch("/api/uc1/roof-drawing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lat: clickPoint[0], lng: clickPoint[1], address }),
+        body: JSON.stringify({ lat: clickPoint[0], lng: clickPoint[1] }),
       })
         .then((r) => r.json())
         .catch(() => null);
@@ -139,7 +141,7 @@ export function RoofAssessmentModule({
     } finally {
       setAiBusy(false);
     }
-  }, [clickPoint, roofPlan, address]);
+  }, [clickPoint, roofPlan]);
 
   const appliedArea = reviewedArea ?? building?.areaM2 ?? 0;
 
