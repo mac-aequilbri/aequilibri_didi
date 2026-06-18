@@ -7,6 +7,7 @@ import {
   acceptAssessment,
   getAssessment,
   refineAssessmentPhases,
+  refineAssessmentBudget,
   runConstructionAssessment,
 } from "@/services/platform/construction/assess";
 import type { PhaseInput } from "@/services/platform/construction/phaseTemplates";
@@ -14,6 +15,10 @@ import {
   checkPhaseFeasibility,
   type FeasibilityResult,
 } from "@/services/platform/construction/phaseFeasibility";
+import {
+  reviewBudget,
+  type BudgetReviewResult,
+} from "@/services/platform/construction/budgetReview";
 
 export async function runAssessmentAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
@@ -110,6 +115,40 @@ export async function reestimateWithRoofAreaAction(formData: FormData): Promise<
     ...(Number.isFinite(input.lat) && Number.isFinite(input.lng) ? { lat: input.lat, lng: input.lng } : {}),
   });
   redirect(orgPath(ctx.orgSlug, `/assess?run=${newId}`));
+}
+
+export async function refineBudgetAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  await getCurrentUser(ctx);
+  const assessmentId = Number(formData.get("assessmentId"));
+  if (!assessmentId) return;
+  let lines: { category: string; amount: number }[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get("budget") ?? "[]"));
+    if (Array.isArray(parsed)) {
+      lines = parsed.map((l) => ({ category: String(l?.category ?? ""), amount: Number(l?.amount) || 0 }));
+    }
+  } catch {
+    return;
+  }
+  await refineAssessmentBudget(ctx, assessmentId, lines);
+  redirect(orgPath(ctx.orgSlug, `/assess?run=${assessmentId}`));
+}
+
+/** AI sanity-check of the budget breakdown currently in the editor. Invoked
+ *  directly from the client; auth verified here (Server Functions are
+ *  reachable by direct POST). */
+export async function checkBudgetAction(args: {
+  org: string;
+  lines: { category: string; amount: number }[];
+  context: { categoryLabel?: string; scope?: string; sizeSqm?: number | null };
+}): Promise<BudgetReviewResult> {
+  const ctx = await requireOrgCtx(String(args.org ?? ""));
+  await getCurrentUser(ctx);
+  const lines = Array.isArray(args.lines)
+    ? args.lines.map((l) => ({ category: String(l?.category ?? ""), amount: Number(l?.amount) || 0 }))
+    : [];
+  return reviewBudget(lines, args.context ?? {});
 }
 
 export async function acceptAssessmentAction(formData: FormData): Promise<void> {

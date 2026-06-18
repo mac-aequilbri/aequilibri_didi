@@ -480,6 +480,40 @@ export function buildTaperedQuote(inp: QuoteInputs = {}): PortCityQuote {
   return q;
 }
 
+// ── Re-roof budget suggestion (for the platform Assessment Engine) ───────────
+// Maps a PortCity quote built from a measured roof area into the platform's
+// {category, amount}[] budget-breakdown shape, so a re-roof assessment starts
+// from the same rate card UC1 quotes on. Ex-GST; an initial suggestion the
+// estimator then edits.
+export interface ReRoofBudgetLine {
+  category: string;
+  amount: number;
+}
+
+export function reRoofBudgetSuggestion(
+  roofAreaM2: number,
+  opts: { roofType?: string; perimeterM?: number; suburb?: string } = {},
+): { lines: ReRoofBudgetLine[]; total: number } {
+  const area = Math.max(0, Math.round(roofAreaM2));
+  if (area <= 0) return { lines: [], total: 0 };
+  // Rough perimeter from the footprint when not supplied (square-ish building).
+  const perimeterM = opts.perimeterM && opts.perimeterM > 0 ? Math.round(opts.perimeterM) : Math.round(4 * Math.sqrt(area));
+  const q = buildPortCityQuote({
+    roofType: opts.roofType || "hip",
+    roofAreaM2: area,
+    perimeterM,
+    includeBins: true,
+    includeGutters: true,
+    gutterLm: perimeterM,
+    suburb: opts.suburb,
+  });
+  const lines: ReRoofBudgetLine[] = q.items.map((i) => ({ category: i.description, amount: i.amount }));
+  const margin = round2(q.internalSubtotal * q.markupPct);
+  if (margin > 0) lines.push({ category: `Margin (${Math.round(q.markupPct * 100)}%)`, amount: margin });
+  lines.push(...q.gutterItems.map((i) => ({ category: i.description, amount: i.amount })));
+  return { lines, total: q.grandTotalExGst };
+}
+
 // ── Good / Better / Best package tiers ──────────────────────────────────────
 export const PACKAGE_TIERS: Record<
   string,

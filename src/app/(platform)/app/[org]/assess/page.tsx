@@ -11,6 +11,7 @@ import { acceptAssessmentAction } from "./actions";
 import { AcceptAssessmentButton } from "./SubmitButtons";
 import { IntakeForm } from "./IntakeForm";
 import { PhaseRefiner } from "./PhaseRefiner";
+import { BudgetRefiner } from "./BudgetRefiner";
 import { RoofAssessmentModule } from "./RoofAssessmentModule";
 
 export const dynamic = "force-dynamic";
@@ -178,17 +179,22 @@ export default async function AssessPage({
 
           <section className="ae-card p-5 grid gap-6 sm:grid-cols-2">
             <div>
-              <h3 className="font-semibold text-sm mb-2">Budget breakdown</h3>
-              <table className="w-full text-sm">
-                <tbody>
-                  {assessment.detail.budgetBreakdown.map((b, i) => (
-                    <tr key={i} className="border-t border-neutral-100">
-                      <td className="py-1.5 pr-2">{b.category}</td>
-                      <td className="py-1.5 text-right whitespace-nowrap">{currency(b.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="flex items-baseline justify-between mb-2">
+                <h3 className="font-semibold text-sm">Budget breakdown</h3>
+                {assessment.category === "reroof" && (
+                  <span className="text-[11px] text-neutral-500">
+                    seeded from UC1 rates{assessment.budgetRefined ? " · edited" : ""}
+                  </span>
+                )}
+              </div>
+              <BudgetRefiner
+                orgSlug={ctx.orgSlug}
+                assessmentId={Number(run)}
+                initial={assessment.detail.budgetBreakdown}
+                categoryLabel={assessment.categoryLabel}
+                scope={assessment.input.scope}
+                sizeSqm={assessment.input.sizeSqm}
+              />
             </div>
             <div>
               <h3 className="font-semibold text-sm mb-2">Risks identified</h3>

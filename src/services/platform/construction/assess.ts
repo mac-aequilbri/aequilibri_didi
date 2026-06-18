@@ -20,6 +20,7 @@ import { OrgCtx } from "@/lib/platform/types";
 import type { GeocodeResult } from "@/lib/platform/geocode";
 import { runAssessment } from "../assessment";
 import { getCategory } from "@/lib/platform/jobCatalog";
+import { reRoofBudgetSuggestion } from "@/services/uc1/pricing";
 import { getMatchingGuidance } from "../learning";
 import {
   applyTemplateWeeks,
@@ -76,6 +77,8 @@ export interface StoredAssessment {
   phasesGenerated: PhaseInput[];
   /** Set once a human edits the phase plan before acceptance. */
   phasesRefined?: boolean;
+  /** Set once a human edits the budget breakdown before acceptance. */
+  budgetRefined?: boolean;
   /** Guidance rules that informed the AI analysis. */
   guidanceApplied?: string[];
   demoMode: boolean;
@@ -207,6 +210,18 @@ export async function runConstructionAssessment(
     } catch {
       estimate = demoEstimate(input);
       estimate.summary = `AI output could not be parsed; deterministic fallback used. Raw: ${res.content.slice(0, 200)}`;
+    }
+  }
+
+  // 2a. Re-roof budget seed: for re-roof jobs, replace the AI's budget with a
+  //     deterministic breakdown from UC1's rate card, sized off the roof area
+  //     (input.sizeSqm — the measured footprint after the roof check). It's an
+  //     editable starting suggestion that matches how UC1 quotes re-roofs.
+  if (category?.key === "reroof" && input.sizeSqm && input.sizeSqm > 0) {
+    const seed = reRoofBudgetSuggestion(input.sizeSqm, { suburb });
+    if (seed.lines.length) {
+      estimate.budgetBreakdown = seed.lines;
+      estimate.budgetTotal = seed.total;
     }
   }
 
@@ -351,6 +366,36 @@ export async function refineAssessmentPhases(
 
   stored.detail.phases = clean;
   stored.phasesRefined = true;
+  await prisma.platAssessment.update({
+    where: { id: row.id },
+    data: { result: JSON.stringify(stored) },
+  });
+}
+
+/** Refine the draft assessment's budget breakdown before acceptance — add,
+ *  remove or adjust lines. The budget_total field is recomputed from the lines
+ *  so the rest of the review (and acceptance) reflects the edit. */
+export async function refineAssessmentBudget(
+  ctx: OrgCtx,
+  assessmentId: number,
+  lines: { category: string; amount: number }[],
+): Promise<void> {
+  const row = await prisma.platAssessment.findFirst({
+    where: { id: assessmentId, orgId: ctx.orgId, status: "draft" },
+  });
+  if (!row) throw new Error("Assessment not found (already accepted or discarded?)");
+  const stored = JSON.parse(row.result) as StoredAssessment;
+
+  const clean = lines
+    .map((l) => ({ category: String(l.category ?? "").trim().slice(0, 120), amount: Math.round((Number(l.amount) || 0) * 100) / 100 }))
+    .filter((l) => l.category.length > 0 && l.amount >= 0);
+
+  stored.detail.budgetBreakdown = clean;
+  const total = clean.reduce((s, l) => s + l.amount, 0);
+  if (stored.fields.budget_total) {
+    stored.fields.budget_total.value = total;
+    stored.budgetRefined = true;
+  }
   await prisma.platAssessment.update({
     where: { id: row.id },
     data: { result: JSON.stringify(stored) },

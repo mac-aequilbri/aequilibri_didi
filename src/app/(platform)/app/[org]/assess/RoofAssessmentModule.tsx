@@ -8,9 +8,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useFormStatus } from "react-dom";
 import GoogleMap, { type LatLng } from "@/components/GoogleMap";
 import RoofPlanDialog, { type RoofPlan } from "@/app/(uc1)/uc1/quotes/new/RoofPlanDialog";
 import { reestimateWithRoofAreaAction } from "./actions";
+
+function ReestimateButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={disabled || pending} className="btn-ae text-sm disabled:opacity-40">
+      {pending ? "Re-estimating…" : "Apply roof area & re-estimate"}
+    </button>
+  );
+}
 
 interface BuildingInfo {
   outline: LatLng[];
@@ -213,9 +223,7 @@ export function RoofAssessmentModule({
           <input type="hidden" name="org" value={orgSlug} />
           <input type="hidden" name="assessmentId" value={assessmentId} />
           <input type="hidden" name="areaSqm" value={appliedArea || ""} />
-          <button type="submit" disabled={!appliedArea} className="btn-ae text-sm disabled:opacity-40">
-            Apply roof area &amp; re-estimate
-          </button>
+          <ReestimateButton disabled={!appliedArea} />
         </form>
       </div>
       {appliedArea > 0 && (
