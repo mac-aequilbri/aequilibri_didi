@@ -6,7 +6,16 @@ import type { NavSection } from "@/components/Sidebar";
 import { orgPath } from "./paths";
 import { OrgCtx } from "./types";
 
-export function buildNav(ctx: OrgCtx, jobCount: number): NavSection[] {
+/** Live counts surfaced as nav pills. All optional; absent = no pill. */
+export interface NavCounts {
+  /** Pending approvals — shown as the prominent (terracotta) badge. */
+  pending?: number;
+  openActions?: number;
+  openRisks?: number;
+  openVariations?: number;
+}
+
+export function buildNav(ctx: OrgCtx, jobCount: number, counts: NavCounts = {}): NavSection[] {
   const f = ctx.config.features;
   const p = (path: string) => orgPath(ctx.orgSlug, path);
   // Single-engagement long_project orgs (e.g. Dulong Downs) pin their one job;
@@ -21,6 +30,7 @@ export function buildNav(ctx: OrgCtx, jobCount: number): NavSection[] {
       items: [
         { href: p(""), label: "Dashboard", exact: true },
         { href: p("/assistant"), label: ctx.config.assistant.name },
+        { href: p("/approvals"), label: "Approvals", badge: counts.pending || undefined },
       ],
     },
     {
@@ -29,14 +39,16 @@ export function buildNav(ctx: OrgCtx, jobCount: number): NavSection[] {
         { href: p("/assess"), label: "New Assessment" },
         ...(multiJob ? [{ href: p("/projects"), label: "Projects" }] : []),
         { href: p("/phases"), label: "Phases" },
-        { href: p("/actions"), label: "Actions" },
+        { href: p("/actions"), label: "Actions", count: counts.openActions || undefined },
         { href: p("/decisions"), label: "Decisions" },
-        ...(f.risks ? [{ href: p("/risks"), label: "Risks" }] : []),
-        ...(f.variations ? [{ href: p("/variations"), label: "Variations" }] : []),
+        ...(f.risks ? [{ href: p("/risks"), label: "Risks", count: counts.openRisks || undefined }] : []),
+        ...(f.variations
+          ? [{ href: p("/variations"), label: "Variations", count: counts.openVariations || undefined }]
+          : []),
         ...(f.procurement ? [{ href: p("/procurement"), label: "Procurement" }] : []),
         ...(f.project_plan ? [{ href: p("/project-plan"), label: "Project Plan" }] : []),
         ...(f.room_matrix ? [{ href: p("/room-matrix"), label: "Room Matrix" }] : []),
-        ...(f.delay_cascade ? [{ href: p("/delay-cascade"), label: "Delay Cascade" }] : []),
+        ...(f.delay_cascade ? [{ href: p("/delay-cascade"), label: "Schedule impact" }] : []),
       ],
     },
     {
@@ -57,10 +69,10 @@ export function buildNav(ctx: OrgCtx, jobCount: number): NavSection[] {
       ],
     },
     {
-      heading: "Intelligence",
+      heading: "Automation",
       items: [
-        ...(f.learning_rules ? [{ href: p("/learning-rules"), label: "Learning Rules" }] : []),
-        { href: p("/exec-log"), label: "Execution Log" },
+        ...(f.learning_rules ? [{ href: p("/learning-rules"), label: "Automation rules" }] : []),
+        { href: p("/exec-log"), label: "Activity" },
       ],
     },
   ];

@@ -46,7 +46,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
   return (
     <div className="p-6">
       <PageHeader
-        title="Learning Rules"
+        title="Automation rules"
         subtitle="Corrections → hypotheses → validated rules. Confidence compounds with every activation."
       />
 

@@ -40,8 +40,8 @@ export default async function ExecLogPage({ params }: { params: Promise<{ org: s
   return (
     <div className="p-6">
       <PageHeader
-        title="Execution Log"
-        subtitle="Every write is audited here; AI proposals wait in this queue until a human approves them."
+        title="Activity"
+        subtitle="Every write is audited here — a full, append-only trail of who changed what, and when."
       />
 
       {proposals.length > 0 && (

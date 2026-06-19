@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export interface NavItem {
   href: string;
   label: string;
   /** Highlight only on exact match (root/dashboard items). */
   exact?: boolean;
+  /** Prominent count pill (e.g. pending approvals); hidden when 0/undefined. */
+  badge?: number;
+  /** Quiet informational count (e.g. open risks); hidden when 0/undefined. */
+  count?: number;
 }
 
 export interface NavSection {
@@ -20,20 +24,32 @@ export function Sidebar({
   sections,
   orgName,
   menuLabel = "Menu",
+  pendingCount = 0,
 }: {
   sections: NavSection[];
-  /** Shown as the "Org: …" switcher (org-scoped layouts only). */
+  /** Shown as the org switcher (org-scoped layouts only). */
   orgName?: string;
   /** Mobile top-bar label when there's no org switcher. */
   menuLabel?: string;
+  /** Pending approvals — surfaced as a badge in the mobile top bar. */
+  pendingCount?: number;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // Per-section collapse, in-memory: the layout (and this component) persists
+  // across in-app navigation, so collapsed groups stay collapsed as you move
+  // around — only a full reload resets them.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggleSection = (heading: string) =>
+    setCollapsed((prev) => ({ ...prev, [heading]: !prev[heading] }));
 
-  // Close the drawer whenever the route changes (mobile tap-through).
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  // Close the drawer when the route changes (mobile tap-through) — handled
+  // during render rather than in an effect.
+  const [seenPath, setSeenPath] = useState(pathname);
+  if (pathname !== seenPath) {
+    setSeenPath(pathname);
+    if (open) setOpen(false);
+  }
 
   const isActive = (item: NavItem) =>
     pathname === item.href ||
@@ -57,11 +73,16 @@ export function Sidebar({
           ☰
         </button>
         {orgName ? (
-          <Link href="/app" className="text-xs text-neutral-600 truncate" title="Switch organisation">
-            Org: <span className="font-semibold text-neutral-700">{orgName}</span>
+          <Link href="/app" className="text-xs text-neutral-700 font-semibold truncate" title="Switch organisation">
+            {orgName} <span className="text-neutral-400 font-normal">▾</span>
           </Link>
         ) : (
           <span className="text-xs font-semibold text-neutral-700 truncate">{menuLabel}</span>
+        )}
+        {pendingCount > 0 && (
+          <span className="nav-badge nav-badge-mobile ml-auto" title={`${pendingCount} awaiting approval`}>
+            {pendingCount}
+          </span>
         )}
       </div>
 
@@ -83,8 +104,8 @@ export function Sidebar({
       >
         <div className="px-4 py-2 text-xs text-neutral-500 border-b border-[var(--ae-earth)] flex items-center justify-between gap-2">
           {orgName ? (
-            <Link href="/app" className="hover:underline truncate" title="Switch organisation">
-              Org: <span className="font-semibold text-neutral-700">{orgName}</span>
+            <Link href="/app" className="hover:underline truncate font-semibold text-neutral-700" title="Switch organisation">
+              {orgName} <span className="text-neutral-400 font-normal">▾</span>
             </Link>
           ) : (
             <span className="font-semibold text-neutral-700 truncate">{menuLabel}</span>
@@ -100,22 +121,53 @@ export function Sidebar({
         </div>
 
         <div className="py-4">
-          {sections.map((section, i) => (
-            <div key={i} className="mb-4">
-              {section.heading && (
-                <div className="px-4 py-1 text-[0.68rem] font-semibold uppercase tracking-wider text-neutral-400">
-                  {section.heading}
-                </div>
-              )}
-              <nav className="px-2">
-                {section.items.map((item) => (
-                  <Link key={item.href} href={item.href} className={isActive(item) ? "active" : ""}>
-                    {item.label}
-                  </Link>
-                ))}
-              </nav>
-            </div>
-          ))}
+          {sections.map((section, i) => {
+            const isCollapsed = section.heading ? !!collapsed[section.heading] : false;
+            return (
+              <div key={i} className="mb-4">
+                {section.heading && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.heading!)}
+                    aria-expanded={!isCollapsed}
+                    className="sidebar-section-toggle text-[0.68rem] font-semibold uppercase tracking-wider text-neutral-400"
+                  >
+                    <span>{section.heading}</span>
+                    <span className={`sidebar-section-chevron ${isCollapsed ? "collapsed" : ""}`}>
+                      ▾
+                    </span>
+                  </button>
+                )}
+                {!isCollapsed && (
+                  <nav className="px-2">
+                    {section.items.map((item) => {
+                      const pill = item.badge ? (
+                        <span className="nav-badge">{item.badge}</span>
+                      ) : item.count ? (
+                        <span className="nav-count">{item.count}</span>
+                      ) : null;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={isActive(item) ? "active" : ""}
+                        >
+                          {pill ? (
+                            <span className="flex items-center justify-between gap-2">
+                              <span>{item.label}</span>
+                              {pill}
+                            </span>
+                          ) : (
+                            item.label
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </nav>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </>

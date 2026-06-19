@@ -9,6 +9,24 @@
   --ae-space: #dc9f82;
   --ae-cream: #e3ddcd;
   --ae-ink: #2c2c2c;
+
+  /* Derived brand accents */
+  --ae-space-hover: #c8876e;
+  --ae-space-deep: #8f4b2d; /* dark terracotta — emphasis text on tints */
+  --ae-quiet: #b4b8bd; /* muted "all clear" / disabled grey */
+
+  /* Semantic colours — warm, harmonised with the elemental palette. One source
+     of truth for status badges, metric tones, attention chips and the journey. */
+  --ae-success: #2f7d57;
+  --ae-success-bg: #e2efe6;
+  --ae-warning: #8a6a1e;
+  --ae-warning-bg: #f6ebcd;
+  --ae-danger: #a83f33;
+  --ae-danger-bg: #f2dcd7;
+  --ae-info: #3a6b8c;
+  --ae-info-bg: #dde8f0;
+  --ae-muted: #6b6b6b;
+  --ae-muted-bg: #ececec;
 }
 
 @theme inline {
@@ -49,7 +67,7 @@ h1, h2, h3, h4, h5 {
 }
 
 .btn-ae { background: var(--ae-space); border: none; color: #fff; font-weight: 600; padding: 8px 16px; border-radius: 6px; display: inline-block; cursor: pointer; }
-.btn-ae:hover { background: #c8876e; color: #fff; }
+.btn-ae:hover { background: var(--ae-space-hover); color: #fff; }
 .btn-ae-outline { border: 2px solid var(--ae-space); color: var(--ae-space); background: transparent; font-weight: 600; padding: 6px 14px; border-radius: 6px; display: inline-block; cursor: pointer; }
 .btn-ae-outline:hover { background: var(--ae-space); color: #fff; }
 
@@ -71,15 +89,58 @@ h1, h2, h3, h4, h5 {
 .metric-card { background: #fff; border-radius: 10px; padding: 20px; text-align: center; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.07); }
 .metric-card .value { font-size: 2rem; font-weight: 700; font-family: "Montserrat", sans-serif; color: var(--ae-space); }
 .metric-card .label { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.06em; }
+.metric-hint { font-size: 0.72rem; color: #9aa0a6; margin-top: 4px; }
+/* Semantic metric colours. Compound selectors match the base `.metric-card .value`
+   specificity and win on source order. Neutral keeps the brand terracotta. */
+.metric-card .value.metric-good { color: var(--ae-success); }
+.metric-card .value.metric-warn { color: var(--ae-warning); }
+.metric-card .value.metric-bad { color: var(--ae-danger); }
+.metric-card .value.metric-quiet { color: var(--ae-quiet); }
+.metric-card-link { display: block; text-decoration: none; transition: box-shadow .15s, transform .15s; }
+.metric-card-link:hover { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); transform: translateY(-1px); }
+
+/* "Needs your attention" dashboard strip. */
+.attention-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; background: #fffaf7; border: 1px solid var(--ae-space); border-left-width: 6px; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; }
+.attention-banner-title { font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--ae-space-deep); }
+.attention-banner-items { display: flex; flex-wrap: wrap; gap: 8px; }
+.attention-chip { font-size: .78rem; font-weight: 600; border-radius: 999px; padding: 4px 12px; text-decoration: none; border: 1px solid transparent; transition: filter .15s; }
+.attention-chip:hover { filter: brightness(.96); }
+.attention-chip.attention-warn { background: var(--ae-warning-bg); color: var(--ae-warning); border-color: var(--ae-warning-bg); }
+.attention-chip.attention-bad { background: var(--ae-danger-bg); color: var(--ae-danger); border-color: var(--ae-danger-bg); }
+
+/* Sidebar count badge (e.g. pending approvals). */
+.nav-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; background: var(--ae-space); color: #fff; line-height: 1; }
+.nav-badge-mobile { margin-left: 4px; }
+/* Informational count pill (e.g. open risks) — quieter than the badge. */
+.nav-count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; font-size: 0.66rem; font-weight: 700; background: var(--ae-cream); color: #8a8a8a; line-height: 1; }
+.sidebar a.active .nav-count { background: #fff; }
+/* Collapsible section heading toggle. */
+.sidebar-section-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none; border: none; cursor: pointer; padding: 4px 16px; text-align: left; }
+.sidebar-section-toggle:hover { color: var(--ae-space); }
+.sidebar-section-chevron { font-size: 0.6rem; color: #b4b8bd; transition: transform .15s; }
+.sidebar-section-chevron.collapsed { transform: rotate(-90deg); }
+
+/* Assistant starter-prompt chips. */
+.suggestion-chip { font-size: .8rem; color: var(--ae-ink); background: #fff; border: 1px solid var(--ae-earth); border-radius: 999px; padding: 7px 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s, background .15s; }
+.suggestion-chip:hover { border-color: var(--ae-space); background: #fffaf7; box-shadow: 0 2px 8px rgba(220,159,130,.15); }
 
 .status-badge { padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; text-transform: capitalize; }
-.status-draft { background: #f0f0f0; color: #666; }
-.status-active { background: #d4edda; color: #155724; }
-.status-complete { background: #cce5ff; color: #004085; }
-.status-overdue { background: #f8d7da; color: #721c24; }
-.status-pending { background: #fff3cd; color: #856404; }
-.status-confirmed, .status-sent, .status-approved, .status-accepted { background: #d4edda; color: #155724; }
-.status-rejected, .status-cancelled { background: #f8d7da; color: #721c24; }
+.status-draft { background: var(--ae-muted-bg); color: var(--ae-muted); }
+.status-active { background: var(--ae-success-bg); color: var(--ae-success); }
+.status-complete { background: var(--ae-info-bg); color: var(--ae-info); }
+.status-overdue { background: var(--ae-danger-bg); color: var(--ae-danger); }
+.status-pending { background: var(--ae-warning-bg); color: var(--ae-warning); }
+.status-confirmed, .status-sent, .status-approved, .status-accepted, .status-executed { background: var(--ae-success-bg); color: var(--ae-success); }
+.status-rejected, .status-cancelled, .status-failed { background: var(--ae-danger-bg); color: var(--ae-danger); }
+.status-expired { background: var(--ae-muted-bg); color: var(--ae-muted); }
+
+/* Breadcrumb bar — auto-derived wayfinding above each org page. */
+.ae-breadcrumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 12px 32px 0; font-size: .78rem; color: var(--ae-muted); }
+.ae-crumb-link { color: var(--ae-muted); text-decoration: none; }
+.ae-crumb-link:hover { color: var(--ae-space); text-decoration: underline; }
+.ae-crumb-sep { color: var(--ae-quiet); }
+.ae-crumb-current { color: var(--ae-ink); font-weight: 600; }
+@media (max-width: 640px) { .ae-breadcrumbs { padding: 8px 16px 0; } }
 
 footer.ae-footer { background: var(--ae-ink); color: var(--ae-earth); text-align: center; padding: 16px; font-size: 0.8rem; margin-top: 48px; }
 
@@ -92,8 +153,8 @@ footer.ae-footer { background: var(--ae-ink); color: var(--ae-earth); text-align
 .journey-shell { background: rgba(255,255,255,.84); border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 14px; box-shadow: 0 6px 18px rgba(26,26,46,.05); }
 .journey-shell-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .journey-eyebrow { font-size: .64rem; color: #777; text-transform: uppercase; letter-spacing: .08em; font-weight: 900; }
-.journey-shell-title { font-size: .9rem; font-weight: 900; color: #1a1a2e; margin-top: 1px; }
-.journey-progress-copy { font-size: .72rem; font-weight: 900; color: #8f4b2d; background: rgba(220,159,130,.16); border-radius: 999px; padding: 5px 10px; white-space: nowrap; }
+.journey-shell-title { font-size: .9rem; font-weight: 900; color: var(--ae-ink); margin-top: 1px; }
+.journey-progress-copy { font-size: .72rem; font-weight: 900; color: var(--ae-space-deep); background: rgba(220,159,130,.16); border-radius: 999px; padding: 5px 10px; white-space: nowrap; }
 .journey-progress-track { height: 8px; background: #eef0f3; border-radius: 999px; overflow: hidden; margin-bottom: 12px; }
 .journey-progress-fill { height: 100%; background: var(--ae-space); border-radius: 999px; transition: width .3s; }
 .quote-journey { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
@@ -105,25 +166,25 @@ footer.ae-footer { background: var(--ae-ink); color: var(--ae-earth); text-align
 .qj-step::before { content: attr(data-step); position: absolute; left: 13px; top: 14px; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #eef0f3; color: #6b7280; font-size: .78rem; font-weight: 900; }
 .qj-step.active { border: 2px solid var(--ae-space); background: #fffaf7; box-shadow: 0 10px 22px rgba(220,159,130,.16); opacity: 1; }
 .qj-step.active::before { background: var(--ae-space); color: #fff; }
-.qj-step.complete { border-color: #27ae60; background: #f3fbf6; opacity: 1; }
-.qj-step.complete::before { content: "✓"; background: #27ae60; color: #fff; }
+.qj-step.complete { border-color: var(--ae-success); background: #f3fbf6; opacity: 1; }
+.qj-step.complete::before { content: "✓"; background: var(--ae-success); color: #fff; }
 .qj-kicker { font-size: .64rem; color: #888; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
-.qj-title { font-size: .84rem; font-weight: 800; color: #1a1a2e; margin-top: 2px; }
+.qj-title { font-size: .84rem; font-weight: 800; color: var(--ae-ink); margin-top: 2px; }
 .qj-note { font-size: .68rem; color: #777; margin-top: 1px; line-height: 1.35; }
 .qj-status { display: inline-flex; align-items: center; margin-top: 8px; border-radius: 999px; padding: 3px 8px; font-size: .62rem; font-weight: 800; background: #f3f4f6; color: #6b7280; }
-.qj-step.active .qj-status { background: rgba(220,159,130,.18); color: #8f4b2d; }
-.qj-step.complete .qj-status { background: #dff4e7; color: #155724; }
+.qj-step.active .qj-status { background: rgba(220,159,130,.18); color: var(--ae-space-deep); }
+.qj-step.complete .qj-status { background: var(--ae-success-bg); color: var(--ae-success); }
 /* Layout (flex-direction / alignment) is set via Tailwind utilities on the
    element so it can stack responsively; this rule only carries the styling. */
 .journey-action { display: flex; gap: 16px; border: 2px solid var(--ae-space); border-left-width: 7px; background: #fffaf7; border-radius: 8px; padding: 16px 18px; margin: 8px 0 18px; box-shadow: 0 8px 18px rgba(26,26,46,.08); }
-.journey-action-title { font-size: .96rem; font-weight: 900; color: #1a1a2e; }
+.journey-action-title { font-size: .96rem; font-weight: 900; color: var(--ae-ink); }
 .journey-action-note { font-size: .78rem; color: #555; line-height: 1.35; margin-top: 2px; }
 .quote-side-panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
 .quote-side-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f1f3; }
 .quote-side-row:last-child { border-bottom: 0; }
 .quote-side-dot { width: 9px; height: 9px; border-radius: 50%; background: #d1d5db; flex-shrink: 0; margin-top: 5px; }
-.quote-side-row.ready .quote-side-dot { background: #27ae60; }
-.quote-side-row strong { display: block; color: #1a1a2e; font-size: .84rem; }
+.quote-side-row.ready .quote-side-dot { background: var(--ae-success); }
+.quote-side-row strong { display: block; color: var(--ae-ink); font-size: .84rem; }
 .quote-side-row span { display: block; color: #777; font-size: .72rem; line-height: 1.35; }
 .est-panel { background: #fdf5f0; border: 2px solid var(--ae-space); border-radius: 10px; padding: 18px; margin-top: 16px; }
 .est-area-big { font-size: 2.4rem; font-weight: 800; font-family: "Montserrat", sans-serif; color: var(--ae-space); line-height: 1; }

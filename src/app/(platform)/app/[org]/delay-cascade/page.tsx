@@ -35,7 +35,7 @@ export default async function DelayCascadePage({ params }: { params: Promise<{ o
   return (
     <div className="p-6 max-w-2xl">
       <PageHeader
-        title="Delay Cascade"
+        title="Schedule impact"
         subtitle="Model how a delay event ripples through the remaining phases."
       />
       <form action={runDelayCascade} className="ae-card p-5 space-y-4 mb-8">

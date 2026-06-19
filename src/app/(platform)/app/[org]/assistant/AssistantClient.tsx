@@ -55,21 +55,42 @@ export default function AssistantClient({
   sessionId,
   messages,
   pendingProposals,
+  suggestions = [],
 }: {
   orgSlug: string;
   assistantName: string;
   sessionId: number;
   messages: ChatMessageView[];
   pendingProposals: PendingProposalView[];
+  /** Data-grounded starter prompts shown in the empty state. */
+  suggestions?: string[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [inFlight, setInFlight] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Clear the optimistic in-flight bubble once the server round-trip brings
+  // new messages. Done during render (not an effect) per React's "adjust state
+  // when a prop changes" guidance.
+  const [seenCount, setSeenCount] = useState(messages.length);
+  if (messages.length !== seenCount) {
+    setSeenCount(messages.length);
     setInFlight(null);
+  }
+
+  // Scrolling to the newest message is a real DOM side-effect, so it stays here.
+  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages.length]);
+
+  // Drop a starter prompt into the composer and send it straight away.
+  const sendSuggestion = (text: string) => {
+    if (!inputRef.current || !formRef.current) return;
+    inputRef.current.value = text;
+    setInFlight(text);
+    formRef.current.requestSubmit();
+  };
 
   const tableLabel = (t: string) => t.replace(/^plat_(core|con|cfg)_/, "");
 
@@ -77,10 +98,26 @@ export default function AssistantClient({
     <div className="flex flex-col h-[calc(100vh-9rem)]">
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1">
         {messages.length === 0 && !inFlight && (
-          <p className="text-sm text-neutral-500 py-6 text-center">
-            Start a conversation — {assistantName} knows this organisation&apos;s jobs, budget,
-            actions and learning rules, and can save decisions and actions for you.
-          </p>
+          <div className="py-6 text-center">
+            <p className="text-sm text-neutral-500">
+              Start a conversation — {assistantName} knows this organisation&apos;s jobs, budget,
+              actions and learning rules, and can save decisions and actions for you.
+            </p>
+            {suggestions.length > 0 && (
+              <div className="mt-5 flex flex-wrap gap-2 justify-center">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => sendSuggestion(s)}
+                    className="suggestion-chip"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
         {messages.map((m) => (
           <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -179,6 +216,7 @@ export default function AssistantClient({
         <input type="hidden" name="org" value={orgSlug} />
         <input type="hidden" name="sessionId" value={sessionId} />
         <input
+          ref={inputRef}
           name="message"
           autoComplete="off"
           placeholder={`Ask ${assistantName}…`}
