@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { Sidebar } from "@/components/Sidebar";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { CommandSearch } from "@/components/CommandSearch";
 import { buildNav } from "@/lib/platform/nav";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 
@@ -41,7 +42,12 @@ export default async function OrgLayout({
         pendingCount={pendingCount}
       />
       <main className="flex-1 overflow-auto min-w-0">
-        <Breadcrumbs orgName={ctx.orgName} orgSlug={ctx.orgSlug} />
+        <div className="flex items-center gap-3 px-6 pt-3">
+          <Breadcrumbs orgName={ctx.orgName} orgSlug={ctx.orgSlug} />
+          <div className="ml-auto shrink-0">
+            <CommandSearch orgSlug={ctx.orgSlug} />
+          </div>
+        </div>
         {children}
       </main>
     </div>
