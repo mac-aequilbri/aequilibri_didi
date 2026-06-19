@@ -2,16 +2,24 @@
 // writes. Every proposal here is a PlatPendingWrite awaiting a decision; the
 // same executeProposal/rejectProposal path the assistant uses backs the
 // buttons, so approving here is identical to approving inline in chat.
+//
+// Each proposal renders a field-level diff: additions for a create, before→after
+// for an update, a removal notice for a delete — so you approve a concrete change,
+// not an opaque payload.
 
 import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { isWritableTable, readRecord } from "@/lib/platform/recordWriter";
 import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const tableLabel = (key: string) => key.replace(/_/g, " ");
 const opLabel = (op: string) => ({ create: "Create", update: "Update", delete: "Delete" })[op] ?? op;
+
+// Storage/plumbing fields that are noise in a human review.
+const SKIP_FIELDS = new Set(["context", "meta", "aiDraft", "aiAnalysis", "extractedActions", "jobId"]);
 
 function timeAgo(d: Date): string {
   const mins = Math.round((Date.now() - d.getTime()) / 60000);
@@ -29,21 +37,48 @@ function expiryNote(expiresAt: Date): { text: string; soon: boolean } {
   return { text: `expires in ${days} days`, soon: days <= 2 };
 }
 
-/** Pull a few human-readable fields out of the stored JSON payload. */
-function summarise(payload: string): { key: string; value: string }[] {
-  let obj: Record<string, unknown>;
+function fmt(v: unknown): string {
+  if (v === null || v === undefined) return "—";
+  const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+  return s.length > 90 ? s.slice(0, 90) + "…" : s;
+}
+
+const isEmpty = (v: unknown) =>
+  v === "" ||
+  v == null ||
+  (typeof v === "object" && !Array.isArray(v) && Object.keys(v as object).length === 0);
+
+interface Change {
+  key: string;
+  /** null = this field is a new addition (create / newly-set). */
+  before: string | null;
+  after: string;
+}
+
+/** Diff the proposed payload against the record's current state. */
+function buildChanges(op: string, payload: string, current: Record<string, unknown> | null): Change[] {
+  let proposed: Record<string, unknown>;
   try {
-    obj = JSON.parse(payload);
+    proposed = JSON.parse(payload);
   } catch {
-    return [{ key: "payload", value: payload.slice(0, 120) }];
+    return [{ key: "payload", before: null, after: fmt(payload) }];
   }
-  return Object.entries(obj)
-    .filter(([, v]) => v !== "" && v != null && !(typeof v === "object" && !Array.isArray(v) && Object.keys(v as object).length === 0))
-    .slice(0, 6)
-    .map(([key, v]) => ({
-      key,
-      value: String(typeof v === "object" ? JSON.stringify(v) : v).slice(0, 90),
-    }));
+  const entries = Object.entries(proposed).filter(([k]) => !SKIP_FIELDS.has(k));
+
+  if (op === "create") {
+    return entries
+      .filter(([, v]) => !isEmpty(v))
+      .slice(0, 10)
+      .map(([key, v]) => ({ key, before: null, after: fmt(v) }));
+  }
+  // update: surface only fields that actually change.
+  const changes: Change[] = [];
+  for (const [key, v] of entries) {
+    const after = fmt(v);
+    const before = current ? fmt(current[key]) : "—";
+    if (after !== before) changes.push({ key, before, after });
+  }
+  return changes;
 }
 
 export default async function ApprovalsPage({
@@ -65,6 +100,18 @@ export default async function ApprovalsPage({
     }),
   ]);
 
+  // Resolve each proposal into a concrete diff (fetching the current row for
+  // updates/deletes so we can show what actually changes).
+  const proposals = await Promise.all(
+    pending.map(async (prop) => {
+      const current =
+        prop.op !== "create" && prop.recordId && isWritableTable(prop.tableKey)
+          ? await readRecord(ctx, prop.tableKey, prop.recordId)
+          : null;
+      return { prop, changes: buildChanges(prop.op, prop.payload, current) };
+    }),
+  );
+
   return (
     <div className="p-6">
       <PageHeader
@@ -72,7 +119,7 @@ export default async function ApprovalsPage({
         subtitle={`${ctx.config.assistant.name} can propose changes but never writes without you. Review and approve each one here.`}
       />
 
-      {pending.length === 0 ? (
+      {proposals.length === 0 ? (
         <div className="ae-card p-8 text-center">
           <div className="text-3xl mb-2">✓</div>
           <p className="font-semibold">You&apos;re all caught up</p>
@@ -82,7 +129,7 @@ export default async function ApprovalsPage({
         </div>
       ) : (
         <div className="space-y-3">
-          {pending.map((prop) => {
+          {proposals.map(({ prop, changes }) => {
             const exp = expiryNote(prop.expiresAt);
             const isAi = prop.actorType === "ai";
             return (
@@ -99,6 +146,7 @@ export default async function ApprovalsPage({
                       </span>
                       <span className="font-semibold">
                         {opLabel(prop.op)} {tableLabel(prop.tableKey)}
+                        {prop.recordId ? <span className="text-neutral-400"> #{prop.recordId}</span> : null}
                       </span>
                     </div>
                     <p className="text-xs text-neutral-500 mt-0.5">
@@ -124,14 +172,36 @@ export default async function ApprovalsPage({
                     </form>
                   </div>
                 </div>
-                <dl className="mt-3 pt-3 border-t border-neutral-100 grid gap-x-6 gap-y-1 sm:grid-cols-2 text-sm">
-                  {summarise(prop.payload).map(({ key, value }) => (
-                    <div key={key} className="flex gap-2 min-w-0">
-                      <dt className="text-neutral-400 shrink-0">{key}</dt>
-                      <dd className="text-neutral-700 truncate">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
+
+                {prop.op === "delete" ? (
+                  <p className="mt-3 pt-3 border-t border-neutral-100 text-sm text-red-700">
+                    Permanently deletes this {tableLabel(prop.tableKey)} record.
+                  </p>
+                ) : (
+                  <dl className="mt-3 pt-3 border-t border-neutral-100 space-y-1.5 text-sm">
+                    {changes.length === 0 && (
+                      <p className="text-xs text-neutral-400">No effective change.</p>
+                    )}
+                    {changes.map((c) => (
+                      <div key={c.key} className="flex flex-wrap items-baseline gap-x-2">
+                        <dt className="text-[0.7rem] uppercase tracking-wide text-neutral-400 w-32 shrink-0">
+                          {c.key}
+                        </dt>
+                        <dd className="min-w-0 text-neutral-700">
+                          {c.before === null ? (
+                            <span className="text-[var(--ae-success)]">{c.after}</span>
+                          ) : (
+                            <>
+                              <span className="line-through text-neutral-400">{c.before}</span>
+                              <span className="mx-1.5 text-neutral-300">→</span>
+                              <span className="font-medium text-[var(--ae-space-deep)]">{c.after}</span>
+                            </>
+                          )}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </div>
             );
           })}

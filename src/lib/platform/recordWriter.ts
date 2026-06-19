@@ -386,6 +386,24 @@ export type WritableTable = keyof typeof REGISTRY;
 
 export const WRITABLE_TABLES = Object.keys(REGISTRY) as WritableTable[];
 
+export function isWritableTable(table: string): table is WritableTable {
+  return table in REGISTRY;
+}
+
+/** Current state of an org-scoped record in a writable table — used by the
+ *  approvals inbox to render before→after diffs. Null if absent. The findFirst
+ *  carries orgId, so the tenancy guard is satisfied. */
+export async function readRecord(
+  ctx: OrgCtx,
+  table: WritableTable,
+  recordId: number,
+): Promise<Record<string, unknown> | null> {
+  const row = await REGISTRY[table].delegate().findFirst({
+    where: { id: recordId, orgId: ctx.orgId },
+  });
+  return (row as Record<string, unknown> | null) ?? null;
+}
+
 // ── write API ─────────────────────────────────────────────────────────
 
 export interface WriteRequest {

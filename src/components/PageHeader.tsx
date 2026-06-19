@@ -96,14 +96,26 @@ export function AttentionBanner({ items }: { items: AttentionItem[] }) {
   );
 }
 
-const KNOWN = new Set([
-  "draft", "active", "complete", "overdue", "pending", "confirmed",
-  "sent", "approved", "accepted", "rejected", "cancelled",
-  "executed", "expired", "failed",
-]);
+// Every status the platform emits, mapped to one of the existing tone classes.
+// Grouping by meaning (not per-status classes) keeps the CSS small and means a
+// new status only needs a line here. Unknown values fall back to the muted draft
+// tone rather than rendering grey-by-accident.
+const STATUS_TONE: Record<string, string> = {
+  // resolved / healthy → green
+  active: "active", in_progress: "active", done: "active", mitigated: "active",
+  confirmed: "confirmed", approved: "approved", accepted: "accepted",
+  sent: "sent", executed: "executed",
+  // finished / closed → blue
+  complete: "complete", closed: "complete",
+  // in-flight / needs attention → amber
+  pending: "pending", open: "pending", submitted: "pending", proposed: "pending", intake: "pending",
+  // negative → red
+  overdue: "overdue", rejected: "rejected", cancelled: "cancelled", failed: "failed",
+  // inert → muted
+  draft: "draft", deferred: "draft", superseded: "draft", expired: "expired",
+};
 
 export function StatusBadge({ status }: { status: string }) {
-  const key = status.toLowerCase();
-  const cls = KNOWN.has(key) ? `status-${key}` : "status-draft";
-  return <span className={`status-badge ${cls}`}>{status}</span>;
+  const cls = STATUS_TONE[status.toLowerCase()] ?? "draft";
+  return <span className={`status-badge status-${cls}`}>{status.replace(/_/g, " ")}</span>;
 }
