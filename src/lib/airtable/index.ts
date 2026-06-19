@@ -12,4 +12,7 @@ export {
 } from "./config";
 export { AirtableError } from "./client";
 export type { AirtableRecord, ListOptions, Codec, FieldDef } from "./types";
+export { CORE_SCHEMA, type CoreTableName } from "./schema.generated";
+export * as core from "./generic";
+export type { CoreRow } from "./generic";
 export * as decisions from "./tables/decisions";

@@ -1,0 +1,53 @@
+// Regenerate src/lib/airtable/schema.generated.ts from a live base's meta API.
+//
+//   node scripts/airtable-gen-schema.mjs [baseId]
+//
+// Defaults to the demo base. Reads AIRTABLE_PAT from .env or the environment.
+// Emits the Core tables' stable table/field IDs as a typed `as const` module.
+
+import { readFileSync, writeFileSync } from "node:fs";
+
+const CORE = [
+  "ORGANISATIONS", "CONTACTS", "WORKSTREAMS", "DECISIONS", "ACTION_HUB",
+  "EXECUTION_LOG", "CORRECTIONS", "JOBS", "HYPOTHESES", "LEARNING_RULES",
+  "DOCUMENTS", "INTELLIGENCE_SNAPSHOT",
+];
+
+function loadPat() {
+  if (process.env.AIRTABLE_PAT) return process.env.AIRTABLE_PAT;
+  const env = readFileSync(new URL("../.env", import.meta.url), "utf8");
+  const line = env.split(/\r?\n/).find((l) => l.startsWith("AIRTABLE_PAT="));
+  if (!line) throw new Error("AIRTABLE_PAT not found");
+  return line.slice("AIRTABLE_PAT=".length).trim();
+}
+
+const baseId = process.argv[2] ?? "appharWaojouHgMeW";
+const res = await fetch(`https://api.airtable.com/v0/meta/bases/${baseId}/tables`, {
+  headers: { Authorization: `Bearer ${loadPat()}` },
+});
+if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+const byName = new Map((await res.json()).tables.map((t) => [t.name, t]));
+const out = [
+  `// AUTO-GENERATED from base ${baseId} via the Airtable meta API.`,
+  "// Source of truth for Core table/field IDs. Regenerate, do not hand-edit:",
+  "//   node scripts/airtable-gen-schema.mjs",
+  "",
+  "export const CORE_SCHEMA = {",
+];
+for (const name of CORE) {
+  const t = byName.get(name);
+  if (!t) throw new Error(`Table not found in base: ${name}`);
+  out.push(`  ${name}: {`);
+  out.push(`    tableId: ${JSON.stringify(t.id)},`);
+  out.push("    fields: [");
+  for (const f of t.fields) {
+    out.push(`      { name: ${JSON.stringify(f.name)}, id: ${JSON.stringify(f.id)}, type: ${JSON.stringify(f.type)} },`);
+  }
+  out.push("    ],");
+  out.push("  },");
+}
+out.push("} as const;", "", "export type CoreTableName = keyof typeof CORE_SCHEMA;", "");
+
+writeFileSync(new URL("../src/lib/airtable/schema.generated.ts", import.meta.url), out.join("\n"));
+console.log(`wrote schema.generated.ts (${CORE.length} Core tables from ${baseId})`);
