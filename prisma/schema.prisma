@@ -1543,7 +1543,7 @@ model PlatConAccountingConnection {
   provider      String    @default("demo") @db.VarChar(20)
   status        String    @default("disconnected") @db.VarChar(30)
   orgName       String    @default("") @map("org_name") @db.VarChar(200)
-  accessToken   String    @default("") @map("access_token") @db.VarChar(500)
+  accessToken   String    @default("") @map("access_token") @db.Text
   lastSync      DateTime? @map("last_sync")
   syncLog       String    @default("") @map("sync_log")
   recordsSynced Int       @default(0) @map("records_synced")
