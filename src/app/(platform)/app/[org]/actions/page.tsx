@@ -1,9 +1,9 @@
 // Action Hub (core tier) — actions from any source: manual, chat, minutes.
 
-import { prisma } from "@/lib/db";
 import { EmptyState, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadActions } from "@/lib/platform/actionsSource";
 import { orgPath } from "@/lib/platform/paths";
 import { updateActionStatus } from "./actions";
 
@@ -21,29 +21,10 @@ export default async function ActionsPage({
   const ctx = await requireOrgCtx((await params).org);
   const { status } = await searchParams;
 
-  const where = {
-    orgId: ctx.orgId,
-    ...(status && STATUSES.includes(status as (typeof STATUSES)[number]) ? { status } : {}),
-  };
-  const [items, openCount, overdueCount, fromChat] = await Promise.all([
-    prisma.platActionHub.findMany({
-      where,
-      orderBy: [{ status: "asc" }, { dueDate: "asc" }],
-      take: 200,
-      include: { job: { select: { code: true } } },
-    }),
-    prisma.platActionHub.count({
-      where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] } },
-    }),
-    prisma.platActionHub.count({
-      where: {
-        orgId: ctx.orgId,
-        status: { in: ["open", "in_progress"] },
-        dueDate: { lt: new Date() },
-      },
-    }),
-    prisma.platActionHub.count({ where: { orgId: ctx.orgId, sourceType: "chat" } }),
-  ]);
+  const { items, metrics } = await loadActions(ctx, status);
+  const openCount = metrics.open;
+  const overdueCount = metrics.overdue;
+  const fromChat = metrics.fromChat;
 
   const isOverdue = (a: (typeof items)[number]) =>
     a.dueDate && a.dueDate < new Date() && (a.status === "open" || a.status === "in_progress");
@@ -93,8 +74,8 @@ export default async function ActionsPage({
               <tr key={a.id} className="border-t border-neutral-100">
                 <td className="py-2 pr-2">
                   <span className="font-medium">{a.title}</span>
-                  {a.job?.code && (
-                    <span className="ml-1 text-xs text-neutral-400">{a.job.code}</span>
+                  {a.jobCode && (
+                    <span className="ml-1 text-xs text-neutral-400">{a.jobCode}</span>
                   )}
                   {a.detail && (
                     <span className="block text-xs text-neutral-500 line-clamp-1">{a.detail}</span>
