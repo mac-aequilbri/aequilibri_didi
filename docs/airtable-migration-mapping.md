@@ -186,3 +186,50 @@ Prove the pattern end-to-end on one slice before touching all ~32 platform table
 
 Then fan out across the remaining Core tables, then Domain, then Config — JOBS early (it's the
 linked-record hub everything else points at).
+
+---
+
+## 10. Step 2 findings — live schema reconciliation (`AEQUILIBRI_DIDI_DEMO`)
+
+> Verified against base `appharWaojouHgMeW` (AEQUILIBRI_DIDI_DEMO) via the Airtable meta API.
+> **Caveats:** the supplied PAT sees *only* this one base — the Master Template
+> (`appIf959oh38fgKYp`) and the live operational Dulong Downs base are **not** reachable with it,
+> and the token is **write-capable (`create`), not read-only**. Rotate + re-scope before production.
+
+### Base state
+- **18 tables**: all 12 Core present + partial Roofing extension (RATE_CARD, PRICING, TEAM, REGIONS)
+  + REFERENCE_DATA + NOMENCLATURE_OVERRIDES.
+- **No Residential Project Delivery extension** (no BUDGET/CASHFLOWS/PHASES/PROCUREMENT/VENDORS/
+  ROOM_MATRIX) — confirms the spec's finding. A migration target base must have these created first.
+- This base is **template/demo-shaped**, not the live operational Dulong Downs base.
+
+### Critical finding: table taxonomy matches, field schemas diverge
+The 12 Core table **names** match the spec 1:1, but the **fields** do not match the Prisma models.
+The Airtable schema is **richer and canonical** (per spec: live schema wins, template is corrected
+to match — not the reverse). Migration maps the app onto the Airtable schema, not vice-versa.
+
+### `DECISIONS` field map (table `tblsHgiXa0Efo3IWD`)
+
+| App (`PlatDecision`) | Airtable field | Field ID | Type | Note |
+|---|---|---|---|---|
+| `description` | Decision_Description | fldz30kBm8F3cyeG6 | multilineText | |
+| `rationale` | Rationale | fldXH5tHvUC8RpuCi | multilineText | |
+| `alternatives` | Alternatives_Rejected | fld6bddEWs7EQHqGp | multilineText | |
+| `status` | Status | fldvggciokLYyx5FQ | singleSelect | values differ: proposed/confirmed → **Pending/Made/Reversed** |
+| `madeBy` | Owner | fldBnBOU8MG66EW2z | link→TEAM | **string → linked record** |
+| `decidedAt` | Decision_Date | fldtrM1uTnlpf88Si | dateTime | |
+| `category` | Decision_Type | fldFyep7Zdj1TyGB5 | singleSelect | approx (Strategic/Technical/Commercial/Operational) |
+| `jobId` | *(none direct)* | — | — | DECISIONS links to **WORKSTREAMS + ACTION_HUB**, not JOBS |
+| *(app must supply)* | Decision_Name | fldIDXimKr7PBC41e | singleLineText | **primary field** — required |
+| *(no app field)* | Reversibility | fldm5JcGXHe6nmn0R | singleSelect | richer-than-app |
+| *(no app field)* | Confidence | fldIWCQyuCuh1SKW0 | number | richer-than-app |
+| *(no app field)* | Context | fldoDHCBl7JvmLZoT | multilineText | richer-than-app |
+| *(no app field)* | Decision_Made | fldJvJU0acmJOI5GP | multilineText | richer-than-app |
+| *(no app field)* | Notes | fld9Bd0Q9I4aHdhcY | multilineText | richer-than-app |
+| *(no app field)* | _TIER | fldACe62pelNf1cjp | singleLineText | Airtable tier tag (Core/Domain/Config) |
+| *(no app field)* | Domain | fldQOD6FVY3WY2lCV | singleLineText | domain tag |
+| *(no app field)* | ACTION_HUB | fldcbxS44JV1C8ntZ | link→ACTION_HUB | |
+
+**Implication:** auto-generating field maps from the Prisma schema is insufficient — each table
+needs reconciliation against the live Airtable schema, and the app model is a *subset* that must
+be widened to use the canonical fields (linked records, select options, the richer fields).
