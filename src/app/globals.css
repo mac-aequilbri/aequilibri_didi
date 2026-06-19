@@ -142,6 +142,18 @@ h1, h2, h3, h4, h5 {
 .ae-crumb-sep { color: var(--ae-quiet); }
 .ae-crumb-current { color: var(--ae-ink); font-weight: 600; }
 
+/* Guided empty state. */
+.ae-empty { text-align: center; padding: 32px 16px; }
+.ae-empty-icon { font-size: 1.8rem; opacity: .45; margin-bottom: 6px; }
+.ae-empty-title { font-weight: 600; color: var(--ae-ink); }
+.ae-empty-hint { font-size: .85rem; color: var(--ae-muted); margin: 4px auto 0; max-width: 44ch; }
+.ae-empty-action { margin-top: 14px; }
+
+/* Loading skeleton shimmer. */
+.skeleton { background: linear-gradient(90deg, #ececec 25%, #f4f1ea 37%, #ececec 63%); background-size: 400% 100%; border-radius: 6px; animation: ae-shimmer 1.4s ease infinite; }
+@keyframes ae-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
 /* ⌘K command palette. */
 .cmdk-trigger { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--ae-earth); border-radius: 8px; padding: 6px 10px; font-size: .8rem; color: var(--ae-muted); cursor: pointer; transition: border-color .15s, color .15s; }
 .cmdk-trigger:hover { border-color: var(--ae-space); color: var(--ae-ink); }

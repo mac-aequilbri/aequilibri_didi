@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { PageHeader } from "@/components/PageHeader";
+import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 
@@ -50,8 +50,12 @@ export default async function VendorsPage({ params }: { params: Promise<{ org: s
             ))}
             {vendors.length === 0 && (
               <tr>
-                <td className="py-4 text-neutral-500" colSpan={5}>
-                  No vendors yet.
+                <td colSpan={5} className="py-6">
+                  <EmptyState
+                    title="No vendors yet"
+                    hint="Keep subcontractors and suppliers — with ratings and contacts — here."
+                    action={{ href: orgPath(ctx.orgSlug, "/vendors/new"), label: "+ New vendor" }}
+                  />
                 </td>
               </tr>
             )}

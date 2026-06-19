@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { BarsCompare } from "@/components/charts";
-import { MetricCard, PageHeader } from "@/components/PageHeader";
+import { EmptyState, MetricCard, PageHeader } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -134,7 +134,13 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
           </section>
         );
       })}
-      {all.length === 0 && <p className="text-sm text-neutral-500">No budget lines yet.</p>}
+      {all.length === 0 && (
+        <EmptyState
+          title="No budget lines yet"
+          hint="Budget lines drive variance tracking and the cashflow forecast."
+          action={{ href: orgPath(ctx.orgSlug, "/budget/new"), label: "+ New budget line" }}
+        />
+      )}
     </div>
   );
 }

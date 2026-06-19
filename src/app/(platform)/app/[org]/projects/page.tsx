@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -52,7 +52,13 @@ export default async function ProjectsPage({ params }: { params: Promise<{ org: 
             </p>
           </Link>
         ))}
-        {jobs.length === 0 && <p className="text-sm text-neutral-500">No projects yet.</p>}
+        {jobs.length === 0 && (
+          <EmptyState
+            title="No projects yet"
+            hint="Each project is a job on the platform — create one to start tracking phases, budget and risk."
+            action={{ href: orgPath(ctx.orgSlug, "/projects/new"), label: "+ New project" }}
+          />
+        )}
       </div>
     </div>
   );

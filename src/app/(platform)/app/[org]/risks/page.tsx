@@ -1,7 +1,7 @@
 // Risk register with likelihood × impact scoring and batch escalation.
 
 import { prisma } from "@/lib/db";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { setRiskStatus } from "./actions";
@@ -100,8 +100,12 @@ export default async function RisksPage({ params }: { params: Promise<{ org: str
             })}
             {risks.length === 0 && (
               <tr>
-                <td className="py-4 text-neutral-500" colSpan={5}>
-                  No risks recorded.
+                <td colSpan={5} className="py-6">
+                  <EmptyState
+                    title="No risks recorded"
+                    hint="Log risks with likelihood × impact; the high scorers can be batch-escalated."
+                    action={{ href: orgPath(ctx.orgSlug, "/risks/new"), label: "+ New risk" }}
+                  />
                 </td>
               </tr>
             )}

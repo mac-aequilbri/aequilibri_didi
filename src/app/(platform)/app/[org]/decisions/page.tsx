@@ -2,7 +2,7 @@
 // "proposed" with sourceType=chat and are confirmed or superseded here.
 
 import { prisma } from "@/lib/db";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -82,8 +82,12 @@ export default async function DecisionsPage({ params }: { params: Promise<{ org:
             ))}
             {decisions.length === 0 && (
               <tr>
-                <td className="py-4 text-neutral-500" colSpan={5}>
-                  No decisions yet.
+                <td colSpan={5} className="py-6">
+                  <EmptyState
+                    title="No decisions yet"
+                    hint="Record key decisions and their rationale so the project's reasoning stays traceable."
+                    action={{ href: orgPath(ctx.orgSlug, "/decisions/new"), label: "+ New decision" }}
+                  />
                 </td>
               </tr>
             )}

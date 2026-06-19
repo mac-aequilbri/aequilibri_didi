@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -61,8 +61,12 @@ export default async function VariationsPage({ params }: { params: Promise<{ org
             ))}
             {variations.length === 0 && (
               <tr>
-                <td className="py-4 text-neutral-500" colSpan={5}>
-                  No variation orders yet.
+                <td colSpan={5} className="py-6">
+                  <EmptyState
+                    title="No variation orders yet"
+                    hint="Capture scope changes with their cost and time impact for client sign-off."
+                    action={{ href: orgPath(ctx.orgSlug, "/variations/new"), label: "+ New variation" }}
+                  />
                 </td>
               </tr>
             )}

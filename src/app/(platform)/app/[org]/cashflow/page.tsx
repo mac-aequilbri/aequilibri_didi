@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { TrendChart } from "@/components/charts";
-import { PageHeader } from "@/components/PageHeader";
+import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -123,7 +123,11 @@ export default async function CashflowPage({ params }: { params: Promise<{ org: 
         );
       })}
       {jobs.every((j) => !j.conCashflows.length) && (
-        <p className="text-sm text-neutral-500">No cashflow entries yet.</p>
+        <EmptyState
+          title="No cashflow entries yet"
+          hint="Track projected vs actual cash by month to spot squeezes early."
+          action={{ href: orgPath(ctx.orgSlug, "/cashflow/new"), label: "+ New entry" }}
+        />
       )}
     </div>
   );

@@ -119,3 +119,32 @@ export function StatusBadge({ status }: { status: string }) {
   const cls = STATUS_TONE[status.toLowerCase()] ?? "draft";
   return <span className={`status-badge status-${cls}`}>{status.replace(/_/g, " ")}</span>;
 }
+
+/** Guided empty state — an icon, what-this-is line, and an optional first action.
+ *  Renders fine inside a spanning table cell or a card. */
+export function EmptyState({
+  icon = "✶",
+  title,
+  hint,
+  action,
+}: {
+  icon?: string;
+  title: string;
+  hint?: string;
+  action?: { href: string; label: string };
+}) {
+  return (
+    <div className="ae-empty">
+      <div className="ae-empty-icon" aria-hidden="true">
+        {icon}
+      </div>
+      <p className="ae-empty-title">{title}</p>
+      {hint && <p className="ae-empty-hint">{hint}</p>}
+      {action && (
+        <Link href={action.href} className="btn-ae ae-empty-action">
+          {action.label}
+        </Link>
+      )}
+    </div>
+  );
+}

@@ -1,7 +1,7 @@
 // Action Hub (core tier) — actions from any source: manual, chat, minutes.
 
 import { prisma } from "@/lib/db";
-import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -135,8 +135,12 @@ export default async function ActionsPage({
             ))}
             {items.length === 0 && (
               <tr>
-                <td className="py-4 text-neutral-500" colSpan={6}>
-                  No actions{status ? ` with status "${status}"` : ""}.
+                <td colSpan={6} className="py-6">
+                  <EmptyState
+                    title={status ? `No ${status.replace("_", " ")} actions` : "No actions yet"}
+                    hint="Actions from the assistant, meeting minutes, or added by hand all land in this one queue."
+                    action={{ href: orgPath(ctx.orgSlug, "/actions/new"), label: "+ New action" }}
+                  />
                 </td>
               </tr>
             )}
