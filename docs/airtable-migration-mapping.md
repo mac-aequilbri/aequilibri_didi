@@ -233,3 +233,50 @@ to match — not the reverse). Migration maps the app onto the Airtable schema, 
 **Implication:** auto-generating field maps from the Prisma schema is insufficient — each table
 needs reconciliation against the live Airtable schema, and the app model is a *subset* that must
 be widened to use the canonical fields (linked records, select options, the richer fields).
+
+---
+
+## 11. Step 2 (cont.) — full Core reconciliation + the topology finding
+
+> All 11 remaining Core tables pulled from `AEQUILIBRI_DIDI_DEMO`. Raw field IDs/types/links and
+> select options are captured machine-readably in `docs/airtable-core-schema.json` (the source for
+> building bindings). This section records the findings that change the *approach*.
+
+### 🔴 The relational topology differs — this is the big one
+The Postgres model and the live Airtable model are not just renamed; they are **wired together
+differently**:
+
+| | Postgres (`Plat*`) | Live Airtable |
+|---|---|---|
+| Tenant | `orgId` column on every row | **No `orgId`** — the base *is* the org |
+| Central spine | `PlatJob` (`jobId` FK everywhere) | **`WORKSTREAMS`** — DECISIONS, EXECUTION_LOG, JOBS, HYPOTHESES, DOCUMENTS, INTELLIGENCE_SNAPSHOT all link to it |
+| People | `madeBy`/`owner`/`createdBy` **strings** | **`TEAM` linked records** (Lead, Assigned_To, Owner, Contributor, Detected_By, Prepared_By…) |
+| Learning loop | Job → Correction → Hypothesis → Rule (by id) | EXECUTION_LOG → **CORRECTIONS** (Related_Execution) → HYPOTHESES → **LEARNING_RULES**; JOBS carries `Learning_Rule_Candidate` |
+
+So a query the app takes for granted — "decisions for this job" — **doesn't exist in Airtable**:
+decisions hang off WORKSTREAMS, not JOBS. Migration therefore requires **re-pointing the app's
+relationship traversal**, not just remapping field names. This is real work and a design decision,
+not a mechanical pass.
+
+### Per-table reconciliation (canonical Airtable ← app)
+
+| Airtable table | Matches spec | Notable divergence from `Plat*` |
+|---|---|---|
+| ORGANISATIONS | ✅ | `Type` select (Customer/Partner/Vendor/Advisor/Investor/Prospect); links to CONTACTS/WORKSTREAMS/TEAM. App `PlatOrganisation` is a tenant root — semantics differ. |
+| CONTACTS | ✅ | First/Last/Contact name split; `Organisation` linked record (app uses none). |
+| WORKSTREAMS | ✅ | The hub. `Track` + `Priority` selects, links to 6 Core tables. App `PlatWorkstream` only links job. |
+| ACTION_HUB | ✅ | `Assigned_To`→TEAM, `Linked_Decision`→DECISIONS. App uses jobId/workstreamId + `owner` string. |
+| EXECUTION_LOG | ✅ | `Contributor`→TEAM, `Initiated_By` (AI/Owner/System), links to CORRECTIONS. App keys off jobId + actor strings. |
+| CORRECTIONS | ✅ | Links to **EXECUTION_LOG** (not Job); `Root_Cause` text, `AI_Output`/`Human_Correction` text (app stores numeric ai/humanValue + dimension). |
+| JOBS | ✅ | `currency` fields (Est/Actual_Value); `Workstream` link; `Learning_Rule_Candidate`. App `PlatJob` is org+phase rich, no workstream link. |
+| HYPOTHESES | ✅ | `Hypothesis_Type` (Business-Assumption/Domain-Pattern/Process-Pattern), `Promote_to_Rule`, `Evidence_Count`. Close to app intent. |
+| LEARNING_RULES | ✅ | **Canonical spec schema** (Trigger_Context, Operational_Directive, Confidence_Level, Override_Permission, Applies_To, Times_Triggered, Last_Triggered, Source_Correction). App `PlatLearningRule` is a *different* remodel (ruleCode/kind/adjustment/autoApply). Needs explicit field reconciliation. |
+| DOCUMENTS | ✅ | `File` attachments + `Drive_URL` + `Document_Type`/`Doc_Status` selects. Confirms spec "Drive URLs"; app stores far more (textContent/aiSummary/version chain). |
+| INTELLIGENCE_SNAPSHOT | ✅ | Aggregate metrics as numbers + `Confidence_Trajectory` select; links to WORKSTREAM/TEAM. Close to app. |
+
+### Decision this raises (do NOT pre-encode)
+Because the topology and several field schemas diverge, I deliberately did **not** mass-generate the
+other 11 binding files — that would encode guesses (the spec's own warning against premature
+automation). Each table's binding needs a call on: (a) how app relationships re-point onto the
+Airtable spine (WORKSTREAMS/TEAM), and (b) whether the app model widens to the canonical fields or
+keeps a reduced view. Recommend resolving these alongside the §8 classification questions.
