@@ -2,11 +2,11 @@
 // promote them to rules, confidence compounds with every activation, and
 // Intelligence Snapshots make the accumulated understanding auditable.
 
-import { prisma } from "@/lib/db";
 import { TrendChart } from "@/components/charts";
 import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadLearning } from "@/lib/platform/learningSource";
 import {
   promoteHypothesisAction,
   rejectHypothesisAction,
@@ -19,24 +19,9 @@ export const dynamic = "force-dynamic";
 
 export default async function LearningRulesPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const [rules, hypotheses, corrections, unclustered, snapshots] = await Promise.all([
-    prisma.platLearningRule.findMany({
-      where: { orgId: ctx.orgId },
-      orderBy: [{ isActive: "desc" }, { confidence: "desc" }],
-    }),
-    prisma.platHypothesis.findMany({
-      where: { orgId: ctx.orgId, status: "pending" },
-      orderBy: { confidence: "desc" },
-    }),
-    prisma.platCorrection.count({ where: { orgId: ctx.orgId } }),
-    prisma.platCorrection.count({ where: { orgId: ctx.orgId, hypothesisId: null } }),
-    prisma.platIntelligenceSnapshot.findMany({
-      where: { orgId: ctx.orgId },
-      orderBy: { capturedAt: "desc" },
-      take: 24,
-    }),
-  ]);
-  const trajectory = [...snapshots].reverse();
+  const { rules, hypotheses, correctionsCount: corrections, unclustered, snapshots } =
+    await loadLearning(ctx);
+  const trajectory = [...snapshots].reverse().filter((s) => s.capturedAt !== null);
 
   const active = rules.filter((r) => r.isActive);
   const avgConfidence = active.length
@@ -169,7 +154,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
               {
                 name: "Avg rule confidence",
                 points: trajectory.map((s) => ({
-                  label: s.capturedAt.toISOString().slice(5, 10),
+                  label: (s.capturedAt ?? new Date(0)).toISOString().slice(5, 10),
                   value: s.avgConfidence,
                 })),
               },
@@ -180,7 +165,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                       points: trajectory
                         .filter((s) => s.accuracyRatePct != null)
                         .map((s) => ({
-                          label: s.capturedAt.toISOString().slice(5, 10),
+                          label: (s.capturedAt ?? new Date(0)).toISOString().slice(5, 10),
                           value: s.accuracyRatePct!,
                         })),
                     },
@@ -205,12 +190,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
           </thead>
           <tbody>
             {snapshots.slice(0, 8).map((s) => {
-              let gaps: string[] = [];
-              try {
-                gaps = JSON.parse(s.gaps);
-              } catch {
-                /* none */
-              }
+              const gaps = s.gaps;
               return (
                 <tr key={s.id} className="border-t border-neutral-100 align-top">
                   <td className="py-2 pr-2 whitespace-nowrap text-xs">{formatDate(s.capturedAt)}</td>
