@@ -42,6 +42,14 @@ async function fromPostgres(ctx: OrgCtx): Promise<DecisionView[]> {
   }));
 }
 
+// Airtable DECISIONS status -> app status (so the page's confirm/supersede
+// controls, keyed on app values, are reachable in Airtable mode).
+const AIR_TO_APP_DECISION_STATUS: Record<string, string> = {
+  Pending: "proposed",
+  Made: "confirmed",
+  Reversed: "superseded",
+};
+
 async function fromAirtable(ctx: OrgCtx): Promise<DecisionView[]> {
   const rows = await core.list(ctx.orgSlug, "DECISIONS", { maxRecords: 200 });
   return rows.map((r) => {
@@ -55,7 +63,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<DecisionView[]> {
       // Owner is a TEAM linked record; name resolution is a later step.
       madeBy: Array.isArray(owner) && owner.length > 0 ? "(linked)" : "—",
       sourceType: "airtable",
-      status: str(r["Status"]) || "—",
+      status: AIR_TO_APP_DECISION_STATUS[str(r["Status"])] ?? "proposed",
       date: str(r["Decision_Date"]) || null,
     };
   });
