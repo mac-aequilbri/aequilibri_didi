@@ -108,7 +108,7 @@ export async function runHypothesisEngine(
     for (const [k, values] of keyCounts) {
       let best = "";
       let n = 0;
-      for (const [v, count] of values) if (count > n) ((best = v), (n = count));
+      for (const [v, count] of values) if (count > n) { best = v; n = count; }
       if (n / group.length >= 0.6) trigger[k] = best;
     }
 

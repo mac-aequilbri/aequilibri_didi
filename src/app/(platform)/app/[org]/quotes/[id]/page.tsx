@@ -2,7 +2,6 @@
 // server-side), move through the draft → sent → accepted/rejected lifecycle,
 // and open the printable client view.
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";

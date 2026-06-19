@@ -174,6 +174,30 @@ describe("recordWriter lifecycle", () => {
     });
     expect(action?.status).toBe("done"); // still unchanged
   });
+
+  it("re-validates at approval time and fails closed on an invalid payload", async () => {
+    // A stored proposal whose payload no longer satisfies the schema (here an
+    // empty title) must never be written — executeProposal re-validates, throws,
+    // and parks the row in "failed" rather than silently applying bad data.
+    const bad = await prisma.platPendingWrite.create({
+      data: {
+        orgId: ctx.orgId,
+        tableKey: "action",
+        op: "create",
+        payload: JSON.stringify({ title: "" }), // violates title.min(1)
+        actorType: "ai",
+        actorName: "TestBot",
+        status: "proposed",
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+    await expect(executeProposal(ctx, bad.id, "Approver")).rejects.toThrow();
+    const pending = await prisma.platPendingWrite.findFirst({
+      where: { id: bad.id, orgId: ctx.orgId },
+    });
+    expect(pending?.status).toBe("failed");
+    expect(pending?.error).toBeTruthy();
+  });
 });
 
 describe("learning loop", () => {

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { currency, formatDate, toNum } from "@/lib/format";
-import { PageHeader, MetricCard, StatusBadge } from "@/components/PageHeader";
+import { PageHeader, MetricCard } from "@/components/PageHeader";
 import { addStormLead, importStormLeadsCsv, updateStormLead } from "../actions";
 
 export const dynamic = "force-dynamic";

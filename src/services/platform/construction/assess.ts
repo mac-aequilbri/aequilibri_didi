@@ -8,7 +8,6 @@
 
 import { callClaude } from "@/lib/claude";
 import { prisma } from "@/lib/db";
-import { toNum } from "@/lib/format";
 import { emitCorrection } from "@/lib/platform/corrections";
 import { geocodeProviders } from "@/lib/platform/geocode";
 import { mulMoney } from "@/lib/platform/money";

@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { logger, errMeta } from "@/lib/logger";
 import { Actor, OrgCtx } from "./types";
 
 // ── field helpers (typecast layer) ────────────────────────────────────
@@ -501,6 +502,13 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
     });
     return { status: "executed", recordId, execLogId: log.id };
   } catch (err) {
+    logger.error("Record write failed", {
+      orgId: ctx.orgId,
+      table: req.table,
+      op: req.op,
+      recordId: req.recordId,
+      ...errMeta(err),
+    });
     await prisma.platExecutionLog
       .create({
         data: {
@@ -583,6 +591,13 @@ export async function executeProposal(
     return { status: "executed", recordId, execLogId: log.id, proposalId: pending.id };
   } catch (err) {
     const message = String(err instanceof Error ? err.message : err).slice(0, 1000);
+    logger.error("Proposal execution failed", {
+      orgId: ctx.orgId,
+      proposalId: pending.id,
+      table: pending.tableKey,
+      op: pending.op,
+      ...errMeta(err),
+    });
     await prisma.platPendingWrite.update({
       where: { id: pending.id },
       data: { status: "failed", resolvedBy: approvedBy, resolvedAt: new Date(), error: message },
