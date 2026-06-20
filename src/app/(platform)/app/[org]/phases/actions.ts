@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { airtableEnabled, core } from "@/lib/airtable";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { writeRecord } from "@/lib/platform/recordWriter";
@@ -17,7 +18,21 @@ const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // matches documents/actions.ts
 export async function approvePhase(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
+  const recordIdRaw = String(formData.get("recordId") ?? "");
+  if (!recordIdRaw) return;
+
+  if (airtableEnabled()) {
+    if (recordIdRaw.startsWith("rec")) {
+      await core.update(ctx.orgSlug, "PHASES", recordIdRaw, {
+        Is_AI_Draft: false,
+        Approved_By: user.name,
+      });
+    }
+    revalidatePath(orgPath(ctx.orgSlug, "/phases"));
+    return;
+  }
+
+  const recordId = Number(recordIdRaw);
   if (!recordId) return;
   await writeRecord(ctx, {
     table: "phase",
@@ -32,7 +47,18 @@ export async function approvePhase(formData: FormData): Promise<void> {
 export async function rejectPhase(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
+  const recordIdRaw = String(formData.get("recordId") ?? "");
+  if (!recordIdRaw) return;
+
+  if (airtableEnabled()) {
+    if (recordIdRaw.startsWith("rec")) {
+      await core.remove(ctx.orgSlug, "PHASES", [recordIdRaw]);
+    }
+    revalidatePath(orgPath(ctx.orgSlug, "/phases"));
+    return;
+  }
+
+  const recordId = Number(recordIdRaw);
   if (!recordId) return;
   await writeRecord(ctx, {
     table: "phase",
@@ -96,15 +122,31 @@ export async function dismissEvidenceSuggestionAction(formData: FormData): Promi
 export async function setPhaseProgress(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
+  const recordIdRaw = String(formData.get("recordId") ?? "");
   const completionPct = Number(formData.get("completionPct"));
-  if (!recordId || !Number.isFinite(completionPct)) return;
-  const status = completionPct >= 100 ? "complete" : completionPct > 0 ? "in_progress" : "pending";
+  if (!recordIdRaw || !Number.isFinite(completionPct)) return;
+  const pct = Math.max(0, Math.min(100, completionPct));
+  const status = pct >= 100 ? "complete" : pct > 0 ? "in_progress" : "pending";
+
+  if (airtableEnabled()) {
+    if (recordIdRaw.startsWith("rec")) {
+      // typecast creates the "in_progress" option if absent.
+      await core.update(ctx.orgSlug, "PHASES", recordIdRaw, {
+        Completion_Pct: pct,
+        Status: status,
+      });
+    }
+    revalidatePath(orgPath(ctx.orgSlug, "/phases"));
+    return;
+  }
+
+  const recordId = Number(recordIdRaw);
+  if (!recordId) return;
   await writeRecord(ctx, {
     table: "phase",
     op: "update",
     recordId,
-    data: { completionPct: Math.max(0, Math.min(100, completionPct)), status },
+    data: { completionPct: pct, status },
     actor: { type: "human", name: user.name },
   });
   revalidatePath(orgPath(ctx.orgSlug, "/phases"));
