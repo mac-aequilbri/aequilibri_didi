@@ -1,16 +1,13 @@
-import { prisma } from "@/lib/db";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadVendors } from "@/lib/platform/vendorsSource";
 import { orgPath } from "@/lib/platform/paths";
 
 export const dynamic = "force-dynamic";
 
 export default async function VendorsPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const vendors = await prisma.platConVendor.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: [{ isActive: "desc" }, { name: "asc" }],
-  });
+  const vendors = await loadVendors(ctx);
 
   return (
     <div className="p-6">
