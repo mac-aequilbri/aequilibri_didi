@@ -551,6 +551,32 @@ export const CORE_SCHEMA = {
       { name: "Auto_Apply", id: "fldyLjIQqwGoWoeN3", type: "checkbox" },
     ],
   },
+  ROOFING_QUOTES: {
+    tableId: "tblnmk0xr8dTkyPBT",
+    fields: [
+      { name: "Ref_Number", id: "fldmjrrq6BfcnwKnA", type: "singleLineText" },
+      { name: "Property_Address", id: "fld1EyGvRQJZl6Qvz", type: "singleLineText" },
+      { name: "Contact_Name", id: "fld6PPOqv8KpqfNel", type: "singleLineText" },
+      { name: "Status", id: "flduEvaFwFtGtf8CP", type: "singleSelect" },
+      { name: "Material", id: "fldzuGLJw9ixnJwZP", type: "singleLineText" },
+      { name: "Flat_Area_Sqm", id: "fldt57y73xPh8EJNi", type: "number" },
+      { name: "Pitch_Type", id: "fld2pkYSO9pLK3Lx0", type: "singleLineText" },
+      { name: "Total", id: "fldpA63pB56J4iCyz", type: "currency" },
+      { name: "Created_At", id: "fldBCQeo6pS0G15UK", type: "dateTime" },
+      { name: "ROOFING_QUOTE_ITEMS", id: "fldssEqwh6OD5Bq96", type: "multipleRecordLinks" },
+    ],
+  },
+  ROOFING_QUOTE_ITEMS: {
+    tableId: "tbla6UnVfACv98gpf",
+    fields: [
+      { name: "Description", id: "fldI2H77Y84Yiqv7s", type: "singleLineText" },
+      { name: "Quantity", id: "fldJLLeHWTVFVAHPq", type: "number" },
+      { name: "Unit", id: "fldxEQGbqj55SYBHb", type: "singleLineText" },
+      { name: "Unit_Price_Ex_GST", id: "fldpdBF4Yn5QTymXc", type: "currency" },
+      { name: "Sort_Order", id: "fldnCXMusSnXHrx3E", type: "number" },
+      { name: "Quote", id: "fldfzAv6b8ximbX6w", type: "multipleRecordLinks" },
+    ],
+  },
 } as const;
 
 export type CoreTableName = keyof typeof CORE_SCHEMA;

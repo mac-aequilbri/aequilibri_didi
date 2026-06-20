@@ -490,6 +490,72 @@ export interface Uc1IntelRuleView {
   isActive: boolean;
   autoApply: boolean;
 }
+export interface Uc1QuoteRow {
+  id: string;
+  refNumber: string;
+  propertyAddress: string;
+  status: string;
+  createdAt: Date | string | null;
+  contactName: string | null;
+  total: number;
+}
+
+const GST = 1.1;
+
+/** Quotes list with totals. Postgres computes total from line items; Airtable
+ *  uses the denormalized Total field. Returns `connected:false` on DB error to
+ *  match the page's existing behaviour. */
+export async function loadUc1Quotes(
+  status: string,
+): Promise<{ connected: boolean; rows: Uc1QuoteRow[] }> {
+  if (!airtableEnabled()) {
+    try {
+      const where = status && status !== "all" ? { status } : {};
+      const quotes = await prisma.uc1Quote.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { items: true, contact: true },
+      });
+      return {
+        connected: true,
+        rows: quotes.map((q) => ({
+          id: String(q.id),
+          refNumber: q.refNumber,
+          propertyAddress: q.propertyAddress,
+          status: q.status,
+          createdAt: q.createdAt,
+          contactName: q.contact?.name ?? null,
+          total:
+            Math.round(
+              q.items.reduce((s, i) => s + Number(i.quantity) * Number(i.unitPriceExGst), 0) *
+                GST *
+                100,
+            ) / 100,
+        })),
+      };
+    } catch {
+      return { connected: false, rows: [] };
+    }
+  }
+  try {
+    const all = await core.list(UC1_SLUG, "ROOFING_QUOTES", { maxRecords: 500 });
+    const rows = all
+      .filter((q) => status === "all" || !status || str(q["Status"]) === status)
+      .map((q) => ({
+        id: q.id,
+        refNumber: str(q["Ref_Number"]),
+        propertyAddress: str(q["Property_Address"]),
+        status: str(q["Status"]) || "draft",
+        createdAt: str(q["Created_At"]) || null,
+        contactName: str(q["Contact_Name"]) || null,
+        total: num(q["Total"]),
+      }));
+    return { connected: true, rows };
+  } catch {
+    return { connected: false, rows: [] };
+  }
+}
+
 export interface Uc1IntelligenceData {
   snapshot: Uc1IntelSnapshotView | null;
   corrections: Uc1IntelCorrectionView[];
