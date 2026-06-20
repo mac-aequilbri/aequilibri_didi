@@ -106,6 +106,8 @@ export async function createRecords(
       body: JSON.stringify({
         records: batch.map((fields) => ({ fields })),
         returnFieldsByFieldId: true,
+        // Coerce values and auto-create missing single-select options on write.
+        typecast: true,
       }),
     })) as ListResponse;
     out.push(...data.records);
@@ -123,7 +125,7 @@ export async function updateRecords(
   for (const batch of chunk(records, 10)) {
     const data = (await request(baseId, `${baseId}/${tableId}`, {
       method: "PATCH",
-      body: JSON.stringify({ records: batch, returnFieldsByFieldId: true }),
+      body: JSON.stringify({ records: batch, returnFieldsByFieldId: true, typecast: true }),
     })) as ListResponse;
     out.push(...data.records);
   }

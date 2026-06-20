@@ -1,7 +1,7 @@
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadProcurement } from "@/lib/platform/procurementSource";
 import { orgPath } from "@/lib/platform/paths";
 import { setProcurementStatus } from "./actions";
 
@@ -11,11 +11,7 @@ const STATUSES = ["pending", "ordered", "delivered", "invoiced", "paid"];
 
 export default async function ProcurementPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const orders = await prisma.platConProcurement.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: [{ status: "asc" }, { dueDate: "asc" }],
-    include: { job: { select: { code: true } }, vendor: { select: { name: true } } },
-  });
+  const orders = await loadProcurement(ctx);
 
   return (
     <div className="p-6">
@@ -41,9 +37,9 @@ export default async function ProcurementPage({ params }: { params: Promise<{ or
               <tr key={o.id} className="border-t border-neutral-100">
                 <td className="py-2 pr-2">
                   <span className="font-medium">{o.item}</span>
-                  <span className="ml-1 text-xs text-neutral-400">{o.job?.code}</span>
+                  <span className="ml-1 text-xs text-neutral-400">{o.jobCode}</span>
                 </td>
-                <td className="py-2 pr-2 text-xs">{o.vendor?.name || o.vendorName || "—"}</td>
+                <td className="py-2 pr-2 text-xs">{o.vendorName || "—"}</td>
                 <td className="py-2 pr-2 text-right text-xs">{o.qty}</td>
                 <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(toNum(o.total))}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">
