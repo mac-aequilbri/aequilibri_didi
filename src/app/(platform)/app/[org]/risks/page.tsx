@@ -1,8 +1,8 @@
 // Risk register with likelihood × impact scoring and batch escalation.
 
-import { prisma } from "@/lib/db";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadRisks } from "@/lib/platform/risksSource";
 import { orgPath } from "@/lib/platform/paths";
 import { setRiskStatus } from "./actions";
 
@@ -16,11 +16,7 @@ function scoreClass(score: number): string {
 
 export default async function RisksPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const risks = await prisma.platConRisk.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-    include: { job: { select: { code: true } } },
-  });
+  const risks = await loadRisks(ctx);
 
   return (
     <div className="p-6">
@@ -50,7 +46,7 @@ export default async function RisksPage({ params }: { params: Promise<{ org: str
                 <tr key={r.id} className="border-t border-neutral-100 align-top">
                   <td className="py-2 pr-2">
                     <span className="font-medium">{r.description}</span>
-                    {r.job?.code && <span className="ml-1 text-xs text-neutral-400">{r.job.code}</span>}
+                    {r.jobCode && <span className="ml-1 text-xs text-neutral-400">{r.jobCode}</span>}
                     {r.createdByAi && (
                       <span className="ml-1 text-[0.65rem] px-1 rounded bg-violet-100 text-violet-700">AI</span>
                     )}

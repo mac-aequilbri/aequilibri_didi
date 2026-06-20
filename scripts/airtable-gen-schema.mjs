@@ -8,9 +8,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 const CORE = [
+  // Core tier
   "ORGANISATIONS", "CONTACTS", "WORKSTREAMS", "DECISIONS", "ACTION_HUB",
   "EXECUTION_LOG", "CORRECTIONS", "JOBS", "HYPOTHESES", "LEARNING_RULES",
   "DOCUMENTS", "INTELLIGENCE_SNAPSHOT",
+  // Domain Extension — Residential Project Delivery (skipped if absent)
+  "RISKS", "VENDORS", "BUDGET", "CASHFLOW", "PROCUREMENT", "PHASES",
+  "VARIATIONS", "QUOTES", "ROOM_MATRIX", "MEETING_MINUTES", "WEEKLY_REPORTS",
 ];
 
 function loadPat() {
@@ -37,7 +41,10 @@ const out = [
 ];
 for (const name of CORE) {
   const t = byName.get(name);
-  if (!t) throw new Error(`Table not found in base: ${name}`);
+  if (!t) {
+    console.warn(`skip ${name} (absent from base ${baseId})`);
+    continue;
+  }
   out.push(`  ${name}: {`);
   out.push(`    tableId: ${JSON.stringify(t.id)},`);
   out.push("    fields: [");
