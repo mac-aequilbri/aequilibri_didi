@@ -379,3 +379,76 @@ export async function loadUc1PriceCheck(): Promise<{
     recentChanges: [],
   };
 }
+
+export interface Uc1ActionView {
+  id: string;
+  action: string;
+  priority: string;
+  dueDate: Date | null;
+  triggerCondition: string;
+  status: string;
+  notes: string;
+}
+
+export async function loadUc1Actions(): Promise<Uc1ActionView[]> {
+  if (!airtableEnabled()) {
+    const rows = await prisma.uc1ActionHub.findMany({
+      orderBy: [{ priority: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+    });
+    return rows.map((a) => ({
+      id: String(a.id),
+      action: a.action,
+      priority: a.priority,
+      dueDate: a.dueDate,
+      triggerCondition: a.triggerCondition,
+      status: a.status,
+      notes: a.notes,
+    }));
+  }
+  const rows = await core.list(UC1_SLUG, "ROOFING_ACTION_HUB", { maxRecords: 500 });
+  return rows.map((r) => {
+    const due = str(r["Due_Date"]);
+    return {
+      id: r.id,
+      action: str(r["Action"]),
+      priority: str(r["Priority"]) || "P2",
+      dueDate: due ? new Date(due) : null,
+      triggerCondition: str(r["Trigger_Condition"]),
+      status: str(r["Status"]) || "open",
+      notes: str(r["Notes"]),
+    };
+  });
+}
+
+export interface Uc1ExecLogView {
+  id: string;
+  toolName: string;
+  status: string;
+  durationMs: number;
+  createdAt: Date | string | null;
+}
+
+export async function loadUc1ExecLog(): Promise<Uc1ExecLogView[]> {
+  if (!airtableEnabled()) {
+    const rows = await prisma.uc1ExecutionLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { id: true, toolName: true, status: true, durationMs: true, createdAt: true },
+    });
+    return rows.map((r) => ({
+      id: String(r.id),
+      toolName: r.toolName,
+      status: r.status,
+      durationMs: r.durationMs,
+      createdAt: r.createdAt,
+    }));
+  }
+  const rows = await core.list(UC1_SLUG, "ROOFING_EXECUTION_LOG", { maxRecords: 100 });
+  return rows.map((r) => ({
+    id: r.id,
+    toolName: str(r["Tool_Name"]),
+    status: str(r["Status"]) || "success",
+    durationMs: num(r["Duration_Ms"]),
+    createdAt: str(r["Logged_At"]) || null,
+  }));
+}

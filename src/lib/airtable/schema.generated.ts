@@ -483,6 +483,26 @@ export const CORE_SCHEMA = {
       { name: "Errors", id: "fldn50BQBjhZGynr1", type: "number" },
     ],
   },
+  ROOFING_ACTION_HUB: {
+    tableId: "tblEA6u7XpSdVBGJ0",
+    fields: [
+      { name: "Action", id: "fldkIdF1fwiuc1y2T", type: "singleLineText" },
+      { name: "Priority", id: "fldEGhOXWanzeuisu", type: "singleSelect" },
+      { name: "Due_Date", id: "fldZIifHA2DmbdeKT", type: "date" },
+      { name: "Trigger_Condition", id: "fldhq7Ho4EvtFJnJC", type: "singleLineText" },
+      { name: "Status", id: "fld7EK94T2DlFiSyX", type: "singleSelect" },
+      { name: "Notes", id: "fldYXX4lB7mxcyxTQ", type: "multilineText" },
+    ],
+  },
+  ROOFING_EXECUTION_LOG: {
+    tableId: "tbl3CdMVCESxiI8uC",
+    fields: [
+      { name: "Tool_Name", id: "fldevlAFMGyyd2rK1", type: "singleLineText" },
+      { name: "Status", id: "fldgiDOnVjszOfHUS", type: "singleLineText" },
+      { name: "Duration_Ms", id: "fldBTb6d3pVskQMX0", type: "number" },
+      { name: "Logged_At", id: "fld16TkAm54ygAOLV", type: "dateTime" },
+    ],
+  },
 } as const;
 
 export type CoreTableName = keyof typeof CORE_SCHEMA;

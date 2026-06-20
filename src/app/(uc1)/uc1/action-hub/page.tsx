@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { PageHeader, MetricCard } from "@/components/PageHeader";
+import { loadUc1Actions, type Uc1ActionView } from "@/lib/platform/uc1Source";
 import { createAction, updateActionStatus, deleteAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -19,9 +19,9 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default async function ActionHubPage() {
-  let actions: Awaited<ReturnType<typeof prisma.uc1ActionHub.findMany>> = [];
+  let actions: Uc1ActionView[] = [];
   try {
-    actions = await prisma.uc1ActionHub.findMany({ orderBy: [{ priority: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }] });
+    actions = await loadUc1Actions();
   } catch { actions = []; }
 
   const open = actions.filter((a) => a.status === "open" || a.status === "in_progress");

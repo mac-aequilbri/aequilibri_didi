@@ -1,13 +1,13 @@
-import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { loadUc1ExecLog, type Uc1ExecLogView } from "@/lib/platform/uc1Source";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExecLog() {
-  let rows: { id: number; toolName: string; status: string; durationMs: number; createdAt: Date }[] = [];
+  let rows: Uc1ExecLogView[] = [];
   try {
-    rows = await prisma.uc1ExecutionLog.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, toolName: true, status: true, durationMs: true, createdAt: true } });
+    rows = await loadUc1ExecLog();
   } catch {
     rows = [];
   }
