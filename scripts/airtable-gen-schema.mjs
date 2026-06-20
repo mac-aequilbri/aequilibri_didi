@@ -15,6 +15,8 @@ const CORE = [
   // Domain Extension — Residential Project Delivery (skipped if absent)
   "RISKS", "VENDORS", "BUDGET", "CASHFLOW", "PROCUREMENT", "PHASES",
   "VARIATIONS", "QUOTES", "ROOM_MATRIX", "MEETING_MINUTES", "WEEKLY_REPORTS",
+  // Domain Extension — Roofing Estimation (UC1; skipped if absent)
+  "ROOFING_CONTACTS",
 ];
 
 function loadPat() {

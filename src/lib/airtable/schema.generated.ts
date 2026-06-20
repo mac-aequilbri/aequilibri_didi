@@ -385,6 +385,16 @@ export const CORE_SCHEMA = {
       { name: "Job", id: "fldj9rqT82gkaZAUg", type: "multipleRecordLinks" },
     ],
   },
+  ROOFING_CONTACTS: {
+    tableId: "tbl9INNDYYPON38Jr",
+    fields: [
+      { name: "Contact_Name", id: "fldA0PLRd1opoJXq6", type: "singleLineText" },
+      { name: "Email", id: "fldYByNcK9d9rd09I", type: "email" },
+      { name: "Phone", id: "fldhWF4Y0tw4YUUl7", type: "phoneNumber" },
+      { name: "Company", id: "fldV5McSfd6XcI7M1", type: "singleLineText" },
+      { name: "Address", id: "fldWEKV5ovxh0ZxRX", type: "multilineText" },
+    ],
+  },
 } as const;
 
 export type CoreTableName = keyof typeof CORE_SCHEMA;
