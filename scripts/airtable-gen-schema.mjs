@@ -16,7 +16,7 @@ const CORE = [
   "RISKS", "VENDORS", "BUDGET", "CASHFLOW", "PROCUREMENT", "PHASES",
   "VARIATIONS", "QUOTES", "ROOM_MATRIX", "MEETING_MINUTES", "WEEKLY_REPORTS",
   // Domain Extension — Roofing Estimation (UC1; skipped if absent)
-  "ROOFING_CONTACTS",
+  "ROOFING_CONTACTS", "ROOFING_RATE_CARDS",
 ];
 
 function loadPat() {

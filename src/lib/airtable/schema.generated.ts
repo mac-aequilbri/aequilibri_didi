@@ -395,6 +395,17 @@ export const CORE_SCHEMA = {
       { name: "Address", id: "fldWEKV5ovxh0ZxRX", type: "multilineText" },
     ],
   },
+  ROOFING_RATE_CARDS: {
+    tableId: "tbl1wDseQODNjmlG9",
+    fields: [
+      { name: "Material", id: "fld1ptpgyv4qW3urG", type: "singleLineText" },
+      { name: "Pitch_Type", id: "fldhvZLgSrlc764MA", type: "singleLineText" },
+      { name: "Description", id: "fldrb71Zyo5yr16hf", type: "multilineText" },
+      { name: "Unit", id: "fldEXL6wghZVACDXn", type: "singleLineText" },
+      { name: "Rate_Ex_GST", id: "fldpdEf2dfmgcPWSL", type: "currency" },
+      { name: "Is_Active", id: "fldJH2JOw5hSNl6au", type: "checkbox" },
+    ],
+  },
 } as const;
 
 export type CoreTableName = keyof typeof CORE_SCHEMA;

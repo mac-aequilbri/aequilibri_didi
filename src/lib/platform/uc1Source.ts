@@ -50,3 +50,44 @@ export async function loadUc1Contacts(): Promise<Uc1ContactView[]> {
     quotes: 0, // quote linkage not migrated yet
   }));
 }
+
+function num(v: unknown): number {
+  return typeof v === "number" ? v : 0;
+}
+
+export interface Uc1RateCardView {
+  id: string;
+  material: string;
+  pitchType: string;
+  description: string;
+  unit: string;
+  rateExGst: number;
+  isActive: boolean;
+}
+
+export async function loadUc1RateCards(): Promise<Uc1RateCardView[]> {
+  if (!airtableEnabled()) {
+    const rows = await prisma.uc1RateCard.findMany({
+      orderBy: [{ material: "asc" }, { pitchType: "asc" }],
+    });
+    return rows.map((c) => ({
+      id: String(c.id),
+      material: c.material,
+      pitchType: c.pitchType,
+      description: c.description,
+      unit: c.unit,
+      rateExGst: Number(c.rateExGst),
+      isActive: c.isActive,
+    }));
+  }
+  const rows = await core.list(UC1_SLUG, "ROOFING_RATE_CARDS", { maxRecords: 500 });
+  return rows.map((r) => ({
+    id: r.id,
+    material: str(r["Material"]),
+    pitchType: str(r["Pitch_Type"]),
+    description: str(r["Description"]),
+    unit: str(r["Unit"]) || "m²",
+    rateExGst: num(r["Rate_Ex_GST"]),
+    isActive: r["Is_Active"] === true,
+  }));
+}
