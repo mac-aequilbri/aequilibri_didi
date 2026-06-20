@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { currency, formatDate, toNum } from "@/lib/format";
+import { currency, formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
-import { normalizeAddressKey } from "@/services/uc1/correctionMemory";
+import {
+  loadUc1MeasurementHistory,
+  type Uc1MeasurementSnapshotView,
+  type Uc1QuoteSnapshotView,
+} from "@/lib/platform/uc1Source";
 
 export const dynamic = "force-dynamic";
 
@@ -13,65 +16,11 @@ export default async function MeasurementHistoryPage({
 }) {
   const sp = await searchParams;
   const query = (sp.q ?? "").trim();
-  const key = normalizeAddressKey(query);
 
-  let snapshots: {
-    id: number;
-    address: string;
-    totalAreaM2: number;
-    sectionCount: number;
-    storeys: number;
-    snapshotType: string;
-    createdAt: Date;
-    quote: { id: number; refNumber: string } | null;
-  }[] = [];
-  let quoteSnapshots: {
-    id: number;
-    address: string;
-    roofType: string;
-    totalIncGst: number;
-    createdAt: Date;
-    quote: { id: number; refNumber: string } | null;
-  }[] = [];
-
+  let snapshots: Uc1MeasurementSnapshotView[] = [];
+  let quoteSnapshots: Uc1QuoteSnapshotView[] = [];
   try {
-    const where = query
-      ? { OR: [{ address: { contains: query } }, { addressKey: { contains: key } }] }
-      : {};
-
-    const [snaps, qsnaps] = await Promise.all([
-      prisma.uc1MeasurementSnapshot.findMany({
-        where,
-        include: { quote: { select: { id: true, refNumber: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 100,
-      }),
-      prisma.uc1QuoteSnapshot.findMany({
-        where,
-        include: { quote: { select: { id: true, refNumber: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      }),
-    ]);
-
-    snapshots = snaps.map((s) => ({
-      id: s.id,
-      address: s.address,
-      totalAreaM2: toNum(s.totalAreaM2),
-      sectionCount: s.sectionCount,
-      storeys: s.storeys,
-      snapshotType: s.snapshotType,
-      createdAt: s.createdAt,
-      quote: s.quote,
-    }));
-    quoteSnapshots = qsnaps.map((s) => ({
-      id: s.id,
-      address: s.address,
-      roofType: s.roofType,
-      totalIncGst: toNum(s.totalIncGst),
-      createdAt: s.createdAt,
-      quote: s.quote,
-    }));
+    ({ snapshots, quoteSnapshots } = await loadUc1MeasurementHistory(query));
   } catch {
     // graceful empty state (tables may be absent in dev)
   }

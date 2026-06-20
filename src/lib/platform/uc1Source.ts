@@ -556,6 +556,210 @@ export async function loadUc1Quotes(
   }
 }
 
+function incGst(n: number): number {
+  return Math.round(n * GST * 100) / 100;
+}
+
+export interface Uc1ConditionReportView {
+  id: string;
+  reportNumber: string;
+  clientName: string;
+  grade: string;
+  urgency: string;
+  status: string;
+  price: number;
+  generatedAt: Date | string | null;
+}
+
+export async function loadUc1ConditionReports(): Promise<Uc1ConditionReportView[]> {
+  if (!airtableEnabled()) {
+    const reports = await prisma.uc1RoofConditionReport.findMany({ orderBy: { generatedAt: "desc" } });
+    return reports.map((r) => ({
+      id: String(r.id),
+      reportNumber: r.reportNumber,
+      clientName: r.clientName,
+      grade: r.conditionGrade,
+      urgency: r.urgencyLevel,
+      status: r.status,
+      price: incGst(Number(r.priceExGst)),
+      generatedAt: r.generatedAt,
+    }));
+  }
+  const rows = await core.list(UC1_SLUG, "ROOFING_CONDITION_REPORTS", { maxRecords: 500 });
+  return rows.map((r) => ({
+    id: r.id,
+    reportNumber: str(r["Report_Number"]),
+    clientName: str(r["Client_Name"]),
+    grade: str(r["Condition_Grade"]),
+    urgency: str(r["Urgency_Level"]),
+    status: str(r["Status"]) || "draft",
+    price: incGst(num(r["Price_Ex_GST"])),
+    generatedAt: str(r["Generated_At"]) || null,
+  }));
+}
+
+export interface Uc1PurchaseOrderView {
+  id: string;
+  poNumber: string;
+  vendor: string;
+  status: string;
+  createdAt: Date | string | null;
+  total: number;
+}
+
+export async function loadUc1PurchaseOrders(): Promise<Uc1PurchaseOrderView[]> {
+  if (!airtableEnabled()) {
+    const pos = await prisma.uc1PurchaseOrder.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { vendor: true, poItems: true },
+    });
+    return pos.map((p) => ({
+      id: String(p.id),
+      poNumber: p.poNumber,
+      vendor: p.vendor.name,
+      status: p.status,
+      createdAt: p.createdAt,
+      total: incGst(p.poItems.reduce((s, i) => s + Number(i.quantity) * Number(i.unitPriceExGst), 0)),
+    }));
+  }
+  const rows = await core.list(UC1_SLUG, "ROOFING_PURCHASE_ORDERS", { maxRecords: 500 });
+  return rows.map((p) => ({
+    id: p.id,
+    poNumber: str(p["PO_Number"]),
+    vendor: str(p["Vendor_Name"]),
+    status: str(p["Status"]) || "draft",
+    createdAt: str(p["Created_At"]) || null,
+    total: num(p["Total"]),
+  }));
+}
+
+export interface Uc1StormEventView {
+  id: string;
+  name: string;
+  eventType: string;
+  eventDate: Date | string | null;
+  state: string;
+  leads: number;
+}
+
+export async function loadUc1StormEvents(): Promise<Uc1StormEventView[]> {
+  if (!airtableEnabled()) {
+    const events = await prisma.uc1StormEvent.findMany({
+      orderBy: { eventDate: "desc" },
+      include: { _count: { select: { leads: true } } },
+    });
+    return events.map((e) => ({
+      id: String(e.id),
+      name: e.name,
+      eventType: e.eventType,
+      eventDate: e.eventDate,
+      state: e.state,
+      leads: e._count.leads,
+    }));
+  }
+  const rows = await core.list(UC1_SLUG, "ROOFING_STORM_EVENTS", { maxRecords: 500 });
+  return rows.map((e) => ({
+    id: e.id,
+    name: str(e["Name"]),
+    eventType: str(e["Event_Type"]),
+    eventDate: str(e["Event_Date"]) || null,
+    state: str(e["State"]),
+    leads: num(e["Leads_Count"]),
+  }));
+}
+
+export interface Uc1MeasurementSnapshotView {
+  id: string;
+  address: string;
+  totalAreaM2: number;
+  sectionCount: number;
+  storeys: number;
+  snapshotType: string;
+  createdAt: Date | string | null;
+  quote: { id: string; refNumber: string } | null;
+}
+export interface Uc1QuoteSnapshotView {
+  id: string;
+  address: string;
+  roofType: string;
+  totalIncGst: number;
+  createdAt: Date | string | null;
+  quote: { id: string; refNumber: string } | null;
+}
+
+export async function loadUc1MeasurementHistory(query: string): Promise<{
+  snapshots: Uc1MeasurementSnapshotView[];
+  quoteSnapshots: Uc1QuoteSnapshotView[];
+}> {
+  if (!airtableEnabled()) {
+    const where = query ? { OR: [{ address: { contains: query } }] } : {};
+    const [snaps, qsnaps] = await Promise.all([
+      prisma.uc1MeasurementSnapshot.findMany({
+        where,
+        include: { quote: { select: { id: true, refNumber: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+      prisma.uc1QuoteSnapshot.findMany({
+        where,
+        include: { quote: { select: { id: true, refNumber: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+    ]);
+    return {
+      snapshots: snaps.map((s) => ({
+        id: String(s.id),
+        address: s.address,
+        totalAreaM2: Number(s.totalAreaM2),
+        sectionCount: s.sectionCount,
+        storeys: s.storeys,
+        snapshotType: s.snapshotType,
+        createdAt: s.createdAt,
+        quote: s.quote ? { id: String(s.quote.id), refNumber: s.quote.refNumber } : null,
+      })),
+      quoteSnapshots: qsnaps.map((s) => ({
+        id: String(s.id),
+        address: s.address,
+        roofType: s.roofType,
+        totalIncGst: Number(s.totalIncGst),
+        createdAt: s.createdAt,
+        quote: s.quote ? { id: String(s.quote.id), refNumber: s.quote.refNumber } : null,
+      })),
+    };
+  }
+  const q = query.toLowerCase();
+  const match = (addr: string) => !q || addr.toLowerCase().includes(q);
+  const [snapRows, qsnapRows] = await Promise.all([
+    core.list(UC1_SLUG, "ROOFING_MEASUREMENT_SNAPSHOTS", { maxRecords: 100 }),
+    core.list(UC1_SLUG, "ROOFING_QUOTE_SNAPSHOTS", { maxRecords: 50 }),
+  ]);
+  return {
+    snapshots: snapRows
+      .filter((s) => match(str(s["Address"])))
+      .map((s) => ({
+        id: s.id,
+        address: str(s["Address"]),
+        totalAreaM2: num(s["Total_Area_M2"]),
+        sectionCount: num(s["Section_Count"]),
+        storeys: num(s["Storeys"]),
+        snapshotType: str(s["Snapshot_Type"]) || "use_measurements",
+        createdAt: str(s["Created_At"]) || null,
+        quote: null,
+      })),
+    quoteSnapshots: qsnapRows
+      .filter((s) => match(str(s["Address"])))
+      .map((s) => ({
+        id: s.id,
+        address: str(s["Address"]),
+        roofType: str(s["Roof_Type"]),
+        totalIncGst: num(s["Total_Inc_GST"]),
+        createdAt: str(s["Created_At"]) || null,
+        quote: null,
+      })),
+  };
+}
+
 export interface Uc1IntelligenceData {
   snapshot: Uc1IntelSnapshotView | null;
   corrections: Uc1IntelCorrectionView[];

@@ -577,6 +577,58 @@ export const CORE_SCHEMA = {
       { name: "Quote", id: "fldfzAv6b8ximbX6w", type: "multipleRecordLinks" },
     ],
   },
+  ROOFING_CONDITION_REPORTS: {
+    tableId: "tbljHjUGT4kM0yGZA",
+    fields: [
+      { name: "Report_Number", id: "fldefjEphbWg2Gqy2", type: "singleLineText" },
+      { name: "Client_Name", id: "fldqn5E5B6xwto21B", type: "singleLineText" },
+      { name: "Condition_Grade", id: "fld0BKN862hivatJZ", type: "singleLineText" },
+      { name: "Urgency_Level", id: "fldtY1VHsAEieUwWu", type: "singleLineText" },
+      { name: "Status", id: "fldLcfrrI0YlDhXZR", type: "singleSelect" },
+      { name: "Price_Ex_GST", id: "fldJrnytQdb3h9Tf3", type: "currency" },
+      { name: "Generated_At", id: "fldHh434HeoGUKNuL", type: "dateTime" },
+    ],
+  },
+  ROOFING_PURCHASE_ORDERS: {
+    tableId: "tblr6R3zdvJ0Thidw",
+    fields: [
+      { name: "PO_Number", id: "fldd547rwmwybAvUC", type: "singleLineText" },
+      { name: "Vendor_Name", id: "flduJBveemDQvvSsa", type: "singleLineText" },
+      { name: "Status", id: "fldzkLma95Y0teM8p", type: "singleSelect" },
+      { name: "Total", id: "fldxfFeFtrgXMIYLo", type: "currency" },
+      { name: "Created_At", id: "fldAzR8egROejzJmE", type: "dateTime" },
+    ],
+  },
+  ROOFING_STORM_EVENTS: {
+    tableId: "tblsmggD9abxBBxoY",
+    fields: [
+      { name: "Name", id: "fld2LKTWObYYXJKPi", type: "singleLineText" },
+      { name: "Event_Type", id: "fldgVllSJJsKjKN5O", type: "singleLineText" },
+      { name: "Event_Date", id: "fld0DgK18rwzFs3ed", type: "date" },
+      { name: "State", id: "fldGxUZqHKZ6YGXg6", type: "singleLineText" },
+      { name: "Leads_Count", id: "fldcuSYiAQSa2hnx9", type: "number" },
+    ],
+  },
+  ROOFING_MEASUREMENT_SNAPSHOTS: {
+    tableId: "tblWvJuMi13rPCHgj",
+    fields: [
+      { name: "Address", id: "fldj2uzxJ9fhEcjL3", type: "singleLineText" },
+      { name: "Total_Area_M2", id: "fldoMvsTYOU6tJG7e", type: "number" },
+      { name: "Section_Count", id: "fldYXxThCW0MFM3G3", type: "number" },
+      { name: "Storeys", id: "fldoJWmeXFFh1gHrd", type: "number" },
+      { name: "Snapshot_Type", id: "fld7ohXulN2OV7xLJ", type: "singleLineText" },
+      { name: "Created_At", id: "fldm4bfGqQse0zCQo", type: "dateTime" },
+    ],
+  },
+  ROOFING_QUOTE_SNAPSHOTS: {
+    tableId: "tbl0YQUof4R3HTdsS",
+    fields: [
+      { name: "Address", id: "fldw9sKTqlXGcHCiV", type: "singleLineText" },
+      { name: "Roof_Type", id: "fldO3M4AXPqDxeWKk", type: "singleLineText" },
+      { name: "Total_Inc_GST", id: "flditXGlMSNXb3OwF", type: "currency" },
+      { name: "Created_At", id: "fldvtT83tBmgbgoz3", type: "dateTime" },
+    ],
+  },
 } as const;
 
 export type CoreTableName = keyof typeof CORE_SCHEMA;

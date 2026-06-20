@@ -1,15 +1,14 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
+import { loadUc1StormEvents, type Uc1StormEventView } from "@/lib/platform/uc1Source";
 
 export const dynamic = "force-dynamic";
 
 export default async function StormDashboard() {
-  let rows: { id: number; name: string; eventType: string; eventDate: Date; state: string; leads: number }[] = [];
+  let rows: Uc1StormEventView[] = [];
   try {
-    const events = await prisma.uc1StormEvent.findMany({ orderBy: { eventDate: "desc" }, include: { _count: { select: { leads: true } } } });
-    rows = events.map((e) => ({ id: e.id, name: e.name, eventType: e.eventType, eventDate: e.eventDate, state: e.state, leads: e._count.leads }));
+    rows = await loadUc1StormEvents();
   } catch {
     rows = [];
   }

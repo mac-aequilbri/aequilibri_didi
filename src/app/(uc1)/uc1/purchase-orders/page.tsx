@@ -1,23 +1,14 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { currency, toNum, formatDate } from "@/lib/format";
-import { incGst } from "@/lib/money";
+import { currency, formatDate } from "@/lib/format";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { loadUc1PurchaseOrders, type Uc1PurchaseOrderView } from "@/lib/platform/uc1Source";
 
 export const dynamic = "force-dynamic";
 
 export default async function PurchaseOrders() {
-  let rows: { id: number; poNumber: string; vendor: string; status: string; createdAt: Date; total: number }[] = [];
+  let rows: Uc1PurchaseOrderView[] = [];
   try {
-    const pos = await prisma.uc1PurchaseOrder.findMany({ orderBy: { createdAt: "desc" }, include: { vendor: true, poItems: true } });
-    rows = pos.map((p) => ({
-      id: p.id,
-      poNumber: p.poNumber,
-      vendor: p.vendor.name,
-      status: p.status,
-      createdAt: p.createdAt,
-      total: incGst(p.poItems.reduce((s, i) => s + toNum(i.quantity) * toNum(i.unitPriceExGst), 0)),
-    }));
+    rows = await loadUc1PurchaseOrders();
   } catch {
     rows = [];
   }
