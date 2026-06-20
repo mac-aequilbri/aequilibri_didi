@@ -1,51 +1,18 @@
-import { prisma } from "@/lib/db";
-import { currency, formatDate, toNum } from "@/lib/format";
+import { currency, formatDate } from "@/lib/format";
 import { PageHeader, MetricCard, StatusBadge } from "@/components/PageHeader";
+import {
+  loadUc1PriceCheck,
+  type Uc1PriceCheckLogView,
+  type Uc1PriceMovementView,
+} from "@/lib/platform/uc1Source";
 
 export const dynamic = "force-dynamic";
 
 export default async function PriceCheckLogPage() {
-  let logs: {
-    id: number;
-    runAt: Date;
-    status: string;
-    vendorsChecked: number;
-    pricesUpdated: number;
-    pricesUnchanged: number;
-    errors: number;
-    summary: string;
-  }[] = [];
-  let recentChanges: {
-    id: number;
-    description: string;
-    unitPriceExGst: number;
-    previousPrice: number | null;
-    updatedAt: Date;
-    vendor: { name: string };
-  }[] = [];
-
+  let logs: Uc1PriceCheckLogView[] = [];
+  let recentChanges: Uc1PriceMovementView[] = [];
   try {
-    // Map Decimal fields through toNum so the typed arrays hold plain numbers.
-    // (The prod Postgres client returns Prisma Decimal; the dev SQLite client
-    // returns number — converting here keeps this correct on both.)
-    const [logRows, priceRows] = await Promise.all([
-      prisma.uc1PriceCheckLog.findMany({ orderBy: { runAt: "desc" }, take: 50 }),
-      prisma.uc1VendorMaterialPrice.findMany({
-        where: { previousPrice: { not: null } },
-        include: { vendor: { select: { name: true } } },
-        orderBy: { updatedAt: "desc" },
-        take: 20,
-      }),
-    ]);
-    logs = logRows;
-    recentChanges = priceRows.map((p) => ({
-      id: p.id,
-      description: p.description,
-      unitPriceExGst: toNum(p.unitPriceExGst),
-      previousPrice: p.previousPrice == null ? null : toNum(p.previousPrice),
-      updatedAt: p.updatedAt,
-      vendor: { name: p.vendor.name },
-    }));
+    ({ logs, recentChanges } = await loadUc1PriceCheck());
   } catch {
     // graceful empty state
   }

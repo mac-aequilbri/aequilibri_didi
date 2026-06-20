@@ -238,3 +238,144 @@ export async function loadUc1Team(): Promise<Uc1TeamMemberView[]> {
     corrections: 0,
   }));
 }
+
+export interface Uc1SolarPartnerView {
+  id: string;
+  name: string;
+  contactName: string;
+  referralFeePct: number;
+  avgInstallValue: number;
+  isActive: boolean;
+}
+
+export async function loadUc1SolarPartners(): Promise<Uc1SolarPartnerView[]> {
+  if (!airtableEnabled()) {
+    const rows = await prisma.uc1SolarPartner.findMany({ orderBy: { name: "asc" } });
+    return rows.map((p) => ({
+      id: String(p.id),
+      name: p.name,
+      contactName: p.contactName,
+      referralFeePct: Number(p.referralFeePct),
+      avgInstallValue: Number(p.avgInstallValue),
+      isActive: p.isActive,
+    }));
+  }
+  const rows = await core.list(UC1_SLUG, "ROOFING_SOLAR_PARTNERS", { maxRecords: 500 });
+  return rows.map((r) => ({
+    id: r.id,
+    name: str(r["Name"]),
+    contactName: str(r["Contact_Name"]),
+    referralFeePct: num(r["Referral_Fee_Pct"]),
+    avgInstallValue: num(r["Avg_Install_Value"]),
+    isActive: r["Is_Active"] === true,
+  }));
+}
+
+export interface Uc1WorkstreamView {
+  id: string;
+  name: string;
+  description: string;
+  milestone: string;
+  status: string;
+  loadAtSessionStart: boolean;
+  lastUpdated: Date | string | null;
+}
+
+export async function loadUc1Workstreams(): Promise<Uc1WorkstreamView[]> {
+  if (!airtableEnabled()) {
+    const rows = await prisma.uc1Workstream.findMany({
+      orderBy: [{ status: "asc" }, { lastUpdated: "desc" }],
+    });
+    return rows.map((w) => ({
+      id: String(w.id),
+      name: w.name,
+      description: w.description,
+      milestone: w.milestone,
+      status: w.status,
+      loadAtSessionStart: w.loadAtSessionStart,
+      lastUpdated: w.lastUpdated,
+    }));
+  }
+  const rows = await core.list(UC1_SLUG, "ROOFING_WORKSTREAMS", { maxRecords: 500 });
+  return rows.map((r) => ({
+    id: r.id,
+    name: str(r["Name"]),
+    description: str(r["Description"]),
+    milestone: str(r["Milestone"]),
+    status: str(r["Status"]) || "active",
+    loadAtSessionStart: r["Load_At_Session_Start"] === true,
+    lastUpdated: str(r["Last_Updated"]) || null,
+  }));
+}
+
+export interface Uc1PriceCheckLogView {
+  id: string;
+  runAt: Date | string | null;
+  status: string;
+  vendorsChecked: number;
+  pricesUpdated: number;
+  pricesUnchanged: number;
+  errors: number;
+  summary: string;
+}
+
+export interface Uc1PriceMovementView {
+  id: string;
+  description: string;
+  unitPriceExGst: number;
+  previousPrice: number | null;
+  updatedAt: Date | string | null;
+  vendor: { name: string };
+}
+
+export async function loadUc1PriceCheck(): Promise<{
+  logs: Uc1PriceCheckLogView[];
+  recentChanges: Uc1PriceMovementView[];
+}> {
+  if (!airtableEnabled()) {
+    const [logRows, priceRows] = await Promise.all([
+      prisma.uc1PriceCheckLog.findMany({ orderBy: { runAt: "desc" }, take: 50 }),
+      prisma.uc1VendorMaterialPrice.findMany({
+        where: { previousPrice: { not: null } },
+        include: { vendor: { select: { name: true } } },
+        orderBy: { updatedAt: "desc" },
+        take: 20,
+      }),
+    ]);
+    return {
+      logs: logRows.map((l) => ({
+        id: String(l.id),
+        runAt: l.runAt,
+        status: l.status,
+        vendorsChecked: l.vendorsChecked,
+        pricesUpdated: l.pricesUpdated,
+        pricesUnchanged: l.pricesUnchanged,
+        errors: l.errors,
+        summary: l.summary,
+      })),
+      recentChanges: priceRows.map((p) => ({
+        id: String(p.id),
+        description: p.description,
+        unitPriceExGst: Number(p.unitPriceExGst),
+        previousPrice: p.previousPrice == null ? null : Number(p.previousPrice),
+        updatedAt: p.updatedAt,
+        vendor: { name: p.vendor.name },
+      })),
+    };
+  }
+  const rows = await core.list(UC1_SLUG, "ROOFING_PRICE_CHECK_LOG", { maxRecords: 50 });
+  return {
+    logs: rows.map((r) => ({
+      id: r.id,
+      runAt: str(r["Run_At"]) || null,
+      status: str(r["Status"]) || "success",
+      vendorsChecked: num(r["Vendors_Checked"]),
+      pricesUpdated: num(r["Prices_Updated"]),
+      pricesUnchanged: num(r["Prices_Unchanged"]),
+      errors: num(r["Errors"]),
+      summary: str(r["Summary"]),
+    })),
+    // Vendor price-movement tracking not migrated yet.
+    recentChanges: [],
+  };
+}

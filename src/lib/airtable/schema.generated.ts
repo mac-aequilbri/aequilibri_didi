@@ -448,6 +448,41 @@ export const CORE_SCHEMA = {
       { name: "Is_Active", id: "fldy6JkPUs667jHCC", type: "checkbox" },
     ],
   },
+  ROOFING_SOLAR_PARTNERS: {
+    tableId: "tblynX9gI5XfLUAWE",
+    fields: [
+      { name: "Name", id: "fldaKOfPXp3wWmqdA", type: "singleLineText" },
+      { name: "Contact_Name", id: "fldVD3n03rTHH2lHZ", type: "singleLineText" },
+      { name: "Contact_Email", id: "fldnMpOSRlJ9nlrIk", type: "email" },
+      { name: "Referral_Fee_Pct", id: "fld3dsEAdcGTZcnXy", type: "number" },
+      { name: "Avg_Install_Value", id: "fldVQ4a1mX78olGjK", type: "currency" },
+      { name: "Is_Active", id: "fldPSo1RdB1BUs3rz", type: "checkbox" },
+    ],
+  },
+  ROOFING_WORKSTREAMS: {
+    tableId: "tblIE4zWIICgeMETX",
+    fields: [
+      { name: "Name", id: "fldeqSVHZmI7Pw1My", type: "singleLineText" },
+      { name: "Description", id: "fld79yKilumKMWicH", type: "multilineText" },
+      { name: "Milestone", id: "fld5K5NqipBZphPkB", type: "singleLineText" },
+      { name: "Status", id: "fldRSjPiS9aaBYngz", type: "singleSelect" },
+      { name: "Load_At_Session_Start", id: "fldZUHosVLaWchp8P", type: "checkbox" },
+      { name: "Notes", id: "fldrO2Hi2G9ytAhLX", type: "multilineText" },
+      { name: "Last_Updated", id: "fldw3QfcZdhJfgqXn", type: "date" },
+    ],
+  },
+  ROOFING_PRICE_CHECK_LOG: {
+    tableId: "tblicf2SVBJQzRrIG",
+    fields: [
+      { name: "Summary", id: "fld4skbzdQh5dkYNM", type: "singleLineText" },
+      { name: "Run_At", id: "fldQwotro9BP7nFjB", type: "dateTime" },
+      { name: "Status", id: "fldY33uGw2gmi4ZSc", type: "singleLineText" },
+      { name: "Vendors_Checked", id: "fldumTQ9ap2WOTKH6", type: "number" },
+      { name: "Prices_Updated", id: "fldur9KjdgL2nrgs4", type: "number" },
+      { name: "Prices_Unchanged", id: "fldBtugJByzRsxgYC", type: "number" },
+      { name: "Errors", id: "fldn50BQBjhZGynr1", type: "number" },
+    ],
+  },
 } as const;
 
 export type CoreTableName = keyof typeof CORE_SCHEMA;

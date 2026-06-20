@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
+import { loadUc1Workstreams, type Uc1WorkstreamView } from "@/lib/platform/uc1Source";
 import { createWorkstream, toggleSessionLoad, updateStatus, deleteWorkstream } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -12,9 +12,9 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default async function WorkstreamsPage() {
-  let rows: Awaited<ReturnType<typeof prisma.uc1Workstream.findMany>> = [];
+  let rows: Uc1WorkstreamView[] = [];
   try {
-    rows = await prisma.uc1Workstream.findMany({ orderBy: [{ status: "asc" }, { lastUpdated: "desc" }] });
+    rows = await loadUc1Workstreams();
   } catch { rows = []; }
 
   const sessionLoaded = rows.filter((r) => r.loadAtSessionStart && r.status === "active");
@@ -68,7 +68,7 @@ export default async function WorkstreamsPage() {
                     <td className="text-right whitespace-nowrap">
                       <form action={updateStatus} className="inline mr-1">
                         <input type="hidden" name="id" value={w.id} />
-                        <select name="status" defaultValue={w.status} onChange={() => {}} className="text-xs border border-[var(--ae-earth)] rounded px-1 py-0.5 mr-1">
+                        <select name="status" defaultValue={w.status} className="text-xs border border-[var(--ae-earth)] rounded px-1 py-0.5 mr-1">
                           <option value="active">active</option>
                           <option value="paused">paused</option>
                           <option value="complete">complete</option>
