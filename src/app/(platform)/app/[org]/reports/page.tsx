@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadWeeklyReports } from "@/lib/platform/domainListSources";
 import { orgPath } from "@/lib/platform/paths";
 import { generateReportAction } from "./actions";
 
@@ -11,11 +12,8 @@ export const dynamic = "force-dynamic";
 export default async function ReportsPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
   const [reports, jobs] = await Promise.all([
-    prisma.platConWeeklyReport.findMany({
-      where: { orgId: ctx.orgId },
-      orderBy: { weekEnding: "desc" },
-      include: { job: { select: { code: true } } },
-    }),
+    loadWeeklyReports(ctx),
+    // Jobs feed the AI-generate dropdown (still Postgres-backed).
     prisma.platJob.findMany({
       where: { orgId: ctx.orgId },
       select: { id: true, code: true, name: true },
@@ -68,7 +66,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ org: s
                   <Link href={orgPath(ctx.orgSlug, `/reports/${r.id}`)} className="font-medium hover:underline">
                     {r.title || `Week ending ${formatDate(r.weekEnding)}`}
                   </Link>
-                  <span className="ml-1 text-xs text-neutral-400">{r.job?.code}</span>
+                  <span className="ml-1 text-xs text-neutral-400">{r.jobCode}</span>
                   {r.isAiGenerated && (
                     <span className="ml-1 text-[0.65rem] px-1 rounded bg-violet-100 text-violet-700">AI</span>
                   )}

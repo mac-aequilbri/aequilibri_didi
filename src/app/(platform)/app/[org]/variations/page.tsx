@@ -1,19 +1,15 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadVariations } from "@/lib/platform/domainListSources";
 import { orgPath } from "@/lib/platform/paths";
 
 export const dynamic = "force-dynamic";
 
 export default async function VariationsPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const variations = await prisma.platConVariationOrder.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: { createdAt: "desc" },
-    include: { job: { select: { code: true } } },
-  });
+  const variations = await loadVariations(ctx);
 
   return (
     <div className="p-6">
@@ -45,7 +41,7 @@ export default async function VariationsPage({ params }: { params: Promise<{ org
                   <Link href={orgPath(ctx.orgSlug, `/variations/${v.id}`)} className="font-medium hover:underline">
                     {v.title}
                   </Link>
-                  <span className="ml-1 text-xs text-neutral-400">{v.job?.code}</span>
+                  <span className="ml-1 text-xs text-neutral-400">{v.jobCode}</span>
                   {v.isAiDrafted && (
                     <span className="ml-1 text-[0.65rem] px-1 rounded bg-violet-100 text-violet-700">AI</span>
                   )}
