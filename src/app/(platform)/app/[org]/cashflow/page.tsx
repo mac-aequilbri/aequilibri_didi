@@ -1,10 +1,10 @@
 // Cashflow — projected vs actual per period per job.
 
-import { prisma } from "@/lib/db";
 import { TrendChart } from "@/components/charts";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadCashflowJobs } from "@/lib/platform/cashflowSource";
 import { orgPath } from "@/lib/platform/paths";
 import { updateCashflowActual } from "./actions";
 
@@ -12,11 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CashflowPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: { code: "asc" },
-    include: { conCashflows: { orderBy: { period: "asc" } } },
-  });
+  const jobs = await loadCashflowJobs(ctx);
 
   return (
     <div className="p-6">
