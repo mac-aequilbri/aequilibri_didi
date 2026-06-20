@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { currency, toNum, formatDate } from "@/lib/format";
 import { gst as gstOf, incGst } from "@/lib/money";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { PITCH_FACTORS, materialDisplay } from "@/services/uc1/constants";
+import { loadUc1Quote } from "@/lib/platform/uc1Source";
 import { updateQuoteStatus, addLineItem, deleteLineItem, deleteQuote, repriceQuote, autoAddGuttering } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -25,12 +25,7 @@ function pricingBadge(q: { pricingMechanism: string; pricingMode: string; packag
 
 export default async function QuoteDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const quoteId = Number(id);
-  if (!Number.isInteger(quoteId)) notFound();
-
-  const quote = await prisma.uc1Quote
-    .findUnique({ where: { id: quoteId }, include: { items: { orderBy: { sortOrder: "asc" } }, contact: true } })
-    .catch(() => null);
+  const quote = await loadUc1Quote(id);
   if (!quote) notFound();
 
   const subtotal = quote.items.reduce((s, i) => s + toNum(i.quantity) * toNum(i.unitPriceExGst), 0);

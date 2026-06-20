@@ -760,6 +760,116 @@ export async function loadUc1MeasurementHistory(query: string): Promise<{
   };
 }
 
+export interface Uc1QuoteItemView {
+  id: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  unitPriceExGst: number;
+  sortOrder: number;
+}
+export interface Uc1QuoteDetail {
+  id: string;
+  refNumber: string;
+  propertyAddress: string;
+  status: string;
+  material: string;
+  pitchType: string;
+  wasteFactorPct: number;
+  flatAreaSqm: number;
+  pricingMechanism: string;
+  pricingMode: string;
+  packageTier: string;
+  notes: string;
+  roofPolygonJson: string;
+  createdAt: Date | string | null;
+  updatedAt: Date | string | null;
+  contact: { name: string; company: string; email: string } | null;
+  items: Uc1QuoteItemView[];
+}
+
+export async function loadUc1Quote(id: string): Promise<Uc1QuoteDetail | null> {
+  if (!airtableEnabled()) {
+    const n = Number(id);
+    if (!Number.isInteger(n)) return null;
+    const q = await prisma.uc1Quote
+      .findUnique({
+        where: { id: n },
+        include: { items: { orderBy: { sortOrder: "asc" } }, contact: true },
+      })
+      .catch(() => null);
+    if (!q) return null;
+    return {
+      id: String(q.id),
+      refNumber: q.refNumber,
+      propertyAddress: q.propertyAddress,
+      status: q.status,
+      material: q.material,
+      pitchType: q.pitchType,
+      wasteFactorPct: Number(q.wasteFactorPct),
+      flatAreaSqm: Number(q.flatAreaSqm),
+      pricingMechanism: q.pricingMechanism,
+      pricingMode: q.pricingMode,
+      packageTier: q.packageTier,
+      notes: q.notes,
+      roofPolygonJson: q.roofPolygonJson ?? "",
+      createdAt: q.createdAt,
+      updatedAt: q.updatedAt,
+      contact: q.contact
+        ? { name: q.contact.name, company: q.contact.company, email: q.contact.email }
+        : null,
+      items: q.items.map((i) => ({
+        id: String(i.id),
+        description: i.description,
+        quantity: Number(i.quantity),
+        unit: i.unit,
+        unitPriceExGst: Number(i.unitPriceExGst),
+        sortOrder: i.sortOrder,
+      })),
+    };
+  }
+  let q;
+  try {
+    q = await core.get(UC1_SLUG, "ROOFING_QUOTES", id);
+  } catch {
+    return null;
+  }
+  const allItems = await core.list(UC1_SLUG, "ROOFING_QUOTE_ITEMS", { maxRecords: 500 });
+  const items = allItems
+    .filter((it) => Array.isArray(it["Quote"]) && (it["Quote"] as string[]).includes(id))
+    .map((it) => ({
+      id: it.id,
+      description: str(it["Description"]),
+      quantity: num(it["Quantity"]),
+      unit: str(it["Unit"]) || "m²",
+      unitPriceExGst: num(it["Unit_Price_Ex_GST"]),
+      sortOrder: num(it["Sort_Order"]),
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const name = str(q["Contact_Name"]);
+  return {
+    id: q.id,
+    refNumber: str(q["Ref_Number"]),
+    propertyAddress: str(q["Property_Address"]),
+    status: str(q["Status"]) || "draft",
+    material: str(q["Material"]) || "colorbond",
+    pitchType: str(q["Pitch_Type"]) || "standard",
+    wasteFactorPct: num(q["Waste_Factor_Pct"]),
+    flatAreaSqm: num(q["Flat_Area_Sqm"]),
+    pricingMechanism: str(q["Pricing_Mechanism"]) || "cost_plus",
+    pricingMode: str(q["Pricing_Mode"]),
+    packageTier: str(q["Package_Tier"]),
+    notes: str(q["Notes"]),
+    roofPolygonJson: str(q["Roof_Polygon_Json"]),
+    createdAt: str(q["Created_At"]) || null,
+    updatedAt: str(q["Updated_At"]) || null,
+    contact: name
+      ? { name, company: str(q["Contact_Company"]), email: str(q["Contact_Email"]) }
+      : null,
+    items,
+  };
+}
+
 export interface Uc1IntelligenceData {
   snapshot: Uc1IntelSnapshotView | null;
   corrections: Uc1IntelCorrectionView[];
