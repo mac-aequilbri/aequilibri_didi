@@ -503,6 +503,54 @@ export const CORE_SCHEMA = {
       { name: "Logged_At", id: "fld16TkAm54ygAOLV", type: "dateTime" },
     ],
   },
+  ROOFING_INTELLIGENCE_SNAPSHOT: {
+    tableId: "tblUFEep2vwND2jhZ",
+    fields: [
+      { name: "Label", id: "fldprVKrdWXSuTjhK", type: "singleLineText" },
+      { name: "Captured_At", id: "fldtc7q7DJyYncgNG", type: "dateTime" },
+      { name: "Accuracy_Rate_Pct", id: "fldrjqrouLsz9pqXb", type: "number" },
+      { name: "Completed_Jobs", id: "fldk4TxPSKNPNJFK3", type: "number" },
+      { name: "Avg_Confidence", id: "fldaMKvvk5cvCGPN3", type: "number" },
+      { name: "Confidence_Trajectory", id: "fldlcLbnxIR6beC7r", type: "singleSelect" },
+      { name: "Gaps_Json", id: "fldNeITp5CX6o38J8", type: "multilineText" },
+    ],
+  },
+  ROOFING_CORRECTIONS: {
+    tableId: "tblnScQSEWvNzkMST",
+    fields: [
+      { name: "Dimension", id: "fld6O4CvLj8FZwCNs", type: "singleLineText" },
+      { name: "Suburb", id: "fldiSzjaoTV6rthmO", type: "singleLineText" },
+      { name: "AI_Value", id: "fldnyI5ArgbRWKJfH", type: "number" },
+      { name: "Human_Value", id: "fldkf56YnZ1vfktPX", type: "number" },
+      { name: "Variance_Pct", id: "fldadkT8Ff51y88KO", type: "number" },
+      { name: "Root_Cause", id: "fldqDgspinpJfyjB2", type: "multilineText" },
+      { name: "Created_At", id: "fldheXf5rtocznjLG", type: "dateTime" },
+    ],
+  },
+  ROOFING_HYPOTHESES: {
+    tableId: "tblS9TjsVAfOmmR5i",
+    fields: [
+      { name: "Description", id: "fldFoCsox7IYfCrXE", type: "singleLineText" },
+      { name: "Sample_Count", id: "fldicCIhFUR3Duago", type: "number" },
+      { name: "Avg_Variance_Pct", id: "fldv1Lw0BlgIQeMal", type: "number" },
+      { name: "Confidence", id: "fldNdFgky46hFoD9H", type: "number" },
+      { name: "Status", id: "fldlKqha5JCUToNeP", type: "singleSelect" },
+    ],
+  },
+  ROOFING_LEARNING_RULES: {
+    tableId: "tblAo76JsN6r9ppSu",
+    fields: [
+      { name: "Rule_Code", id: "fldkDldCy1GdDfGUO", type: "singleLineText" },
+      { name: "Category", id: "fldtOSGmQjmGqEOIA", type: "singleLineText" },
+      { name: "Description", id: "fldePkqsdHJWzDeqF", type: "multilineText" },
+      { name: "Trigger_Condition", id: "fld4KdYz5H5rT8mTT", type: "singleLineText" },
+      { name: "Priority", id: "fld8heqmnj74QW6pA", type: "number" },
+      { name: "Confidence", id: "fldRrkRp1g8nifKV0", type: "number" },
+      { name: "Times_Triggered", id: "fldNbyrJWS1Cur8s8", type: "number" },
+      { name: "Is_Active", id: "fldZgNrUm4jfljN3D", type: "checkbox" },
+      { name: "Auto_Apply", id: "fldyLjIQqwGoWoeN3", type: "checkbox" },
+    ],
+  },
 } as const;
 
 export type CoreTableName = keyof typeof CORE_SCHEMA;

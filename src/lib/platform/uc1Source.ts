@@ -452,3 +452,147 @@ export async function loadUc1ExecLog(): Promise<Uc1ExecLogView[]> {
     createdAt: str(r["Logged_At"]) || null,
   }));
 }
+
+export interface Uc1IntelSnapshotView {
+  accuracyRatePct: number;
+  completedJobs: number;
+  avgConfidence: number;
+  confidenceTrajectory: string;
+  gapsJson: string;
+}
+export interface Uc1IntelCorrectionView {
+  id: string;
+  dimension: string;
+  suburb: string;
+  aiValue: number;
+  humanValue: number;
+  variancePct: number;
+  rootCause: string;
+  createdAt: Date | string | null;
+}
+export interface Uc1IntelHypothesisView {
+  id: string;
+  description: string;
+  sampleCount: number;
+  avgVariancePct: number;
+  confidence: number;
+  status: string;
+}
+export interface Uc1IntelRuleView {
+  id: string;
+  ruleCode: string;
+  category: string;
+  description: string;
+  triggerCondition: string;
+  priority: number;
+  confidence: number;
+  timesTriggered: number;
+  isActive: boolean;
+  autoApply: boolean;
+}
+export interface Uc1IntelligenceData {
+  snapshot: Uc1IntelSnapshotView | null;
+  corrections: Uc1IntelCorrectionView[];
+  hypotheses: Uc1IntelHypothesisView[];
+  rules: Uc1IntelRuleView[];
+}
+
+export async function loadUc1Intelligence(): Promise<Uc1IntelligenceData> {
+  if (!airtableEnabled()) {
+    const [snap, corrections, hypotheses, rules] = await Promise.all([
+      prisma.uc1IntelligenceSnapshot.findFirst({ orderBy: { capturedAt: "desc" } }),
+      prisma.uc1Correction.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
+      prisma.uc1Hypothesis.findMany({ orderBy: { confidence: "desc" } }),
+      prisma.uc1LearningRule.findMany({ orderBy: [{ isActive: "desc" }, { confidence: "desc" }] }),
+    ]);
+    return {
+      snapshot: snap
+        ? {
+            accuracyRatePct: snap.accuracyRatePct,
+            completedJobs: snap.completedJobs,
+            avgConfidence: snap.avgConfidence,
+            confidenceTrajectory: snap.confidenceTrajectory,
+            gapsJson: snap.gapsJson,
+          }
+        : null,
+      corrections: corrections.map((c) => ({
+        id: String(c.id),
+        dimension: c.dimension,
+        suburb: c.suburb,
+        aiValue: c.aiValue,
+        humanValue: c.humanValue,
+        variancePct: c.variancePct,
+        rootCause: c.rootCause,
+        createdAt: c.createdAt,
+      })),
+      hypotheses: hypotheses.map((h) => ({
+        id: String(h.id),
+        description: h.description,
+        sampleCount: h.sampleCount,
+        avgVariancePct: h.avgVariancePct,
+        confidence: h.confidence,
+        status: h.status,
+      })),
+      rules: rules.map((r) => ({
+        id: String(r.id),
+        ruleCode: r.ruleCode,
+        category: r.category,
+        description: r.description,
+        triggerCondition: r.triggerCondition,
+        priority: r.priority,
+        confidence: r.confidence,
+        timesTriggered: r.timesTriggered,
+        isActive: r.isActive,
+        autoApply: r.autoApply,
+      })),
+    };
+  }
+  const [snapRows, corrRows, hypRows, ruleRows] = await Promise.all([
+    core.list(UC1_SLUG, "ROOFING_INTELLIGENCE_SNAPSHOT", { maxRecords: 1 }),
+    core.list(UC1_SLUG, "ROOFING_CORRECTIONS", { maxRecords: 20 }),
+    core.list(UC1_SLUG, "ROOFING_HYPOTHESES", { maxRecords: 200 }),
+    core.list(UC1_SLUG, "ROOFING_LEARNING_RULES", { maxRecords: 200 }),
+  ]);
+  const s = snapRows[0];
+  return {
+    snapshot: s
+      ? {
+          accuracyRatePct: num(s["Accuracy_Rate_Pct"]),
+          completedJobs: num(s["Completed_Jobs"]),
+          avgConfidence: num(s["Avg_Confidence"]),
+          confidenceTrajectory: str(s["Confidence_Trajectory"]) || "stable",
+          gapsJson: str(s["Gaps_Json"]) || "[]",
+        }
+      : null,
+    corrections: corrRows.map((c) => ({
+      id: c.id,
+      dimension: str(c["Dimension"]),
+      suburb: str(c["Suburb"]),
+      aiValue: num(c["AI_Value"]),
+      humanValue: num(c["Human_Value"]),
+      variancePct: num(c["Variance_Pct"]),
+      rootCause: str(c["Root_Cause"]),
+      createdAt: str(c["Created_At"]) || null,
+    })),
+    hypotheses: hypRows.map((h) => ({
+      id: h.id,
+      description: str(h["Description"]),
+      sampleCount: num(h["Sample_Count"]),
+      avgVariancePct: num(h["Avg_Variance_Pct"]),
+      confidence: num(h["Confidence"]),
+      status: str(h["Status"]) || "pending",
+    })),
+    rules: ruleRows.map((r) => ({
+      id: r.id,
+      ruleCode: str(r["Rule_Code"]),
+      category: str(r["Category"]),
+      description: str(r["Description"]),
+      triggerCondition: str(r["Trigger_Condition"]),
+      priority: num(r["Priority"]),
+      confidence: num(r["Confidence"]),
+      timesTriggered: num(r["Times_Triggered"]),
+      isActive: r["Is_Active"] === true,
+      autoApply: r["Auto_Apply"] === true,
+    })),
+  };
+}
