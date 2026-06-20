@@ -1,10 +1,10 @@
 // Budget vs actual per job, with inline actual updates (human-only writes).
 
-import { prisma } from "@/lib/db";
 import { BarsCompare } from "@/components/charts";
 import { EmptyState, MetricCard, PageHeader } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadBudgetJobs } from "@/lib/platform/budgetSource";
 import { orgPath } from "@/lib/platform/paths";
 import { updateBudgetActual } from "./actions";
 
@@ -12,13 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function BudgetPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: { code: "asc" },
-    include: {
-      conBudgets: { orderBy: [{ category: "asc" }], include: { phase: { select: { name: true } } } },
-    },
-  });
+  const jobs = await loadBudgetJobs(ctx);
 
   const all = jobs.flatMap((j) => j.conBudgets);
   const totBudget = all.reduce((s, b) => s + toNum(b.budgetAmount), 0);
@@ -96,7 +90,7 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
                         <span className="font-medium">{b.category || b.description}</span>
                         <span className="block text-xs text-neutral-500">
                           {b.description}
-                          {b.phase?.name ? ` · ${b.phase.name}` : ""}
+                          {b.phaseName ? ` · ${b.phaseName}` : ""}
                         </span>
                       </td>
                       <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(budget)}</td>
