@@ -1,13 +1,13 @@
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { loadUc1FinanceProviders, type Uc1FinanceProviderView } from "@/lib/platform/uc1Source";
 import { createFinanceProvider, toggleFinanceProvider } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function FinanceProviders() {
-  let rows: Awaited<ReturnType<typeof prisma.uc1FinanceProvider.findMany>> = [];
+  let rows: Uc1FinanceProviderView[] = [];
   try {
-    rows = await prisma.uc1FinanceProvider.findMany({ orderBy: { name: "asc" } });
+    rows = await loadUc1FinanceProviders();
   } catch {
     rows = [];
   }

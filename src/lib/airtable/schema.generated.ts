@@ -406,6 +406,48 @@ export const CORE_SCHEMA = {
       { name: "Is_Active", id: "fldJH2JOw5hSNl6au", type: "checkbox" },
     ],
   },
+  ROOFING_FINANCE_PROVIDERS: {
+    tableId: "tblsFAjoezpt1oCj5",
+    fields: [
+      { name: "Name", id: "fldZpiSviGXoO9gRD", type: "singleLineText" },
+      { name: "Interest_Rate_Pct", id: "fldGKNRU7B5CBwV8d", type: "number" },
+      { name: "Min_Term_Months", id: "fldvC3EZKLpOw1G6V", type: "number" },
+      { name: "Max_Term_Months", id: "fldzbfiROhEfmTqgR", type: "number" },
+      { name: "Tagline", id: "fldQUhyfzBcILnDZm", type: "singleLineText" },
+      { name: "Is_Active", id: "fld3KJhEpvM5AarTk", type: "checkbox" },
+    ],
+  },
+  ROOFING_GUTTERING_RATES: {
+    tableId: "tblYoH8DE3ssZ2UGU",
+    fields: [
+      { name: "Item_Type", id: "fldoAEP2far7v4LKC", type: "singleLineText" },
+      { name: "Description", id: "flddZtPvwWdrRzY80", type: "singleLineText" },
+      { name: "Rate_Ex_GST", id: "flduHpb8peiU2eabG", type: "currency" },
+      { name: "Unit", id: "fldHw8IVbmMvlEfOt", type: "singleLineText" },
+      { name: "Is_Active", id: "fldLZRnzueU6Bcm4W", type: "checkbox" },
+    ],
+  },
+  ROOFING_REGIONS: {
+    tableId: "tblFQ52z6Do1BcUAy",
+    fields: [
+      { name: "Name", id: "fld5nM4q4rPnH5UIU", type: "singleLineText" },
+      { name: "Postcodes", id: "fldNX18UpYXvlOuw9", type: "singleLineText" },
+      { name: "Travel_Days", id: "fldCzsfWvSlACu9xP", type: "number" },
+      { name: "Travel_Rate", id: "fldxa6daI3sEOn9iH", type: "currency" },
+      { name: "Premium_Pct", id: "fldedUljw2ylfZZlV", type: "number" },
+      { name: "Is_Active", id: "fldYulKQT9BErzaxt", type: "checkbox" },
+    ],
+  },
+  ROOFING_TEAM: {
+    tableId: "tblD8jJYxonsPx7MP",
+    fields: [
+      { name: "Name", id: "fldQ8qKXHKc2ybHhl", type: "singleLineText" },
+      { name: "Role", id: "fldYGcnA0aC6MfsBt", type: "singleSelect" },
+      { name: "Accuracy_Profile", id: "fldHm524hjoxEyMWB", type: "singleLineText" },
+      { name: "Date_Joined", id: "fldO3tSKwLD2zOCD4", type: "date" },
+      { name: "Is_Active", id: "fldy6JkPUs667jHCC", type: "checkbox" },
+    ],
+  },
 } as const;
 
 export type CoreTableName = keyof typeof CORE_SCHEMA;

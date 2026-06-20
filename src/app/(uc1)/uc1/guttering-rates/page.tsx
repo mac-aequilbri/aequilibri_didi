@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/db";
 import { currency } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
+import { loadUc1GutteringRates, type Uc1GutteringRateView } from "@/lib/platform/uc1Source";
 import { createGutteringRate, toggleGutteringRate, deleteGutteringRate } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic";
 const ITEM_TYPES = ["gutter", "downpipe_90mm", "downpipe_100mm", "valley", "ridge", "fascia"];
 
 export default async function GutteringRates() {
-  let rows: Awaited<ReturnType<typeof prisma.uc1GutteringRate.findMany>> = [];
+  let rows: Uc1GutteringRateView[] = [];
   try {
-    rows = await prisma.uc1GutteringRate.findMany({ orderBy: { itemType: "asc" } });
+    rows = await loadUc1GutteringRates();
   } catch {
     rows = [];
   }
