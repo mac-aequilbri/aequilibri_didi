@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { currency, toNum, formatDate } from "@/lib/format";
 import { gst as gstOf, incGst } from "@/lib/money";
 import { materialDisplay } from "@/services/uc1/constants";
 import { buildScopeOfWorks } from "@/services/uc1/pricing";
+import { loadUc1Quote } from "@/lib/platform/uc1Source";
 import PrintButton from "./PrintButton";
 
 export const dynamic = "force-dynamic";
@@ -48,12 +48,7 @@ function footprintDims(coords: number[][]): { wM: number; hM: number } | null {
 
 export default async function QuotePrint({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const quoteId = Number(id);
-  if (!Number.isInteger(quoteId)) notFound();
-
-  const quote = await prisma.uc1Quote
-    .findUnique({ where: { id: quoteId }, include: { items: { orderBy: { sortOrder: "asc" } }, contact: true } })
-    .catch(() => null);
+  const quote = await loadUc1Quote(id);
   if (!quote) notFound();
 
   const subtotal = quote.items.reduce((s, i) => s + toNum(i.quantity) * toNum(i.unitPriceExGst), 0);

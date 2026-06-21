@@ -782,9 +782,17 @@ export interface Uc1QuoteDetail {
   packageTier: string;
   notes: string;
   roofPolygonJson: string;
+  ridgeLm: number;
+  eaveLm: number;
+  valleyLm: number;
+  hipLm: number;
+  rakeLm: number;
+  pitchDegActual: number;
+  storeys: number;
+  roofColour: string;
   createdAt: Date | string | null;
   updatedAt: Date | string | null;
-  contact: { name: string; company: string; email: string } | null;
+  contact: { name: string; company: string; email: string; phone: string } | null;
   items: Uc1QuoteItemView[];
 }
 
@@ -813,10 +821,23 @@ export async function loadUc1Quote(id: string): Promise<Uc1QuoteDetail | null> {
       packageTier: q.packageTier,
       notes: q.notes,
       roofPolygonJson: q.roofPolygonJson ?? "",
+      ridgeLm: Number(q.ridgeLm),
+      eaveLm: Number(q.eaveLm),
+      valleyLm: Number(q.valleyLm),
+      hipLm: Number(q.hipLm),
+      rakeLm: Number(q.rakeLm),
+      pitchDegActual: Number(q.pitchDegActual),
+      storeys: q.storeys,
+      roofColour: q.roofColour,
       createdAt: q.createdAt,
       updatedAt: q.updatedAt,
       contact: q.contact
-        ? { name: q.contact.name, company: q.contact.company, email: q.contact.email }
+        ? {
+            name: q.contact.name,
+            company: q.contact.company,
+            email: q.contact.email,
+            phone: q.contact.phone,
+          }
         : null,
       items: q.items.map((i) => ({
         id: String(i.id),
@@ -861,10 +882,23 @@ export async function loadUc1Quote(id: string): Promise<Uc1QuoteDetail | null> {
     packageTier: str(q["Package_Tier"]),
     notes: str(q["Notes"]),
     roofPolygonJson: str(q["Roof_Polygon_Json"]),
+    ridgeLm: num(q["Ridge_Lm"]),
+    eaveLm: num(q["Eave_Lm"]),
+    valleyLm: num(q["Valley_Lm"]),
+    hipLm: num(q["Hip_Lm"]),
+    rakeLm: num(q["Rake_Lm"]),
+    pitchDegActual: num(q["Pitch_Deg_Actual"]),
+    storeys: num(q["Storeys"]) || 1,
+    roofColour: str(q["Roof_Colour"]),
     createdAt: str(q["Created_At"]) || null,
     updatedAt: str(q["Updated_At"]) || null,
     contact: name
-      ? { name, company: str(q["Contact_Company"]), email: str(q["Contact_Email"]) }
+      ? {
+          name,
+          company: str(q["Contact_Company"]),
+          email: str(q["Contact_Email"]),
+          phone: str(q["Contact_Phone"]),
+        }
       : null,
     items,
   };
