@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { currency, formatDate, toNum } from "@/lib/format";
 import { PageHeader, MetricCard } from "@/components/PageHeader";
+import { loadUc1StormEvent } from "@/lib/platform/uc1Source";
 import { addStormLead, importStormLeadsCsv, updateStormLead } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +16,7 @@ const LEAD_STATUS: [string, string][] = [
 
 export default async function StormDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const eventId = Number(id);
-  if (!Number.isInteger(eventId)) notFound();
-
-  const event = await prisma.uc1StormEvent
-    .findUnique({ where: { id: eventId }, include: { leads: { orderBy: { createdAt: "desc" } } } })
-    .catch(() => null);
+  const event = await loadUc1StormEvent(id);
   if (!event) notFound();
 
   const leads = event.leads;

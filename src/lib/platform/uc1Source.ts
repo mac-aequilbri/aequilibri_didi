@@ -668,6 +668,83 @@ export async function loadUc1StormEvents(): Promise<Uc1StormEventView[]> {
   }));
 }
 
+export interface Uc1StormLeadView {
+  id: string;
+  address: string;
+  suburb: string;
+  roofAreaSqm: number;
+  estimatedValue: number;
+  contactName: string;
+  contactPhone: string;
+  status: string;
+}
+export interface Uc1StormDetail {
+  id: string;
+  name: string;
+  eventType: string;
+  severity: number;
+  eventDate: Date | string | null;
+  affectedSuburbs: string;
+  leads: Uc1StormLeadView[];
+}
+
+export async function loadUc1StormEvent(id: string): Promise<Uc1StormDetail | null> {
+  if (!airtableEnabled()) {
+    const n = Number(id);
+    if (!Number.isInteger(n)) return null;
+    const e = await prisma.uc1StormEvent
+      .findUnique({ where: { id: n }, include: { leads: { orderBy: { createdAt: "desc" } } } })
+      .catch(() => null);
+    if (!e) return null;
+    return {
+      id: String(e.id),
+      name: e.name,
+      eventType: e.eventType,
+      severity: e.severity,
+      eventDate: e.eventDate,
+      affectedSuburbs: e.affectedSuburbs,
+      leads: e.leads.map((l) => ({
+        id: String(l.id),
+        address: l.address,
+        suburb: l.suburb,
+        roofAreaSqm: Number(l.roofAreaSqm),
+        estimatedValue: Number(l.estimatedValue),
+        contactName: l.contactName,
+        contactPhone: l.contactPhone,
+        status: l.status,
+      })),
+    };
+  }
+  let e;
+  try {
+    e = await core.get(UC1_SLUG, "ROOFING_STORM_EVENTS", id);
+  } catch {
+    return null;
+  }
+  const allLeads = await core.list(UC1_SLUG, "ROOFING_STORM_LEADS", { maxRecords: 500 });
+  const leads = allLeads
+    .filter((l) => Array.isArray(l["Storm_Event"]) && (l["Storm_Event"] as string[]).includes(id))
+    .map((l) => ({
+      id: l.id,
+      address: str(l["Address"]),
+      suburb: str(l["Suburb"]),
+      roofAreaSqm: num(l["Roof_Area_Sqm"]),
+      estimatedValue: num(l["Estimated_Value"]),
+      contactName: str(l["Contact_Name"]),
+      contactPhone: str(l["Contact_Phone"]),
+      status: str(l["Status"]) || "new",
+    }));
+  return {
+    id: e.id,
+    name: str(e["Name"]),
+    eventType: str(e["Event_Type"]),
+    severity: num(e["Severity"]),
+    eventDate: str(e["Event_Date"]) || null,
+    affectedSuburbs: str(e["Affected_Suburbs"]),
+    leads,
+  };
+}
+
 export interface Uc1MeasurementSnapshotView {
   id: string;
   address: string;
