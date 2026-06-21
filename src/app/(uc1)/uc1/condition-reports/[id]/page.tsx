@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { currency, formatDate } from "@/lib/format";
 import { incGst } from "@/lib/money";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { loadUc1ConditionReport } from "@/lib/platform/uc1Source";
 import { finaliseReport, deliverReport, updateReportPrice } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -14,12 +14,7 @@ const GRADE_COLOR: Record<string, string> = {
 
 export default async function ConditionReportDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const reportId = Number(id);
-  if (!Number.isInteger(reportId)) notFound();
-
-  const report = await prisma.uc1RoofConditionReport
-    .findUnique({ where: { id: reportId }, include: { quote: { select: { id: true, refNumber: true, propertyAddress: true } } } })
-    .catch(() => null);
+  const report = await loadUc1ConditionReport(id);
   if (!report) notFound();
 
   return (

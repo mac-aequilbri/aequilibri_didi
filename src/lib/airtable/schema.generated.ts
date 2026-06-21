@@ -605,6 +605,12 @@ export const CORE_SCHEMA = {
       { name: "Status", id: "fldLcfrrI0YlDhXZR", type: "singleSelect" },
       { name: "Price_Ex_GST", id: "fldJrnytQdb3h9Tf3", type: "currency" },
       { name: "Generated_At", id: "fldHh434HeoGUKNuL", type: "dateTime" },
+      { name: "Condition_Score", id: "fldHlW80YthTmsFdj", type: "number" },
+      { name: "Life_Remaining_Years", id: "fldilyd0HBovqlcjK", type: "number" },
+      { name: "AI_Assessment", id: "fldDbqQWPBmoVxEi2", type: "multilineText" },
+      { name: "Recommended_Works", id: "fldbyzo4UNEsHHpJt", type: "multilineText" },
+      { name: "Report_Type", id: "fldFxM9JktWSi5CDq", type: "singleLineText" },
+      { name: "Inspector_Name", id: "fldGU74rPvzxQbuSD", type: "singleLineText" },
     ],
   },
   ROOFING_PURCHASE_ORDERS: {
@@ -615,6 +621,7 @@ export const CORE_SCHEMA = {
       { name: "Status", id: "fldzkLma95Y0teM8p", type: "singleSelect" },
       { name: "Total", id: "fldxfFeFtrgXMIYLo", type: "currency" },
       { name: "Created_At", id: "fldAzR8egROejzJmE", type: "dateTime" },
+      { name: "ROOFING_PO_ITEMS", id: "fldl5cZ6PK3KNxSnN", type: "multipleRecordLinks" },
     ],
   },
   ROOFING_STORM_EVENTS: {
@@ -661,6 +668,17 @@ export const CORE_SCHEMA = {
       { name: "Contact_Phone", id: "fldOiGN69qFPxIBPV", type: "singleLineText" },
       { name: "Status", id: "fld82G5f0Ph1KsXnD", type: "singleSelect" },
       { name: "Storm_Event", id: "fldfgUvxnw0LGS1uw", type: "multipleRecordLinks" },
+    ],
+  },
+  ROOFING_PO_ITEMS: {
+    tableId: "tblWY0FuPiPEsIFLc",
+    fields: [
+      { name: "Description", id: "fldTsELSee0wvyMeB", type: "singleLineText" },
+      { name: "Quantity", id: "fldpPvSOCA3LoH8QH", type: "number" },
+      { name: "Unit", id: "fld0uxcZ9qH1aXBpH", type: "singleLineText" },
+      { name: "Unit_Price_Ex_GST", id: "fldBQvxNCg4CEEvUj", type: "currency" },
+      { name: "Sort_Order", id: "fldf6RAU29kQOXo3R", type: "number" },
+      { name: "Purchase_Order", id: "fldaf19v1tGKZeqTB", type: "multipleRecordLinks" },
     ],
   },
 } as const;

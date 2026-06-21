@@ -981,6 +981,144 @@ export async function loadUc1Quote(id: string): Promise<Uc1QuoteDetail | null> {
   };
 }
 
+export interface Uc1PoDetail {
+  id: string;
+  poNumber: string;
+  vendor: string;
+  status: string;
+  createdAt: Date | string | null;
+  items: Uc1QuoteItemView[];
+}
+
+export async function loadUc1PurchaseOrder(id: string): Promise<Uc1PoDetail | null> {
+  if (!airtableEnabled()) {
+    const n = Number(id);
+    if (!Number.isInteger(n)) return null;
+    const po = await prisma.uc1PurchaseOrder
+      .findUnique({
+        where: { id: n },
+        include: { vendor: true, poItems: { orderBy: { sortOrder: "asc" } } },
+      })
+      .catch(() => null);
+    if (!po) return null;
+    return {
+      id: String(po.id),
+      poNumber: po.poNumber,
+      vendor: po.vendor.name,
+      status: po.status,
+      createdAt: po.createdAt,
+      items: po.poItems.map((i) => ({
+        id: String(i.id),
+        description: i.description,
+        quantity: Number(i.quantity),
+        unit: i.unit,
+        unitPriceExGst: Number(i.unitPriceExGst),
+        sortOrder: i.sortOrder,
+      })),
+    };
+  }
+  let po;
+  try {
+    po = await core.get(UC1_SLUG, "ROOFING_PURCHASE_ORDERS", id);
+  } catch {
+    return null;
+  }
+  const allItems = await core.list(UC1_SLUG, "ROOFING_PO_ITEMS", { maxRecords: 500 });
+  const items = allItems
+    .filter((it) => Array.isArray(it["Purchase_Order"]) && (it["Purchase_Order"] as string[]).includes(id))
+    .map((it) => ({
+      id: it.id,
+      description: str(it["Description"]),
+      quantity: num(it["Quantity"]),
+      unit: str(it["Unit"]) || "m²",
+      unitPriceExGst: num(it["Unit_Price_Ex_GST"]),
+      sortOrder: num(it["Sort_Order"]),
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  return {
+    id: po.id,
+    poNumber: str(po["PO_Number"]),
+    vendor: str(po["Vendor_Name"]),
+    status: str(po["Status"]) || "draft",
+    createdAt: str(po["Created_At"]) || null,
+    items,
+  };
+}
+
+export interface Uc1ConditionReportDetail {
+  id: string;
+  reportNumber: string;
+  conditionGrade: string;
+  conditionScore: number;
+  lifeRemainingYears: number;
+  urgencyLevel: string;
+  aiAssessment: string;
+  recommendedWorks: string;
+  status: string;
+  reportType: string;
+  clientName: string;
+  inspectorName: string;
+  priceExGst: number;
+  generatedAt: Date | string | null;
+  quote: { id: string; refNumber: string; propertyAddress: string } | null;
+}
+
+export async function loadUc1ConditionReport(id: string): Promise<Uc1ConditionReportDetail | null> {
+  if (!airtableEnabled()) {
+    const n = Number(id);
+    if (!Number.isInteger(n)) return null;
+    const r = await prisma.uc1RoofConditionReport
+      .findUnique({
+        where: { id: n },
+        include: { quote: { select: { id: true, refNumber: true, propertyAddress: true } } },
+      })
+      .catch(() => null);
+    if (!r) return null;
+    return {
+      id: String(r.id),
+      reportNumber: r.reportNumber,
+      conditionGrade: r.conditionGrade,
+      conditionScore: r.conditionScore,
+      lifeRemainingYears: r.lifeRemainingYears,
+      urgencyLevel: r.urgencyLevel,
+      aiAssessment: r.aiAssessment,
+      recommendedWorks: r.recommendedWorks,
+      status: r.status,
+      reportType: r.reportType,
+      clientName: r.clientName,
+      inspectorName: r.inspectorName,
+      priceExGst: Number(r.priceExGst),
+      generatedAt: r.generatedAt,
+      quote: r.quote
+        ? { id: String(r.quote.id), refNumber: r.quote.refNumber, propertyAddress: r.quote.propertyAddress }
+        : null,
+    };
+  }
+  let r;
+  try {
+    r = await core.get(UC1_SLUG, "ROOFING_CONDITION_REPORTS", id);
+  } catch {
+    return null;
+  }
+  return {
+    id: r.id,
+    reportNumber: str(r["Report_Number"]),
+    conditionGrade: str(r["Condition_Grade"]) || "B",
+    conditionScore: num(r["Condition_Score"]),
+    lifeRemainingYears: num(r["Life_Remaining_Years"]),
+    urgencyLevel: str(r["Urgency_Level"]) || "routine",
+    aiAssessment: str(r["AI_Assessment"]),
+    recommendedWorks: str(r["Recommended_Works"]),
+    status: str(r["Status"]) || "draft",
+    reportType: str(r["Report_Type"]) || "homebuyer",
+    clientName: str(r["Client_Name"]),
+    inspectorName: str(r["Inspector_Name"]),
+    priceExGst: num(r["Price_Ex_GST"]),
+    generatedAt: str(r["Generated_At"]) || null,
+    quote: null, // quote linkage not migrated
+  };
+}
+
 export interface Uc1IntelligenceData {
   snapshot: Uc1IntelSnapshotView | null;
   corrections: Uc1IntelCorrectionView[];
