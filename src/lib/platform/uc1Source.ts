@@ -986,6 +986,9 @@ export interface Uc1PoDetail {
   poNumber: string;
   vendor: string;
   status: string;
+  deliveryAddress: string;
+  requestedDeliveryDate: Date | string | null;
+  notes: string;
   createdAt: Date | string | null;
   items: Uc1QuoteItemView[];
 }
@@ -1006,6 +1009,9 @@ export async function loadUc1PurchaseOrder(id: string): Promise<Uc1PoDetail | nu
       poNumber: po.poNumber,
       vendor: po.vendor.name,
       status: po.status,
+      deliveryAddress: po.deliveryAddress,
+      requestedDeliveryDate: po.requestedDeliveryDate,
+      notes: po.notes,
       createdAt: po.createdAt,
       items: po.poItems.map((i) => ({
         id: String(i.id),
@@ -1040,6 +1046,9 @@ export async function loadUc1PurchaseOrder(id: string): Promise<Uc1PoDetail | nu
     poNumber: str(po["PO_Number"]),
     vendor: str(po["Vendor_Name"]),
     status: str(po["Status"]) || "draft",
+    deliveryAddress: str(po["Delivery_Address"]),
+    requestedDeliveryDate: str(po["Requested_Delivery_Date"]) || null,
+    notes: str(po["Notes"]),
     createdAt: str(po["Created_At"]) || null,
     items,
   };
