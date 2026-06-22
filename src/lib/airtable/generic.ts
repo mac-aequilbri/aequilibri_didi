@@ -73,7 +73,7 @@ export async function list(
   table: CoreTableName,
   opts: ListOptions = {},
 ): Promise<CoreRow[]> {
-  const recs = await listRecords(resolveBaseId(orgSlug), tableId(table), opts);
+  const recs = await listRecords(await resolveBaseId(orgSlug), tableId(table), opts);
   return recs.map((r) => recordToApp(r, fieldDefs(table)) as CoreRow);
 }
 
@@ -83,7 +83,7 @@ export async function get(
   table: CoreTableName,
   recordId: string,
 ): Promise<CoreRow> {
-  const rec = await getRecord(resolveBaseId(orgSlug), tableId(table), recordId);
+  const rec = await getRecord(await resolveBaseId(orgSlug), tableId(table), recordId);
   return recordToApp(rec, fieldDefs(table)) as CoreRow;
 }
 
@@ -95,7 +95,7 @@ export async function create(
 ): Promise<CoreRow> {
   assertWritable();
   const fields = appToFields(data, fieldDefs(table));
-  const [rec] = await createRecords(resolveBaseId(orgSlug), tableId(table), [fields]);
+  const [rec] = await createRecords(await resolveBaseId(orgSlug), tableId(table), [fields]);
   return recordToApp(rec, fieldDefs(table)) as CoreRow;
 }
 
@@ -108,7 +108,7 @@ export async function update(
 ): Promise<CoreRow> {
   assertWritable();
   const fields = appToFields(patch, fieldDefs(table));
-  const [rec] = await updateRecords(resolveBaseId(orgSlug), tableId(table), [
+  const [rec] = await updateRecords(await resolveBaseId(orgSlug), tableId(table), [
     { id: recordId, fields },
   ]);
   return recordToApp(rec, fieldDefs(table)) as CoreRow;
@@ -121,5 +121,5 @@ export async function remove(
   recordIds: string[],
 ): Promise<void> {
   assertWritable();
-  await deleteRecords(resolveBaseId(orgSlug), tableId(table), recordIds);
+  await deleteRecords(await resolveBaseId(orgSlug), tableId(table), recordIds);
 }

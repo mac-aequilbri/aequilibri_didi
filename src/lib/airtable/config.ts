@@ -5,10 +5,12 @@
 // read from the environment (never hard-coded; .env is gitignored).
 //
 // Per-customer base model: each client is its own cloned Airtable base, so a
-// request must resolve to that client's baseId. The long-term home for this is
-// a PlatOrganisation.airtableBaseId column; until that exists, the mapping is
-// driven by AIRTABLE_BASES (a JSON object of { orgSlug: baseId }), with the
-// demo base as the development default.
+// request must resolve to that client's baseId. The canonical home is the
+// PlatOrganisation.airtableBaseId column (set at provisioning); AIRTABLE_BASES
+// (a JSON object of { orgSlug: baseId }) is the legacy/override fallback, with
+// the demo base as the development default.
+
+import { prisma } from "@/lib/db";
 
 /** Demo base (AEQUILIBRI_DIDI_DEMO) — the only base the dev PAT can reach. */
 export const DEMO_BASE_ID = "appharWaojouHgMeW";
@@ -41,11 +43,21 @@ function baseRegistry(): Record<string, string> {
   }
 }
 
-/** Resolve an org slug to its Airtable base id. Falls back to the demo base in
- *  development so the spike runs without configuration. */
-export function resolveBaseId(orgSlug: string): string {
+/** Resolve an org slug to its Airtable base id. Resolution order:
+ *   1. the org's provisioned `airtableBaseId` column (the canonical home), then
+ *   2. the AIRTABLE_BASES env map (legacy / not-yet-provisioned orgs), then
+ *   3. the demo base in development.
+ *  Throws in production when none match, so a misconfigured org fails loudly.
+ *  The DB lookup is best-effort: if Postgres is unreachable we still fall back
+ *  to the env map, and the cost is negligible next to the Airtable round-trip. */
+export async function resolveBaseId(orgSlug: string): Promise<string> {
+  const org = await prisma.platOrganisation
+    .findUnique({ where: { slug: orgSlug }, select: { airtableBaseId: true } })
+    .catch(() => null);
+  if (org?.airtableBaseId) return org.airtableBaseId;
+
   const registry = baseRegistry();
   if (registry[orgSlug]) return registry[orgSlug];
   if (process.env.NODE_ENV !== "production") return DEMO_BASE_ID;
-  throw new Error(`No Airtable base mapped for org "${orgSlug}" (set AIRTABLE_BASES).`);
+  throw new Error(`No Airtable base mapped for org "${orgSlug}" (provision its base or set AIRTABLE_BASES).`);
 }
