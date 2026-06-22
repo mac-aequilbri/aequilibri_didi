@@ -36,6 +36,7 @@
 | **B** onboarding provisions the client base | ✅ | `src/services/platform/onboarding.ts` calls `provisionClientBase()` before the txn, stores `airtableBaseId`, fails onboarding on error. Commit `47bf278` |
 | **C** assessment acceptance → Airtable job-tree | ✅ | `Job` link spec added to phase/budget_line/risk/cashflow/procurement maps; `createJobWithCode` returns `RecordId`; `acceptAssessment` uses numeric `pgJobId` for Postgres-bound writes. Commit `1eb000a` |
 | **Base-aware data layer** | ✅ | Tables/fields addressed by **name** (clone-stable), not per-base ids — so reads AND writes work against any provisioned base, not just the demo. `client.ts`/`generic.ts`/`codecs.ts`/`types.ts`. Commit `cf93830`. (Fixed the `job` create 403 on orgId 8.) *Not yet live-verified — local PAT went stale; re-test on Render.* |
+| **P1 (started)** job detail reads Airtable | ✅ | `src/lib/platform/jobDetailSource.ts` (`loadJobDetail`: Postgres for numeric id, Airtable for `rec…` id) + `/app/[org]/projects/[id]` wired to it. **Fixes the post-acceptance 404.** Commit `5f07dc9`. This is the pattern for the rest of P1. |
 
 **Net working flow:** onboard a client → its own base is provisioned + registered → create an assessment (draft in Postgres) → accept → job + phases + budget + risks written into the client's Airtable base, linked.
 
@@ -47,12 +48,12 @@
 - **Render `AIRTABLE_PAT` is stale → 401.** Update Render's env var to the re-scoped token (the value in local `.env` that authenticates today). Token must have `schema.bases:write` + workspace-creator on `wsppysXBoesIgMtpA`. Confirm `AIRTABLE_WORKSPACE_ID` + `AIRTABLE_TEMPLATE_BASE_ID` are applied.
 - **Delete leftover test base(s)** in the Airtable UI (e.g. "Provision Verify (delete me)"). The PAT can't delete bases via API (403).
 
-### P1 — Detail-page read migration (the big remaining bucket)
-NOTE: this is a *separate* issue from the (now-fixed) base-aware layer. These pages read **Postgres directly** (they don't use the Airtable `*Source` path at all), so they **break on `rec…` ids** in Airtable mode:
-- `/app/[org]/projects/[id]` (job detail) — **404s right after assessment acceptance**. Highest-visibility gap. (An untracked `src/lib/platform/jobDetailSource.ts` may already be a start on this.)
-- `variations/[id]`, `quotes/[id]`, `meeting-minutes/[id]` detail pages.
-- AI-generation services read job context from Postgres: variation draft, weekly report, minutes (`src/services/platform/construction/*`).
-- **Acceptance criterion:** after accepting an assessment in Airtable mode, the job detail page renders from the Airtable base.
+### P1 — Detail-page read migration (in progress)
+NOTE: this is a *separate* issue from the (now-fixed) base-aware layer. These pages read **Postgres directly** (they don't use the Airtable `*Source` path), so they **break on `rec…` ids** in Airtable mode.
+- ✅ **`/app/[org]/projects/[id]` (job detail) — DONE** (`jobDetailSource.ts`, commit `5f07dc9`). The post-acceptance landing page now renders from the org's Airtable base. **This establishes the pattern** for the rest: a `*DetailSource.ts` with `fromPostgres`/`fromAirtable` behind `airtableEnabled()`, a uniform `*View` interface, related rows filtered by their `Job` link, and the page consuming the view.
+- ⬜ **`quotes/[id]`** (the heaviest page — quote + lines + totals), **`variations/[id]`**, **`meeting-minutes/[id]`** detail pages. Each needs its own `*DetailSource.ts` + page rewrite following the jobDetailSource pattern.
+- ⬜ **AI-generation services** read job context from Postgres: variation draft, weekly report, minutes (`src/services/platform/construction/{variations,reports,minutes}.ts`). These need their job/context reads pointed at Airtable so generation works for an Airtable-only org.
+- **Acceptance criterion (met for job detail):** after accepting an assessment in Airtable mode, the detail page renders from the Airtable base.
 
 ### P2 — Learning engine + config reads (Postgres-bound)
 - `learning.ts` (`getActiveRules`, `getMatchingGuidance`, `applyRules`, `getLearningSettings`) reads `prisma.platLearningRule` / `prisma.platCfgSetting` directly — **not** Airtable-aware.
@@ -87,20 +88,24 @@ NOTE: this is a *separate* issue from the (now-fixed) base-aware layer. These pa
 
 ## 5. Suggested order of attack (next session)
 
-1. **Unblock + verify** (P0): fix Render `AIRTABLE_PAT`, run one real onboard→assess→accept on Render/local, record exactly what lands in the client base and what errors.
-2. **Job detail page** (P1, highest ROI): make `/app/[org]/projects/[id]` read from Airtable so acceptance has a working landing page. Establish the detail-page read pattern, then replicate to `quotes/[id]`, `variations/[id]`, `meeting-minutes/[id]`.
-3. **AI-context reads** (P1): point the construction AI services at Airtable job context.
-4. **Learning/config reads** (P2): decide Airtable vs Postgres-as-engine-state; if Airtable, migrate `learning.ts` + cfg reads and write onboarding rules/config to the base.
-5. **Assessment record** (P3) if full system-of-record is required.
-6. **Cleanup decisions** (P4): job code, TEAM/PRICING, per-customer base mapping.
+1. ✅ **DONE — base-aware data layer** (was the critical blocker; commit `cf93830`).
+2. ✅ **DONE — job detail page** reads Airtable (`jobDetailSource.ts`, commit `5f07dc9`) — the post-accept landing page works.
+3. **Verify on Render** (P0b): re-run onboard→assess→accept now that the base-aware fix + job detail are deployed; record what lands and what errors. (Local PAT is stale — refresh local `.env` if verifying locally.)
+4. **Remaining P1 detail pages**: `quotes/[id]` (heaviest), `variations/[id]`, `meeting-minutes/[id]` — one `*DetailSource.ts` + page rewrite each, following the `jobDetailSource.ts` pattern.
+5. **AI-context reads** (P1): point the construction AI services (`variations`/`reports`/`minutes`) at Airtable job context.
+6. **Learning/config reads** (P2): decide Airtable vs Postgres-as-engine-state; if Airtable, migrate `learning.ts` + cfg reads and write onboarding rules/config to the base.
+7. **Assessment record** (P3) if full system-of-record is required.
+8. **Cleanup decisions** (P4): job code, TEAM/PRICING, per-customer base mapping.
 
 ---
 
 ## 6. Starter prompt for a new session
 
 > Continue the Airtable migration for aequilibri-next. Read `docs/airtable-migration-plan.md`
-> and the memory note `uc2-uc3-airtable-writes` first. Current state: onboarding provisions a
-> per-client base and assessment acceptance writes the job-tree to Airtable, but detail pages
-> still read Postgres and 404 on `rec…` ids. Start with P1: make `/app/[org]/projects/[id]`
-> read from the org's Airtable base, then replicate the pattern to the other detail pages.
+> and the memory note `uc2-uc3-airtable-writes` first. Current state: the data layer is
+> base-aware (names, not ids), onboarding provisions a per-client base, assessment acceptance
+> writes the job-tree to Airtable, and the job detail page (`/app/[org]/projects/[id]`) reads
+> from Airtable via `src/lib/platform/jobDetailSource.ts`. Next P1: replicate that exact
+> source pattern to the remaining detail pages — `quotes/[id]`, `variations/[id]`,
+> `meeting-minutes/[id]` — then point the construction AI-context services at Airtable.
 > Keep changes behind `AIRTABLE_MIGRATION`; verify with tsc/eslint/vitest before committing.
