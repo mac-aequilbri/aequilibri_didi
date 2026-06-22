@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
-import { currency, formatDate, toNum } from "@/lib/format";
+import { currency, formatDate } from "@/lib/format";
+import { loadJobDetail } from "@/lib/platform/jobDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 
@@ -17,29 +17,25 @@ export default async function ProjectDetailPage({
 }) {
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
-  const job = await prisma.platJob.findFirst({
-    where: { id: Number(id), orgId: ctx.orgId },
-    include: {
-      conPhases: { where: { isAiDraft: false }, orderBy: { sortOrder: "asc" } },
-      conRisks: { where: { status: "open" }, orderBy: { createdAt: "desc" }, take: 5 },
-      actions: { where: { status: { in: ["open", "in_progress"] } }, orderBy: { dueDate: "asc" }, take: 5 },
-      conBudgets: true,
-      _count: { select: { conBimModels: true, documents: true, conVariations: true } },
-    },
-  });
+  // Postgres (numeric id) or Airtable (rec… id) depending on the flag — the page
+  // renders the same JobDetailView either way.
+  const job = await loadJobDetail(ctx, id);
   if (!job) notFound();
   const p = (path: string) => orgPath(ctx.orgSlug, path);
 
-  const budget = job.conBudgets.reduce((s, b) => s + toNum(b.budgetAmount), 0);
-  const actual = job.conBudgets.reduce((s, b) => s + toNum(b.actualAmount), 0);
+  const subtitleParts = [
+    job.code,
+    job.engagementType ? job.engagementType.replace("_", " ") : "",
+    `${job.address || "no address"}${job.suburb ? `, ${job.suburb}` : ""}`,
+  ].filter(Boolean);
 
   return (
     <div className="p-6">
       <PageHeader
         title={job.name}
-        subtitle={`${job.code} · ${job.engagementType.replace("_", " ")} · ${job.address || "no address"}${job.suburb ? `, ${job.suburb}` : ""}`}
+        subtitle={subtitleParts.join(" · ")}
         actions={[
-          { href: p(`/projects/${job.id}/models`), label: `3D Model & Walkthrough${job._count.conBimModels ? ` (${job._count.conBimModels})` : ""}` },
+          { href: p(`/projects/${job.id}/models`), label: `3D Model & Walkthrough${job.counts.bimModels ? ` (${job.counts.bimModels})` : ""}` },
           { href: p(`/projects/${job.id}/edit`), label: "Edit", variant: "outline" },
         ]}
       />
@@ -47,8 +43,8 @@ export default async function ProjectDetailPage({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         <MetricCard value={`${job.completionPct}%`} label="Complete" />
         <MetricCard value={`${job.healthScore}/100`} label="Health score" />
-        <MetricCard value={currency(budget)} label="Budget (lines)" />
-        <MetricCard value={currency(actual)} label="Actual to date" />
+        <MetricCard value={currency(job.budget)} label="Budget (lines)" />
+        <MetricCard value={currency(job.actual)} label="Actual to date" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -59,7 +55,7 @@ export default async function ProjectDetailPage({
               manage →
             </Link>
           </h2>
-          {job.conPhases.map((ph) => (
+          {job.phases.map((ph) => (
             <div key={ph.id} className="flex items-center gap-3 border-t border-neutral-100 py-2 text-sm">
               <span className="flex-1 font-medium">{ph.name}</span>
               <div className="w-32 h-2 rounded bg-neutral-100 overflow-hidden">
@@ -68,7 +64,7 @@ export default async function ProjectDetailPage({
               <StatusBadge status={ph.status} />
             </div>
           ))}
-          {job.conPhases.length === 0 && <p className="text-sm text-neutral-500">No phases.</p>}
+          {job.phases.length === 0 && <p className="text-sm text-neutral-500">No phases.</p>}
         </section>
 
         <section className="ae-card p-5">
@@ -78,7 +74,7 @@ export default async function ProjectDetailPage({
               register →
             </Link>
           </h2>
-          {job.conRisks.map((r) => (
+          {job.risks.map((r) => (
             <div key={r.id} className="border-t border-neutral-100 py-2 text-sm">
               <span className="font-medium">{r.description}</span>
               <span className="ml-2 text-xs text-neutral-500">
@@ -86,7 +82,7 @@ export default async function ProjectDetailPage({
               </span>
             </div>
           ))}
-          {job.conRisks.length === 0 && <p className="text-sm text-neutral-500">No open risks.</p>}
+          {job.risks.length === 0 && <p className="text-sm text-neutral-500">No open risks.</p>}
 
           <h2 className="font-semibold mb-3 mt-6">
             Next actions{" "}
