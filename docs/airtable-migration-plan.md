@@ -35,6 +35,7 @@
 | **A2/A3** per-org base resolution | ✅ | `PlatOrganisation.airtableBaseId` (migration `20260622000000_org_airtable_base_id`); `resolveBaseId()` async. Commit `8b9b5ac` |
 | **B** onboarding provisions the client base | ✅ | `src/services/platform/onboarding.ts` calls `provisionClientBase()` before the txn, stores `airtableBaseId`, fails onboarding on error. Commit `47bf278` |
 | **C** assessment acceptance → Airtable job-tree | ✅ | `Job` link spec added to phase/budget_line/risk/cashflow/procurement maps; `createJobWithCode` returns `RecordId`; `acceptAssessment` uses numeric `pgJobId` for Postgres-bound writes. Commit `1eb000a` |
+| **Base-aware data layer** | ✅ | Tables/fields addressed by **name** (clone-stable), not per-base ids — so reads AND writes work against any provisioned base, not just the demo. `client.ts`/`generic.ts`/`codecs.ts`/`types.ts`. Commit `cf93830`. (Fixed the `job` create 403 on orgId 8.) *Not yet live-verified — local PAT went stale; re-test on Render.* |
 
 **Net working flow:** onboard a client → its own base is provisioned + registered → create an assessment (draft in Postgres) → accept → job + phases + budget + risks written into the client's Airtable base, linked.
 
@@ -47,8 +48,8 @@
 - **Delete leftover test base(s)** in the Airtable UI (e.g. "Provision Verify (delete me)"). The PAT can't delete bases via API (403).
 
 ### P1 — Detail-page read migration (the big remaining bucket)
-These pages/services still read Postgres, so they **break on `rec…` ids** in Airtable mode:
-- `/app/[org]/projects/[id]` (job detail) — **404s right after assessment acceptance**. Highest-visibility gap.
+NOTE: this is a *separate* issue from the (now-fixed) base-aware layer. These pages read **Postgres directly** (they don't use the Airtable `*Source` path at all), so they **break on `rec…` ids** in Airtable mode:
+- `/app/[org]/projects/[id]` (job detail) — **404s right after assessment acceptance**. Highest-visibility gap. (An untracked `src/lib/platform/jobDetailSource.ts` may already be a start on this.)
 - `variations/[id]`, `quotes/[id]`, `meeting-minutes/[id]` detail pages.
 - AI-generation services read job context from Postgres: variation draft, weekly report, minutes (`src/services/platform/construction/*`).
 - **Acceptance criterion:** after accepting an assessment in Airtable mode, the job detail page renders from the Airtable base.
