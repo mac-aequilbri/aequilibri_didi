@@ -426,7 +426,9 @@ async function createJobWithCode(
         data: { ...data, code: `JOB-${String(max + 1 + attempt).padStart(3, "0")}` },
         actor: { type: "human", name: userName },
       });
-      return result.recordId!;
+      // Assessment → job-tree provisioning threads numeric FKs throughout and
+      // stays on the Postgres path; the id is always an integer here.
+      return result.recordId as number;
     } catch (err) {
       if ((err as { code?: string }).code !== "P2002" || attempt === 2) throw err;
     }

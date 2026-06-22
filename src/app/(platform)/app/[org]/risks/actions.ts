@@ -12,25 +12,11 @@ import { writeRecord } from "@/lib/platform/recordWriter";
 export async function createRisk(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx); // also enforces the write gate
-  const data = formToObject(formData);
-
-  if (airtableEnabled()) {
-    await core.create(ctx.orgSlug, "RISKS", {
-      Risk: String(data.description ?? "").slice(0, 200) || "Untitled risk",
-      Likelihood: Number(data.likelihood) || 3,
-      Impact: Number(data.impact) || 3,
-      Mitigation: String(data.mitigation ?? ""),
-      Owner: String(data.owner ?? ""),
-      Status: "open",
-    });
-    revalidatePath(orgPath(ctx.orgSlug, "/risks"));
-    redirect(orgPath(ctx.orgSlug, "/risks"));
-  }
 
   await writeRecord(ctx, {
     table: "risk",
     op: "create",
-    data,
+    data: formToObject(formData),
     actor: { type: "human", name: user.name },
   });
   revalidatePath(orgPath(ctx.orgSlug, "/risks"));
@@ -44,21 +30,11 @@ export async function setRiskStatus(formData: FormData): Promise<void> {
   const status = String(formData.get("status") ?? "");
   if (!recordIdRaw || !["open", "accepted", "mitigated", "closed"].includes(status)) return;
 
-  if (airtableEnabled()) {
-    // RISKS Status values match the app's, so no remapping needed.
-    if (recordIdRaw.startsWith("rec")) {
-      await core.update(ctx.orgSlug, "RISKS", recordIdRaw, { Status: status });
-    }
-    revalidatePath(orgPath(ctx.orgSlug, "/risks"));
-    return;
-  }
-
-  const recordId = Number(recordIdRaw);
-  if (!recordId) return;
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "risk",
     op: "update",
-    recordId,
+    recordId: recordIdRaw,
     data: { status },
     actor: { type: "human", name: user.name },
   });
@@ -71,19 +47,30 @@ export async function escalateHighRisks(formData: FormData): Promise<void> {
   const user = await getCurrentUser(ctx);
   const threshold = Math.max(1, Number(formData.get("threshold")) || 12);
   const note = String(formData.get("note") ?? "").trim() || `Score ≥ ${threshold} batch escalation.`;
-
-  const risks = await prisma.platConRisk.findMany({
-    where: { orgId: ctx.orgId, status: "open", escalatedAt: null },
-  });
-  for (const r of risks) {
-    if (r.likelihood * r.impact < threshold) continue;
-    await writeRecord(ctx, {
+  const escalate = (recordId: number | string) =>
+    writeRecord(ctx, {
       table: "risk",
       op: "update",
-      recordId: r.id,
+      recordId,
       data: { escalatedAt: new Date().toISOString(), escalationNote: note },
       actor: { type: "human", name: user.name },
     });
+
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 });
+    for (const r of rows) {
+      if (String(r["Status"] ?? "") !== "open" || r["Escalated_At"]) continue;
+      if ((Number(r["Likelihood"]) || 0) * (Number(r["Impact"]) || 0) < threshold) continue;
+      await escalate(r.id);
+    }
+  } else {
+    const risks = await prisma.platConRisk.findMany({
+      where: { orgId: ctx.orgId, status: "open", escalatedAt: null },
+    });
+    for (const r of risks) {
+      if (r.likelihood * r.impact < threshold) continue;
+      await escalate(r.id);
+    }
   }
   revalidatePath(orgPath(ctx.orgSlug, "/risks"));
   redirect(orgPath(ctx.orgSlug, "/risks"));

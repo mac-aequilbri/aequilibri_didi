@@ -6,7 +6,7 @@
 
 import { prisma } from "@/lib/db";
 import type { ToolUse } from "@/lib/claude";
-import { writeRecord, WritableTable } from "@/lib/platform/recordWriter";
+import { writeRecord, WritableTable, type RecordId } from "@/lib/platform/recordWriter";
 import { Actor, AiAuthority, OrgCtx } from "@/lib/platform/types";
 import { TOOL_POLICY } from "./tools";
 
@@ -17,7 +17,7 @@ export interface ToolOutcome {
   summary: string;
   status?: "executed" | "proposed";
   proposalId?: number;
-  recordId?: number;
+  recordId?: RecordId;
 }
 
 /** The aiAuthority policy matrix — exported so it can be tested directly. */
@@ -132,7 +132,9 @@ export async function executeToolUse(
     const result = await writeRecord(ctx, {
       table,
       op,
-      recordId: op === "update" ? Number(input.recordId) : undefined,
+      // Keep the id as-is: Airtable "rec…" ids must not be coerced to NaN;
+      // recordWriter narrows numeric strings to the Postgres Int itself.
+      recordId: op === "update" ? (input.recordId as RecordId | undefined) : undefined,
       data,
       actor,
       requireApproval: requiresApproval(ctx.aiAuthority, policy.risk),

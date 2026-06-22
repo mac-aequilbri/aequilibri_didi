@@ -3,38 +3,74 @@
 // correct whenever lines change, so the UI never has to. Quotes can be
 // generated from the job's assessment budget breakdown (the common path) or
 // built line by line. Status lifecycle: draft → sent → accepted/rejected
-// (or expired). Every write goes through the audited recordWriter.
+// (or expired). Every write goes through the audited recordWriter, which
+// routes to Airtable or Postgres behind AIRTABLE_MIGRATION.
 
+import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { mulMoney, sumMoney } from "@/lib/platform/money";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { OrgCtx } from "@/lib/platform/types";
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
 
+const num = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+/** The lines belonging to a quote, in Airtable mode (linked by the Quote field).
+ *  Airtable can't filter by linked-record id in a formula, so we read and match
+ *  in app — fine at quote-line volumes. */
+async function airtableQuoteLines(
+  ctx: OrgCtx,
+  quoteId: RecordId,
+): Promise<Array<Record<string, unknown>>> {
+  const rows = await core.list(ctx.orgSlug, "QUOTE_LINES", { maxRecords: 500 });
+  const qid = String(quoteId);
+  return rows.filter((r) => Array.isArray(r["Quote"]) && (r["Quote"] as string[]).includes(qid));
+}
+
 /** Next QUO-### code for this org (max existing suffix + 1). */
-async function nextQuoteRef(orgId: number): Promise<string> {
-  const quotes = await prisma.platConQuote.findMany({
-    where: { orgId },
-    select: { refNumber: true },
-  });
-  const max = quotes.reduce((m, q) => {
-    const match = /^QUO-(\d+)$/.exec(q.refNumber);
-    return match ? Math.max(m, Number(match[1])) : m;
-  }, 0);
+async function nextQuoteRef(ctx: OrgCtx): Promise<string> {
+  let max = 0;
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "QUOTES", { maxRecords: 500 });
+    for (const r of rows) {
+      const m = /^QUO-(\d+)$/.exec(String(r["Ref_Number"] ?? ""));
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+  } else {
+    const quotes = await prisma.platConQuote.findMany({
+      where: { orgId: ctx.orgId },
+      select: { refNumber: true },
+    });
+    max = quotes.reduce((m, q) => {
+      const match = /^QUO-(\d+)$/.exec(q.refNumber);
+      return match ? Math.max(m, Number(match[1])) : m;
+    }, 0);
+  }
   return `QUO-${String(max + 1).padStart(3, "0")}`;
 }
 
 /** Recompute subtotal / GST / total from the quote's lines and persist them. */
-export async function recalcQuoteTotals(ctx: OrgCtx, quoteId: number): Promise<void> {
-  const quote = await prisma.platConQuote.findFirst({
-    where: { id: quoteId, orgId: ctx.orgId },
-    include: { lines: true },
-  });
-  if (!quote) return;
-  const subtotal = sumMoney(quote.lines.map((l) => l.lineTotal));
-  const gstAmount = mulMoney(subtotal, toNum(quote.gstRate) / 100);
+export async function recalcQuoteTotals(ctx: OrgCtx, quoteId: RecordId): Promise<void> {
+  let subtotal: number;
+  let gstRate: number;
+  if (airtableEnabled()) {
+    const lines = await airtableQuoteLines(ctx, quoteId);
+    subtotal = sumMoney(lines.map((l) => num(l["Line_Total"])));
+    const quote = await core.get(ctx.orgSlug, "QUOTES", String(quoteId)).catch(() => null);
+    if (!quote) return;
+    gstRate = num(quote["GST_Rate"]) || 10;
+  } else {
+    const quote = await prisma.platConQuote.findFirst({
+      where: { id: Number(quoteId), orgId: ctx.orgId },
+      include: { lines: true },
+    });
+    if (!quote) return;
+    subtotal = sumMoney(quote.lines.map((l) => l.lineTotal));
+    gstRate = toNum(quote.gstRate);
+  }
+  const gstAmount = mulMoney(subtotal, gstRate / 100);
   const total = sumMoney([subtotal, gstAmount]);
   await writeRecord(ctx, {
     table: "quote",
@@ -46,7 +82,7 @@ export async function recalcQuoteTotals(ctx: OrgCtx, quoteId: number): Promise<v
 }
 
 export interface CreateQuoteInput {
-  jobId: number;
+  jobId: RecordId;
   title: string;
   clientName?: string;
   notes?: string;
@@ -58,8 +94,8 @@ export async function createQuote(
   ctx: OrgCtx,
   userName: string,
   input: CreateQuoteInput,
-): Promise<number> {
-  const refNumber = await nextQuoteRef(ctx.orgId);
+): Promise<RecordId> {
+  const refNumber = await nextQuoteRef(ctx);
   const result = await writeRecord(ctx, {
     table: "quote",
     op: "create",
@@ -84,7 +120,7 @@ export async function generateQuoteFromBudget(
   ctx: OrgCtx,
   userName: string,
   jobId: number,
-): Promise<number> {
+): Promise<RecordId> {
   const job = await prisma.platJob.findFirst({
     where: { id: jobId, orgId: ctx.orgId },
     include: { conBudgets: { orderBy: { category: "asc" } }, clientContact: true },
@@ -131,18 +167,27 @@ export interface QuoteLineInput {
   unitPrice: number;
 }
 
+/** Highest existing line sort-order for a quote, in either backend. */
+async function nextLineSortOrder(ctx: OrgCtx, quoteId: RecordId): Promise<number> {
+  if (airtableEnabled()) {
+    const lines = await airtableQuoteLines(ctx, quoteId);
+    return lines.reduce((m, l) => Math.max(m, num(l["Sort_Order"])), 0) + 1;
+  }
+  const last = await prisma.platConQuoteLine.findFirst({
+    where: { quoteId: Number(quoteId) },
+    orderBy: { sortOrder: "desc" },
+    select: { sortOrder: true },
+  });
+  return (last?.sortOrder ?? 0) + 1;
+}
+
 export async function addQuoteLine(
   ctx: OrgCtx,
   userName: string,
-  quoteId: number,
+  quoteId: RecordId,
   input: QuoteLineInput,
 ): Promise<void> {
-  const quote = await prisma.platConQuote.findFirst({
-    where: { id: quoteId, orgId: ctx.orgId },
-    include: { lines: { orderBy: { sortOrder: "desc" }, take: 1 } },
-  });
-  if (!quote) throw new Error("Quote not found");
-  const sortOrder = (quote.lines[0]?.sortOrder ?? 0) + 1;
+  const sortOrder = await nextLineSortOrder(ctx, quoteId);
   await writeRecord(ctx, {
     table: "quote_line",
     op: "create",
@@ -164,8 +209,8 @@ export async function addQuoteLine(
 export async function updateQuoteLine(
   ctx: OrgCtx,
   userName: string,
-  quoteId: number,
-  lineId: number,
+  quoteId: RecordId,
+  lineId: RecordId,
   input: QuoteLineInput,
 ): Promise<void> {
   await writeRecord(ctx, {
@@ -188,8 +233,8 @@ export async function updateQuoteLine(
 export async function removeQuoteLine(
   ctx: OrgCtx,
   userName: string,
-  quoteId: number,
-  lineId: number,
+  quoteId: RecordId,
+  lineId: RecordId,
 ): Promise<void> {
   await writeRecord(ctx, {
     table: "quote_line",
@@ -204,7 +249,7 @@ export async function removeQuoteLine(
 export async function setQuoteStatus(
   ctx: OrgCtx,
   userName: string,
-  quoteId: number,
+  quoteId: RecordId,
   status: QuoteStatus,
 ): Promise<void> {
   const data: Record<string, unknown> = { status };
@@ -222,7 +267,7 @@ export async function setQuoteStatus(
 export async function updateQuoteMeta(
   ctx: OrgCtx,
   userName: string,
-  quoteId: number,
+  quoteId: RecordId,
   input: { title?: string; clientName?: string; notes?: string; validUntil?: string; gstRate?: number },
 ): Promise<void> {
   const data: Record<string, unknown> = {};

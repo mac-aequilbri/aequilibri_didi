@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { classifyDocument, parseDocumentText } from "@/lib/platform/docs";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { getStorer } from "@/lib/platform/storage";
 import { OrgCtx } from "@/lib/platform/types";
 
@@ -15,7 +15,7 @@ export async function ingestDocumentFile(
   ctx: OrgCtx,
   userName: string,
   input: { jobId?: number; jobCode?: string; title: string; name: string; mimeType: string; buf: Buffer },
-): Promise<{ id?: number; classification: string }> {
+): Promise<{ id?: RecordId; classification: string }> {
   const text = parseDocumentText(input.name, input.mimeType, input.buf);
   const cls = await classifyDocument(input.name, text);
   const stored = await getStorer().put(
@@ -51,7 +51,7 @@ export async function ingestDocumentLink(
   ctx: OrgCtx,
   userName: string,
   input: { jobId?: number; title: string; url: string; docType?: string },
-): Promise<number | undefined> {
+): Promise<RecordId | undefined> {
   const result = await writeRecord(ctx, {
     table: "document",
     op: "create",

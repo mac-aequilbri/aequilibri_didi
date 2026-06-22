@@ -1,12 +1,13 @@
 // Variation orders — AI drafting with defensive JSON parsing, human approval
 // with correction capture when the approver edits the AI's numbers.
 
+import { airtableEnabled, core } from "@/lib/airtable";
 import { callClaude } from "@/lib/claude";
 import { prisma } from "@/lib/db";
 import { emitCorrection } from "@/lib/platform/corrections";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { Actor, OrgCtx } from "@/lib/platform/types";
 import { toNum } from "@/lib/format";
 
@@ -28,7 +29,7 @@ export async function aiDraftVariation(
   actorName: string,
   jobId: number,
   brief: string,
-): Promise<{ id?: number; demoMode: boolean }> {
+): Promise<{ id?: RecordId; demoMode: boolean }> {
   const job = await prisma.platJob.findFirst({
     where: { id: jobId, orgId: ctx.orgId },
     include: {
@@ -118,10 +119,33 @@ export async function aiDraftVariation(
 export async function approveVariation(
   ctx: OrgCtx,
   approverName: string,
-  id: number,
+  id: RecordId,
   edits: { costImpact?: number; timeImpactDays?: number } = {},
 ): Promise<void> {
-  const vo = await prisma.platConVariationOrder.findFirst({ where: { id, orgId: ctx.orgId } });
+  // Airtable mode: read priors from the base, write the approval. The
+  // correction-capture learning loop stays Postgres-only (it threads numeric
+  // entity ids and writes to the corrections pipeline).
+  if (airtableEnabled()) {
+    const vo = await core.get(ctx.orgSlug, "VARIATIONS", String(id)).catch(() => null);
+    const finalCost = edits.costImpact ?? (vo ? toNum(vo["Cost_Impact"] as number) : 0);
+    const finalDays = edits.timeImpactDays ?? (vo ? Number(vo["Time_Impact_Days"]) || 0 : 0);
+    await writeRecord(ctx, {
+      table: "variation_order",
+      op: "update",
+      recordId: id,
+      data: {
+        status: "approved",
+        approvedBy: approverName,
+        approvedAt: new Date().toISOString(),
+        costImpact: finalCost,
+        timeImpactDays: finalDays,
+      },
+      actor: { type: "human", name: approverName },
+    });
+    return;
+  }
+
+  const vo = await prisma.platConVariationOrder.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!vo) throw new Error("Variation not found");
 
   const finalCost = edits.costImpact ?? toNum(vo.costImpact);
@@ -171,7 +195,7 @@ export async function approveVariation(
 export async function rejectVariation(
   ctx: OrgCtx,
   rejectorName: string,
-  id: number,
+  id: RecordId,
 ): Promise<void> {
   await writeRecord(ctx, {
     table: "variation_order",

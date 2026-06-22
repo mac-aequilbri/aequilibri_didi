@@ -162,6 +162,8 @@ export const CORE_SCHEMA = {
       { name: "ROOM_MATRIX", id: "fldzp9WneXhjanOiW", type: "multipleRecordLinks" },
       { name: "MEETING_MINUTES", id: "fld9ICwbbFHvZlzdA", type: "multipleRecordLinks" },
       { name: "WEEKLY_REPORTS", id: "fldJm4mQMmQtLBOIg", type: "multipleRecordLinks" },
+      { name: "PHASE_EVIDENCE", id: "fldXSxJkhZgnCiUBG", type: "multipleRecordLinks" },
+      { name: "BIM_MODELS", id: "fldYl7rElmrIjBirZ", type: "multipleRecordLinks" },
     ],
   },
   HYPOTHESES: {
@@ -219,6 +221,7 @@ export const CORE_SCHEMA = {
       { name: "Drive_URL", id: "fld52mzQZH7ZeUxtA", type: "url" },
       { name: "Doc_Status", id: "fldaE2rxr03NbntTJ", type: "singleSelect" },
       { name: "_TIER", id: "fldWIEUK9V5ir3dNm", type: "singleLineText" },
+      { name: "PHASE_EVIDENCE", id: "fld6yg8xEhGRBOdHv", type: "multipleRecordLinks" },
     ],
   },
   INTELLIGENCE_SNAPSHOT: {
@@ -316,6 +319,7 @@ export const CORE_SCHEMA = {
       { name: "Is_AI_Draft", id: "fldOB4ccqicPX3Vyp", type: "checkbox" },
       { name: "Approved_By", id: "fldCiwGu3SDRoWHbM", type: "singleLineText" },
       { name: "Job", id: "fldxxtPokdLt8rTGO", type: "multipleRecordLinks" },
+      { name: "PHASE_EVIDENCE", id: "fldN9ynSVBzWUeOjL", type: "multipleRecordLinks" },
     ],
   },
   VARIATIONS: {
@@ -332,6 +336,8 @@ export const CORE_SCHEMA = {
       { name: "Approved_By", id: "fldmyBHXG3bAiBQuN", type: "singleLineText" },
       { name: "Approved_At", id: "fldvVvHa5nI6nR83m", type: "date" },
       { name: "Job", id: "fldT4F1ccfLCSA3ZJ", type: "multipleRecordLinks" },
+      { name: "Is_AI_Drafted", id: "fldhRJefKfUcc22U5", type: "checkbox" },
+      { name: "AI_Draft", id: "fldDIXN9W2xBiBc7H", type: "multilineText" },
     ],
   },
   QUOTES: {
@@ -348,6 +354,20 @@ export const CORE_SCHEMA = {
       { name: "Notes", id: "fldcym3Li0ehgiTbj", type: "multilineText" },
       { name: "Valid_Until", id: "fldncJqpidzEESZgY", type: "date" },
       { name: "Job", id: "fldirLxrGLxK38ZsW", type: "multipleRecordLinks" },
+      { name: "QUOTE_LINES", id: "fldvI7Sb4nUkScdjS", type: "multipleRecordLinks" },
+    ],
+  },
+  QUOTE_LINES: {
+    tableId: "tbldMARQliqJzPs6a",
+    fields: [
+      { name: "Description", id: "fldc0rmOwjjNAokGc", type: "singleLineText" },
+      { name: "Category", id: "fldMR6VAS7KMXxJQ8", type: "singleLineText" },
+      { name: "Qty", id: "fldTHBNAJGArK2MdZ", type: "number" },
+      { name: "Unit", id: "fld4fx8lxKxVHgkic", type: "singleLineText" },
+      { name: "Unit_Price", id: "fldIzuofwVj4xC1Zt", type: "currency" },
+      { name: "Line_Total", id: "fldS9tu3wzPvNYdFi", type: "currency" },
+      { name: "Sort_Order", id: "fldg4GewyhJkOkDFC", type: "number" },
+      { name: "Quote", id: "fldqTe8hnQWbW5g5k", type: "multipleRecordLinks" },
     ],
   },
   ROOM_MATRIX: {
@@ -359,6 +379,7 @@ export const CORE_SCHEMA = {
       { name: "Ceiling_Height", id: "fldY4oSqivpSXeQJv", type: "singleLineText" },
       { name: "Notes", id: "fldYStTGFh2HqWKmB", type: "multilineText" },
       { name: "Job", id: "fldjnCF336JMUbq9E", type: "multipleRecordLinks" },
+      { name: "Finishes", id: "fldOz4uQZz9cGxxJH", type: "multilineText" },
     ],
   },
   MEETING_MINUTES: {
@@ -371,6 +392,8 @@ export const CORE_SCHEMA = {
       { name: "Actions_Count", id: "fldbxfItFthrXqJx8", type: "number" },
       { name: "Status", id: "fldocbbXttasqYNQ1", type: "singleSelect" },
       { name: "Job", id: "fldzZBGSUm6Dzvqh2", type: "multipleRecordLinks" },
+      { name: "Extracted_Actions", id: "fldVp1K4sPrMxKLqd", type: "multilineText" },
+      { name: "Confirmed_At", id: "fldywSZI9hbseY6cd", type: "date" },
     ],
   },
   WEEKLY_REPORTS: {
@@ -383,6 +406,66 @@ export const CORE_SCHEMA = {
       { name: "Status", id: "fld5gkDPwvTu8tayW", type: "singleSelect" },
       { name: "Approved_By", id: "fldIpsEIeRlU6YVGS", type: "singleLineText" },
       { name: "Job", id: "fldj9rqT82gkaZAUg", type: "multipleRecordLinks" },
+      { name: "Generated_At", id: "fldqjxkDvZ0Tlk0DT", type: "date" },
+      { name: "Approved_At", id: "fldANCOuF7k4uuwhI", type: "date" },
+      { name: "Sent_At", id: "flduG4B5SQvwptT4Z", type: "date" },
+    ],
+  },
+  PHASE_EVIDENCE: {
+    tableId: "tbl1s1LERe6a4jSCq",
+    fields: [
+      { name: "Note", id: "flddrLgM4UovnxiBQ", type: "singleLineText" },
+      { name: "Added_By", id: "fldINPg4SWuY8knr7", type: "singleLineText" },
+      { name: "Phase", id: "fldzicNdWJoRRpIwv", type: "multipleRecordLinks" },
+      { name: "Document", id: "fldb6DZZtlE2AbFTA", type: "multipleRecordLinks" },
+      { name: "Job", id: "fldaKth0ZqC2AS6xZ", type: "multipleRecordLinks" },
+    ],
+  },
+  BIM_MODELS: {
+    tableId: "tblKseu6UAqq04MvC",
+    fields: [
+      { name: "Name", id: "fld0Dt7Ry1QsOuXRN", type: "singleLineText" },
+      { name: "Provider", id: "fldEiJCwakZBHCjyf", type: "singleLineText" },
+      { name: "Embed_URL", id: "fldEIxAoqdSwf4d7e", type: "url" },
+      { name: "Client_Visible", id: "fldOcRhpWHR9wtufV", type: "checkbox" },
+      { name: "Added_By", id: "fldUsbDfhKU8bXjIw", type: "singleLineText" },
+      { name: "Notes", id: "fld63IKXnKOyE9VcC", type: "multilineText" },
+      { name: "Job", id: "fldXrxZggqvJuXLLk", type: "multipleRecordLinks" },
+    ],
+  },
+  PLAT_CFG_REFERENCE: {
+    tableId: "tblRu1DohdoP2Ej1v",
+    fields: [
+      { name: "Name", id: "fld2PAHPnxJQPfp6P", type: "singleLineText" },
+      { name: "Ref_Type", id: "fld5OMMFeL1ASHnir", type: "singleLineText" },
+      { name: "Code", id: "fldhwuIV0mMW4rlyU", type: "singleLineText" },
+      { name: "Value", id: "fldKxmXM4AzO37bE1", type: "multilineText" },
+      { name: "Sort_Order", id: "fldy2kbNnF5wyTCOd", type: "number" },
+      { name: "Is_Active", id: "fldiPRCHM7Ftgn05w", type: "checkbox" },
+    ],
+  },
+  PLAT_CFG_REGION: {
+    tableId: "tblSaqFt8AX3DknV4",
+    fields: [
+      { name: "Region_Name", id: "fldeJ3spoP6qW9I6h", type: "singleLineText" },
+      { name: "Postcodes", id: "fldx2ZhZLwDFghVUv", type: "multilineText" },
+      { name: "Travel_Days", id: "fldGkgYUqvhaLJOMo", type: "number" },
+      { name: "Premium_Pct", id: "fldgX39bsq9xlBfya", type: "number" },
+      { name: "Is_Active", id: "fldJy3AhWyqfFoXVh", type: "checkbox" },
+    ],
+  },
+  PLAT_CFG_NOMENCLATURE: {
+    tableId: "tblvRv6aNjTE8MzLU",
+    fields: [
+      { name: "Customer_Term", id: "fldBnoDFOzvOEBRYv", type: "singleLineText" },
+      { name: "Standard_Term", id: "fldNXUCKl3HJsIjB5", type: "singleLineText" },
+    ],
+  },
+  PLAT_CFG_SETTING: {
+    tableId: "tbl9NfLkhS8DICctV",
+    fields: [
+      { name: "Setting_Key", id: "fld3tEBOgc2NzdLfI", type: "singleLineText" },
+      { name: "Value", id: "fldD7K9g50w7X9bFH", type: "multilineText" },
     ],
   },
   ROOFING_CONTACTS: {
@@ -622,6 +705,9 @@ export const CORE_SCHEMA = {
       { name: "Total", id: "fldxfFeFtrgXMIYLo", type: "currency" },
       { name: "Created_At", id: "fldAzR8egROejzJmE", type: "dateTime" },
       { name: "ROOFING_PO_ITEMS", id: "fldl5cZ6PK3KNxSnN", type: "multipleRecordLinks" },
+      { name: "Delivery_Address", id: "fldOe49tC4xNhSFDY", type: "singleLineText" },
+      { name: "Requested_Delivery_Date", id: "flduK5MfoZQ4cjipJ", type: "date" },
+      { name: "Notes", id: "fldu3F7z67KVhmXYj", type: "multilineText" },
     ],
   },
   ROOFING_STORM_EVENTS: {

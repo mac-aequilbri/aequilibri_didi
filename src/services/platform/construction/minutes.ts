@@ -5,7 +5,7 @@ import { callClaude } from "@/lib/claude";
 import { prisma } from "@/lib/db";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { OrgCtx } from "@/lib/platform/types";
 
 export interface ExtractedAction {
@@ -18,7 +18,7 @@ export async function processMeetingMinutes(
   ctx: OrgCtx,
   userName: string,
   input: { jobId: number; meetingDate: string; title: string; attendees: string; rawMinutes: string },
-): Promise<{ id?: number; actionsCount: number; demoMode: boolean }> {
+): Promise<{ id?: RecordId; actionsCount: number; demoMode: boolean }> {
   const { system } = getPrompt("minutes.extract");
   const res = await callClaude(system, input.rawMinutes.slice(0, 12000), {
     model: modelFor("extraction"),

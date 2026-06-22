@@ -10,5 +10,13 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // The suite asserts the Postgres-mode guarantees the Airtable migration
+    // deliberately preserves (org-isolation guard, approval-time re-validation,
+    // integer record ids). It must not depend on the developer's local .env,
+    // where AIRTABLE_MIGRATION=true would route writes to the shared demo base
+    // (one base for every test org → cross-org isolation can't hold; string
+    // "rec…" ids break Postgres lookups). Airtable-mode writes are proven
+    // separately by scripts/airtable-write-proof.mjs against the demo base.
+    env: { AIRTABLE_MIGRATION: "false" },
   },
 });

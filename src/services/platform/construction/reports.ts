@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { OrgCtx } from "@/lib/platform/types";
 
 export async function generateWeeklyReport(
@@ -14,7 +14,7 @@ export async function generateWeeklyReport(
   userName: string,
   jobId: number,
   weekEnding: string,
-): Promise<{ id?: number; demoMode: boolean }> {
+): Promise<{ id?: RecordId; demoMode: boolean }> {
   const job = await prisma.platJob.findFirst({
     where: { id: jobId, orgId: ctx.orgId },
     include: {
@@ -78,7 +78,7 @@ export async function generateWeeklyReport(
   return { id: result.recordId, demoMode: res.demo_mode };
 }
 
-export async function approveReport(ctx: OrgCtx, userName: string, id: number): Promise<void> {
+export async function approveReport(ctx: OrgCtx, userName: string, id: RecordId): Promise<void> {
   await writeRecord(ctx, {
     table: "weekly_report",
     op: "update",
@@ -88,7 +88,7 @@ export async function approveReport(ctx: OrgCtx, userName: string, id: number): 
   });
 }
 
-export async function markReportSent(ctx: OrgCtx, userName: string, id: number): Promise<void> {
+export async function markReportSent(ctx: OrgCtx, userName: string, id: RecordId): Promise<void> {
   await writeRecord(ctx, {
     table: "weekly_report",
     op: "update",

@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { airtableEnabled, core } from "@/lib/airtable";
 import { formToObject } from "@/lib/platform/forms";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -28,20 +27,11 @@ export async function updateCashflowActual(formData: FormData): Promise<void> {
   const actual = Number(formData.get("actual"));
   if (!recordIdRaw || !Number.isFinite(actual)) return;
 
-  if (airtableEnabled()) {
-    if (recordIdRaw.startsWith("rec")) {
-      await core.update(ctx.orgSlug, "CASHFLOW", recordIdRaw, { Actual: actual });
-    }
-    revalidatePath(orgPath(ctx.orgSlug, "/cashflow"));
-    return;
-  }
-
-  const recordId = Number(recordIdRaw);
-  if (!recordId) return;
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "cashflow",
     op: "update",
-    recordId,
+    recordId: recordIdRaw,
     data: { actual },
     actor: { type: "human", name: user.name },
   });

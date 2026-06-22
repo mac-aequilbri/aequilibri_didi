@@ -20,8 +20,14 @@ import {
 let ctx: OrgCtx;
 const actor = { type: "human" as const, name: "test-suite" };
 
+// The "refuses writes against another org's records" test spins up a second
+// "test-lifecycle-foreign" org and deletes it inline on success; clean both
+// slugs around the suite so a mid-test failure can't leave an orphan that
+// trips the unique-slug constraint on the next run.
+const SLUGS = ["test-lifecycle", "test-lifecycle-foreign"];
+
 beforeAll(async () => {
-  await prismaUnscoped.platOrganisation.deleteMany({ where: { slug: "test-lifecycle" } });
+  await prismaUnscoped.platOrganisation.deleteMany({ where: { slug: { in: SLUGS } } });
   const org = await prisma.platOrganisation.create({
     data: { slug: "test-lifecycle", name: "Lifecycle Test Org" },
   });
@@ -38,7 +44,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prismaUnscoped.platOrganisation.deleteMany({ where: { slug: "test-lifecycle" } });
+  await prismaUnscoped.platOrganisation.deleteMany({ where: { slug: { in: SLUGS } } });
 });
 
 describe("org isolation guard", () => {
@@ -76,7 +82,7 @@ describe("recordWriter lifecycle", () => {
       actor,
     });
     expect(result.status).toBe("executed");
-    actionId = result.recordId!;
+    actionId = result.recordId as number;
     const log = await prisma.platExecutionLog.findFirst({
       where: { orgId: ctx.orgId, id: result.execLogId! },
     });

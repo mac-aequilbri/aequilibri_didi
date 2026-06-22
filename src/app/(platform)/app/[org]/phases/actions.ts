@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { airtableEnabled, core } from "@/lib/airtable";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { writeRecord } from "@/lib/platform/recordWriter";
@@ -21,23 +20,11 @@ export async function approvePhase(formData: FormData): Promise<void> {
   const recordIdRaw = String(formData.get("recordId") ?? "");
   if (!recordIdRaw) return;
 
-  if (airtableEnabled()) {
-    if (recordIdRaw.startsWith("rec")) {
-      await core.update(ctx.orgSlug, "PHASES", recordIdRaw, {
-        Is_AI_Draft: false,
-        Approved_By: user.name,
-      });
-    }
-    revalidatePath(orgPath(ctx.orgSlug, "/phases"));
-    return;
-  }
-
-  const recordId = Number(recordIdRaw);
-  if (!recordId) return;
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "phase",
     op: "update",
-    recordId,
+    recordId: recordIdRaw,
     data: { isAiDraft: false, approvedBy: user.name },
     actor: { type: "human", name: user.name },
   });
@@ -50,20 +37,11 @@ export async function rejectPhase(formData: FormData): Promise<void> {
   const recordIdRaw = String(formData.get("recordId") ?? "");
   if (!recordIdRaw) return;
 
-  if (airtableEnabled()) {
-    if (recordIdRaw.startsWith("rec")) {
-      await core.remove(ctx.orgSlug, "PHASES", [recordIdRaw]);
-    }
-    revalidatePath(orgPath(ctx.orgSlug, "/phases"));
-    return;
-  }
-
-  const recordId = Number(recordIdRaw);
-  if (!recordId) return;
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "phase",
     op: "delete",
-    recordId,
+    recordId: recordIdRaw,
     actor: { type: "human", name: user.name },
   });
   revalidatePath(orgPath(ctx.orgSlug, "/phases"));
@@ -128,24 +106,11 @@ export async function setPhaseProgress(formData: FormData): Promise<void> {
   const pct = Math.max(0, Math.min(100, completionPct));
   const status = pct >= 100 ? "complete" : pct > 0 ? "in_progress" : "pending";
 
-  if (airtableEnabled()) {
-    if (recordIdRaw.startsWith("rec")) {
-      // typecast creates the "in_progress" option if absent.
-      await core.update(ctx.orgSlug, "PHASES", recordIdRaw, {
-        Completion_Pct: pct,
-        Status: status,
-      });
-    }
-    revalidatePath(orgPath(ctx.orgSlug, "/phases"));
-    return;
-  }
-
-  const recordId = Number(recordIdRaw);
-  if (!recordId) return;
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "phase",
     op: "update",
-    recordId,
+    recordId: recordIdRaw,
     data: { completionPct: pct, status },
     actor: { type: "human", name: user.name },
   });

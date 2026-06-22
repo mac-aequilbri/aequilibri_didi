@@ -66,7 +66,7 @@ describe("cross-org writes and reads are refused", () => {
   it("A creates its own record", async () => {
     const r = await writeRecord(A, { table: "action", op: "create", data: { title: "A's action" }, actor });
     expect(r.status).toBe("executed");
-    actionIdA = r.recordId!;
+    actionIdA = r.recordId as number;
   });
 
   it("B cannot update A's record", async () => {
