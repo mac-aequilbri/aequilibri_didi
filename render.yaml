@@ -45,6 +45,14 @@ services:
         value: '{"dulong-downs":"appharWaojouHgMeW","northshore-builders":"appharWaojouHgMeW","coastal-fitouts":"appharWaojouHgMeW"}'
       - key: AIRTABLE_PAT
         sync: false
+      # Onboarding provisions each new customer's base by cloning the template's
+      # structure into this workspace. Provisioning needs a PAT with
+      # schema.bases:write + workspace-creator access. AIRTABLE_TEMPLATE_BASE_ID
+      # defaults to the demo base if unset.
+      - key: AIRTABLE_WORKSPACE_ID
+        value: "wsppysXBoesIgMtpA"
+      - key: AIRTABLE_TEMPLATE_BASE_ID
+        value: "appharWaojouHgMeW"
 
       # ── Auth (Clerk) ────────────────────────────────────────────────────────
       # The platform FAILS CLOSED without these: /app/* returns 503 unless

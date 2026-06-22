@@ -8,7 +8,10 @@
 //     as guidance learning rules before any jobs run, so the assistant
 //     starts with something to work from.
 
+import { airtableEnabled } from "@/lib/airtable";
+import { provisionClientBase } from "@/lib/airtable/provision";
 import { prisma } from "@/lib/db";
+import { logger, errMeta } from "@/lib/logger";
 import { DEFAULT_FEATURES, EngagementType, AiAuthority } from "@/lib/platform/types";
 
 export interface ProvisionInput {
@@ -58,6 +61,25 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
     ? input.allowedEngagementTypes
     : [input.defaultEngagementType];
 
+  // Airtable mode: provision the customer's own base BEFORE the DB transaction
+  // (it's a slow external call — don't hold a txn open across it). The base is
+  // the org in Airtable terms, so a provisioning failure fails onboarding
+  // rather than leaving a half-created org with no base. Identity/config/rules
+  // still live in Postgres (that's where the auth + learning engine read them);
+  // the base is what the already-migrated domain features write to per-client.
+  let airtableBaseId: string | null = null;
+  if (airtableEnabled()) {
+    try {
+      airtableBaseId = await provisionClientBase(input.name.trim());
+    } catch (err) {
+      logger.error("Airtable base provisioning failed", { slug, ...errMeta(err) });
+      return {
+        ok: false,
+        error: `Could not provision the Airtable base: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  }
+
   const orgId = await prisma.$transaction(async (tx) => {
     // ── Instance Setup ──────────────────────────────────────────────
     const org = await tx.platOrganisation.create({
@@ -77,6 +99,7 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
           },
           features: { ...DEFAULT_FEATURES, ...input.features },
         }),
+        airtableBaseId,
       },
     });
 
