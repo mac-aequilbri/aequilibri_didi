@@ -186,10 +186,18 @@ async function main() {
 
   // ── pass 2: link fields (every table now exists) ─────────────────────────
   // Creating a multipleRecordLinks field makes Airtable auto-generate the
-  // symmetric reverse field in the target table. The template stores both
-  // directions, so we create only one side per pair (tracked via
-  // inverseLinkFieldId) to avoid duplicate/conflicting links.
+  // symmetric reverse field in the target table — with a DEFAULT name (the
+  // source table's name), not the template's. We create one side per pair
+  // (tracked via inverseLinkFieldId) and then rename the auto-created reverse to
+  // the template's inverse field name so the app can address both sides by name.
   const handledLinkIds = new Set();
+  const templateFieldName = (fieldId) => {
+    for (const t of all) {
+      const f = t.fields.find((x) => x.id === fieldId);
+      if (f) return f.name;
+    }
+    return undefined;
+  };
   for (const p of plan) {
     const tableId = idByName.get(p.name);
     if (!tableId) continue;
@@ -201,12 +209,23 @@ async function main() {
       await sleep();
       const body = { name: f.name, type: "multipleRecordLinks", options: { linkedTableId } };
       const r = await fetch(`${metaUrl}/tables/${tableId}/fields`, { method: "POST", headers: auth, body: JSON.stringify(body) });
-      if (r.ok) {
-        console.log(`  link ${p.name}.${f.name} -> ${targetName}`);
-        handledLinkIds.add(f.id);
-        if (f.options?.inverseLinkFieldId) handledLinkIds.add(f.options.inverseLinkFieldId);
-      } else {
-        console.error(`  FAIL link ${p.name}.${f.name}: HTTP ${r.status}: ${await r.text()}`);
+      if (!r.ok) { console.error(`  FAIL link ${p.name}.${f.name}: HTTP ${r.status}: ${await r.text()}`); continue; }
+      const created = await r.json();
+      console.log(`  link ${p.name}.${f.name} -> ${targetName}`);
+      handledLinkIds.add(f.id);
+      const tmplInvId = f.options?.inverseLinkFieldId;
+      if (tmplInvId) {
+        handledLinkIds.add(tmplInvId);
+        const wantName = templateFieldName(tmplInvId);
+        const newInvId = created.options?.inverseLinkFieldId;
+        if (wantName && newInvId) {
+          await sleep();
+          const pr = await fetch(`${metaUrl}/tables/${linkedTableId}/fields/${newInvId}`, {
+            method: "PATCH", headers: auth, body: JSON.stringify({ name: wantName }),
+          });
+          if (pr.ok) console.log(`    reverse ${targetName}.${wantName}`);
+          else console.error(`    FAIL rename reverse -> ${wantName}: HTTP ${pr.status}: ${await pr.text()}`);
+        }
       }
     }
   }

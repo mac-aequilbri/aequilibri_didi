@@ -139,6 +139,14 @@ export async function provisionClientBase(
   // pass 2 — link fields; create one side per symmetric pair, skip targets we
   // didn't copy (TEAM/PRICING).
   const handled = new Set<string>();
+  // Resolve a template field's name by its id (to rename auto-created reverses).
+  const templateFieldName = (fieldId: string): string | undefined => {
+    for (const t of all) {
+      const f = t.fields.find((x) => x.id === fieldId);
+      if (f) return f.name;
+    }
+    return undefined;
+  };
   for (const p of plan) {
     const tableId = idByName.get(p.name);
     if (!tableId) continue;
@@ -148,12 +156,27 @@ export async function provisionClientBase(
       const linkedTableId = targetName ? idByName.get(targetName) : null;
       if (!linkedTableId) continue; // target not copied (e.g. TEAM/PRICING)
       await sleep();
-      await metaFetch(`bases/${newBaseId}/tables/${tableId}/fields`, {
+      const created = (await metaFetch(`bases/${newBaseId}/tables/${tableId}/fields`, {
         method: "POST",
         body: JSON.stringify({ name: f.name, type: "multipleRecordLinks", options: { linkedTableId } }),
-      });
+      })) as { options?: { inverseLinkFieldId?: string } };
       handled.add(f.id);
-      if (f.options?.inverseLinkFieldId) handled.add(f.options.inverseLinkFieldId);
+      // Airtable auto-creates the reverse field on the target table with a
+      // default name (the source table's name), NOT the template's. Rename it
+      // to the template's inverse field name so the app can address both sides.
+      const tmplInvId = f.options?.inverseLinkFieldId;
+      if (tmplInvId) {
+        handled.add(tmplInvId);
+        const wantName = templateFieldName(tmplInvId);
+        const newInvId = created.options?.inverseLinkFieldId;
+        if (wantName && newInvId) {
+          await sleep();
+          await metaFetch(`bases/${newBaseId}/tables/${linkedTableId}/fields/${newInvId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ name: wantName }),
+          });
+        }
+      }
     }
   }
 
