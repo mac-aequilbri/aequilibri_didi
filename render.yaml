@@ -32,6 +32,20 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
 
+      # ── Airtable migration (system of record) ─────────────────────────────
+      # When AIRTABLE_MIGRATION=true the migrated functionalities read/write the
+      # org's Airtable base instead of Postgres. AIRTABLE_PAT is a secret and
+      # MUST be set manually in the Render dashboard (sync: false below).
+      # AIRTABLE_BASES maps orgSlug -> baseId; in production an unmapped org
+      # throws (no demo-base fallback). The three demo orgs all point at the
+      # shared demo base here — give each REAL customer its own cloned base.
+      - key: AIRTABLE_MIGRATION
+        value: "true"
+      - key: AIRTABLE_BASES
+        value: '{"dulong-downs":"appharWaojouHgMeW","northshore-builders":"appharWaojouHgMeW","coastal-fitouts":"appharWaojouHgMeW"}'
+      - key: AIRTABLE_PAT
+        sync: false
+
       # ── Auth (Clerk) ────────────────────────────────────────────────────────
       # The platform FAILS CLOSED without these: /app/* returns 503 unless
       # ALLOW_DEMO_MODE=true is set explicitly. Remove ALLOW_DEMO_MODE when

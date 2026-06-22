@@ -1,14 +1,14 @@
-import { prisma } from "@/lib/db";
 import { currency } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
+import { loadUc1SolarPartners, type Uc1SolarPartnerView } from "@/lib/platform/uc1Source";
 import { createSolarPartner, toggleSolarPartner } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function SolarPartners() {
-  let rows: Awaited<ReturnType<typeof prisma.uc1SolarPartner.findMany>> = [];
+  let rows: Uc1SolarPartnerView[] = [];
   try {
-    rows = await prisma.uc1SolarPartner.findMany({ orderBy: { name: "asc" } });
+    rows = await loadUc1SolarPartners();
   } catch {
     rows = [];
   }

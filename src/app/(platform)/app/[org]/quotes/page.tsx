@@ -2,21 +2,17 @@
 // be started blank or generated from a job's assessment budget breakdown.
 
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadQuotes } from "@/lib/platform/domainListSources";
 import { orgPath } from "@/lib/platform/paths";
 
 export const dynamic = "force-dynamic";
 
 export default async function QuotesPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const quotes = await prisma.platConQuote.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: { createdAt: "desc" },
-    include: { job: { select: { name: true, code: true } } },
-  });
+  const quotes = await loadQuotes(ctx);
 
   return (
     <div className="p-4 sm:p-6">
@@ -56,7 +52,7 @@ export default async function QuotesPage({ params }: { params: Promise<{ org: st
                         <span className="block text-xs text-neutral-500">{q.clientName}</span>
                       ) : null}
                     </td>
-                    <td className="py-2 pr-2 text-xs text-neutral-500">{q.job.code}</td>
+                    <td className="py-2 pr-2 text-xs text-neutral-500">{q.jobCode}</td>
                     <td className="py-2 pr-2 text-xs">{formatDate(q.validUntil)}</td>
                     <td className="py-2 pr-2 text-right whitespace-nowrap font-semibold">
                       {currency(q.total)}

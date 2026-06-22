@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>æquilibri — The 11/10 Plan</title>
+<style>
+  :root{
+    --earth:#bbb2ab; --water:#f0cfa4; --air:#c4c7b2; --fire:#bcc5c6;
+    --space:#dc9f82; --space-deep:#8f4b2d; --cream:#e3ddcd; --ink:#2c2c2c;
+    --success:#2f7d57; --warn:#8a6a1e; --danger:#a83f33;
+    --paper:#fbf9f4; --line:#e6ded0; --muted:#7a736a;
+    --sans:"Helvetica Neue",Arial,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:40px 20px 80px}
+  h1,h2,h3{font-weight:800;letter-spacing:.01em;line-height:1.15}
+  .eyebrow{font-size:.72rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--space-deep)}
+  header h1{font-size:2.5rem;margin:.25rem 0 .4rem}
+  header p.lede{font-size:1.05rem;color:var(--muted);max-width:62ch;margin:0}
+  .brandbar{height:6px;border-radius:999px;margin:26px 0 0;
+    background:linear-gradient(90deg,var(--earth),var(--water),var(--air),var(--fire),var(--space))}
+
+  /* thesis */
+  .thesis{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:34px 0 10px}
+  @media(max-width:720px){.thesis{grid-template-columns:1fr}}
+  .tcard{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  .tcard.bet{border:2px solid var(--space);background:#fffaf7}
+  .tcard .step{font-size:.74rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .tcard.bet .step{color:var(--space-deep)}
+  .tcard h3{font-size:1.18rem;margin:.3rem 0 .5rem}
+  .tcard p{margin:0;font-size:.95rem;color:#4a443d}
+
+  .sectiontitle{margin:48px 0 4px;font-size:1.5rem}
+  .sectionsub{margin:0 0 20px;color:var(--muted);font-size:.95rem}
+
+  /* phase cards */
+  .phase{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:0;margin:16px 0;overflow:hidden}
+  .phase-head{display:flex;align-items:flex-start;gap:16px;padding:20px 24px;background:#fff;border-bottom:1px solid var(--line)}
+  .pnum{flex:none;width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:1.1rem;color:#fff;background:var(--ink)}
+  .phase.p1 .pnum{background:var(--space)} .phase.p2 .pnum{background:var(--success)}
+  .phase.p3 .pnum{background:var(--space-deep)} .phase.p4 .pnum{background:#3a6b8c}
+  .phase-head .meta{flex:1;min-width:0}
+  .phase-head h3{font-size:1.22rem;margin:0 0 3px}
+  .phase-head .goal{margin:0;color:var(--muted);font-size:.92rem}
+  .lift{flex:none;display:inline-flex;align-items:center;gap:6px;background:var(--cream);border-radius:999px;
+    padding:5px 11px;font-size:.74rem;font-weight:800;white-space:nowrap}
+  .lift b{color:var(--success)} .lift .dim{color:var(--muted);font-weight:700}
+  .phase-body{padding:8px 24px 20px}
+  .work{display:grid;grid-template-columns:1fr 1fr;gap:4px 28px;margin:14px 0 0}
+  @media(max-width:720px){.work{grid-template-columns:1fr}}
+  .work li{list-style:none;padding:9px 0 9px 24px;position:relative;font-size:.92rem;border-top:1px solid var(--line)}
+  .work li:before{content:"";position:absolute;left:2px;top:15px;width:9px;height:9px;border-radius:50%;background:var(--space)}
+  .work li .t{font-weight:700}
+  .work li .d{color:var(--muted)}
+  .sz{font-size:.68rem;font-weight:800;border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+  .sz.s{background:#e2efe6;color:var(--success)} .sz.m{background:#f6ebcd;color:var(--warn)} .sz.l{background:#f2dcd7;color:var(--danger)}
+
+  /* bets */
+  .bets{margin:14px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.bets{grid-template-columns:1fr}}
+  .bet-card{background:#fff;border:1px solid var(--line);border-left:5px solid var(--space);border-radius:12px;padding:16px 18px}
+  .bet-card h4{margin:0 0 6px;font-size:1.02rem;font-weight:800}
+  .bet-card p{margin:0;font-size:.9rem;color:#4a443d}
+  .bet-card .hook{display:block;margin-top:8px;font-size:.82rem;color:var(--space-deep);font-style:italic}
+
+  .note{margin-top:34px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px;font-size:.9rem;color:#4a443d}
+  .note b{color:var(--ink)}
+  footer{margin-top:30px;color:var(--muted);font-size:.8rem;text-align:center}
+  .seq{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}
+  .seq span{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:.82rem;font-weight:700}
+  .seq .arrow{border:none;color:var(--muted);padding:6px 2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">æquilibri · product roadmap</div>
+    <h1>The 11/10 Plan</h1>
+    <p class="lede">Today the product is a <b>7/10</b>: exceptional architecture and a genuinely differentiated AI write-loop, held back by polish and production-readiness. This is the path from 7 → 10 → <b>11</b>.</p>
+    <div class="brandbar"></div>
+  </header>
+
+  <div class="thesis">
+    <div class="tcard">
+      <div class="step">7 → 10 · close every gap</div>
+      <h3>Earn the score you've already engineered</h3>
+      <p>Your backend is at ~8, your surfaces trail it. Reaching 10 is almost entirely <b>execution, not invention</b>: green the baseline, make the UI as considered as the code, harden the integrations you've already stubbed.</p>
+    </div>
+    <div class="tcard bet">
+      <div class="step">10 → 11 · the bet</div>
+      <h3>Make the AI-ops loop undeniable</h3>
+      <p>11/10 isn't more features — it's <b>focus</b>. Resist breadth. Turn the approve-and-learn loop from a feature into the product's gravity: proactive, explainable, and visibly compounding. That's the thing no competitor has.</p>
+    </div>
+  </div>
+
+  <h2 class="sectiontitle">The plan</h2>
+  <p class="sectionsub">Five phases. The first three reach 10; the fourth is the 11/10 bet; the fifth makes it sellable. Sizing: <span class="sz s">S</span> days · <span class="sz m">M</span> weeks · <span class="sz l">L</span> multi-week.</p>
+
+  <!-- Phase 0 -->
+  <section class="phase p0">
+    <div class="phase-head">
+      <div class="pnum">0</div>
+      <div class="meta">
+        <h3>Foundations &amp; credibility</h3>
+        <p class="goal">Make the codebase trustworthy enough to sell and to survive diligence.</p>
+      </div>
+      <div class="lift"><span class="dim">Code</span> 5.5&nbsp;→&nbsp;<b>8</b></div>
+    </div>
+    <div class="phase-body">
+      <ul class="work">
+        <li><span class="t">Green the lint baseline <span class="sz s">S</span></span><br><span class="d">Fix the remaining <code>set-state-in-effect</code>, <code>require()</code> imports and unused vars; we already cleared the two in touched files.</span></li>
+        <li><span class="t">Test the moat <span class="sz m">M</span></span><br><span class="d">Cover the record-writer path: typecast/validation, proposal TTL expiry, re-validation on approve, cross-org tenancy guard, rule lifecycle.</span></li>
+        <li><span class="t">CI gate <span class="sz s">S</span></span><br><span class="d">GitHub Action (you already deploy GH→Render): typecheck + lint + test must pass before merge to <code>master</code>.</span></li>
+        <li><span class="t">Observability <span class="sz m">M</span></span><br><span class="d">Error boundaries, structured logging, and capture (Sentry-class) on the assistant + write paths.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Phase 1 -->
+  <section class="phase p1">
+    <div class="phase-head">
+      <div class="pnum">1</div>
+      <div class="meta">
+        <h3>Make the UI match the backend</h3>
+        <p class="goal">The single highest-leverage move — close the gap between ~8 engineering and trailing presentation.</p>
+      </div>
+      <div class="lift"><span class="dim">UX</span> 7&nbsp;→&nbsp;<b>9</b></div>
+    </div>
+    <div class="phase-body">
+      <ul class="work">
+        <li><span class="t">Finish the design system <span class="sz m">M</span></span><br><span class="d">Complete status maps (risk <code>open/mitigated/closed</code> render grey today), real empty + loading/skeleton states, one list/detail pattern.</span></li>
+        <li><span class="t">Approval loop as hero <span class="sz m">M</span></span><br><span class="d">Before/after diff of each proposed write, bulk approve, keyboard-driven inbox. Make it the daily driver.</span></li>
+        <li><span class="t">Global search / ⌘K <span class="sz m">M</span></span><br><span class="d">The deferred P2 item — search across jobs, actions, risks, docs from anywhere.</span></li>
+        <li><span class="t">Responsive + visual QA <span class="sz s">S</span></span><br><span class="d">Real device pass; the preview screenshotter couldn't validate rendering this session.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Phase 2 -->
+  <section class="phase p2">
+    <div class="phase-head">
+      <div class="pnum">2</div>
+      <div class="meta">
+        <h3>Production hardening</h3>
+        <p class="goal">Move from "inert until env-configured" to provably safe under real load and real tenants.</p>
+      </div>
+      <div class="lift"><span class="dim">Prod</span> 5&nbsp;→&nbsp;<b>9</b></div>
+    </div>
+    <div class="phase-body">
+      <ul class="work">
+        <li><span class="t">Per-org integrations <span class="sz l">L</span></span><br><span class="d">Encrypted token storage (envelope encryption), per-org Xero OAuth, per-org Drive — the known gaps.</span></li>
+        <li><span class="t">Tenant-isolation tests <span class="sz m">M</span></span><br><span class="d">Automated cross-org leakage tests on every read/write path. This is non-negotiable for multi-tenant trust.</span></li>
+        <li><span class="t">RBAC audit <span class="sz s">S</span></span><br><span class="d">Verify editor/admin/readonly + platform-admin gating end-to-end; portal-token security review.</span></li>
+        <li><span class="t">Close doc-vs-impl gaps <span class="sz m">M</span></span><br><span class="d"><code>ongoing</code>/<code>seasonal</code> engagements, document versioning UI, AI session-close summaries, UC1 onto the shared assessment engine.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Phase 3 -->
+  <section class="phase p3">
+    <div class="phase-head">
+      <div class="pnum">3</div>
+      <div class="meta">
+        <h3>The 11/10 bets</h3>
+        <p class="goal">Lean all the way into the moat. These are what make a buyer say "I've never seen that."</p>
+      </div>
+      <div class="lift"><span class="dim">Moat</span> 8&nbsp;→&nbsp;<b>11</b></div>
+    </div>
+    <div class="phase-body">
+      <div class="bets">
+        <div class="bet-card">
+          <h4>Proactive assistant</h4>
+          <p>Flip from reactive chat to a scheduled agent (you already run an hourly cron). It watches the data, drafts proposals, and fills the approval inbox before you ask.</p>
+          <span class="hook">"Didi spotted 3 risks trending and drafted mitigations for your approval."</span>
+        </div>
+        <div class="bet-card">
+          <h4>Explainable AI / trust layer</h4>
+          <p>Every proposal shows its reasoning, the exact data it read, and which learning rules shaped it. Trust is the bottleneck for AI-in-operations — make it visible.</p>
+          <span class="hook">"Why did the AI suggest this?" — answered, every time.</span>
+        </div>
+        <div class="bet-card">
+          <h4>Compounding learning, made visible</h4>
+          <p>Turn the invisible learning loop into a headline metric: estimate accuracy and overrun reduction over time, per org. This is your renewal and sales story.</p>
+          <span class="hook">"Estimate accuracy +18% since adoption."</span>
+        </div>
+        <div class="bet-card">
+          <h4>Cross-project intelligence</h4>
+          <p>Portfolio-level insight: benchmark a new estimate against this org's own historicals, surface patterns across jobs. The platform gets smarter the more it holds.</p>
+          <span class="hook">Each project makes the next one sharper.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Phase 4 -->
+  <section class="phase p4">
+    <div class="phase-head">
+      <div class="pnum">4</div>
+      <div class="meta">
+        <h3>Go-to-market proof</h3>
+        <p class="goal">Make the value self-evident to a prospect in five minutes.</p>
+      </div>
+      <div class="lift"><span class="dim">GTM</span> →&nbsp;<b>ready</b></div>
+    </div>
+    <div class="phase-body">
+      <ul class="work">
+        <li><span class="t">Self-serve onboarding <span class="sz m">M</span></span><br><span class="d">Polish org provisioning (<code>/app/new</code>) into a guided first-run that seeds a believable starting state.</span></li>
+        <li><span class="t">ROI telemetry <span class="sz m">M</span></span><br><span class="d">Instrument the outcomes the learning metric reports — approvals saved, overruns avoided — so the value is measured, not asserted.</span></li>
+        <li><span class="t">Client portal as magic <span class="sz m">M</span></span><br><span class="d">Make the portal a live, AI-narrated status the client actually trusts — a referral engine.</span></li>
+        <li><span class="t">Security review <span class="sz m">M</span></span><br><span class="d">Independent pass on the multi-tenant write path; lay the groundwork for an enterprise (SOC 2) track.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <h2 class="sectiontitle">Sequencing</h2>
+  <p class="sectionsub">0 and 1 run in parallel and gate everything. The bets (3) start once the loop is trustworthy and visible.</p>
+  <div class="seq">
+    <span>0 · Foundations</span><span class="arrow">+</span><span>1 · UI matches backend</span>
+    <span class="arrow">→</span><span>2 · Hardening</span>
+    <span class="arrow">→</span><span>3 · The bets</span>
+    <span class="arrow">→</span><span>4 · GTM</span>
+  </div>
+
+  <div class="note">
+    <b>The one thing to internalise:</b> you don't get to 11 by adding the tenth module — you get there by making the approve-and-learn loop so proactive, explainable and visibly compounding that it stops looking like software and starts looking like a colleague. Everything in Phases 0–2 exists to make Phase 3 credible. Protect that focus; say no to breadth that doesn't deepen the loop.
+  </div>
+
+  <footer>æquilibri — implementation plan · grounded in a full read of the current codebase. Effort sizes are relative, not commitments.</footer>
+
+</div>
+</body>
+</html>

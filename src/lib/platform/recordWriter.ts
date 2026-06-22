@@ -8,7 +8,10 @@
 // row, audit events only ever get added.
 
 import { z } from "zod";
+import { airtableEnabled, core } from "@/lib/airtable";
+import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { prisma } from "@/lib/db";
+import { logger, errMeta } from "@/lib/logger";
 import { Actor, OrgCtx } from "./types";
 
 // ── field helpers (typecast layer) ────────────────────────────────────
@@ -385,13 +388,45 @@ export type WritableTable = keyof typeof REGISTRY;
 
 export const WRITABLE_TABLES = Object.keys(REGISTRY) as WritableTable[];
 
+export function isWritableTable(table: string): table is WritableTable {
+  return table in REGISTRY;
+}
+
+/** Current state of an org-scoped record in a writable table — used by the
+ *  approvals inbox to render before→after diffs. Null if absent. The findFirst
+ *  carries orgId, so the tenancy guard is satisfied. */
+export async function readRecord(
+  ctx: OrgCtx,
+  table: WritableTable,
+  recordId: number | string,
+): Promise<Record<string, unknown> | null> {
+  const map = airtableEnabled() ? airtableMapFor(table) : undefined;
+  if (map && typeof recordId === "string") {
+    try {
+      return await core.get(ctx.orgSlug, map.table, recordId);
+    } catch {
+      return null;
+    }
+  }
+  const row = await REGISTRY[table].delegate().findFirst({
+    where: { id: Number(recordId), orgId: ctx.orgId },
+  });
+  return (row as Record<string, unknown> | null) ?? null;
+}
+
 // ── write API ─────────────────────────────────────────────────────────
+
+/** A record identity: a Postgres integer id, or an Airtable "rec…" string id
+ *  when AIRTABLE_MIGRATION is on. Threaded through the service layer so a
+ *  parent id can be passed as a child's linked-record reference. */
+export type RecordId = number | string;
 
 export interface WriteRequest {
   table: WritableTable;
   op: "create" | "update" | "delete";
-  /** Required for update/delete. */
-  recordId?: number;
+  /** Required for update/delete. Postgres ids are numbers; Airtable ids are
+   *  "rec…" strings. */
+  recordId?: RecordId;
   data?: unknown;
   actor: Actor;
   /** Persist a proposal instead of writing; executeProposal() completes it. */
@@ -400,7 +435,7 @@ export interface WriteRequest {
 
 export interface WriteResult {
   status: "executed" | "proposed";
-  recordId?: number;
+  recordId?: RecordId;
   /** Audit row id (executed writes). */
   execLogId?: number;
   /** Approval-queue row id (proposed writes). */
@@ -427,11 +462,31 @@ export function validateRecord(
 
 async function performWrite(
   ctx: OrgCtx,
+  table: WritableTable,
   def: TableDef,
   op: WriteRequest["op"],
-  recordId: number | undefined,
+  recordId: number | string | undefined,
   data: Record<string, unknown>,
-): Promise<number | undefined> {
+): Promise<number | string | undefined> {
+  // Airtable as system of record: route to the org's base when the flag is on
+  // and the table has a field map. Tenancy is structural (the base is the org),
+  // so there is no orgId guard here — base resolution derives from ctx.orgSlug.
+  const map = airtableEnabled() ? airtableMapFor(table) : undefined;
+  if (map) {
+    if (op === "create") {
+      const rec = await core.create(ctx.orgSlug, map.table, toFields(map, data, "create"));
+      return rec.id;
+    }
+    if (recordId == null) throw new Error(`${op} requires recordId`);
+    const rid = String(recordId);
+    if (op === "update") {
+      await core.update(ctx.orgSlug, map.table, rid, toFields(map, data, "update"));
+      return rid;
+    }
+    await core.remove(ctx.orgSlug, map.table, [rid]);
+    return rid;
+  }
+
   const delegate = def.delegate();
   if (op === "create") {
     // Learning-rule codes are allocated at WRITE time (deferred proposals
@@ -447,21 +502,85 @@ async function performWrite(
     return row.id;
   }
   if (recordId == null) throw new Error(`${op} requires recordId`);
+  const numId = Number(recordId);
   // Tenancy guard: the target row must belong to this org.
-  const existing = await delegate.findFirst({ where: { id: recordId, orgId: ctx.orgId } });
-  if (!existing) throw new Error(`Record ${recordId} not found in this organisation`);
+  const existing = await delegate.findFirst({ where: { id: numId, orgId: ctx.orgId } });
+  if (!existing) throw new Error(`Record ${numId} not found in this organisation`);
   if (op === "update") {
-    const row = await delegate.update({ where: { id: recordId }, data });
+    const row = await delegate.update({ where: { id: numId }, data });
     return row.id;
   }
-  await delegate.delete({ where: { id: recordId } });
-  return recordId;
+  await delegate.delete({ where: { id: numId } });
+  return numId;
+}
+
+/** Append an "executed" audit row. The Postgres targetId column only holds
+ *  integer ids; an Airtable "rec…" id is recorded in `result` instead. In
+ *  Airtable mode the audit is best-effort — a Postgres outage must not undo a
+ *  write that already landed in the system of record. */
+async function writeExecutedLog(
+  ctx: OrgCtx,
+  args: {
+    jobId: number | undefined;
+    actor: Actor;
+    op: WriteRequest["op"];
+    physical: string;
+    recordId: number | string | undefined;
+    payload: string;
+    bestEffort: boolean;
+    approvedBy?: string;
+    result?: string;
+  },
+): Promise<number | undefined> {
+  const targetId = typeof args.recordId === "number" ? args.recordId : null;
+  const ref = typeof args.recordId === "string" ? `airtable:${args.recordId}` : "";
+  try {
+    const log = await prisma.platExecutionLog.create({
+      data: {
+        orgId: ctx.orgId,
+        jobId: args.jobId,
+        actorType: args.actor.type,
+        actorName: args.actor.name,
+        operation: args.op,
+        targetTable: args.physical,
+        targetId,
+        payload: args.payload,
+        status: "executed",
+        approvedBy: args.approvedBy ?? "",
+        executedAt: new Date(),
+        sourceMessageId: args.actor.sourceMessageId,
+        result: args.result ?? ref,
+      },
+    });
+    return log.id;
+  } catch (err) {
+    if (!args.bestEffort) throw err;
+    logger.warn("Execution-log write skipped (Airtable mode)", { orgId: ctx.orgId, ...errMeta(err) });
+    return undefined;
+  }
 }
 
 export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<WriteResult> {
   const def: TableDef = REGISTRY[req.table];
-  const data = validated(def, req.op, req.data);
+  // Airtable mode skips the Postgres-shaped Zod schema (which would reject the
+  // string record ids / missing numeric FKs of the Airtable world) and lets the
+  // field map do its own coercion from the raw payload.
+  const onAirtable = airtableEnabled() && airtableMapFor(req.table) !== undefined;
+  const data = onAirtable
+    ? ((req.data ?? {}) as Record<string, unknown>)
+    : validated(def, req.op, req.data);
   const jobId = typeof data.jobId === "number" ? data.jobId : undefined;
+  // Postgres ids live in the Int column; Airtable "rec…" ids ride in the payload.
+  // A numeric string (a Postgres id from a form) coerces to the Int column so
+  // the audit trail keeps its numeric target in Postgres mode.
+  const numRecordId =
+    typeof req.recordId === "number"
+      ? req.recordId
+      : typeof req.recordId === "string" && /^\d+$/.test(req.recordId)
+        ? Number(req.recordId)
+        : null;
+  const airRecordId =
+    typeof req.recordId === "string" && req.recordId.startsWith("rec") ? req.recordId : undefined;
 
   if (req.requireApproval) {
     const pending = await prisma.platPendingWrite.create({
@@ -470,8 +589,8 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
         jobId,
         tableKey: req.table,
         op: req.op,
-        recordId: req.recordId,
-        payload: JSON.stringify(data),
+        recordId: numRecordId,
+        payload: JSON.stringify(airRecordId ? { __recId: airRecordId, ...data } : data),
         actorType: req.actor.type,
         actorName: req.actor.name,
         sourceMessageId: req.actor.sourceMessageId,
@@ -483,24 +602,25 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
   }
 
   try {
-    const recordId = await performWrite(ctx, def, req.op, req.recordId, data);
-    const log = await prisma.platExecutionLog.create({
-      data: {
-        orgId: ctx.orgId,
-        jobId,
-        actorType: req.actor.type,
-        actorName: req.actor.name,
-        operation: req.op,
-        targetTable: def.physical,
-        targetId: recordId,
-        payload: JSON.stringify({ table: req.table, op: req.op, data }),
-        status: "executed",
-        executedAt: new Date(),
-        sourceMessageId: req.actor.sourceMessageId,
-      },
+    const recordId = await performWrite(ctx, req.table, def, req.op, req.recordId, data);
+    const execLogId = await writeExecutedLog(ctx, {
+      jobId,
+      actor: req.actor,
+      op: req.op,
+      physical: def.physical,
+      recordId,
+      payload: JSON.stringify({ table: req.table, op: req.op, data }),
+      bestEffort: onAirtable,
     });
-    return { status: "executed", recordId, execLogId: log.id };
+    return { status: "executed", recordId, execLogId };
   } catch (err) {
+    logger.error("Record write failed", {
+      orgId: ctx.orgId,
+      table: req.table,
+      op: req.op,
+      recordId: req.recordId,
+      ...errMeta(err),
+    });
     await prisma.platExecutionLog
       .create({
         data: {
@@ -510,7 +630,7 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
           actorName: req.actor.name,
           operation: req.op,
           targetTable: def.physical,
-          targetId: req.recordId,
+          targetId: numRecordId,
           payload: JSON.stringify({ table: req.table, op: req.op, data }),
           status: "failed",
           error: String(err instanceof Error ? err.message : err).slice(0, 1000),
@@ -554,35 +674,53 @@ export async function executeProposal(
   if (!def) throw new Error(`Unknown table in proposal: ${pending.tableKey}`);
   const op = pending.op as WriteRequest["op"];
 
+  const onAirtable = airtableEnabled() && airtableMapFor(pending.tableKey) !== undefined;
   try {
-    // Re-validate: the schema may have tightened since the proposal was
-    // stored, and stored dates revive as ISO strings.
-    const data = validated(def, op, JSON.parse(pending.payload));
-    const recordId = await performWrite(ctx, def, op, pending.recordId ?? undefined, data);
-    const log = await prisma.platExecutionLog.create({
-      data: {
-        orgId: ctx.orgId,
-        jobId: pending.jobId,
-        actorType: pending.actorType,
-        actorName: pending.actorName,
-        operation: op,
-        targetTable: def.physical,
-        targetId: recordId,
-        payload: pending.payload,
-        status: "executed",
-        approvedBy,
-        executedAt: new Date(),
-        sourceMessageId: pending.sourceMessageId,
-        result: `Deferred write approved (proposal #${pending.id})`,
+    const payloadObj = JSON.parse(pending.payload) as Record<string, unknown>;
+    // Airtable update/delete proposals stash their "rec…" target in the payload
+    // (the Postgres recordId column is integer-only). Strip it before writing.
+    let target: number | string | undefined = pending.recordId ?? undefined;
+    let data: Record<string, unknown>;
+    if (onAirtable) {
+      if (typeof payloadObj.__recId === "string") target = payloadObj.__recId;
+      const { __recId: _r, ...rest } = payloadObj;
+      void _r;
+      data = rest;
+    } else {
+      // Re-validate: the schema may have tightened since the proposal was
+      // stored, and stored dates revive as ISO strings.
+      data = validated(def, op, payloadObj);
+    }
+    const recordId = await performWrite(ctx, pending.tableKey as WritableTable, def, op, target, data);
+    const execLogId = await writeExecutedLog(ctx, {
+      jobId: pending.jobId ?? undefined,
+      actor: {
+        type: pending.actorType as Actor["type"],
+        name: pending.actorName,
+        sourceMessageId: pending.sourceMessageId ?? undefined,
       },
+      op,
+      physical: def.physical,
+      recordId,
+      payload: pending.payload,
+      bestEffort: onAirtable,
+      approvedBy,
+      result: `Deferred write approved (proposal #${pending.id})`,
     });
     await prisma.platPendingWrite.update({
       where: { id: pending.id },
-      data: { status: "executed", resolvedBy: approvedBy, resolvedAt: new Date(), execLogId: log.id },
+      data: { status: "executed", resolvedBy: approvedBy, resolvedAt: new Date(), execLogId },
     });
-    return { status: "executed", recordId, execLogId: log.id, proposalId: pending.id };
+    return { status: "executed", recordId, execLogId, proposalId: pending.id };
   } catch (err) {
     const message = String(err instanceof Error ? err.message : err).slice(0, 1000);
+    logger.error("Proposal execution failed", {
+      orgId: ctx.orgId,
+      proposalId: pending.id,
+      table: pending.tableKey,
+      op: pending.op,
+      ...errMeta(err),
+    });
     await prisma.platPendingWrite.update({
       where: { id: pending.id },
       data: { status: "failed", resolvedBy: approvedBy, resolvedAt: new Date(), error: message },

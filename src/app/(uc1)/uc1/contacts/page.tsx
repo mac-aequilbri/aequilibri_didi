@@ -1,17 +1,13 @@
-import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
+import { loadUc1Contacts, type Uc1ContactView } from "@/lib/platform/uc1Source";
 
 export const dynamic = "force-dynamic";
 
 export default async function Contacts() {
-  let rows: { id: number; name: string; email: string; phone: string; company: string; createdAt: Date; quotes: number }[] = [];
+  let rows: Uc1ContactView[] = [];
   try {
-    const contacts = await prisma.uc1Contact.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { _count: { select: { quotes: true } } },
-    });
-    rows = contacts.map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, company: c.company, createdAt: c.createdAt, quotes: c._count.quotes }));
+    rows = await loadUc1Contacts();
   } catch {
     rows = [];
   }

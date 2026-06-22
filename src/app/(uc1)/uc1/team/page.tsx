@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
+import { loadUc1Team, type Uc1TeamMemberView } from "@/lib/platform/uc1Source";
 import { createTeamMember, toggleMember, updateAccuracyProfile } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -8,12 +8,9 @@ export const dynamic = "force-dynamic";
 const ROLES = ["estimator", "director", "admin", "technician"];
 
 export default async function TeamPage() {
-  let members: Awaited<ReturnType<typeof prisma.uc1TeamMember.findMany>> = [];
-  let correctionCounts: Record<number, number> = {};
+  let members: Uc1TeamMemberView[] = [];
   try {
-    members = await prisma.uc1TeamMember.findMany({ orderBy: [{ isActive: "desc" }, { name: "asc" }] });
-    const counts = await prisma.uc1Correction.groupBy({ by: ["estimatorId"], _count: { id: true }, where: { estimatorId: { not: null } } });
-    correctionCounts = Object.fromEntries(counts.map((c) => [c.estimatorId!, c._count.id]));
+    members = await loadUc1Team();
   } catch { members = []; }
 
   return (
@@ -43,7 +40,7 @@ export default async function TeamPage() {
                         <button className="btn-ae-outline text-xs">Save</button>
                       </form>
                     </td>
-                    <td className="text-right">{correctionCounts[m.id] ?? 0}</td>
+                    <td className="text-right">{m.corrections}</td>
                     <td className="text-sm">{formatDate(m.dateJoined)}</td>
                     <td className="text-right">
                       <form action={toggleMember}>

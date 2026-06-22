@@ -9,7 +9,8 @@ import { writeRecord } from "@/lib/platform/recordWriter";
 
 export async function createActionItem(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const user = await getCurrentUser(ctx);
+  const user = await getCurrentUser(ctx); // also enforces the write gate
+
   await writeRecord(ctx, {
     table: "action",
     op: "create",
@@ -22,14 +23,16 @@ export async function createActionItem(formData: FormData): Promise<void> {
 
 export async function updateActionStatus(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
+  const user = await getCurrentUser(ctx); // also enforces the write gate
+  const recordIdRaw = String(formData.get("recordId") ?? "");
   const status = String(formData.get("status") ?? "");
-  if (!recordId || !status) return;
+  if (!recordIdRaw || !status) return;
+
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "action",
     op: "update",
-    recordId,
+    recordId: recordIdRaw,
     data: { status },
     actor: { type: "human", name: user.name },
   });

@@ -9,9 +9,10 @@ import { writeRecord } from "@/lib/platform/recordWriter";
 
 export async function createDecision(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const user = await getCurrentUser(ctx);
+  const user = await getCurrentUser(ctx); // also enforces the write gate
   const data = formToObject(formData);
   data.madeBy = data.madeBy || user.name;
+
   await writeRecord(ctx, {
     table: "decision",
     op: "create",
@@ -25,13 +26,15 @@ export async function createDecision(formData: FormData): Promise<void> {
 export async function setDecisionStatus(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
+  const recordIdRaw = String(formData.get("recordId") ?? "");
   const status = String(formData.get("status") ?? "");
-  if (!recordId || !["proposed", "confirmed", "superseded"].includes(status)) return;
+  if (!recordIdRaw || !["proposed", "confirmed", "superseded"].includes(status)) return;
+
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "decision",
     op: "update",
-    recordId,
+    recordId: recordIdRaw,
     data: { status, ...(status === "confirmed" ? { decidedAt: new Date().toISOString() } : {}) },
     actor: { type: "human", name: user.name },
   });

@@ -1,25 +1,27 @@
-import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { PageHeader, MetricCard } from "@/components/PageHeader";
+import { loadUc1Intelligence, type Uc1IntelligenceData } from "@/lib/platform/uc1Source";
 import { runEngine, approveHypothesis, rejectHypothesis, promoteRule, toggleRule, takeSnapshot, seedDemo, clearDemo } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function Intelligence() {
-  let snapshot: Awaited<ReturnType<typeof prisma.uc1IntelligenceSnapshot.findFirst>> = null;
-  let corrections: Awaited<ReturnType<typeof prisma.uc1Correction.findMany>> = [];
-  let hypotheses: Awaited<ReturnType<typeof prisma.uc1Hypothesis.findMany>> = [];
-  let rules: Awaited<ReturnType<typeof prisma.uc1LearningRule.findMany>> = [];
+function parseGaps(json: string): string[] {
   try {
-    [snapshot, corrections, hypotheses, rules] = await Promise.all([
-      prisma.uc1IntelligenceSnapshot.findFirst({ orderBy: { capturedAt: "desc" } }),
-      prisma.uc1Correction.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
-      prisma.uc1Hypothesis.findMany({ orderBy: { confidence: "desc" } }),
-      prisma.uc1LearningRule.findMany({ orderBy: [{ isActive: "desc" }, { confidence: "desc" }] }),
-    ]);
-  } catch { /* tables empty */ }
+    const v = JSON.parse(json);
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+}
 
-  const gaps: string[] = snapshot ? JSON.parse(snapshot.gapsJson) : [];
+export default async function Intelligence() {
+  let data: Uc1IntelligenceData = { snapshot: null, corrections: [], hypotheses: [], rules: [] };
+  try {
+    data = await loadUc1Intelligence();
+  } catch { /* tables empty */ }
+  const { snapshot, corrections, hypotheses, rules } = data;
+
+  const gaps: string[] = snapshot ? parseGaps(snapshot.gapsJson) : [];
 
   return (
     <div>

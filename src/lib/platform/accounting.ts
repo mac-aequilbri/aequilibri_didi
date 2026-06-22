@@ -9,6 +9,10 @@
 // The per-org authorization-code flow (each customer connecting their own
 // Xero) is the next step on this same interface.
 
+import { prisma } from "@/lib/db";
+import { encryptSecret, decryptSecret } from "./crypto";
+import type { OrgCtx } from "./types";
+
 export interface AccountingSummary {
   orgName: string;
   invoices: { count: number; total: number; outstanding: number };
@@ -143,4 +147,48 @@ class DemoProvider implements AccountingProvider {
 /** Real Xero when credentials are configured, demo ledger otherwise. */
 export function getAccountingProvider(): AccountingProvider {
   return xeroEnabled() ? new XeroProvider() : new DemoProvider();
+}
+
+// ── Per-org token storage (encrypted at rest) ──────────────────────────────
+// The documented next step is per-customer Xero via the authorization-code
+// flow, where each org connects its own ledger and we hold that org's OAuth
+// token. Those tokens are encrypted with crypto.ts before they touch the DB and
+// decrypted only in memory at use — the `access_token` column never holds
+// plaintext. Scoped to orgId, so one org can never read another's token.
+
+/** Persist an org's accounting OAuth token, encrypted at rest. */
+export async function saveAccountingToken(
+  ctx: OrgCtx,
+  provider: string,
+  token: string,
+  orgName = "",
+): Promise<void> {
+  const encrypted = encryptSecret(token);
+  const existing = await prisma.platConAccountingConnection.findFirst({
+    where: { orgId: ctx.orgId },
+  });
+  if (existing) {
+    await prisma.platConAccountingConnection.update({
+      where: { id: existing.id },
+      data: { provider, status: "connected", accessToken: encrypted, orgName },
+    });
+  } else {
+    await prisma.platConAccountingConnection.create({
+      data: { orgId: ctx.orgId, provider, status: "connected", accessToken: encrypted, orgName },
+    });
+  }
+}
+
+/** Decrypt and return an org's accounting token, or null if none/unreadable.
+ *  A decrypt failure (tamper, key rotation, legacy plaintext) fails closed. */
+export async function loadAccountingToken(ctx: OrgCtx): Promise<string | null> {
+  const conn = await prisma.platConAccountingConnection.findFirst({
+    where: { orgId: ctx.orgId },
+  });
+  if (!conn || !conn.accessToken) return null;
+  try {
+    return decryptSecret(conn.accessToken);
+  } catch {
+    return null;
+  }
 }

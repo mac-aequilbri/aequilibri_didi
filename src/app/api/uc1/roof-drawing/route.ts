@@ -15,7 +15,6 @@ import {
   attachSectionGeometry,
   mergeWeakSections,
   deriveRoofLineFeatures,
-  ROOF_LINE_TYPES,
 } from "@/services/uc1/roofVision";
 import {
   roofStaticMapView,

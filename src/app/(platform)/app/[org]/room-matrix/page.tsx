@@ -1,18 +1,14 @@
 // Room matrix — rooms and finishes grouped by zone (construction domain).
 
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadRoomMatrix } from "@/lib/platform/domainListSources";
 
 export const dynamic = "force-dynamic";
 
 export default async function RoomMatrixPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const rooms = await prisma.platConRoomMatrix.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: [{ zone: "asc" }, { name: "asc" }],
-    include: { job: { select: { code: true } } },
-  });
+  const rooms = await loadRoomMatrix(ctx);
 
   const zones = new Map<string, typeof rooms>();
   for (const r of rooms) {
@@ -48,7 +44,7 @@ export default async function RoomMatrixPage({ params }: { params: Promise<{ org
               {zoneRooms.map((r) => (
                 <tr key={r.id} className="border-t border-neutral-100 align-top">
                   <td className="py-2 pr-2 font-medium whitespace-nowrap">
-                    {r.name} <span className="text-xs font-normal text-neutral-400">{r.job?.code}</span>
+                    {r.name} <span className="text-xs font-normal text-neutral-400">{r.jobCode}</span>
                   </td>
                   <td className="py-2 pr-2 text-right whitespace-nowrap text-xs">
                     {r.areaSqm ? `${r.areaSqm} m²` : "—"}

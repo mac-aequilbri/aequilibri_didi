@@ -1,37 +1,11 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { currency, toNum, formatDate } from "@/lib/format";
-import { incGst } from "@/lib/money";
+import { currency, formatDate } from "@/lib/format";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { loadUc1Quotes } from "@/lib/platform/uc1Source";
 
 export const dynamic = "force-dynamic";
 
 const STATUSES = ["all", "draft", "sent", "accepted", "rejected"] as const;
-
-async function loadQuotes(status: string) {
-  try {
-    const where = status && status !== "all" ? { status } : {};
-    const quotes = await prisma.uc1Quote.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: { items: true, contact: true },
-    });
-    return {
-      connected: true,
-      rows: quotes.map((q) => ({
-        id: q.id,
-        refNumber: q.refNumber,
-        propertyAddress: q.propertyAddress,
-        status: q.status,
-        createdAt: q.createdAt,
-        contactName: q.contact?.name ?? null,
-        total: incGst(q.items.reduce((s, i) => s + toNum(i.quantity) * toNum(i.unitPriceExGst), 0)),
-      })),
-    };
-  } catch {
-    return { connected: false, rows: [] };
-  }
-}
 
 export default async function QuoteList({
   searchParams,
@@ -39,7 +13,7 @@ export default async function QuoteList({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { status = "all" } = await searchParams;
-  const { rows, connected } = await loadQuotes(status);
+  const { rows, connected } = await loadUc1Quotes(status);
 
   return (
     <div>

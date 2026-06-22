@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import GoogleMap, { type LatLng } from "@/components/GoogleMap";
 import RoofPlanDialog, { type RoofPlan, type RoofMeasurement } from "./RoofPlanDialog";
 import { createQuote, recordRoofCorrectionAction } from "./actions";
@@ -135,7 +135,13 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
   }, [clickPoint, address, savedPlan]);
 
   // A new map pin invalidates the saved plan so the next review fetches fresh.
-  useEffect(() => { setSavedPlan(null); }, [clickPoint]);
+  // Handled during render (not an effect) per React's "adjust state on prop
+  // change" guidance — clickPoint changes identity when a new pin drops.
+  const [seenPin, setSeenPin] = useState(clickPoint);
+  if (clickPoint !== seenPin) {
+    setSeenPin(clickPoint);
+    setSavedPlan(null);
+  }
 
   // Apply the reviewed/edited AI roof measurement to the working quote.
   const applyRoofPlan = (rp: RoofPlan, m: RoofMeasurement, edited: { outline: number[][]; sections: RoofPlan["sections"]; outlineChanged: boolean }) => {
@@ -165,10 +171,8 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
     setRoofPlan(null);
   };
 
-  const suburb = useMemo(() => {
-    const parts = address.split(",").map((p) => p.trim());
-    return parts.length >= 2 ? parts[1] : "";
-  }, [address]);
+  const suburbParts = address.split(",").map((p) => p.trim());
+  const suburb = suburbParts.length >= 2 ? suburbParts[1] : "";
 
   // Live pricing — same Port City engine the server uses, so preview == saved price.
   const priced = useMemo(() => {

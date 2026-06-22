@@ -23,13 +23,15 @@ export async function createCashflowEntry(formData: FormData): Promise<void> {
 export async function updateCashflowActual(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
+  const recordIdRaw = String(formData.get("recordId") ?? "");
   const actual = Number(formData.get("actual"));
-  if (!recordId || !Number.isFinite(actual)) return;
+  if (!recordIdRaw || !Number.isFinite(actual)) return;
+
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "cashflow",
     op: "update",
-    recordId,
+    recordId: recordIdRaw,
     data: { actual },
     actor: { type: "human", name: user.name },
   });

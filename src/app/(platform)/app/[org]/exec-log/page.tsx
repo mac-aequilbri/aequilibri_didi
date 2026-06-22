@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadExecLogHistory } from "@/lib/platform/execLogSource";
 import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -24,15 +25,12 @@ export default async function ExecLogPage({ params }: { params: Promise<{ org: s
   const ctx = await requireOrgCtx((await params).org);
 
   const [proposals, logs] = await Promise.all([
+    // App-internal approval queue — always Postgres (no Airtable equivalent).
     prisma.platPendingWrite.findMany({
       where: { orgId: ctx.orgId, status: "proposed" },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.platExecutionLog.findMany({
-      where: { orgId: ctx.orgId },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    }),
+    loadExecLogHistory(ctx),
   ]);
 
   const tableLabel = (t: string) => t.replace(/^plat_(core|con|cfg)_/, "");
@@ -40,8 +38,8 @@ export default async function ExecLogPage({ params }: { params: Promise<{ org: s
   return (
     <div className="p-6">
       <PageHeader
-        title="Execution Log"
-        subtitle="Every write is audited here; AI proposals wait in this queue until a human approves them."
+        title="Activity"
+        subtitle="Every write is audited here — a full, append-only trail of who changed what, and when."
       />
 
       {proposals.length > 0 && (
@@ -124,7 +122,7 @@ export default async function ExecLogPage({ params }: { params: Promise<{ org: s
                   <StatusBadge status={log.status} />
                 </td>
                 <td className="py-2 whitespace-nowrap text-xs text-neutral-500">
-                  {log.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                  {log.createdAt ? log.createdAt.toISOString().slice(0, 16).replace("T", " ") : "—"}
                 </td>
               </tr>
             ))}

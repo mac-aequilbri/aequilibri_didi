@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Scratch/output dir: a standalone CommonJS slide-build script and its own
+    // node_modules, plus uploaded storage — not application source.
+    "var/**",
   ]),
 ]);
 

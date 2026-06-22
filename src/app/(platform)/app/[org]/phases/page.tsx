@@ -2,9 +2,9 @@
 // evidence (photos/documents) attaches per phase; the AI review suggests a
 // completion % from it, and a human approves/adjusts/dismisses the suggestion.
 
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadPhaseJobs } from "@/lib/platform/phasesSource";
 import { parseSuggestion } from "@/services/platform/construction/phaseEvidence";
 import {
   applyEvidenceSuggestionAction,
@@ -28,16 +28,7 @@ export default async function PhasesPage({
 }) {
   const ctx = await requireOrgCtx((await params).org);
   const { err } = await searchParams;
-  const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: { code: "asc" },
-    include: {
-      conPhases: {
-        orderBy: { sortOrder: "asc" },
-        include: { _count: { select: { evidence: true } } },
-      },
-    },
-  });
+  const jobs = await loadPhaseJobs(ctx);
   const drafts = jobs.flatMap((j) => j.conPhases.filter((p) => p.isAiDraft));
 
   return (

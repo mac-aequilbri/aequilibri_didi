@@ -24,5 +24,6 @@ jobs:
       - run: npm run db:dev:gen
       - run: npx prisma db push --schema prisma/schema.dev.prisma
       - run: npm run typecheck
+      - run: npm run lint
       - run: npx vitest run
       - run: npm run build

@@ -168,7 +168,7 @@ async function seedDulongDowns(prisma) {
   });
 
   // Learning loop: guidance rules injected into Didi's prompt + one pending hypothesis.
-  const hyp = await prisma.platHypothesis.create({
+  await prisma.platHypothesis.create({
     data: {
       orgId: org.id,
       description: "Plumbing quotes for rural sites come in ~12% above initial allowance; consider a standing contingency.",

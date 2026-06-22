@@ -1,19 +1,15 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadMeetingMinutes } from "@/lib/platform/domainListSources";
 import { orgPath } from "@/lib/platform/paths";
 
 export const dynamic = "force-dynamic";
 
 export default async function MeetingMinutesPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const minutes = await prisma.platConMeetingMinutes.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: { meetingDate: "desc" },
-    include: { job: { select: { code: true } } },
-  });
+  const minutes = await loadMeetingMinutes(ctx);
 
   return (
     <div className="p-6">
@@ -39,7 +35,7 @@ export default async function MeetingMinutesPage({ params }: { params: Promise<{
                   <Link href={orgPath(ctx.orgSlug, `/meeting-minutes/${m.id}`)} className="font-medium hover:underline">
                     {m.title || `Meeting ${formatDate(m.meetingDate)}`}
                   </Link>
-                  <span className="ml-1 text-xs text-neutral-400">{m.job?.code}</span>
+                  <span className="ml-1 text-xs text-neutral-400">{m.jobCode}</span>
                 </td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{formatDate(m.meetingDate)}</td>
                 <td className="py-2 pr-2 text-right text-xs">{m.actionsCount}</td>

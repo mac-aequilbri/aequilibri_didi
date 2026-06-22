@@ -23,13 +23,15 @@ export async function createBudgetLine(formData: FormData): Promise<void> {
 export async function updateBudgetActual(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
+  const recordIdRaw = String(formData.get("recordId") ?? "");
   const actualAmount = Number(formData.get("actualAmount"));
-  if (!recordId || !Number.isFinite(actualAmount)) return;
+  if (!recordIdRaw || !Number.isFinite(actualAmount)) return;
+
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "budget_line",
     op: "update",
-    recordId,
+    recordId: recordIdRaw,
     data: { actualAmount },
     actor: { type: "human", name: user.name },
   });

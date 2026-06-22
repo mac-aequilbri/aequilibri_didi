@@ -1,24 +1,18 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { currency, formatDate } from "@/lib/format";
-import { incGst } from "@/lib/money";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { loadUc1ConditionReports, type Uc1ConditionReportView } from "@/lib/platform/uc1Source";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConditionReports() {
-  let rows: { id: number; reportNumber: string; clientName: string; grade: string; urgency: string; status: string; price: number; generatedAt: Date }[] = [];
-  let total = 0;
+  let rows: Uc1ConditionReportView[] = [];
   try {
-    const reports = await prisma.uc1RoofConditionReport.findMany({ orderBy: { generatedAt: "desc" } });
-    rows = reports.map((r) => {
-      const price = incGst(Number(r.priceExGst));
-      total += price;
-      return { id: r.id, reportNumber: r.reportNumber, clientName: r.clientName, grade: r.conditionGrade, urgency: r.urgencyLevel, status: r.status, price, generatedAt: r.generatedAt };
-    });
+    rows = await loadUc1ConditionReports();
   } catch {
     rows = [];
   }
+  const total = rows.reduce((s, r) => s + r.price, 0);
 
   return (
     <div>

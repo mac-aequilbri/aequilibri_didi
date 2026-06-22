@@ -17,12 +17,14 @@ const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // matches documents/actions.ts
 export async function approvePhase(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
-  if (!recordId) return;
+  const recordIdRaw = String(formData.get("recordId") ?? "");
+  if (!recordIdRaw) return;
+
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "phase",
     op: "update",
-    recordId,
+    recordId: recordIdRaw,
     data: { isAiDraft: false, approvedBy: user.name },
     actor: { type: "human", name: user.name },
   });
@@ -32,12 +34,14 @@ export async function approvePhase(formData: FormData): Promise<void> {
 export async function rejectPhase(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
-  if (!recordId) return;
+  const recordIdRaw = String(formData.get("recordId") ?? "");
+  if (!recordIdRaw) return;
+
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "phase",
     op: "delete",
-    recordId,
+    recordId: recordIdRaw,
     actor: { type: "human", name: user.name },
   });
   revalidatePath(orgPath(ctx.orgSlug, "/phases"));
@@ -96,15 +100,18 @@ export async function dismissEvidenceSuggestionAction(formData: FormData): Promi
 export async function setPhaseProgress(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
+  const recordIdRaw = String(formData.get("recordId") ?? "");
   const completionPct = Number(formData.get("completionPct"));
-  if (!recordId || !Number.isFinite(completionPct)) return;
-  const status = completionPct >= 100 ? "complete" : completionPct > 0 ? "in_progress" : "pending";
+  if (!recordIdRaw || !Number.isFinite(completionPct)) return;
+  const pct = Math.max(0, Math.min(100, completionPct));
+  const status = pct >= 100 ? "complete" : pct > 0 ? "in_progress" : "pending";
+
+  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {
     table: "phase",
     op: "update",
-    recordId,
-    data: { completionPct: Math.max(0, Math.min(100, completionPct)), status },
+    recordId: recordIdRaw,
+    data: { completionPct: pct, status },
     actor: { type: "human", name: user.name },
   });
   revalidatePath(orgPath(ctx.orgSlug, "/phases"));

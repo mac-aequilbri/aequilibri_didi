@@ -1,14 +1,14 @@
-import { prisma } from "@/lib/db";
 import { currency } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
+import { loadUc1Regions, type Uc1RegionView } from "@/lib/platform/uc1Source";
 import { createRegion, toggleRegion, seedDefaultRegions } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function RegionsPage() {
-  let rows: Awaited<ReturnType<typeof prisma.uc1Region.findMany>> = [];
+  let rows: Uc1RegionView[] = [];
   try {
-    rows = await prisma.uc1Region.findMany({ orderBy: { name: "asc" } });
+    rows = await loadUc1Regions();
   } catch { rows = []; }
 
   return (

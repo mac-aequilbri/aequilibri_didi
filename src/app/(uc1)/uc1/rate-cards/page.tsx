@@ -1,15 +1,15 @@
-import { prisma } from "@/lib/db";
 import { currency } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
 import { MATERIAL_CHOICES, PITCH_CHOICES, materialDisplay } from "@/services/uc1/constants";
+import { loadUc1RateCards, type Uc1RateCardView } from "@/lib/platform/uc1Source";
 import { createRateCard, toggleRateCard, deleteRateCard } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function RateCards() {
-  let cards: Awaited<ReturnType<typeof prisma.uc1RateCard.findMany>> = [];
+  let cards: Uc1RateCardView[] = [];
   try {
-    cards = await prisma.uc1RateCard.findMany({ orderBy: [{ material: "asc" }, { pitchType: "asc" }] });
+    cards = await loadUc1RateCards();
   } catch {
     cards = [];
   }

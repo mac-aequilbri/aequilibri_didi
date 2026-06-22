@@ -1,21 +1,16 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { currency, toNum, formatDate } from "@/lib/format";
 import { gst as gstOf, incGst } from "@/lib/money";
+import { loadUc1PurchaseOrder } from "@/lib/platform/uc1Source";
 
 export const dynamic = "force-dynamic";
 
 export default async function PoPrint({ params }: { params: Promise<{ po_id: string }> }) {
   const { po_id } = await params;
-  const id = Number(po_id);
-  if (!Number.isInteger(id)) notFound();
-
-  const po = await prisma.uc1PurchaseOrder
-    .findUnique({ where: { id }, include: { vendor: true, poItems: { orderBy: { sortOrder: "asc" } } } })
-    .catch(() => null);
+  const po = await loadUc1PurchaseOrder(po_id);
   if (!po) notFound();
 
-  const exGst = po.poItems.reduce((s, i) => s + toNum(i.quantity) * toNum(i.unitPriceExGst), 0);
+  const exGst = po.items.reduce((s, i) => s + toNum(i.quantity) * toNum(i.unitPriceExGst), 0);
 
   return (
     <main className="max-w-3xl mx-auto bg-white p-10 my-8 text-sm" style={{ color: "#2c2c2c" }}>
@@ -31,7 +26,7 @@ export default async function PoPrint({ params }: { params: Promise<{ po_id: str
       </div>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
-        <div><div className="text-neutral-500 uppercase text-xs">Vendor</div><div>{po.vendor.name}</div></div>
+        <div><div className="text-neutral-500 uppercase text-xs">Vendor</div><div>{po.vendor}</div></div>
         <div><div className="text-neutral-500 uppercase text-xs">Deliver to</div><div>{po.deliveryAddress || "—"}</div></div>
         <div><div className="text-neutral-500 uppercase text-xs">Requested delivery</div><div>{formatDate(po.requestedDeliveryDate)}</div></div>
         <div><div className="text-neutral-500 uppercase text-xs">Raised</div><div>{formatDate(po.createdAt)}</div></div>
@@ -40,7 +35,7 @@ export default async function PoPrint({ params }: { params: Promise<{ po_id: str
       <table className="w-full mb-6" style={{ borderCollapse: "collapse" }}>
         <thead><tr style={{ background: "#2c2c2c", color: "#fff" }}><th className="text-left p-2">Description</th><th className="text-right p-2">Qty</th><th className="text-left p-2">Unit</th><th className="text-right p-2">Rate</th><th className="text-right p-2">Amount</th></tr></thead>
         <tbody>
-          {po.poItems.map((i) => (
+          {po.items.map((i) => (
             <tr key={i.id} style={{ borderBottom: "1px solid #e3ddcd" }}>
               <td className="p-2">{i.description}</td><td className="p-2 text-right">{toNum(i.quantity)}</td><td className="p-2">{i.unit}</td>
               <td className="p-2 text-right">{currency(i.unitPriceExGst)}</td><td className="p-2 text-right">{currency(toNum(i.quantity) * toNum(i.unitPriceExGst))}</td>

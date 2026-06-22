@@ -20,8 +20,14 @@ import {
 let ctx: OrgCtx;
 const actor = { type: "human" as const, name: "test-suite" };
 
+// The "refuses writes against another org's records" test spins up a second
+// "test-lifecycle-foreign" org and deletes it inline on success; clean both
+// slugs around the suite so a mid-test failure can't leave an orphan that
+// trips the unique-slug constraint on the next run.
+const SLUGS = ["test-lifecycle", "test-lifecycle-foreign"];
+
 beforeAll(async () => {
-  await prismaUnscoped.platOrganisation.deleteMany({ where: { slug: "test-lifecycle" } });
+  await prismaUnscoped.platOrganisation.deleteMany({ where: { slug: { in: SLUGS } } });
   const org = await prisma.platOrganisation.create({
     data: { slug: "test-lifecycle", name: "Lifecycle Test Org" },
   });
@@ -38,7 +44,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prismaUnscoped.platOrganisation.deleteMany({ where: { slug: "test-lifecycle" } });
+  await prismaUnscoped.platOrganisation.deleteMany({ where: { slug: { in: SLUGS } } });
 });
 
 describe("org isolation guard", () => {
@@ -76,7 +82,7 @@ describe("recordWriter lifecycle", () => {
       actor,
     });
     expect(result.status).toBe("executed");
-    actionId = result.recordId!;
+    actionId = result.recordId as number;
     const log = await prisma.platExecutionLog.findFirst({
       where: { orgId: ctx.orgId, id: result.execLogId! },
     });
@@ -173,6 +179,30 @@ describe("recordWriter lifecycle", () => {
       where: { id: actionId, orgId: ctx.orgId },
     });
     expect(action?.status).toBe("done"); // still unchanged
+  });
+
+  it("re-validates at approval time and fails closed on an invalid payload", async () => {
+    // A stored proposal whose payload no longer satisfies the schema (here an
+    // empty title) must never be written — executeProposal re-validates, throws,
+    // and parks the row in "failed" rather than silently applying bad data.
+    const bad = await prisma.platPendingWrite.create({
+      data: {
+        orgId: ctx.orgId,
+        tableKey: "action",
+        op: "create",
+        payload: JSON.stringify({ title: "" }), // violates title.min(1)
+        actorType: "ai",
+        actorName: "TestBot",
+        status: "proposed",
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+    await expect(executeProposal(ctx, bad.id, "Approver")).rejects.toThrow();
+    const pending = await prisma.platPendingWrite.findFirst({
+      where: { id: bad.id, orgId: ctx.orgId },
+    });
+    expect(pending?.status).toBe("failed");
+    expect(pending?.error).toBeTruthy();
   });
 });
 

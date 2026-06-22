@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function AssistantPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
   const sessionId = await getOrCreateSession(ctx);
-  const [rows, rules, proposals] = await Promise.all([
+  const [rows, rules, proposals, topJob] = await Promise.all([
     listMessages(ctx, sessionId),
     getActiveRules(ctx),
     prisma.platPendingWrite.findMany({
@@ -21,7 +21,22 @@ export default async function AssistantPage({ params }: { params: Promise<{ org:
       orderBy: { createdAt: "desc" },
       take: 10,
     }),
+    prisma.platJob.findFirst({
+      where: { orgId: ctx.orgId },
+      orderBy: { updatedAt: "desc" },
+      select: { name: true },
+    }),
   ]);
+
+  // Starter prompts, grounded in this org's features and live data, to lower
+  // the blank-canvas barrier on the assistant's headline screen.
+  const f = ctx.config.features;
+  const suggestions = [
+    "What needs my attention right now?",
+    ...(f.risks ? ["Summarise the open risks and flag any I should escalate."] : []),
+    ...(topJob ? [`Draft this week's progress update for ${topJob.name}.`] : []),
+    "Which budget lines are tracking over?",
+  ].slice(0, 4);
 
   const messages: ChatMessageView[] = rows.map((m) => {
     let toolCalls: ChatMessageView["toolCalls"] = [];
@@ -56,6 +71,7 @@ export default async function AssistantPage({ params }: { params: Promise<{ org:
             targetTable: p.tableKey,
             payload: p.payload,
           }))}
+          suggestions={suggestions}
         />
       </div>
       <aside className="hidden lg:block pt-16">
