@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { formToObject } from "@/lib/platform/forms";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { recordIdParam, writeRecord } from "@/lib/platform/recordWriter";
 import {
   aiDraftVariation,
   approveVariation,
@@ -41,8 +41,8 @@ export async function aiDraftVariationAction(formData: FormData): Promise<void> 
 export async function approveVariationAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const id = Number(formData.get("recordId"));
-  if (!id) return;
+  const id = recordIdParam(formData.get("recordId"));
+  if (id == null) return;
   const costRaw = formData.get("costImpact");
   const daysRaw = formData.get("timeImpactDays");
   await approveVariation(ctx, user.name, id, {
@@ -56,8 +56,8 @@ export async function approveVariationAction(formData: FormData): Promise<void> 
 export async function rejectVariationAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const id = Number(formData.get("recordId"));
-  if (!id) return;
+  const id = recordIdParam(formData.get("recordId"));
+  if (id == null) return;
   await rejectVariation(ctx, user.name, id);
   revalidatePath(orgPath(ctx.orgSlug, `/variations/${id}`));
   revalidatePath(orgPath(ctx.orgSlug, "/variations"));
