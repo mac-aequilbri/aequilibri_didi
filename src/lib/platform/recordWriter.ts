@@ -421,6 +421,16 @@ export async function readRecord(
  *  parent id can be passed as a child's linked-record reference. */
 export type RecordId = number | string;
 
+/** Parse a form-supplied id into a RecordId: an Airtable "rec…" id stays a
+ *  string, a numeric id (Postgres) coerces to a number. Returns null if blank.
+ *  Detail-page forms post whichever id the active backend produced, so actions
+ *  must accept both rather than Number()-coercing (which would NaN a rec id). */
+export function recordIdParam(v: FormDataEntryValue | null): RecordId | null {
+  const s = typeof v === "string" ? v.trim() : "";
+  if (!s) return null;
+  return /^\d+$/.test(s) ? Number(s) : s;
+}
+
 export interface WriteRequest {
   table: WritableTable;
   op: "create" | "update" | "delete";
