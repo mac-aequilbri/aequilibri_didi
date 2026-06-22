@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { DEFAULT_FEATURES } from "@/lib/platform/types";
+import { PendingSubmitButton } from "@/app/(platform)/app/[org]/assess/SubmitButtons";
 import { provisionOrgAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ export default async function NewOrganisationPage({
       />
       {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
-      <form action={provisionOrgAction} className="space-y-8">
+      <form action={provisionOrgAction} className="relative space-y-8">
         <section className="ae-card p-5 space-y-4">
           <h2 className="font-semibold text-sm">1 · Instance setup</h2>
           <div className="grid grid-cols-2 gap-4">
@@ -169,9 +170,18 @@ export default async function NewOrganisationPage({
           </label>
         </section>
 
-        <button type="submit" className="btn-ae">
-          Provision customer instance
-        </button>
+        <PendingSubmitButton
+          label="Provision customer instance"
+          pendingTitle="Provisioning instance"
+          stages={[
+            "Creating the customer's Airtable base…",
+            "Building the data tables…",
+            "Wiring up the table links…",
+            "Writing instance configuration…",
+            "Encoding domain knowledge rules…",
+            "Handing over the keys…",
+          ]}
+        />
       </form>
     </main>
   );

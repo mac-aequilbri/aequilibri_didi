@@ -57,8 +57,9 @@ function StageTicker({ stages }: { stages: string[] }) {
 
 // Submit button + pending overlay. The overlay is position:absolute, so it
 // fills the nearest positioned ancestor — give the form (or its card) the
-// `relative` class.
-function PendingSubmitButton({
+// `relative` class. Exported so other slow server-action forms (e.g. customer
+// provisioning, which creates an Airtable base) reuse the same loader.
+export function PendingSubmitButton({
   label,
   pendingTitle,
   stages,
