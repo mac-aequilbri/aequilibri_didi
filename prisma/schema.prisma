@@ -783,6 +783,10 @@ model PlatOrganisation {
   settings               String   @default("{}")
   isActive               Boolean  @default(true) @map("is_active")
   createdAt              DateTime @default(now()) @map("created_at")
+  // Per-customer Airtable base (the spec's "bases are clones"). Set when the
+  // org's base is provisioned; resolveBaseId() reads it. Null = not yet on
+  // Airtable (falls back to AIRTABLE_BASES env / demo base).
+  airtableBaseId         String?  @map("airtable_base_id") @db.VarChar(20)
 
   contacts        PlatContact[]
   jobs            PlatJob[]
