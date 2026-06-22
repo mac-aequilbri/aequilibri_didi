@@ -2,8 +2,10 @@
 //
 // A thin wrapper over fetch (Node 20+/Next global fetch — no SDK dependency).
 // Responsibilities: auth, per-base rate limiting, pagination on reads, and
-// batching on writes (Airtable caps writes at 10 records/request). All reads
-// request fields by ID so callers work against stable field IDs, not names.
+// batching on writes (Airtable caps writes at 10 records/request). Tables and
+// fields are addressed by NAME, not id: provisioned per-customer bases are
+// structural clones with identical names but DIFFERENT table/field ids, so name
+// addressing is the only thing that works across every base.
 //
 // NOTE: Airtable has no transactions. Multi-record writes can partially
 // succeed; callers needing atomicity must use the propose/confirm queue
@@ -58,20 +60,20 @@ interface ListResponse {
 /** List records, transparently following pagination. */
 export async function listRecords(
   baseId: string,
-  tableId: string,
+  table: string,
   opts: ListOptions = {},
 ): Promise<AirtableRecord[]> {
   const out: AirtableRecord[] = [];
   let offset: string | undefined;
   do {
-    const params = new URLSearchParams({ returnFieldsByFieldId: "true" });
+    const params = new URLSearchParams();
     if (opts.pageSize) params.set("pageSize", String(opts.pageSize));
     if (opts.maxRecords) params.set("maxRecords", String(opts.maxRecords));
     if (opts.filterByFormula) params.set("filterByFormula", opts.filterByFormula);
     if (opts.view) params.set("view", opts.view);
     if (offset) params.set("offset", offset);
 
-    const data = (await request(baseId, `${baseId}/${tableId}?${params}`, {
+    const data = (await request(baseId, `${baseId}/${encodeURIComponent(table)}?${params}`, {
       method: "GET",
     })) as ListResponse;
 
@@ -85,10 +87,10 @@ export async function listRecords(
 /** Fetch a single record by ID. */
 export async function getRecord(
   baseId: string,
-  tableId: string,
+  table: string,
   recordId: string,
 ): Promise<AirtableRecord> {
-  return (await request(baseId, `${baseId}/${tableId}/${recordId}?returnFieldsByFieldId=true`, {
+  return (await request(baseId, `${baseId}/${encodeURIComponent(table)}/${recordId}`, {
     method: "GET",
   })) as AirtableRecord;
 }
@@ -96,16 +98,15 @@ export async function getRecord(
 /** Create records (fields keyed by field ID), batched at 10/request. */
 export async function createRecords(
   baseId: string,
-  tableId: string,
+  table: string,
   records: Array<Record<string, unknown>>,
 ): Promise<AirtableRecord[]> {
   const out: AirtableRecord[] = [];
   for (const batch of chunk(records, 10)) {
-    const data = (await request(baseId, `${baseId}/${tableId}`, {
+    const data = (await request(baseId, `${baseId}/${encodeURIComponent(table)}`, {
       method: "POST",
       body: JSON.stringify({
         records: batch.map((fields) => ({ fields })),
-        returnFieldsByFieldId: true,
         // Coerce values and auto-create missing single-select options on write.
         typecast: true,
       }),
@@ -118,14 +119,14 @@ export async function createRecords(
 /** Update records (PATCH = merge), batched at 10/request. */
 export async function updateRecords(
   baseId: string,
-  tableId: string,
+  table: string,
   records: Array<{ id: string; fields: Record<string, unknown> }>,
 ): Promise<AirtableRecord[]> {
   const out: AirtableRecord[] = [];
   for (const batch of chunk(records, 10)) {
-    const data = (await request(baseId, `${baseId}/${tableId}`, {
+    const data = (await request(baseId, `${baseId}/${encodeURIComponent(table)}`, {
       method: "PATCH",
-      body: JSON.stringify({ records: batch, returnFieldsByFieldId: true, typecast: true }),
+      body: JSON.stringify({ records: batch, typecast: true }),
     })) as ListResponse;
     out.push(...data.records);
   }
@@ -135,12 +136,12 @@ export async function updateRecords(
 /** Delete records by ID, batched at 10/request. */
 export async function deleteRecords(
   baseId: string,
-  tableId: string,
+  table: string,
   recordIds: string[],
 ): Promise<void> {
   for (const batch of chunk(recordIds, 10)) {
     const params = new URLSearchParams();
     for (const id of batch) params.append("records[]", id);
-    await request(baseId, `${baseId}/${tableId}?${params}`, { method: "DELETE" });
+    await request(baseId, `${baseId}/${encodeURIComponent(table)}?${params}`, { method: "DELETE" });
   }
 }

@@ -61,17 +61,20 @@ export function linkedMany(): Codec<string[]> {
   };
 }
 
-/** Map an Airtable record (fields keyed by field ID) to an app object. */
+/** Map an Airtable record (fields keyed by field NAME) to an app object.
+ *  Names are used (not ids) because they are stable across cloned per-customer
+ *  bases; field ids are unique per base. */
 export function recordToApp(rec: AirtableRecord, fields: FieldDef[]): Record<string, unknown> {
   const out: Record<string, unknown> = { id: rec.id };
   for (const f of fields) {
-    out[f.app] = f.codec.fromCell(rec.fields[f.fieldId]);
+    out[f.app] = f.codec.fromCell(rec.fields[f.app]);
   }
   return out;
 }
 
-/** Build an Airtable `fields` object (keyed by field ID) from an app object.
- *  Omits undefined cells so PATCH leaves untouched fields alone. */
+/** Build an Airtable `fields` object (keyed by field NAME) from an app object.
+ *  Omits undefined cells so PATCH leaves untouched fields alone. Field NAME
+ *  (not id) so the same write works against any cloned base. */
 export function appToFields(
   app: Record<string, unknown>,
   fields: FieldDef[],
@@ -80,7 +83,7 @@ export function appToFields(
   for (const f of fields) {
     if (!(f.app in app)) continue;
     const cell = f.codec.toCell(app[f.app]);
-    if (cell !== undefined) out[f.fieldId] = cell;
+    if (cell !== undefined) out[f.app] = cell;
   }
   return out;
 }

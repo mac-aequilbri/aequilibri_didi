@@ -57,9 +57,10 @@ function fieldDefs(table: CoreTableName): FieldDef[] {
 
 export type CoreRow = Record<string, unknown> & { id: string };
 
-function tableId(table: CoreTableName): string {
-  return CORE_SCHEMA[table].tableId;
-}
+// Tables are addressed by NAME (the CoreTableName is the Airtable table name);
+// the client URL-encodes it. Names are stable across cloned per-customer bases,
+// unlike table/field ids. CORE_SCHEMA is still used (below) for field NAMES +
+// types to pick codecs — both clone-stable.
 
 function assertWritable(): void {
   if (!airtableEnabled()) {
@@ -73,7 +74,7 @@ export async function list(
   table: CoreTableName,
   opts: ListOptions = {},
 ): Promise<CoreRow[]> {
-  const recs = await listRecords(await resolveBaseId(orgSlug), tableId(table), opts);
+  const recs = await listRecords(await resolveBaseId(orgSlug), table, opts);
   return recs.map((r) => recordToApp(r, fieldDefs(table)) as CoreRow);
 }
 
@@ -83,7 +84,7 @@ export async function get(
   table: CoreTableName,
   recordId: string,
 ): Promise<CoreRow> {
-  const rec = await getRecord(await resolveBaseId(orgSlug), tableId(table), recordId);
+  const rec = await getRecord(await resolveBaseId(orgSlug), table, recordId);
   return recordToApp(rec, fieldDefs(table)) as CoreRow;
 }
 
@@ -95,7 +96,7 @@ export async function create(
 ): Promise<CoreRow> {
   assertWritable();
   const fields = appToFields(data, fieldDefs(table));
-  const [rec] = await createRecords(await resolveBaseId(orgSlug), tableId(table), [fields]);
+  const [rec] = await createRecords(await resolveBaseId(orgSlug), table, [fields]);
   return recordToApp(rec, fieldDefs(table)) as CoreRow;
 }
 
@@ -108,7 +109,7 @@ export async function update(
 ): Promise<CoreRow> {
   assertWritable();
   const fields = appToFields(patch, fieldDefs(table));
-  const [rec] = await updateRecords(await resolveBaseId(orgSlug), tableId(table), [
+  const [rec] = await updateRecords(await resolveBaseId(orgSlug), table, [
     { id: recordId, fields },
   ]);
   return recordToApp(rec, fieldDefs(table)) as CoreRow;
@@ -121,5 +122,5 @@ export async function remove(
   recordIds: string[],
 ): Promise<void> {
   assertWritable();
-  await deleteRecords(await resolveBaseId(orgSlug), tableId(table), recordIds);
+  await deleteRecords(await resolveBaseId(orgSlug), table, recordIds);
 }

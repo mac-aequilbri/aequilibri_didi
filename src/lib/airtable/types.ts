@@ -1,8 +1,9 @@
 // Airtable migration — shared types for the data-access layer.
 
 /** A record as returned by the Airtable REST API. With our client, `fields` is
- *  always keyed by field ID (returnFieldsByFieldId=true) so callers never
- *  depend on display names, which can drift between cloned bases. */
+ *  keyed by field NAME: provisioned per-customer bases are structural clones
+ *  with identical field names but different field ids, so names — not ids — are
+ *  the stable key across bases. */
 export interface AirtableRecord {
   id: string;
   createdTime?: string;
@@ -25,9 +26,11 @@ export interface Codec<TApp = unknown> {
 
 /** Binds one app property to one Airtable field, with the codec between them. */
 export interface FieldDef {
-  /** App-facing property name. */
+  /** App-facing property name. Also the Airtable field NAME used on the wire
+   *  (reads/writes key cells by name, for cross-base clone stability). */
   app: string;
-  /** Stable Airtable field ID (fld…). */
+  /** Airtable field id from the template base. Informational only — not used
+   *  on the wire, since ids differ per cloned base. */
   fieldId: string;
   codec: Codec;
 }
