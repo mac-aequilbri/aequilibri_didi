@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
-import { currency, toNum } from "@/lib/format";
+import { currency } from "@/lib/format";
+import { loadJobsList } from "@/lib/platform/jobsListSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 
@@ -9,11 +9,9 @@ export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: { updatedAt: "desc" },
-    include: { _count: { select: { conPhases: true, actions: true, conRisks: true } } },
-  });
+  // Postgres (numeric ids) or Airtable (rec… ids) depending on the flag — the
+  // ids here must match what the detail page (jobDetailSource) can resolve.
+  const jobs = await loadJobsList(ctx);
 
   return (
     <div className="p-6">
@@ -33,8 +31,13 @@ export default async function ProjectsPage({ params }: { params: Promise<{ org: 
               <div>
                 <h2 className="font-semibold">{job.name}</h2>
                 <p className="text-xs text-neutral-500">
-                  {job.code} · {job.engagementType.replace("_", " ")} ·{" "}
-                  {job.suburb || job.address || "no address"}
+                  {[
+                    job.code,
+                    job.engagementType ? job.engagementType.replace("_", " ") : "",
+                    job.suburb || job.address || "no address",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               </div>
               <StatusBadge status={job.status} />
@@ -47,8 +50,8 @@ export default async function ProjectsPage({ params }: { params: Promise<{ org: 
             </div>
             <p className="mt-2 text-xs text-neutral-500">
               {job.completionPct}% complete · health {job.healthScore}/100 · budget{" "}
-              {currency(toNum(job.budgetTotal))} · {job._count.conPhases} phases ·{" "}
-              {job._count.actions} actions · {job._count.conRisks} risks
+              {currency(job.budgetTotal)} · {job.counts.phases} phases ·{" "}
+              {job.counts.actions} actions · {job.counts.risks} risks
             </p>
           </Link>
         ))}
