@@ -177,6 +177,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Escalated_At", from: "escalatedAt", to: DATE },
       { air: "Escalation_Note", from: "escalationNote", to: S },
       { air: "Created_By_AI", from: "createdByAi", to: BOOL },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   procurement: {
@@ -190,6 +191,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Total", from: "total", to: (v) => NUM(v) },
       { air: "Status", from: "status", createDefault: "pending", to: S },
       { air: "Due_Date", from: "dueDate", to: DATE },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   phase: {
@@ -201,6 +203,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Sort_Order", from: "sortOrder", to: (v) => NUM(v) },
       { air: "Is_AI_Draft", from: "isAiDraft", to: BOOL },
       { air: "Approved_By", from: "approvedBy", to: S },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   phase_evidence: {
@@ -222,6 +225,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Budget_Amount", from: "budgetAmount", to: (v) => NUM(v) },
       { air: "Committed_Amount", from: "committedAmount", to: (v) => NUM(v) },
       { air: "Actual_Amount", from: "actualAmount", to: (v) => NUM(v) },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   cashflow: {
@@ -231,6 +235,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Projected", from: "projected", to: (v) => NUM(v) },
       { air: "Actual", from: "actual", to: (v) => NUM(v) },
       { air: "Notes", from: "notes", to: S },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   variation_order: {

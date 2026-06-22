@@ -13,7 +13,7 @@ import { geocodeProviders } from "@/lib/platform/geocode";
 import { mulMoney } from "@/lib/platform/money";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { resolveField, CascadeOutcome } from "@/lib/platform/sourceCascade";
 import { OrgCtx } from "@/lib/platform/types";
 import type { GeocodeResult } from "@/lib/platform/geocode";
@@ -409,7 +409,7 @@ async function createJobWithCode(
   ctx: OrgCtx,
   userName: string,
   data: Record<string, unknown>,
-): Promise<number> {
+): Promise<RecordId> {
   const jobs = await prisma.platJob.findMany({
     where: { orgId: ctx.orgId },
     select: { code: true },
@@ -426,9 +426,11 @@ async function createJobWithCode(
         data: { ...data, code: `JOB-${String(max + 1 + attempt).padStart(3, "0")}` },
         actor: { type: "human", name: userName },
       });
-      // Assessment → job-tree provisioning threads numeric FKs throughout and
-      // stays on the Postgres path; the id is always an integer here.
-      return result.recordId as number;
+      // Postgres returns an integer id; Airtable returns a "rec…" string (the
+      // JOB code has no Airtable field and is dropped by the map). The id is
+      // threaded on as a RecordId — used as the child records' job link.
+      if (result.recordId == null) throw new Error("job create returned no record id");
+      return result.recordId;
     } catch (err) {
       if ((err as { code?: string }).code !== "P2002" || attempt === 2) throw err;
     }
@@ -441,7 +443,7 @@ export async function acceptAssessment(
   userName: string,
   assessmentId: number,
   edits: { budgetTotal?: number } = {},
-): Promise<number> {
+): Promise<RecordId> {
   const row = await prisma.platAssessment.findFirst({
     where: { id: assessmentId, orgId: ctx.orgId, status: "draft" },
   });
@@ -468,6 +470,12 @@ export async function acceptAssessment(
       appliedRules: assessment.appliedRules.map((r) => r.ruleCode),
     }),
   });
+
+  // Postgres-bound writes (the assessment backlink, corrections) need an
+  // integer job id. Under Airtable the job id is a "rec…" string with no home
+  // in those Int columns, so they record null — the durable job + its tree live
+  // in the client's Airtable base, linked via the rec id on the child records.
+  const pgJobId = typeof jobId === "number" ? jobId : undefined;
 
   const scale = aiBudget > 0 ? finalBudget / aiBudget : 1;
   let sortOrder = 0;
@@ -505,7 +513,7 @@ export async function acceptAssessment(
 
   await prisma.platAssessment.update({
     where: { id: row.id },
-    data: { status: "accepted", jobId },
+    data: { status: "accepted", jobId: pgJobId ?? null },
   });
 
   if (finalBudget !== aiBudget && aiBudget > 0) {
@@ -513,7 +521,7 @@ export async function acceptAssessment(
       ctx,
       { type: "human", name: userName },
       {
-        jobId,
+        jobId: pgJobId,
         entityType: "assessment",
         entityId: assessmentId,
         dimension: "budget.total",
@@ -540,7 +548,7 @@ export async function acceptAssessment(
       ctx,
       { type: "human", name: userName },
       {
-        jobId,
+        jobId: pgJobId,
         entityType: "assessment",
         entityId: assessmentId,
         dimension: "schedule.phases",
