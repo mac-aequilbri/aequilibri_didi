@@ -1,8 +1,8 @@
 // New quote — pick the job, then either start blank or pre-fill the lines
 // from that job's assessment budget breakdown.
 
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { createQuoteAction } from "../actions";
@@ -11,11 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewQuotePage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: { code: "asc" },
-    select: { id: true, name: true, code: true, _count: { select: { conBudgets: true } } },
-  });
+  const jobs = await loadJobOptions(ctx);
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl">
@@ -35,8 +31,7 @@ export default async function NewQuotePage({ params }: { params: Promise<{ org: 
             <select name="jobId" required className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
-                  {j.code} — {j.name}
-                  {j._count.conBudgets ? ` (${j._count.conBudgets} budget lines)` : ""}
+                  {j.label}
                 </option>
               ))}
             </select>

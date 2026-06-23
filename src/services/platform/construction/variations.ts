@@ -5,49 +5,55 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import { callClaude } from "@/lib/claude";
 import { prisma } from "@/lib/db";
 import { emitCorrection } from "@/lib/platform/corrections";
+import { loadJobContext } from "@/lib/platform/jobContextSource";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { Actor, OrgCtx } from "@/lib/platform/types";
 import { toNum } from "@/lib/format";
 
-async function nextRefNumber(orgId: number, jobId: number): Promise<string> {
+/** Next VO-### ref. Postgres numbers per job (max suffix + 1); Airtable numbers
+ *  globally over VARIATIONS (its rows carry no Job link to scope by). */
+async function nextRefNumber(ctx: OrgCtx, jobId: RecordId): Promise<string> {
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 });
+    const max = rows.reduce((m, v) => {
+      const match = /-(\d+)$/.exec(String(v["Ref_Number"] ?? ""));
+      return match ? Math.max(m, Number(match[1])) : m;
+    }, 0);
+    return `VO-${String(max + 1).padStart(3, "0")}`;
+  }
   // Max existing suffix + 1 — count-based numbering duplicates after deletes.
+  const numId = Number(jobId);
   const existing = await prisma.platConVariationOrder.findMany({
-    where: { orgId, jobId },
+    where: { orgId: ctx.orgId, jobId: numId },
     select: { refNumber: true },
   });
   const max = existing.reduce((m, v) => {
     const match = /-(\d+)$/.exec(v.refNumber);
     return match ? Math.max(m, Number(match[1])) : m;
   }, 0);
-  return `VO-${String(jobId).padStart(3, "0")}-${String(max + 1).padStart(3, "0")}`;
+  return `VO-${String(numId).padStart(3, "0")}-${String(max + 1).padStart(3, "0")}`;
 }
 
 export async function aiDraftVariation(
   ctx: OrgCtx,
   actorName: string,
-  jobId: number,
+  jobId: RecordId,
   brief: string,
 ): Promise<{ id?: RecordId; demoMode: boolean }> {
-  const job = await prisma.platJob.findFirst({
-    where: { id: jobId, orgId: ctx.orgId },
-    include: {
-      conPhases: { select: { name: true, status: true, completionPct: true } },
-      conBudgets: { select: { category: true, budgetAmount: true, actualAmount: true } },
-    },
-  });
+  const job = await loadJobContext(ctx, jobId);
   if (!job) throw new Error("Job not found");
 
   const { system } = getPrompt("variations.draft");
   const context = JSON.stringify(
     {
-      job: { name: job.name, budgetTotal: toNum(job.budgetTotal) },
-      phases: job.conPhases,
-      budget: job.conBudgets.map((b) => ({
+      job: { name: job.name, budgetTotal: job.budgetTotal },
+      phases: job.phases.map((p) => ({ name: p.name, status: p.status, completionPct: p.completionPct })),
+      budget: job.budget.map((b) => ({
         category: b.category,
-        budget: toNum(b.budgetAmount),
-        actual: toNum(b.actualAmount),
+        budget: b.budgetAmount,
+        actual: b.actualAmount,
       })),
     },
     null,
@@ -95,7 +101,7 @@ export async function aiDraftVariation(
     op: "create",
     data: {
       jobId,
-      refNumber: await nextRefNumber(ctx.orgId, jobId),
+      refNumber: await nextRefNumber(ctx, jobId),
       title: draft.title,
       description: draft.description,
       scopeChange: draft.scopeChange,

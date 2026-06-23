@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadWeeklyReports } from "@/lib/platform/domainListSources";
+import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { orgPath } from "@/lib/platform/paths";
 import { generateReportAction } from "./actions";
 
@@ -13,12 +13,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ org: s
   const ctx = await requireOrgCtx((await params).org);
   const [reports, jobs] = await Promise.all([
     loadWeeklyReports(ctx),
-    // Jobs feed the AI-generate dropdown (still Postgres-backed).
-    prisma.platJob.findMany({
-      where: { orgId: ctx.orgId },
-      select: { id: true, code: true, name: true },
-      orderBy: { code: "asc" },
-    }),
+    loadJobOptions(ctx), // jobs feed the AI-generate dropdown
   ]);
 
   return (
@@ -35,7 +30,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ org: s
           <select name="jobId" className="mt-1 block rounded border border-neutral-300 px-3 py-2">
             {jobs.map((j) => (
               <option key={j.id} value={j.id}>
-                {j.code} — {j.name}
+                {j.label}
               </option>
             ))}
           </select>

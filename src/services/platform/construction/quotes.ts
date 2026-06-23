@@ -9,6 +9,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { loadJobContext } from "@/lib/platform/jobContextSource";
 import { mulMoney, sumMoney } from "@/lib/platform/money";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { OrgCtx } from "@/lib/platform/types";
@@ -119,24 +120,21 @@ export async function createQuote(
 export async function generateQuoteFromBudget(
   ctx: OrgCtx,
   userName: string,
-  jobId: number,
+  jobId: RecordId,
 ): Promise<RecordId> {
-  const job = await prisma.platJob.findFirst({
-    where: { id: jobId, orgId: ctx.orgId },
-    include: { conBudgets: { orderBy: { category: "asc" } }, clientContact: true },
-  });
+  const job = await loadJobContext(ctx, jobId);
   if (!job) throw new Error("Job not found");
 
   const quoteId = await createQuote(ctx, userName, {
     jobId,
     title: `${job.name} — quotation`,
-    clientName: job.clientContact?.name ?? "",
+    clientName: job.clientName,
   });
 
   let sortOrder = 0;
-  for (const line of job.conBudgets) {
+  for (const line of job.budget) {
     sortOrder += 1;
-    const unitPrice = toNum(line.budgetAmount);
+    const unitPrice = line.budgetAmount;
     await writeRecord(ctx, {
       table: "quote_line",
       op: "create",

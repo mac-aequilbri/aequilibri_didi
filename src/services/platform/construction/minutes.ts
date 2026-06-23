@@ -67,7 +67,7 @@ async function createActionsAndConfirm(
 export async function processMeetingMinutes(
   ctx: OrgCtx,
   userName: string,
-  input: { jobId: number; meetingDate: string; title: string; attendees: string; rawMinutes: string },
+  input: { jobId: RecordId; meetingDate: string; title: string; attendees: string; rawMinutes: string },
 ): Promise<{ id?: RecordId; actionsCount: number; demoMode: boolean }> {
   const { system } = getPrompt("minutes.extract");
   const res = await callClaude(system, input.rawMinutes.slice(0, 12000), {

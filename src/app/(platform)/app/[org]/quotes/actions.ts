@@ -19,9 +19,9 @@ import {
 export async function createQuoteAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const jobId = Number(formData.get("jobId"));
+  const jobId = recordIdParam(formData.get("jobId"));
   const title = String(formData.get("title") ?? "").trim();
-  if (!jobId || !title) return;
+  if (jobId == null || !title) return;
   const fromBudget = formData.get("fromBudget") === "on";
   const quoteId = fromBudget
     ? await generateQuoteFromBudget(ctx, user.name, jobId)
@@ -38,8 +38,8 @@ export async function createQuoteAction(formData: FormData): Promise<void> {
 export async function generateFromBudgetAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const jobId = Number(formData.get("jobId"));
-  if (!jobId) return;
+  const jobId = recordIdParam(formData.get("jobId"));
+  if (jobId == null) return;
   const quoteId = await generateQuoteFromBudget(ctx, user.name, jobId);
   redirect(orgPath(ctx.orgSlug, `/quotes/${quoteId}`));
 }

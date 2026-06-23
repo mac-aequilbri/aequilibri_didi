@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { createActionItem } from "../actions";
 
@@ -7,11 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewActionPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId },
-    select: { id: true, code: true, name: true },
-    orderBy: { code: "asc" },
-  });
+  const jobs = await loadJobOptions(ctx);
 
   return (
     <div className="p-6 max-w-xl">
@@ -33,7 +29,7 @@ export default async function NewActionPage({ params }: { params: Promise<{ org:
               <option value="">—</option>
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
-                  {j.code} — {j.name}
+                  {j.label}
                 </option>
               ))}
             </select>

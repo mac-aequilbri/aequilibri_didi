@@ -13,9 +13,9 @@ import {
 export async function processMinutesAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const jobId = Number(formData.get("jobId"));
+  const jobId = recordIdParam(formData.get("jobId"));
   const rawMinutes = String(formData.get("rawMinutes") ?? "").trim();
-  if (!jobId || !rawMinutes) return;
+  if (jobId == null || !rawMinutes) return;
   const { id } = await processMeetingMinutes(ctx, user.name, {
     jobId,
     meetingDate: String(formData.get("meetingDate") ?? "") || new Date().toISOString().slice(0, 10),
