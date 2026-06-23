@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { loadVendorOptions } from "@/lib/platform/configSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { createProcurement } from "../actions";
@@ -8,17 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewProcurementPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  // Vendor dropdown stays Postgres for now (the procurement field map carries a
-  // free-text Vendor_Name, not a Vendor link — see plan P4); jobs route through
-  // the backend-agnostic picker source.
-  const [jobs, vendors] = await Promise.all([
-    loadJobOptions(ctx),
-    prisma.platConVendor.findMany({
-      where: { orgId: ctx.orgId, isActive: true },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const [jobs, vendors] = await Promise.all([loadJobOptions(ctx), loadVendorOptions(ctx)]);
 
   return (
     <div className="p-6 max-w-xl">

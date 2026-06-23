@@ -484,7 +484,15 @@ async function performWrite(
   const map = airtableEnabled() ? airtableMapFor(table) : undefined;
   if (map) {
     if (op === "create") {
-      const rec = await core.create(ctx.orgSlug, map.table, toFields(map, data, "create"));
+      // Learning-rule codes are allocated at write time (mirrors the Postgres
+      // branch); "AUTO" from the assistant executor becomes a real LRN-#### so
+      // the rule's Instance isn't the literal "AUTO".
+      let payload = data;
+      if (table === "learning_rule" && (data.ruleCode === "AUTO" || !data.ruleCode)) {
+        const { nextRuleCode } = await import("@/services/platform/learning");
+        payload = { ...data, ruleCode: await nextRuleCode(ctx) };
+      }
+      const rec = await core.create(ctx.orgSlug, map.table, toFields(map, payload, "create"));
       return rec.id;
     }
     if (recordId == null) throw new Error(`${op} requires recordId`);
@@ -505,7 +513,7 @@ async function performWrite(
       const { createRuleWithCode } = await import("@/services/platform/learning");
       const { ruleCode: _auto, ...rest } = data;
       void _auto;
-      const rule = await createRuleWithCode(ctx.orgId, rest as never);
+      const rule = await createRuleWithCode(ctx, rest as never);
       return rule.id;
     }
     const row = await delegate.create({ data: { ...data, orgId: ctx.orgId } });

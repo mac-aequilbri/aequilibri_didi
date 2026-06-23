@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { loadReferenceOptions } from "@/lib/platform/configSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { createBudgetLine } from "../actions";
@@ -8,14 +8,9 @@ export const dynamic = "force-dynamic";
 
 export default async function NewBudgetLinePage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  // Categories are Customer Config (still Postgres — see plan P2); jobs route
-  // through the backend-agnostic picker source.
   const [jobs, categories] = await Promise.all([
     loadJobOptions(ctx),
-    prisma.platCfgReference.findMany({
-      where: { orgId: ctx.orgId, type: "budget_category", isActive: true },
-      orderBy: { sortOrder: "asc" },
-    }),
+    loadReferenceOptions(ctx, "budget_category"),
   ]);
 
   return (

@@ -1,12 +1,14 @@
-// Learning Loop data source — Postgres (default) or the canonical Airtable
-// tables (LEARNING_RULES / HYPOTHESES / CORRECTIONS / INTELLIGENCE_SNAPSHOT)
-// when AIRTABLE_MIGRATION is enabled.
+// Learning Loop data source for the learning-rules page.
 //
-// ⚠️ ASSUMPTION MAPPINGS — Airtable's learning-loop topology differs from the
-// app's, so the Airtable branch encodes best-guess mappings that MUST be
-// confirmed (see docs/airtable-migration-mapping.md §8/§11). Each is flagged
-// inline with ASSUMPTION. These are deliberately explicit guesses, not a
-// reconciliation.
+// Split by where each datum actually lives after the P2 migration:
+//   • LEARNING_RULES — the durable, validated knowledge — read from Airtable
+//     when AIRTABLE_MIGRATION is on (the engine writes/reads it there too, so
+//     page and engine agree). The read here is the inverse of the learning_rule
+//     field map (fieldMaps.ts) — no longer guesswork.
+//   • HYPOTHESES / CORRECTIONS / INTELLIGENCE_SNAPSHOT — the loop machinery —
+//     remain Postgres "engine state" (relational, numeric ids, and the
+//     canonical Airtable schema lacks a Corrections→Hypotheses link to cluster
+//     by), so they are read from Postgres in BOTH modes.
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
@@ -57,16 +59,56 @@ function str(v: unknown): string {
 function num(v: unknown): number {
   return typeof v === "number" ? v : 0;
 }
-function bool(v: unknown): boolean {
-  return v === true;
+
+const RULE_ACTIVE_STATUSES = new Set(["Published", "Updated"]);
+
+function parseGaps(raw: string): string[] {
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
 }
 
-async function fromPostgres(ctx: OrgCtx): Promise<LearningData> {
-  const [rules, hypotheses, correctionsCount, unclustered, snapshots] = await Promise.all([
-    prisma.platLearningRule.findMany({
-      where: { orgId: ctx.orgId },
-      orderBy: [{ isActive: "desc" }, { confidence: "desc" }],
-    }),
+async function rulesFromPostgres(ctx: OrgCtx): Promise<RuleView[]> {
+  const rules = await prisma.platLearningRule.findMany({
+    where: { orgId: ctx.orgId },
+    orderBy: [{ isActive: "desc" }, { confidence: "desc" }],
+  });
+  return rules.map((r) => ({
+    id: String(r.id),
+    ruleCode: r.ruleCode,
+    description: r.description,
+    kind: r.kind,
+    confidence: r.confidence,
+    timesTriggered: r.timesTriggered,
+    isActive: r.isActive,
+    autoApply: r.autoApply,
+    cannotOverride: r.cannotOverride,
+  }));
+}
+
+async function rulesFromAirtable(ctx: OrgCtx): Promise<RuleView[]> {
+  const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
+  return rows
+    .map((r) => ({
+      id: r.id,
+      ruleCode: str(r["Instance"]),
+      description: str(r["Rule_Description"]) || str(r["Rule_Name"]),
+      kind: str(r["Rule_Type"]).toLowerCase() === "adjustment" ? "adjustment" : "guidance",
+      confidence: num(r["Confidence_Level"]),
+      timesTriggered: num(r["Times_Triggered"]),
+      isActive: RULE_ACTIVE_STATUSES.has(str(r["Rule_Status"])),
+      autoApply: str(r["Applies_To"]) === "AI Layer Only",
+      cannotOverride: r["Override_Permission"] === false,
+    }))
+    .sort((a, b) => Number(b.isActive) - Number(a.isActive) || b.confidence - a.confidence);
+}
+
+/** Loop machinery — Postgres engine state in both modes. */
+async function enginePartsFromPostgres(ctx: OrgCtx): Promise<Omit<LearningData, "rules">> {
+  const [hypotheses, correctionsCount, unclustered, snapshots] = await Promise.all([
     prisma.platHypothesis.findMany({
       where: { orgId: ctx.orgId, status: "pending" },
       orderBy: { confidence: "desc" },
@@ -79,26 +121,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<LearningData> {
       take: 24,
     }),
   ]);
-  const parseGaps = (raw: string): string[] => {
-    try {
-      const v = JSON.parse(raw);
-      return Array.isArray(v) ? v.map(String) : [];
-    } catch {
-      return [];
-    }
-  };
   return {
-    rules: rules.map((r) => ({
-      id: String(r.id),
-      ruleCode: r.ruleCode,
-      description: r.description,
-      kind: r.kind,
-      confidence: r.confidence,
-      timesTriggered: r.timesTriggered,
-      isActive: r.isActive,
-      autoApply: r.autoApply,
-      cannotOverride: r.cannotOverride,
-    })),
     hypotheses: hypotheses.map((h) => ({
       id: String(h.id),
       description: h.description,
@@ -121,63 +144,12 @@ async function fromPostgres(ctx: OrgCtx): Promise<LearningData> {
   };
 }
 
-async function fromAirtable(ctx: OrgCtx): Promise<LearningData> {
-  const [ruleRows, hypRows, corrRows, snapRows] = await Promise.all([
-    core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 200 }),
-    core.list(ctx.orgSlug, "HYPOTHESES", { maxRecords: 200 }),
-    core.list(ctx.orgSlug, "CORRECTIONS", { maxRecords: 200 }),
-    core.list(ctx.orgSlug, "INTELLIGENCE_SNAPSHOT", { maxRecords: 24 }),
+/** Load the learning-loop data: rules from the active backend, loop machinery
+ *  always from Postgres. */
+export async function loadLearning(ctx: OrgCtx): Promise<LearningData> {
+  const [rules, engine] = await Promise.all([
+    airtableEnabled() ? rulesFromAirtable(ctx) : rulesFromPostgres(ctx),
+    enginePartsFromPostgres(ctx),
   ]);
-
-  const rules: RuleView[] = ruleRows.map((r) => ({
-    id: r.id,
-    ruleCode: str(r["Instance"]), // ASSUMPTION: Instance ~= rule code
-    description: str(r["Rule_Description"]) || str(r["Rule_Name"]),
-    kind: str(r["Rule_Type"]),
-    confidence: num(r["Confidence_Level"]),
-    timesTriggered: num(r["Times_Triggered"]),
-    // ASSUMPTION: Published/Updated => active; Draft/Retired => inactive
-    isActive: ["Published", "Updated"].includes(str(r["Rule_Status"])),
-    // ASSUMPTION: applies only to the AI layer => auto-apply
-    autoApply: str(r["Applies_To"]) === "AI Layer Only",
-    // ASSUMPTION: no override permission => locked
-    cannotOverride: bool(r["Override_Permission"]) === false,
-  }));
-
-  // ASSUMPTION: "pending review" == Airtable status "Open"
-  const hypotheses: HypothesisView[] = hypRows
-    .filter((h) => str(h["Status"]) === "Open")
-    .map((h) => ({
-      id: h.id,
-      description: str(h["Hypothesis_Name"]),
-      dimension: str(h["Hypothesis_Type"]), // ASSUMPTION: type stands in for dimension
-      sampleCount: num(h["Evidence_Count"]),
-      avgVariancePct: 0, // no Airtable equivalent
-      confidence: num(h["Confidence"]),
-    }));
-
-  const correctionsCount = corrRows.length;
-  // ASSUMPTION: "unclustered" == not yet turned into a rule (Rule_Generated unchecked)
-  const unclustered = corrRows.filter((c) => bool(c["Rule_Generated"]) === false).length;
-
-  const snapshots: SnapshotView[] = snapRows.map((s) => {
-    const when = str(s["Snapshot_Date"]) || str(s["Date_Created"]);
-    const gapsText = str(s["Known_Gaps"]);
-    return {
-      id: s.id,
-      capturedAt: when ? new Date(when) : null,
-      accuracyRatePct: null, // no accuracy field in Airtable snapshot
-      activeRules: num(s["Total_Active_Rules"]),
-      autoApplyRules: 0, // no Airtable equivalent
-      avgConfidence: 0, // no Airtable equivalent (kept for the trend chart shape)
-      gaps: gapsText ? [gapsText] : [],
-    };
-  });
-
-  return { rules, hypotheses, correctionsCount, unclustered, snapshots };
-}
-
-/** Load the learning-loop data from whichever backend is active. */
-export function loadLearning(ctx: OrgCtx): Promise<LearningData> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+  return { rules, ...engine };
 }

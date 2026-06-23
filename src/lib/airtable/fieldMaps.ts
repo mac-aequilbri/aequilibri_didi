@@ -154,13 +154,27 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
     ],
   },
   learning_rule: {
+    // Reconciled with the canonical Airtable LEARNING_RULES schema so the engine
+    // (getActiveRules/applyRules) and the learning-rules page read what this
+    // writes. typecast:true on the client auto-creates the single-select options
+    // (Rule_Type/Rule_Status/Applies_To). Every spec is presence-driven (no
+    // derived field), so a partial update (e.g. a status toggle) never clobbers
+    // unrelated fields. ruleCode/kind/isActive/autoApply round-trip; the
+    // adjustment JSON rides in Operational_Directive (dimension is recovered
+    // from it on read).
     table: "LEARNING_RULES",
     specs: [
+      { air: "Instance", from: "ruleCode", to: S },
       { air: "Rule_Name", from: "description", to: (v) => S(v).slice(0, 120) || "Untitled rule" },
       { air: "Rule_Description", from: "description", to: S },
-      { air: "Operational_Directive", from: "category", to: S },
+      { air: "Rule_Type", from: "kind", to: (v) => S(v) || "guidance" },
+      { air: "Rule_Status", from: "isActive", createDefault: true, to: (v) => (BOOL(v) ? "Published" : "Draft") },
+      { air: "Applies_To", from: "autoApply", to: (v) => (BOOL(v) ? "AI Layer Only" : "Owner Review") },
+      { air: "Trigger_Context", from: "triggerCondition", to: S },
+      { air: "Operational_Directive", from: "adjustment", to: S },
       { air: "Priority", from: "priority", to: (v) => NUM(v) },
       { air: "Confidence_Level", from: "confidence", to: (v) => NUM(v, 50) },
+      { air: "Times_Triggered", from: "timesTriggered", to: (v) => NUM(v) },
       { air: "Override_Permission", from: "cannotOverride", to: (v) => !BOOL(v) },
     ],
   },

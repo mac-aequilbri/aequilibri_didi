@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { recordIdParam, writeRecord } from "@/lib/platform/recordWriter";
 import {
   promoteHypothesisToRule,
   runHypothesisEngine,
@@ -35,9 +35,9 @@ export async function rejectHypothesisAction(formData: FormData): Promise<void> 
 export async function toggleRuleAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
+  const recordId = recordIdParam(formData.get("recordId"));
   const isActive = formData.get("isActive") === "true";
-  if (!recordId) return;
+  if (recordId == null) return;
   await writeRecord(ctx, {
     table: "learning_rule",
     op: "update",

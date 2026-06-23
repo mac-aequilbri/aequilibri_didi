@@ -5,8 +5,13 @@
 // ("adjustment" = numeric, applied by the assessment engine; "guidance" =
 // text, injected into the assistant prompt); thresholds live in PlatCfgSetting.
 
+import { airtableEnabled, core } from "@/lib/airtable";
+import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { prisma } from "@/lib/db";
 import { OrgCtx } from "@/lib/platform/types";
+
+const S = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
+const N = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
 export interface Adjustment {
   type: "dimension_multiplier" | "contingency_pct";
@@ -35,16 +40,38 @@ const SETTING_KEYS: Record<keyof LearningSettings, string> = {
   autoApplyTriggers: "learning.auto_apply_min_triggers",
 };
 
-export async function getLearningSettings(ctx: OrgCtx): Promise<LearningSettings> {
+async function settingsByKey(ctx: OrgCtx): Promise<Map<string, string>> {
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "PLAT_CFG_SETTING", { maxRecords: 500 });
+    const m = new Map<string, string>();
+    for (const r of rows) {
+      const key = typeof r["Setting_Key"] === "string" ? (r["Setting_Key"] as string) : "";
+      if (key) m.set(key, typeof r["Value"] === "string" ? (r["Value"] as string) : String(r["Value"] ?? ""));
+    }
+    return m;
+  }
   const rows = await prisma.platCfgSetting.findMany({
     where: { orgId: ctx.orgId, key: { in: Object.values(SETTING_KEYS) } },
   });
-  const byKey = new Map(rows.map((r) => [r.key, r.value]));
+  return new Map(rows.map((r) => [r.key, r.value]));
+}
+
+export async function getLearningSettings(ctx: OrgCtx): Promise<LearningSettings> {
+  const byKey = await settingsByKey(ctx);
   const out = { ...DEFAULTS };
   for (const [field, key] of Object.entries(SETTING_KEYS) as [keyof LearningSettings, string][]) {
     const raw = byKey.get(key);
     if (raw == null) continue;
-    const n = Number(JSON.parse(raw));
+    // Settings are stored as a JSON-encoded scalar in Postgres; the Airtable
+    // mirror stores the plain value. Parse defensively for both.
+    let n = Number(raw);
+    if (!Number.isFinite(n)) {
+      try {
+        n = Number(JSON.parse(raw));
+      } catch {
+        continue;
+      }
+    }
     if (Number.isFinite(n) && n > 0) out[field] = n;
   }
   return out;
@@ -181,30 +208,55 @@ export async function setHypothesisStatus(
 }
 
 /** Next LRN-#### code for this org: max existing suffix + 1 (count-based
- *  numbering duplicates after deletions). Concurrent allocations can still
- *  collide — callers create under the @@unique([orgId, ruleCode]) constraint
- *  and retry via createRuleWithCode. */
-export async function nextRuleCode(orgId: number, bump = 0): Promise<string> {
-  const rules = await prisma.platLearningRule.findMany({
-    where: { orgId },
-    select: { ruleCode: true },
-  });
-  const max = rules.reduce((m, r) => Math.max(m, Number(r.ruleCode.replace(/\D/g, "")) || 0), 0);
+ *  numbering duplicates after deletions). Reads from whichever backend holds the
+ *  rules. Concurrent allocations can still collide — the Postgres path retries
+ *  under @@unique([orgId, ruleCode]); Airtable has no unique constraint (rare
+ *  dup tolerated, matching the rest of the Airtable write path). */
+export async function nextRuleCode(ctx: OrgCtx, bump = 0): Promise<string> {
+  let max = 0;
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
+    max = rows.reduce((m, r) => Math.max(m, Number(S(r["Instance"]).replace(/\D/g, "")) || 0), 0);
+  } else {
+    const rules = await prisma.platLearningRule.findMany({
+      where: { orgId: ctx.orgId },
+      select: { ruleCode: true },
+    });
+    max = rules.reduce((m, r) => Math.max(m, Number(r.ruleCode.replace(/\D/g, "")) || 0), 0);
+  }
   return `LRN-${String(max + 1 + bump).padStart(4, "0")}`;
 }
 
-/** Create a rule with a freshly allocated code, retrying on a unique-code
- *  collision (two concurrent promotions). */
+/** App-shaped rule create payload (a subset of the Prisma create data, shared
+ *  with the Airtable field map). */
+type RuleCreateData = Omit<
+  Parameters<typeof prisma.platLearningRule.create>[0]["data"],
+  "ruleCode" | "orgId"
+>;
+
+/** Create a rule with a freshly allocated code. Routes to the org's Airtable
+ *  base (via the learning_rule field map) or Postgres (retrying on a unique-code
+ *  collision from two concurrent promotions). */
 export async function createRuleWithCode(
-  orgId: number,
-  data: Omit<Parameters<typeof prisma.platLearningRule.create>[0]["data"], "ruleCode" | "orgId">,
-): Promise<{ id: number; ruleCode: string }> {
+  ctx: OrgCtx,
+  data: RuleCreateData,
+): Promise<{ id: string; ruleCode: string }> {
+  if (airtableEnabled()) {
+    const ruleCode = await nextRuleCode(ctx);
+    const map = airtableMapFor("learning_rule")!;
+    const rec = await core.create(
+      ctx.orgSlug,
+      map.table,
+      toFields(map, { ...(data as Record<string, unknown>), ruleCode }, "create"),
+    );
+    return { id: rec.id, ruleCode };
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
-    const ruleCode = await nextRuleCode(orgId, attempt);
+    const ruleCode = await nextRuleCode(ctx, attempt);
     try {
       /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-      const rule = await prisma.platLearningRule.create({ data: { ...(data as any), orgId, ruleCode } });
-      return { id: rule.id, ruleCode };
+      const rule = await prisma.platLearningRule.create({ data: { ...(data as any), orgId: ctx.orgId, ruleCode } });
+      return { id: String(rule.id), ruleCode };
     } catch (err) {
       const code = (err as { code?: string }).code;
       if (code !== "P2002" || attempt === 2) throw err;
@@ -217,7 +269,7 @@ export async function promoteHypothesisToRule(
   ctx: OrgCtx,
   id: number,
   kind: "adjustment" | "guidance" = "adjustment",
-): Promise<number | null> {
+): Promise<string | null> {
   const h = await prisma.platHypothesis.findFirst({ where: { id, orgId: ctx.orgId } });
   if (!h) return null;
 
@@ -240,7 +292,7 @@ export async function promoteHypothesisToRule(
     adjustment = JSON.stringify(adj);
   }
 
-  const rule = await createRuleWithCode(ctx.orgId, {
+  const rule = await createRuleWithCode(ctx, {
     kind: effectiveKind,
     description: h.description,
     dimension: h.dimension,
@@ -269,11 +321,80 @@ function ruleMatches(triggerRaw: string, context: Record<string, string>): boole
   return true; // empty trigger matches everything
 }
 
-export async function getActiveRules(ctx: OrgCtx) {
-  return prisma.platLearningRule.findMany({
+/** Backend-neutral active-rule shape consumed by the engine + assistant. */
+export interface RuleRow {
+  id: string;
+  ruleCode: string;
+  kind: string;
+  description: string;
+  dimension: string;
+  triggerCondition: string;
+  adjustment: string;
+  priority: number;
+  confidence: number;
+  isActive: boolean;
+  autoApply: boolean;
+  cannotOverride: boolean;
+  timesTriggered: number;
+}
+
+const RULE_ACTIVE_STATUSES = new Set(["Published", "Updated"]);
+
+/** Read an Airtable LEARNING_RULES row into the neutral shape — the exact
+ *  inverse of the learning_rule field map (fieldMaps.ts). */
+function ruleFromAirtable(r: Record<string, unknown> & { id: string }): RuleRow {
+  const adjustment = S(r["Operational_Directive"]) || "{}";
+  let dimension = "";
+  try {
+    const adj = JSON.parse(adjustment) as { dimension?: unknown };
+    if (adj && typeof adj.dimension === "string") dimension = adj.dimension;
+  } catch {
+    /* not an adjustment rule */
+  }
+  return {
+    id: r.id,
+    ruleCode: S(r["Instance"]),
+    kind: S(r["Rule_Type"]).toLowerCase() === "adjustment" ? "adjustment" : "guidance",
+    description: S(r["Rule_Description"]) || S(r["Rule_Name"]),
+    dimension,
+    triggerCondition: S(r["Trigger_Context"]) || "{}",
+    adjustment,
+    priority: N(r["Priority"]),
+    confidence: N(r["Confidence_Level"]),
+    isActive: RULE_ACTIVE_STATUSES.has(S(r["Rule_Status"])),
+    autoApply: S(r["Applies_To"]) === "AI Layer Only",
+    cannotOverride: r["Override_Permission"] === false,
+    timesTriggered: N(r["Times_Triggered"]),
+  };
+}
+
+export async function getActiveRules(ctx: OrgCtx): Promise<RuleRow[]> {
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
+    return rows
+      .map(ruleFromAirtable)
+      .filter((r) => r.isActive)
+      .sort((a, b) => a.priority - b.priority || b.confidence - a.confidence);
+  }
+  const rows = await prisma.platLearningRule.findMany({
     where: { orgId: ctx.orgId, isActive: true },
     orderBy: [{ priority: "asc" }, { confidence: "desc" }],
   });
+  return rows.map((r) => ({
+    id: String(r.id),
+    ruleCode: r.ruleCode,
+    kind: r.kind,
+    description: r.description,
+    dimension: r.dimension,
+    triggerCondition: r.triggerCondition,
+    adjustment: r.adjustment,
+    priority: r.priority,
+    confidence: r.confidence,
+    isActive: r.isActive,
+    autoApply: r.autoApply,
+    cannotOverride: r.cannotOverride,
+    timesTriggered: r.timesTriggered,
+  }));
 }
 
 /** Read-only: the org's active GUIDANCE rules matching a context, without
@@ -325,16 +446,26 @@ export async function applyRules(
       confidence: r.confidence,
       autoApply: r.autoApply,
     });
-    await prisma.platLearningRule.update({
-      where: { id: r.id },
-      data: {
-        timesTriggered: { increment: 1 },
-        confidence: Math.min(99, r.confidence + 1),
-        autoApply:
-          r.confidence + 1 >= settings.autoApplyConfidence &&
-          r.timesTriggered + 1 >= settings.autoApplyTriggers,
-      },
-    });
+    const newConfidence = Math.min(99, r.confidence + 1);
+    const newAutoApply =
+      newConfidence >= settings.autoApplyConfidence &&
+      r.timesTriggered + 1 >= settings.autoApplyTriggers;
+    if (airtableEnabled()) {
+      await core.update(ctx.orgSlug, "LEARNING_RULES", r.id, {
+        Times_Triggered: r.timesTriggered + 1,
+        Confidence_Level: newConfidence,
+        Applies_To: newAutoApply ? "AI Layer Only" : "Owner Review",
+      });
+    } else {
+      await prisma.platLearningRule.update({
+        where: { id: Number(r.id) },
+        data: {
+          timesTriggered: { increment: 1 },
+          confidence: newConfidence,
+          autoApply: newAutoApply,
+        },
+      });
+    }
   }
   return applied;
 }
@@ -365,10 +496,9 @@ export async function snapshotIntelligence(ctx: OrgCtx): Promise<number> {
   const [totalJobs, completedJobs, rules, corrections, pendingHyp, prevSnap] = await Promise.all([
     prisma.platJob.count({ where: { orgId: ctx.orgId } }),
     prisma.platJob.count({ where: { orgId: ctx.orgId, status: { in: ["completed", "archived"] } } }),
-    prisma.platLearningRule.findMany({
-      where: { orgId: ctx.orgId, isActive: true },
-      orderBy: { confidence: "desc" },
-    }),
+    // Rules from the active backend (Airtable when on); corrections/hypotheses
+    // remain Postgres engine state, so the snapshot bridges both.
+    getActiveRules(ctx),
     prisma.platCorrection.findMany({
       where: { orgId: ctx.orgId, variancePct: { not: null } },
       select: { variancePct: true },
