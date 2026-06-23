@@ -1,11 +1,13 @@
 // Quote detail — edit meta, add/edit/remove priced lines (totals recomputed
 // server-side), move through the draft → sent → accepted/rejected lifecycle,
-// and open the printable client view.
+// and open the printable client view. Reads through loadQuoteDetail so the
+// Postgres → Airtable swap is invisible; the id is numeric (Postgres) or a
+// "rec…" id (Airtable) and the forms post it back to RecordId-aware actions.
 
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
-import { currency, formatDate, toNum } from "@/lib/format";
+import { currency, formatDate } from "@/lib/format";
+import { loadQuoteDetail } from "@/lib/platform/quoteDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import {
@@ -25,10 +27,7 @@ export default async function QuoteDetailPage({
 }) {
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
-  const quote = await prisma.platConQuote.findFirst({
-    where: { id: Number(id), orgId: ctx.orgId },
-    include: { job: { select: { name: true, code: true } }, lines: { orderBy: { sortOrder: "asc" } } },
-  });
+  const quote = await loadQuoteDetail(ctx, id);
   if (!quote) notFound();
 
   const slug = ctx.orgSlug;
@@ -38,7 +37,7 @@ export default async function QuoteDetailPage({
     <div className="p-4 sm:p-6 max-w-4xl">
       <PageHeader
         title={`${quote.refNumber} · ${quote.title}`}
-        subtitle={`${quote.job.code} — ${quote.job.name}`}
+        subtitle={`${quote.jobCode ? `${quote.jobCode} — ` : ""}${quote.jobName}`}
         actions={[
           { href: orgPath(slug, `/quotes/${quote.id}/print`), label: "Print / PDF", variant: "outline" },
           { href: orgPath(slug, "/quotes"), label: "Back to quotes", variant: "outline" },
@@ -91,7 +90,7 @@ export default async function QuoteDetailPage({
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">GST rate (%)</span>
-            <input type="number" step="0.01" name="gstRate" defaultValue={toNum(quote.gstRate)} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="number" step="0.01" name="gstRate" defaultValue={quote.gstRate} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <label className="block text-sm sm:col-span-2">
             <span className="text-neutral-600">Notes / terms</span>
@@ -127,9 +126,9 @@ export default async function QuoteDetailPage({
                       <input type="hidden" name="quoteId" value={quote.id} />
                       <input type="hidden" name="lineId" value={l.id} />
                       <input name="description" defaultValue={l.description} className="flex-1 min-w-40 rounded border border-neutral-200 px-2 py-1" />
-                      <input name="qty" type="number" step="0.01" defaultValue={toNum(l.qty)} className="w-16 rounded border border-neutral-200 px-2 py-1 text-right" aria-label="Quantity" />
+                      <input name="qty" type="number" step="0.01" defaultValue={l.qty} className="w-16 rounded border border-neutral-200 px-2 py-1 text-right" aria-label="Quantity" />
                       <input name="unit" defaultValue={l.unit} className="w-16 rounded border border-neutral-200 px-2 py-1" aria-label="Unit" />
-                      <input name="unitPrice" type="number" step="0.01" defaultValue={toNum(l.unitPrice)} className="w-24 rounded border border-neutral-200 px-2 py-1 text-right" aria-label="Unit price" />
+                      <input name="unitPrice" type="number" step="0.01" defaultValue={l.unitPrice} className="w-24 rounded border border-neutral-200 px-2 py-1 text-right" aria-label="Unit price" />
                       <span className="w-24 text-right font-medium whitespace-nowrap">{currency(l.lineTotal)}</span>
                       <button type="submit" className="btn-ae-outline text-xs">Save</button>
                     </form>
@@ -192,7 +191,7 @@ export default async function QuoteDetailPage({
           <span>{currency(quote.subtotal)}</span>
         </div>
         <div className="flex justify-between text-sm py-1">
-          <span className="text-neutral-600">GST ({toNum(quote.gstRate)}%)</span>
+          <span className="text-neutral-600">GST ({quote.gstRate}%)</span>
           <span>{currency(quote.gstAmount)}</span>
         </div>
         <div className="flex justify-between font-bold py-1 border-t border-neutral-200 mt-1">
@@ -212,7 +211,7 @@ function StatusButton({
   outline,
 }: {
   org: string;
-  id: number;
+  id: string;
   status: string;
   label: string;
   outline?: boolean;

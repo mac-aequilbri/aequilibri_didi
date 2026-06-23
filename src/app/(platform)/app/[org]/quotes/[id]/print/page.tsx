@@ -1,9 +1,10 @@
 // Printable client-facing quote. Clean A4-ish layout; the browser's print
-// dialog produces the PDF. No app chrome.
+// dialog produces the PDF. No app chrome. Reads through loadQuoteDetail so it
+// renders from Postgres or Airtable behind the migration flag.
 
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { currency, formatDate, toNum } from "@/lib/format";
+import { currency, formatDate } from "@/lib/format";
+import { loadQuoteDetail } from "@/lib/platform/quoteDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 
 export const dynamic = "force-dynamic";
@@ -15,11 +16,11 @@ export default async function QuotePrintPage({
 }) {
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
-  const quote = await prisma.platConQuote.findFirst({
-    where: { id: Number(id), orgId: ctx.orgId },
-    include: { job: { select: { name: true, code: true, address: true, suburb: true } }, lines: { orderBy: { sortOrder: "asc" } } },
-  });
+  const quote = await loadQuoteDetail(ctx, id);
   if (!quote) notFound();
+
+  const projectLocation =
+    [quote.jobAddress, quote.jobSuburb].filter(Boolean).join(", ") || quote.jobCode;
 
   return (
     <div className="bg-white min-h-screen text-neutral-900">
@@ -33,7 +34,7 @@ export default async function QuotePrintPage({
           </div>
           <div className="text-right text-sm">
             <div className="font-mono font-semibold">{quote.refNumber}</div>
-            <div className="text-neutral-500">{formatDate(quote.createdAt)}</div>
+            {quote.createdAt && <div className="text-neutral-500">{formatDate(quote.createdAt)}</div>}
             {quote.validUntil && (
               <div className="text-neutral-500">Valid until {formatDate(quote.validUntil)}</div>
             )}
@@ -48,10 +49,8 @@ export default async function QuotePrintPage({
           </div>
           <div>
             <div className="text-xs uppercase tracking-wide text-neutral-400 mb-1">Project</div>
-            <div className="font-semibold">{quote.job.name}</div>
-            <div className="text-neutral-600">
-              {[quote.job.address, quote.job.suburb].filter(Boolean).join(", ") || quote.job.code}
-            </div>
+            <div className="font-semibold">{quote.jobName}</div>
+            <div className="text-neutral-600">{projectLocation}</div>
           </div>
         </div>
 
@@ -72,7 +71,7 @@ export default async function QuotePrintPage({
                   {l.description}
                   {l.category ? <span className="block text-xs text-neutral-400">{l.category}</span> : null}
                 </td>
-                <td className="py-2 text-right pr-3">{toNum(l.qty)}</td>
+                <td className="py-2 text-right pr-3">{l.qty}</td>
                 <td className="py-2">{l.unit}</td>
                 <td className="py-2 text-right whitespace-nowrap">{currency(l.unitPrice)}</td>
                 <td className="py-2 text-right whitespace-nowrap">{currency(l.lineTotal)}</td>
@@ -88,7 +87,7 @@ export default async function QuotePrintPage({
               <span>{currency(quote.subtotal)}</span>
             </div>
             <div className="flex justify-between py-1">
-              <span className="text-neutral-600">GST ({toNum(quote.gstRate)}%)</span>
+              <span className="text-neutral-600">GST ({quote.gstRate}%)</span>
               <span>{currency(quote.gstAmount)}</span>
             </div>
             <div className="flex justify-between py-2 border-t-2 border-neutral-800 font-bold text-base">
