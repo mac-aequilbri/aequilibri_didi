@@ -455,14 +455,19 @@ async function createJobWithCode(
   userName: string,
   data: Record<string, unknown>,
 ): Promise<RecordId> {
-  const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId },
-    select: { code: true },
-  });
-  const max = jobs.reduce((m, j) => {
-    const match = /^JOB-(\d+)$/.exec(j.code);
-    return match ? Math.max(m, Number(match[1])) : m;
-  }, 0);
+  // Airtable JOBS has no Code field (the map drops it), so the code is only
+  // meaningful in Postgres mode — skip the read otherwise (no Postgres in prod).
+  let max = 0;
+  if (!airtableEnabled()) {
+    const jobs = await prisma.platJob.findMany({
+      where: { orgId: ctx.orgId },
+      select: { code: true },
+    });
+    max = jobs.reduce((m, j) => {
+      const match = /^JOB-(\d+)$/.exec(j.code);
+      return match ? Math.max(m, Number(match[1])) : m;
+    }, 0);
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const result = await writeRecord(ctx, {

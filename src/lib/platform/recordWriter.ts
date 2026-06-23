@@ -532,6 +532,14 @@ async function performWrite(
   return numId;
 }
 
+/** actor.type → the EXECUTION_LOG.Initiated_By single-select (typecast on the
+ *  client creates the option if missing). */
+const INITIATED_BY: Record<Actor["type"], string> = {
+  ai: "AI",
+  human: "Owner",
+  system: "System",
+};
+
 /** Append an "executed" audit row. The Postgres targetId column only holds
  *  integer ids; an Airtable "rec…" id is recorded in `result` instead. In
  *  Airtable mode the audit is best-effort — a Postgres outage must not undo a
@@ -552,6 +560,25 @@ async function writeExecutedLog(
 ): Promise<number | undefined> {
   const targetId = typeof args.recordId === "number" ? args.recordId : null;
   const ref = typeof args.recordId === "string" ? `airtable:${args.recordId}` : "";
+  // Airtable system of record: the audit trail lives in the org's base
+  // EXECUTION_LOG (so it survives a Postgres-free prod). Best-effort — a failed
+  // audit must never undo a write that already landed.
+  if (airtableEnabled()) {
+    try {
+      await core.create(ctx.orgSlug, "EXECUTION_LOG", {
+        Log_Entry: `${args.op} ${args.physical}`.slice(0, 200),
+        Action_Type: args.op,
+        Tables_Affected: args.physical,
+        Summary: args.result || args.payload,
+        Initiated_By: INITIATED_BY[args.actor.type] ?? "System",
+        Status: "executed",
+        Date_Time: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.warn("Airtable execution-log write skipped", { orgId: ctx.orgId, ...errMeta(err) });
+    }
+    return undefined; // Airtable has no numeric audit id to thread
+  }
   try {
     const log = await prisma.platExecutionLog.create({
       data: {

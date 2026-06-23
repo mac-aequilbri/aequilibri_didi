@@ -2,10 +2,10 @@
 // front and centre; multi-job orgs see a portfolio summary.
 
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { TrendChart } from "@/components/charts";
 import { AttentionBanner, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import type { AttentionItem } from "@/components/PageHeader";
+import { loadDashboard } from "@/lib/platform/dashboardSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { currency } from "@/lib/format";
@@ -20,51 +20,9 @@ export default async function OrgDashboard({
   const ctx = await requireOrgCtx((await params).org);
   const p = (path: string) => orgPath(ctx.orgSlug, path);
 
-  const [jobs, openActions, overdueActions, pendingProposals, budgetAgg, recentLogs, activeRules] =
-    await Promise.all([
-      prisma.platJob.findMany({
-        where: { orgId: ctx.orgId },
-        orderBy: { updatedAt: "desc" },
-        take: 6,
-      }),
-      prisma.platActionHub.count({
-        where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] } },
-      }),
-      prisma.platActionHub.count({
-        where: {
-          orgId: ctx.orgId,
-          status: { in: ["open", "in_progress"] },
-          dueDate: { lt: new Date() },
-        },
-      }),
-      prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed" } }),
-      prisma.platConBudgetLine.aggregate({
-        where: { orgId: ctx.orgId },
-        _sum: { budgetAmount: true, actualAmount: true },
-      }),
-      prisma.platExecutionLog.findMany({
-        where: { orgId: ctx.orgId },
-        orderBy: { createdAt: "desc" },
-        take: 8,
-      }),
-      prisma.platLearningRule.count({ where: { orgId: ctx.orgId, isActive: true } }),
-    ]);
-
-  const cashflows = await prisma.platConCashflow.findMany({
-    where: { orgId: ctx.orgId },
-    select: { period: true, projected: true, actual: true },
-  });
-  const byPeriod = new Map<string, { projected: number; actual: number }>();
-  for (const c of cashflows) {
-    const agg = byPeriod.get(c.period) ?? { projected: 0, actual: 0 };
-    agg.projected += Number(c.projected);
-    agg.actual += Number(c.actual);
-    byPeriod.set(c.period, agg);
-  }
-  const periods = [...byPeriod.entries()].sort(([a], [b]) => a.localeCompare(b));
-
-  const budget = Number(budgetAgg._sum.budgetAmount ?? 0);
-  const actual = Number(budgetAgg._sum.actualAmount ?? 0);
+  const { jobs, openActions, overdueActions, pendingProposals, budget, actual, recentLogs, activeRules, cashflow } =
+    await loadDashboard(ctx);
+  const periods = cashflow.map((c) => [c.period, { projected: c.projected, actual: c.actual }] as const);
   const variancePct = budget > 0 ? Math.round(((actual - budget) / budget) * 1000) / 10 : 0;
   // Overspend (actual above budget) is the only variance that demands action.
   const overBudget = budget > 0 && variancePct > 0;

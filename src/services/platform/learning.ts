@@ -749,21 +749,49 @@ async function snapshotPendingHyp(ctx: OrgCtx): Promise<number> {
   return prisma.platHypothesis.count({ where: { orgId: ctx.orgId, status: "pending" } });
 }
 
-export async function snapshotIntelligence(ctx: OrgCtx): Promise<number> {
-  // Rules + corrections + hypotheses come from the active backend (Airtable when
-  // on); job counts + the snapshot history stay Postgres (snapshots are a local
-  // metric log, not migrated).
-  const [totalJobs, completedJobs, rules, corrections, pendingHyp, prevSnap] = await Promise.all([
+/** Total + completed job counts from the active backend. */
+async function snapshotJobCounts(ctx: OrgCtx): Promise<{ total: number; completed: number }> {
+  if (airtableEnabled()) {
+    const jobs = await core.list(ctx.orgSlug, "JOBS", { maxRecords: 1000 });
+    const done = new Set(["completed", "archived"]);
+    return { total: jobs.length, completed: jobs.filter((j) => done.has(S(j["Status"]))).length };
+  }
+  const [total, completed] = await Promise.all([
     prisma.platJob.count({ where: { orgId: ctx.orgId } }),
     prisma.platJob.count({ where: { orgId: ctx.orgId, status: { in: ["completed", "archived"] } } }),
+  ]);
+  return { total, completed };
+}
+
+/** Average confidence of the most recent snapshot (for the trajectory delta). */
+async function snapshotPrevAvg(ctx: OrgCtx): Promise<number | null> {
+  if (airtableEnabled()) {
+    const recs = await core.list(ctx.orgSlug, "INTELLIGENCE_SNAPSHOT", { maxRecords: 50 });
+    if (!recs.length) return null;
+    const latest = recs.sort((a, b) => S(b["Snapshot_Date"]).localeCompare(S(a["Snapshot_Date"])))[0];
+    try {
+      const m = JSON.parse(S(latest["Accuracy_Summary"]) || "{}") as { avgConfidence?: unknown };
+      return typeof m.avgConfidence === "number" ? m.avgConfidence : null;
+    } catch {
+      return null;
+    }
+  }
+  const prev = await prisma.platIntelligenceSnapshot.findFirst({
+    where: { orgId: ctx.orgId },
+    orderBy: { capturedAt: "desc" },
+  });
+  return prev?.avgConfidence ?? null;
+}
+
+export async function snapshotIntelligence(ctx: OrgCtx): Promise<number> {
+  const [counts, rules, corrections, pendingHyp, prevAvg] = await Promise.all([
+    snapshotJobCounts(ctx),
     getActiveRules(ctx),
     snapshotCorrections(ctx),
     snapshotPendingHyp(ctx),
-    prisma.platIntelligenceSnapshot.findFirst({
-      where: { orgId: ctx.orgId },
-      orderBy: { capturedAt: "desc" },
-    }),
+    snapshotPrevAvg(ctx),
   ]);
+  const { total: totalJobs, completed: completedJobs } = counts;
 
   const accuracy = corrections.length
     ? Math.round(
@@ -784,10 +812,44 @@ export async function snapshotIntelligence(ctx: OrgCtx): Promise<number> {
   if (autoApplyRules === 0 && rules.length > 0) gaps.push("No rules at auto-apply threshold yet.");
 
   let trajectory = "stable";
-  if (prevSnap) {
-    const delta = avgConfidence - prevSnap.avgConfidence;
+  if (prevAvg != null) {
+    const delta = avgConfidence - prevAvg;
     if (delta > 2) trajectory = "improving";
     else if (delta < -2) trajectory = "degrading";
+  }
+
+  const topRules = rules.slice(0, 5).map((r) => ({
+    code: r.ruleCode,
+    confidence: r.confidence,
+    triggers: r.timesTriggered,
+    desc: r.description,
+  }));
+
+  if (airtableEnabled()) {
+    const day = new Date().toISOString().slice(0, 10);
+    // Rich app metrics ride in Accuracy_Summary JSON so learningSource can
+    // recover accuracy/autoApply/avgConfidence the canonical columns lack.
+    await core.create(ctx.orgSlug, "INTELLIGENCE_SNAPSHOT", {
+      Snapshot_Name: `Snapshot ${day}`,
+      Snapshot_Date: day,
+      Total_Jobs_Completed: completedJobs,
+      Total_Corrections: corrections.length,
+      Total_Active_Rules: rules.length,
+      Average_Variance_Percent: accuracy != null ? Math.round((100 - accuracy) * 10) / 10 : 0,
+      Known_Gaps: gaps.join("; "),
+      Accuracy_Summary: JSON.stringify({
+        accuracyRatePct: accuracy,
+        activeRules: rules.length,
+        autoApplyRules,
+        avgConfidence,
+        gaps,
+        trajectory,
+        corrections: corrections.length,
+        totalJobs,
+        topRules,
+      }),
+    });
+    return 0; // Airtable has no numeric snapshot id
   }
 
   const snap = await prisma.platIntelligenceSnapshot.create({
@@ -799,14 +861,7 @@ export async function snapshotIntelligence(ctx: OrgCtx): Promise<number> {
       activeRules: rules.length,
       autoApplyRules,
       avgConfidence,
-      topRules: JSON.stringify(
-        rules.slice(0, 5).map((r) => ({
-          code: r.ruleCode,
-          confidence: r.confidence,
-          triggers: r.timesTriggered,
-          desc: r.description,
-        })),
-      ),
+      topRules: JSON.stringify(topRules),
       gaps: JSON.stringify(gaps),
       metrics: JSON.stringify({ trajectory, corrections: corrections.length }),
     },
