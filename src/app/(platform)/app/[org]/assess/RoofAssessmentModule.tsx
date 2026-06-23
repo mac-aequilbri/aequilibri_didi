@@ -39,7 +39,7 @@ export function RoofAssessmentModule({
   geocode,
 }: {
   orgSlug: string;
-  assessmentId: number;
+  assessmentId: string | number;
   address: string;
   mapsApiKey: string;
   geocode: { lat?: number; lng?: number; formatted?: string; suburb?: string; source: string; confidence: number };

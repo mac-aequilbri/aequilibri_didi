@@ -6,6 +6,8 @@
 //   are created, so jobs enter the platform THROUGH the engine.
 // Accepting with an edited budget emits a correction, closing the loop.
 
+import { airtableEnabled, core } from "@/lib/airtable";
+import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { callClaude } from "@/lib/claude";
 import { prisma } from "@/lib/db";
 import { emitCorrection } from "@/lib/platform/corrections";
@@ -118,7 +120,7 @@ export async function runConstructionAssessment(
   ctx: OrgCtx,
   userName: string,
   input: AssessmentIntakeInput,
-): Promise<number> {
+): Promise<RecordId> {
   // 1. Data collection cascade — geocode the address through real providers.
   const fullAddress = [input.address, input.suburb].filter(Boolean).join(" ");
   // Prefer the precise rooftop point picked from Google Places at intake (same
@@ -294,21 +296,28 @@ export async function runConstructionAssessment(
     demoMode: res.demo_mode,
   };
 
-  const assessment = await prisma.platAssessment.create({
-    data: {
-      orgId: ctx.orgId,
-      name: input.name,
-      engagementType: input.engagementType,
-      address: input.address,
-      suburb,
-      sizeSqm: input.sizeSqm,
-      scope: input.scope,
-      result: JSON.stringify(stored),
-      status: "draft",
-      promptVersion: version,
-      createdBy: userName,
-    },
-  });
+  const data = {
+    name: input.name,
+    engagementType: input.engagementType,
+    address: input.address,
+    suburb,
+    sizeSqm: input.sizeSqm,
+    scope: input.scope,
+    result: JSON.stringify(stored),
+    status: "draft",
+    promptVersion: version,
+    createdBy: userName,
+  };
+  let assessmentId: RecordId;
+  if (airtableEnabled()) {
+    const map = airtableMapFor("assessment")!;
+    const rec = await core.create(ctx.orgSlug, map.table, toFields(map, data, "create"));
+    assessmentId = rec.id;
+  } else {
+    const row = await prisma.platAssessment.create({ data: { orgId: ctx.orgId, ...data } });
+    assessmentId = row.id;
+  }
+
   await prisma.platExecutionLog
     .create({
       data: {
@@ -317,31 +326,73 @@ export async function runConstructionAssessment(
         actorName: "Assessment Engine",
         operation: "generate",
         targetTable: "plat_core_assessment",
-        targetId: assessment.id,
+        // Int column holds a Postgres id; an Airtable "rec…" id rides in result.
+        targetId: typeof assessmentId === "number" ? assessmentId : null,
         payload: JSON.stringify({ ...input, by: userName }),
-        result: `Assessment #${assessment.id} drafted (confidence ${stored.overallConfidence})`,
+        result:
+          typeof assessmentId === "string"
+            ? `airtable:${assessmentId} drafted (confidence ${stored.overallConfidence})`
+            : `Assessment #${assessmentId} drafted (confidence ${stored.overallConfidence})`,
         status: "executed",
         executedAt: new Date(),
         promptVersion: version,
       },
     })
     .catch(() => {});
-  return assessment.id;
+  return assessmentId;
+}
+
+/** Read an assessment's stored payload + status from the active backend. */
+async function readAssessment(
+  ctx: OrgCtx,
+  assessmentId: RecordId,
+): Promise<{ stored: StoredAssessment; status: string } | null> {
+  if (airtableEnabled()) {
+    const rec = await core.get(ctx.orgSlug, "ASSESSMENTS", String(assessmentId)).catch(() => null);
+    if (!rec) return null;
+    const raw = typeof rec["Result"] === "string" ? rec["Result"] : "";
+    const status = (typeof rec["Status"] === "string" ? rec["Status"] : "") || "draft";
+    try {
+      return { stored: JSON.parse(raw) as StoredAssessment, status };
+    } catch {
+      return null;
+    }
+  }
+  const row = await prisma.platAssessment.findFirst({
+    where: { id: Number(assessmentId), orgId: ctx.orgId },
+  });
+  if (!row) return null;
+  try {
+    return { stored: JSON.parse(row.result) as StoredAssessment, status: row.status };
+  } catch {
+    return null;
+  }
+}
+
+/** Overwrite an assessment draft's Result blob in the active backend. */
+async function updateAssessmentResult(
+  ctx: OrgCtx,
+  assessmentId: RecordId,
+  stored: StoredAssessment,
+): Promise<void> {
+  if (airtableEnabled()) {
+    await core.update(ctx.orgSlug, "ASSESSMENTS", String(assessmentId), {
+      Result: JSON.stringify(stored),
+    });
+    return;
+  }
+  await prisma.platAssessment.update({
+    where: { id: Number(assessmentId) },
+    data: { result: JSON.stringify(stored) },
+  });
 }
 
 export async function getAssessment(
   ctx: OrgCtx,
-  assessmentId: number,
+  assessmentId: RecordId,
 ): Promise<StoredAssessment | null> {
-  const row = await prisma.platAssessment.findFirst({
-    where: { id: assessmentId, orgId: ctx.orgId },
-  });
-  if (!row) return null;
-  try {
-    return JSON.parse(row.result) as StoredAssessment;
-  } catch {
-    return null;
-  }
+  const row = await readAssessment(ctx, assessmentId);
+  return row?.stored ?? null;
 }
 
 /** Refine the draft assessment's phase plan before acceptance — rename,
@@ -349,14 +400,14 @@ export async function getAssessment(
  *  generated snapshot is kept so acceptance can diff and emit a correction. */
 export async function refineAssessmentPhases(
   ctx: OrgCtx,
-  assessmentId: number,
+  assessmentId: RecordId,
   phases: PhaseInput[],
 ): Promise<void> {
-  const row = await prisma.platAssessment.findFirst({
-    where: { id: assessmentId, orgId: ctx.orgId, status: "draft" },
-  });
-  if (!row) throw new Error("Assessment not found (already accepted or discarded?)");
-  const stored = JSON.parse(row.result) as StoredAssessment;
+  const found = await readAssessment(ctx, assessmentId);
+  if (!found || found.status !== "draft") {
+    throw new Error("Assessment not found (already accepted or discarded?)");
+  }
+  const stored = found.stored;
 
   const clean = phases
     .map((p) => ({ name: String(p.name ?? "").trim().slice(0, 200), weeks: Math.max(0, Math.round(Number(p.weeks) || 0)) }))
@@ -365,10 +416,7 @@ export async function refineAssessmentPhases(
 
   stored.detail.phases = clean;
   stored.phasesRefined = true;
-  await prisma.platAssessment.update({
-    where: { id: row.id },
-    data: { result: JSON.stringify(stored) },
-  });
+  await updateAssessmentResult(ctx, assessmentId, stored);
 }
 
 /** Refine the draft assessment's budget breakdown before acceptance — add,
@@ -376,14 +424,14 @@ export async function refineAssessmentPhases(
  *  so the rest of the review (and acceptance) reflects the edit. */
 export async function refineAssessmentBudget(
   ctx: OrgCtx,
-  assessmentId: number,
+  assessmentId: RecordId,
   lines: { category: string; amount: number }[],
 ): Promise<void> {
-  const row = await prisma.platAssessment.findFirst({
-    where: { id: assessmentId, orgId: ctx.orgId, status: "draft" },
-  });
-  if (!row) throw new Error("Assessment not found (already accepted or discarded?)");
-  const stored = JSON.parse(row.result) as StoredAssessment;
+  const found = await readAssessment(ctx, assessmentId);
+  if (!found || found.status !== "draft") {
+    throw new Error("Assessment not found (already accepted or discarded?)");
+  }
+  const stored = found.stored;
 
   const clean = lines
     .map((l) => ({ category: String(l.category ?? "").trim().slice(0, 120), amount: Math.round((Number(l.amount) || 0) * 100) / 100 }))
@@ -395,10 +443,7 @@ export async function refineAssessmentBudget(
     stored.fields.budget_total.value = total;
     stored.budgetRefined = true;
   }
-  await prisma.platAssessment.update({
-    where: { id: row.id },
-    data: { result: JSON.stringify(stored) },
-  });
+  await updateAssessmentResult(ctx, assessmentId, stored);
 }
 
 /** Acceptance gate: creates the job + phases + budget lines + risks from the
@@ -441,14 +486,17 @@ async function createJobWithCode(
 export async function acceptAssessment(
   ctx: OrgCtx,
   userName: string,
-  assessmentId: number,
+  assessmentId: RecordId,
   edits: { budgetTotal?: number } = {},
 ): Promise<RecordId> {
-  const row = await prisma.platAssessment.findFirst({
-    where: { id: assessmentId, orgId: ctx.orgId, status: "draft" },
-  });
-  if (!row) throw new Error("Assessment not found (already accepted or discarded?)");
-  const assessment = JSON.parse(row.result) as StoredAssessment;
+  const found = await readAssessment(ctx, assessmentId);
+  if (!found || found.status !== "draft") {
+    throw new Error("Assessment not found (already accepted or discarded?)");
+  }
+  const assessment = found.stored;
+  // The assessment backlink + corrections are Postgres-bound (Int columns); a
+  // "rec…" assessment id has no home there, so they record null/undefined.
+  const pgAssessmentId = typeof assessmentId === "number" ? assessmentId : undefined;
 
   const aiBudget = Number(assessment.fields.budget_total?.value) || 0;
   const finalBudget = edits.budgetTotal ?? aiBudget;
@@ -511,10 +559,20 @@ export async function acceptAssessment(
     });
   }
 
-  await prisma.platAssessment.update({
-    where: { id: row.id },
-    data: { status: "accepted", jobId: pgJobId ?? null },
-  });
+  if (airtableEnabled()) {
+    const map = airtableMapFor("assessment")!;
+    await core.update(
+      ctx.orgSlug,
+      map.table,
+      String(assessmentId),
+      toFields(map, { status: "accepted", jobId }, "update"),
+    );
+  } else {
+    await prisma.platAssessment.update({
+      where: { id: Number(assessmentId) },
+      data: { status: "accepted", jobId: pgJobId ?? null },
+    });
+  }
 
   if (finalBudget !== aiBudget && aiBudget > 0) {
     await emitCorrection(
@@ -523,7 +581,7 @@ export async function acceptAssessment(
       {
         jobId: pgJobId,
         entityType: "assessment",
-        entityId: assessmentId,
+        entityId: pgAssessmentId,
         dimension: "budget.total",
         aiValue: aiBudget,
         humanValue: finalBudget,
@@ -550,7 +608,7 @@ export async function acceptAssessment(
       {
         jobId: pgJobId,
         entityType: "assessment",
-        entityId: assessmentId,
+        entityId: pgAssessmentId,
         dimension: "schedule.phases",
         aiValueText: generatedNames,
         humanValueText: finalNames,

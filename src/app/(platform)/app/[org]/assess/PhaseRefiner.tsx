@@ -45,7 +45,7 @@ export function PhaseRefiner({
   sizeSqm,
 }: {
   orgSlug: string;
-  assessmentId: number;
+  assessmentId: string | number;
   initial: Phase[];
   categoryLabel?: string;
   engagementType?: string;

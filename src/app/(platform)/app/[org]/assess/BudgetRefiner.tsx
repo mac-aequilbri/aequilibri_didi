@@ -40,7 +40,7 @@ export function BudgetRefiner({
   sizeSqm,
 }: {
   orgSlug: string;
-  assessmentId: number;
+  assessmentId: string | number;
   initial: BudgetLine[];
   categoryLabel?: string;
   scope?: string;

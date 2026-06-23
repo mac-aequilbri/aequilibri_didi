@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
+import { recordIdParam } from "@/lib/platform/recordWriter";
 import {
   acceptAssessment,
   getAssessment,
@@ -47,8 +48,8 @@ export async function runAssessmentAction(formData: FormData): Promise<void> {
 export async function refinePhasesAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   await getCurrentUser(ctx);
-  const assessmentId = Number(formData.get("assessmentId"));
-  if (!assessmentId) return;
+  const assessmentId = recordIdParam(formData.get("assessmentId"));
+  if (assessmentId == null) return;
   let phases: PhaseInput[] = [];
   try {
     const parsed = JSON.parse(String(formData.get("phases") ?? "[]"));
@@ -96,9 +97,9 @@ export async function checkPhaseFeasibilityAction(args: {
 export async function reestimateWithRoofAreaAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const assessmentId = Number(formData.get("assessmentId"));
+  const assessmentId = recordIdParam(formData.get("assessmentId"));
   const areaSqm = Number(formData.get("areaSqm"));
-  if (!assessmentId || !Number.isFinite(areaSqm) || areaSqm <= 0) return;
+  if (assessmentId == null || !Number.isFinite(areaSqm) || areaSqm <= 0) return;
 
   const stored = await getAssessment(ctx, assessmentId);
   if (!stored) return;
@@ -120,8 +121,8 @@ export async function reestimateWithRoofAreaAction(formData: FormData): Promise<
 export async function refineBudgetAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   await getCurrentUser(ctx);
-  const assessmentId = Number(formData.get("assessmentId"));
-  if (!assessmentId) return;
+  const assessmentId = recordIdParam(formData.get("assessmentId"));
+  if (assessmentId == null) return;
   let lines: { category: string; amount: number }[] = [];
   try {
     const parsed = JSON.parse(String(formData.get("budget") ?? "[]"));
@@ -154,8 +155,8 @@ export async function checkBudgetAction(args: {
 export async function acceptAssessmentAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const assessmentId = Number(formData.get("assessmentId"));
-  if (!assessmentId) return;
+  const assessmentId = recordIdParam(formData.get("assessmentId"));
+  if (assessmentId == null) return;
   const budgetRaw = Number(formData.get("budgetTotal"));
   const jobId = await acceptAssessment(ctx, user.name, assessmentId, {
     budgetTotal: Number.isFinite(budgetRaw) && budgetRaw > 0 ? budgetRaw : undefined,

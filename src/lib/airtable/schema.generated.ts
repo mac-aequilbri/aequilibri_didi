@@ -3,6 +3,25 @@
 //   node scripts/airtable-gen-schema.mjs
 
 export const CORE_SCHEMA = {
+  // Added by scripts/airtable-add-assessments-table.mjs (P3). Addressed by NAME,
+  // so these ids are placeholders; re-run airtable-gen-schema.mjs to capture the
+  // real ids once the table exists in the template base.
+  ASSESSMENTS: {
+    tableId: "tblAssessments00000",
+    fields: [
+      { name: "Assessment_Name", id: "fldAssessName000000", type: "singleLineText" },
+      { name: "Engagement_Type", id: "fldAssessEngType000", type: "singleLineText" },
+      { name: "Address", id: "fldAssessAddress000", type: "singleLineText" },
+      { name: "Suburb", id: "fldAssessSuburb0000", type: "singleLineText" },
+      { name: "Size_Sqm", id: "fldAssessSize000000", type: "number" },
+      { name: "Scope", id: "fldAssessScope00000", type: "multilineText" },
+      { name: "Result", id: "fldAssessResult0000", type: "multilineText" },
+      { name: "Status", id: "fldAssessStatus0000", type: "singleSelect" },
+      { name: "Prompt_Version", id: "fldAssessPromptVer0", type: "singleLineText" },
+      { name: "Created_By", id: "fldAssessCreatedBy0", type: "singleLineText" },
+      { name: "Job", id: "fldAssessJobLink000", type: "multipleRecordLinks" },
+    ],
+  },
   ORGANISATIONS: {
     tableId: "tblhkggy89SSAjF2y",
     fields: [

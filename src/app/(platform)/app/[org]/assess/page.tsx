@@ -25,7 +25,9 @@ export default async function AssessPage({
 }) {
   const ctx = await requireOrgCtx((await params).org);
   const { run } = await searchParams;
-  const assessment = run ? await getAssessment(ctx, Number(run)) : null;
+  // run is the assessment id from the redirect — a numeric string (Postgres) or
+  // a "rec…" id (Airtable). Pass it through verbatim, never Number()-coerced.
+  const assessment = run ? await getAssessment(ctx, run) : null;
 
   const budgetField = assessment?.fields.budget_total;
   const durationField = assessment?.fields.duration_weeks;
@@ -119,7 +121,7 @@ export default async function AssessPage({
           {(assessment.category === "reroof" || assessment.category === "roof_repair") && (
             <RoofAssessmentModule
               orgSlug={ctx.orgSlug}
-              assessmentId={Number(run)}
+              assessmentId={run!}
               address={assessment.input.address}
               mapsApiKey={process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY || ""}
               geocode={{
@@ -168,7 +170,7 @@ export default async function AssessPage({
             </p>
             <PhaseRefiner
               orgSlug={ctx.orgSlug}
-              assessmentId={Number(run)}
+              assessmentId={run!}
               initial={assessment.detail.phases}
               categoryLabel={assessment.categoryLabel}
               engagementType={assessment.input.engagementType}
@@ -189,7 +191,7 @@ export default async function AssessPage({
               </div>
               <BudgetRefiner
                 orgSlug={ctx.orgSlug}
-                assessmentId={Number(run)}
+                assessmentId={run!}
                 initial={assessment.detail.budgetBreakdown}
                 categoryLabel={assessment.categoryLabel}
                 scope={assessment.input.scope}

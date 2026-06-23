@@ -139,6 +139,25 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Estimated_Value", from: "budgetTotal", to: (v) => NUM(v) },
     ],
   },
+  assessment: {
+    // P3 — the intake draft. The rich StoredAssessment rides in Result as JSON
+    // (same as the Postgres `result` column); the scalars are for display/filter.
+    // Job links on acceptance (LINK no-ops for a non-rec id).
+    table: "ASSESSMENTS",
+    specs: [
+      { air: "Assessment_Name", from: "name", to: (v) => S(v) || "Assessment" },
+      { air: "Engagement_Type", from: "engagementType", to: S },
+      { air: "Address", from: "address", to: S },
+      { air: "Suburb", from: "suburb", to: S },
+      { air: "Size_Sqm", from: "sizeSqm", to: (v) => (v == null || v === "" ? undefined : NUM(v)) },
+      { air: "Scope", from: "scope", to: S },
+      { air: "Result", from: "result", to: S },
+      { air: "Status", from: "status", createDefault: "draft", to: S },
+      { air: "Prompt_Version", from: "promptVersion", to: S },
+      { air: "Created_By", from: "createdBy", to: S },
+      { air: "Job", from: "jobId", to: LINK },
+    ],
+  },
   contact: {
     table: "CONTACTS",
     specs: [
