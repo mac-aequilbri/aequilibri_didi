@@ -71,9 +71,11 @@ Decision taken: **full migration to Airtable** (to the extent the canonical sche
 - **Diagnostics:** `/app/[org]/diagnostics` (admin-only) shows the flag, the resolved base id, and Airtable-vs-Postgres row counts per table — the quickest way to confirm an org's data actually lives in Airtable.
 - **Not yet live-verified (whole P2):** the local `AIRTABLE_PAT` is stale, so all of P2 was checked only via tsc/eslint/fieldMaps-test. Verify on Render: onboard an Airtable org → confirm categories/settings/seed-rules land + the learning-rules page renders them; record a correction (approve-with-edits), run the hypothesis engine, promote a hypothesis → confirm the rule appears.
 
-### P3 — Assessment record itself (deferred "C-full")
-- The transient **assessment draft stays in Postgres**; there is **no `ASSESSMENTS` table** in the template base.
-- If full system-of-record is wanted: add `ASSESSMENTS` table to the template base (via meta API create-table) → add to `PLATFORM_TABLES` in both provisioners → regenerate `schema.generated.ts` → add a field map → route `runConstructionAssessment` / `getAssessment` / refine / accept and thread `assessmentId` as `RecordId`.
+### P3 — Assessment record — ✅ DONE (`573663e`)
+- A thin `ASSESSMENTS` table holds the draft: scalar intake columns + a `Result` long-text with the `StoredAssessment` JSON (same shape Postgres stored in `result`) + a `Status` select + a `Job` link. Created by [scripts/airtable-add-assessments-table.mjs](../scripts/airtable-add-assessments-table.mjs).
+- `runConstructionAssessment`/`getAssessment`/`refineAssessmentPhases`/`refineAssessmentBudget`/`acceptAssessment` branch on `airtableEnabled` (core.* + the `assessment` field map); `assessmentId` is a `RecordId` end-to-end (actions parse via `recordIdParam`; the assess page passes the raw `run` id; refiner/roof components accept `string | number`). The job-tree write + correction emit were already RecordId-aware.
+- **⚠️ REQUIRED:** run `node scripts/airtable-add-assessments-table.mjs <baseId>` on the **template base + every existing base** (needs a valid PAT) before the engine works on a base.
+- **Not live-verified** (stale local PAT) — tsc/eslint/fieldMaps-test clean.
 
 ### P4 — Smaller / decisions
 - **JOBS has no code field** in Airtable → `JOB-###` codes aren't persisted (jobs keyed by rec id). Add a `Code` field + map, or drop the concept in Airtable.
