@@ -9,6 +9,7 @@
 //     starts with something to work from.
 
 import { airtableEnabled, core } from "@/lib/airtable";
+import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { provisionClientBase } from "@/lib/airtable/provision";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
@@ -27,7 +28,11 @@ const SEED_SETTINGS: Array<{ key: string; value: string }> = [
  *  getLearningSettings) see the same data the Postgres txn just wrote. Best
  *  effort: a mirror failure must not fail onboarding (Postgres remains the
  *  fallback during the cutover), so callers swallow errors. */
-async function mirrorConfigToBase(orgSlug: string, categories: string[]): Promise<void> {
+async function mirrorConfigToBase(
+  orgSlug: string,
+  categories: string[],
+  rules: string[],
+): Promise<void> {
   for (let i = 0; i < categories.length; i++) {
     const name = categories[i];
     await core.create(orgSlug, "PLAT_CFG_REFERENCE", {
@@ -40,6 +45,27 @@ async function mirrorConfigToBase(orgSlug: string, categories: string[]): Promis
   }
   for (const s of SEED_SETTINGS) {
     await core.create(orgSlug, "PLAT_CFG_SETTING", { Setting_Key: s.key, Value: s.value });
+  }
+  // Seed guidance rules — through the learning_rule field map so they read back
+  // identically to engine/promotion-created rules.
+  const ruleMap = airtableMapFor("learning_rule")!;
+  let seq = 0;
+  for (const description of rules) {
+    seq += 1;
+    const fields = toFields(
+      ruleMap,
+      {
+        ruleCode: `LRN-${String(seq).padStart(4, "0")}`,
+        kind: "guidance",
+        description,
+        confidence: 80,
+        isActive: true,
+        autoApply: false,
+        cannotOverride: false,
+      },
+      "create",
+    );
+    await core.create(orgSlug, "LEARNING_RULES", fields);
   }
 }
 
@@ -93,9 +119,10 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
   // Airtable mode: provision the customer's own base BEFORE the DB transaction
   // (it's a slow external call — don't hold a txn open across it). The base is
   // the org in Airtable terms, so a provisioning failure fails onboarding
-  // rather than leaving a half-created org with no base. Identity/config/rules
-  // still live in Postgres (that's where the auth + learning engine read them);
-  // the base is what the already-migrated domain features write to per-client.
+  // rather than leaving a half-created org with no base. Org identity/team stay
+  // in Postgres (auth + tenancy); Customer Config + seed rules are written to
+  // Postgres in the txn AND mirrored into the base afterwards (the Airtable
+  // reads prefer the base, falling back to Postgres during the cutover).
   let airtableBaseId: string | null = null;
   if (airtableEnabled()) {
     try {
@@ -210,7 +237,7 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
   // the base isn't seeded). Seed learning rules are mirrored separately.
   if (airtableEnabled()) {
     try {
-      await mirrorConfigToBase(slug, categories);
+      await mirrorConfigToBase(slug, categories, rules);
     } catch (err) {
       logger.warn("Airtable config mirror skipped", { slug, ...errMeta(err) });
     }
