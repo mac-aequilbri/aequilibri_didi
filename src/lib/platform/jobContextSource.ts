@@ -177,9 +177,19 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
       actual: num(c["Actual"]),
     }));
 
-  // VARIATIONS has no Job link in the field map, so it can't be filtered by job
-  // in Airtable mode; report the empty set rather than every org-wide variation.
-  void variationRows;
+  const variations: JobContextVariation[] = variationRows
+    .filter(
+      (v) =>
+        linksTo(v["Job"], id) &&
+        ["submitted", "approved"].includes(str(v["Status"]) || "submitted"),
+    )
+    .slice(0, 5)
+    .map((v) => ({
+      refNumber: str(v["Ref_Number"]),
+      title: str(v["Title"]) || "(variation)",
+      costImpact: num(v["Cost_Impact"]),
+      status: str(v["Status"]) || "submitted",
+    }));
 
   return {
     id: job.id,
@@ -195,7 +205,7 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
     risks,
     cashflow,
     actions: [], // ACTION_HUB has no Job link in Airtable
-    variations: [], // VARIATIONS has no Job link in the field map
+    variations,
   };
 }
 

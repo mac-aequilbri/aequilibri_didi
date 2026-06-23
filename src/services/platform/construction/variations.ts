@@ -13,7 +13,8 @@ import { Actor, OrgCtx } from "@/lib/platform/types";
 import { toNum } from "@/lib/format";
 
 /** Next VO-### ref. Postgres numbers per job (max suffix + 1); Airtable numbers
- *  globally over VARIATIONS (its rows carry no Job link to scope by). */
+ *  globally over VARIATIONS — simpler than reading each row's Job link, and the
+ *  ref is only a display label (the Job link is the real association). */
 async function nextRefNumber(ctx: OrgCtx, jobId: RecordId): Promise<string> {
   if (airtableEnabled()) {
     const rows = await core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 });
