@@ -30,9 +30,9 @@ export async function createVariation(formData: FormData): Promise<void> {
 
 export async function aiDraftVariationAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const jobId = Number(formData.get("jobId"));
+  const jobId = recordIdParam(formData.get("jobId"));
   const brief = String(formData.get("brief") ?? "").trim();
-  if (!jobId || !brief) return;
+  if (jobId == null || !brief) return;
   const { id } = await aiDraftVariation(ctx, ctx.config.assistant.name, jobId, brief);
   revalidatePath(orgPath(ctx.orgSlug, "/variations"));
   redirect(orgPath(ctx.orgSlug, id ? `/variations/${id}` : "/variations"));

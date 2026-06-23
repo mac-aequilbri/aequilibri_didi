@@ -1,6 +1,7 @@
 // Meeting minutes — AI extraction of action items, human confirmation
 // creates real Action Hub rows (sourceType=meeting_minutes).
 
+import { airtableEnabled, core } from "@/lib/airtable";
 import { callClaude } from "@/lib/claude";
 import { prisma } from "@/lib/db";
 import { modelFor } from "@/lib/platform/modelRouter";
@@ -14,10 +15,59 @@ export interface ExtractedAction {
   dueDate: string | null;
 }
 
+function parseActions(raw: unknown): ExtractedAction[] {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as ExtractedAction[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Create one Action Hub row per extracted action, then stamp the minutes
+ *  record confirmed. Shared by both backends; jobId is whatever link the
+ *  minutes carried (dropped by the ACTION_HUB map in Airtable mode, which has
+ *  no Job link). Returns the number of actions created. */
+async function createActionsAndConfirm(
+  ctx: OrgCtx,
+  userName: string,
+  minutesId: RecordId,
+  jobId: RecordId | undefined,
+  actions: ExtractedAction[],
+): Promise<number> {
+  let created = 0;
+  for (const a of actions) {
+    if (!a.title) continue;
+    await writeRecord(ctx, {
+      table: "action",
+      op: "create",
+      data: {
+        jobId,
+        title: a.title,
+        owner: a.owner,
+        dueDate: a.dueDate ?? undefined,
+        sourceType: "meeting_minutes",
+        sourceId: minutesId,
+      },
+      actor: { type: "human", name: userName },
+    });
+    created++;
+  }
+  await writeRecord(ctx, {
+    table: "meeting_minutes",
+    op: "update",
+    recordId: minutesId,
+    data: { status: "confirmed", confirmedAt: new Date().toISOString(), actionsCount: created },
+    actor: { type: "human", name: userName },
+  });
+  return created;
+}
+
 export async function processMeetingMinutes(
   ctx: OrgCtx,
   userName: string,
-  input: { jobId: number; meetingDate: string; title: string; attendees: string; rawMinutes: string },
+  input: { jobId: RecordId; meetingDate: string; title: string; attendees: string; rawMinutes: string },
 ): Promise<{ id?: RecordId; actionsCount: number; demoMode: boolean }> {
   const { system } = getPrompt("minutes.extract");
   const res = await callClaude(system, input.rawMinutes.slice(0, 12000), {
@@ -65,45 +115,26 @@ export async function processMeetingMinutes(
 export async function confirmMeetingMinutes(
   ctx: OrgCtx,
   userName: string,
-  id: number,
+  id: RecordId,
 ): Promise<number> {
+  if (airtableEnabled()) {
+    const m = await core.get(ctx.orgSlug, "MEETING_MINUTES", String(id)).catch(() => null);
+    if (!m || m["Status"] === "confirmed") return 0;
+    const jobLink = m["Job"];
+    const jobId = Array.isArray(jobLink) && jobLink.length ? String(jobLink[0]) : undefined;
+    return createActionsAndConfirm(ctx, userName, id, jobId, parseActions(m["Extracted_Actions"]));
+  }
+
   const minutes = await prisma.platConMeetingMinutes.findFirst({
-    where: { id, orgId: ctx.orgId },
+    where: { id: Number(id), orgId: ctx.orgId },
   });
   if (!minutes || minutes.status === "confirmed") return 0;
 
-  let actions: ExtractedAction[] = [];
-  try {
-    actions = JSON.parse(minutes.extractedActions);
-  } catch {
-    actions = [];
-  }
-
-  let created = 0;
-  for (const a of actions) {
-    if (!a.title) continue;
-    await writeRecord(ctx, {
-      table: "action",
-      op: "create",
-      data: {
-        jobId: minutes.jobId,
-        title: a.title,
-        owner: a.owner,
-        dueDate: a.dueDate ?? undefined,
-        sourceType: "meeting_minutes",
-        sourceId: minutes.id,
-      },
-      actor: { type: "human", name: userName },
-    });
-    created++;
-  }
-
-  await writeRecord(ctx, {
-    table: "meeting_minutes",
-    op: "update",
-    recordId: minutes.id,
-    data: { status: "confirmed", confirmedAt: new Date().toISOString(), actionsCount: created },
-    actor: { type: "human", name: userName },
-  });
-  return created;
+  return createActionsAndConfirm(
+    ctx,
+    userName,
+    minutes.id,
+    minutes.jobId,
+    parseActions(minutes.extractedActions),
+  );
 }

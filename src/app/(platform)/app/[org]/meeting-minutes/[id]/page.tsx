@@ -1,13 +1,14 @@
 // Minutes detail — review extracted actions; confirming creates real
-// Action Hub rows (sourceType=meeting_minutes).
+// Action Hub rows (sourceType=meeting_minutes). Reads through loadMinutesDetail
+// so the Postgres → Airtable swap is invisible; the id is numeric (Postgres) or
+// a "rec…" id (Airtable) and the confirm form posts it back RecordId-aware.
 
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
+import { loadMinutesDetail } from "@/lib/platform/minutesDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
-import type { ExtractedAction } from "@/services/platform/construction/minutes";
 import { confirmMinutesAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -19,24 +20,17 @@ export default async function MinutesDetailPage({
 }) {
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
-  const minutes = await prisma.platConMeetingMinutes.findFirst({
-    where: { id: Number(id), orgId: ctx.orgId },
-    include: { job: { select: { code: true, name: true } } },
-  });
+  const minutes = await loadMinutesDetail(ctx, id);
   if (!minutes) notFound();
 
-  let actions: ExtractedAction[] = [];
-  try {
-    actions = JSON.parse(minutes.extractedActions);
-  } catch {
-    actions = [];
-  }
+  const meetingDateLabel = minutes.meetingDate ? formatDate(minutes.meetingDate) : "—";
+  const actions = minutes.extractedActions;
 
   return (
     <div className="p-6 max-w-2xl">
       <PageHeader
-        title={minutes.title || `Meeting ${formatDate(minutes.meetingDate)}`}
-        subtitle={`${minutes.job?.code} · ${formatDate(minutes.meetingDate)}${minutes.attendees ? ` · ${minutes.attendees}` : ""}`}
+        title={minutes.title || `Meeting ${meetingDateLabel}`}
+        subtitle={`${minutes.jobCode ? `${minutes.jobCode} · ` : ""}${meetingDateLabel}${minutes.attendees ? ` · ${minutes.attendees}` : ""}`}
         actions={[{ href: orgPath(ctx.orgSlug, "/meeting-minutes"), label: "All minutes", variant: "outline" }]}
       />
 

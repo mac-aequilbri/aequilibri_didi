@@ -253,6 +253,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Submitted_By", from: "submittedBy", to: S },
       { air: "Approved_By", from: "approvedBy", to: S },
       { air: "Approved_At", from: "approvedAt", to: DATE },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   vendor: {
@@ -290,6 +291,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Actions_Count", from: "actionsCount", to: (v) => NUM(v) },
       { air: "Status", from: "status", createDefault: "raw", to: S },
       { air: "Confirmed_At", from: "confirmedAt", to: DATE },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   weekly_report: {
@@ -303,6 +305,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Approved_By", from: "approvedBy", to: S },
       { air: "Approved_At", from: "approvedAt", to: DATE },
       { air: "Sent_At", from: "sentAt", to: DATE },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   bim_model: {
@@ -330,6 +333,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Total", from: "total", to: (v) => NUM(v) },
       { air: "Notes", from: "notes", to: S },
       { air: "Valid_Until", from: "validUntil", to: DATE },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   quote_line: {
