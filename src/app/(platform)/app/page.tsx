@@ -4,10 +4,21 @@
 // listed; demo mode shows everything.
 
 import Link from "next/link";
+import { controlEnabled, listControlTeam, listOrgRegistry } from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { getAuthEmail, isPlatformAdmin } from "@/lib/platform/org-context";
 
 export const dynamic = "force-dynamic";
+
+interface OrgCard {
+  slug: string;
+  name: string;
+  vertical: string;
+  defaultEngagementType: string;
+  /** Null when the count isn't cheaply available (control/Airtable mode). */
+  jobs: number | null;
+  emails: string[];
+}
 
 export default async function OrgPickerPage({
   searchParams,
@@ -18,18 +29,39 @@ export default async function OrgPickerPage({
   const email = await getAuthEmail();
   const canProvision = await isPlatformAdmin();
 
-  const orgs = await prisma.platOrganisation.findMany({
-    where: { isActive: true },
-    orderBy: { name: "asc" },
-    include: {
-      _count: { select: { jobs: true } },
-      cfgTeam: { where: { isActive: true }, select: { email: true } },
-    },
-  });
-  const visible =
-    email === null
-      ? orgs
-      : orgs.filter((o) => o.cfgTeam.some((m) => m.email.toLowerCase() === email));
+  let orgs: OrgCard[];
+  if (controlEnabled()) {
+    const reg = await listOrgRegistry();
+    orgs = await Promise.all(
+      reg.map(async (e) => ({
+        slug: e.slug,
+        name: e.name,
+        vertical: e.vertical,
+        defaultEngagementType: e.defaultEngagementType,
+        jobs: null,
+        emails: (await listControlTeam(e.slug)).map((m) => m.email.toLowerCase()),
+      })),
+    );
+    orgs.sort((a, b) => a.name.localeCompare(b.name));
+  } else {
+    const rows = await prisma.platOrganisation.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      include: {
+        _count: { select: { jobs: true } },
+        cfgTeam: { where: { isActive: true }, select: { email: true } },
+      },
+    });
+    orgs = rows.map((o) => ({
+      slug: o.slug,
+      name: o.name,
+      vertical: o.vertical,
+      defaultEngagementType: o.defaultEngagementType,
+      jobs: o._count.jobs,
+      emails: o.cfgTeam.map((m) => m.email.toLowerCase()),
+    }));
+  }
+  const visible = email === null ? orgs : orgs.filter((o) => o.emails.includes(email));
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-16">
@@ -69,14 +101,14 @@ export default async function OrgPickerPage({
         <div className="grid gap-6 sm:grid-cols-2">
           {visible.map((org) => (
             <Link
-              key={org.id}
+              key={org.slug}
               href={`/app/${org.slug}`}
               className="ae-card p-6 block hover:shadow-md transition-shadow"
             >
               <h2 className="text-lg font-semibold mb-1">{org.name}</h2>
               <p className="text-sm text-neutral-600 capitalize">
-                {org.vertical} · {org.defaultEngagementType.replace("_", " ")} ·{" "}
-                {org._count.jobs} job{org._count.jobs === 1 ? "" : "s"}
+                {org.vertical} · {org.defaultEngagementType.replace("_", " ")}
+                {org.jobs !== null ? ` · ${org.jobs} job${org.jobs === 1 ? "" : "s"}` : ""}
               </p>
             </Link>
           ))}

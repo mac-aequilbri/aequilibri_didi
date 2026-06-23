@@ -8,6 +8,12 @@
 // platform runs in open demo mode (first admin acts as the current user).
 
 import { redirect } from "next/navigation";
+import {
+  controlEnabled,
+  getOrgRegistry,
+  listControlTeam,
+  type ControlTeamMember,
+} from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { clerkEnabled, platformAdminEmails } from "./authConfig";
 import {
@@ -47,14 +53,36 @@ export async function getAuthEmail(): Promise<string | null> {
   return user?.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null;
 }
 
-async function findMembership(orgId: number, email: string) {
+/** Find a team member by email in whichever store holds the registry. */
+async function findMember(ctx: OrgCtx, email: string): Promise<ControlTeamMember | null> {
+  if (controlEnabled()) {
+    const members = await listControlTeam(ctx.orgSlug);
+    return members.find((m) => m.email.toLowerCase() === email) ?? null;
+  }
   const members = await prisma.platCfgTeamMember.findMany({
-    where: { orgId, isActive: true },
+    where: { orgId: ctx.orgId, isActive: true },
   });
-  return members.find((m) => m.email.toLowerCase() === email) ?? null;
+  const m = members.find((x) => x.email.toLowerCase() === email);
+  return m ? { name: m.name, email: m.email, role: m.role, isActive: m.isActive } : null;
 }
 
 export async function getOrgCtx(orgSlug: string): Promise<OrgCtx | null> {
+  if (controlEnabled()) {
+    const e = await getOrgRegistry(orgSlug);
+    if (!e || !e.isActive) return null;
+    return {
+      orgId: e.orgId,
+      orgSlug: e.slug,
+      orgName: e.name,
+      vertical: e.vertical,
+      defaultEngagementType: e.defaultEngagementType as EngagementType,
+      allowedEngagementTypes: parseJson<EngagementType[]>(e.allowedEngagementTypes, [
+        e.defaultEngagementType as EngagementType,
+      ]),
+      aiAuthority: e.aiAuthority as AiAuthority,
+      config: parseConfig(e.settings),
+    };
+  }
   const org = await prisma.platOrganisation.findFirst({
     where: { slug: orgSlug, isActive: true },
   });
@@ -81,7 +109,7 @@ export async function requireOrgCtx(orgSlug: string): Promise<OrgCtx> {
 
   const email = await getAuthEmail();
   if (email !== null) {
-    const member = await findMembership(ctx.orgId, email);
+    const member = await findMember(ctx, email);
     if (!member) redirect("/app?denied=1");
   }
   return ctx;
@@ -99,7 +127,7 @@ export interface CurrentUser {
 export async function getCurrentUser(ctx: OrgCtx): Promise<CurrentUser> {
   const email = await getAuthEmail();
   if (email !== null) {
-    const member = await findMembership(ctx.orgId, email);
+    const member = await findMember(ctx, email);
     if (!member) redirect("/app?denied=1");
     if (member.role === "readonly") {
       throw new Error("Your role in this organisation is read-only — writes are not permitted.");
@@ -107,6 +135,14 @@ export async function getCurrentUser(ctx: OrgCtx): Promise<CurrentUser> {
     return { name: member.name, role: member.role, email: member.email };
   }
 
+  // Demo mode: the first active admin (admins sort before editor/readonly).
+  if (controlEnabled()) {
+    const members = await listControlTeam(ctx.orgSlug);
+    const member = [...members].sort((a, b) => a.role.localeCompare(b.role))[0];
+    return member
+      ? { name: member.name, role: member.role, email: member.email }
+      : { name: "Demo User", role: "admin", email: "" };
+  }
   const member = await prisma.platCfgTeamMember.findFirst({
     where: { orgId: ctx.orgId, isActive: true },
     orderBy: [{ role: "asc" }, { id: "asc" }], // "admin" sorts before "editor"/"readonly"

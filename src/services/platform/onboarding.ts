@@ -9,6 +9,12 @@
 //     starts with something to work from.
 
 import { airtableEnabled, core } from "@/lib/airtable";
+import {
+  controlEnabled,
+  createControlTeamMember,
+  createOrgRegistry,
+  getOrgRegistry,
+} from "@/lib/airtable/control";
 import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { provisionClientBase } from "@/lib/airtable/provision";
 import { prisma } from "@/lib/db";
@@ -109,12 +115,28 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
     return { ok: false, error: "Slug must be lowercase letters/numbers/hyphens (and not a reserved word)." };
   }
   if (!input.name.trim()) return { ok: false, error: "Organisation name is required." };
-  if (await prisma.platOrganisation.findFirst({ where: { slug } })) {
-    return { ok: false, error: `An organisation with slug "${slug}" already exists.` };
-  }
+
   const allowed = input.allowedEngagementTypes.length
     ? input.allowedEngagementTypes
     : [input.defaultEngagementType];
+  const vertical = input.vertical ?? "construction";
+  const settings = JSON.stringify({
+    assistant: {
+      name: input.assistantName.trim() || "Assistant",
+      persona:
+        input.assistantPersona.trim() ||
+        `You are the AI project coordinator for ${input.name.trim()}. Be precise, data-driven, and flag risks proactively.`,
+    },
+    features: { ...DEFAULT_FEATURES, ...input.features },
+  });
+
+  // Slug uniqueness — checked in whichever store owns the org registry.
+  const exists = controlEnabled()
+    ? (await getOrgRegistry(slug)) !== null
+    : (await prisma.platOrganisation.findFirst({ where: { slug } })) !== null;
+  if (exists) {
+    return { ok: false, error: `An organisation with slug "${slug}" already exists.` };
+  }
 
   // Airtable mode: provision the customer's own base BEFORE the DB transaction
   // (it's a slow external call — don't hold a txn open across it). The base is
@@ -139,25 +161,45 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
   const categories = input.budgetCategories.map((c) => c.trim()).filter(Boolean);
   const rules = input.initialRules.map((r) => r.trim()).filter(Boolean);
 
+  // ── Control plane: org identity lives in the Airtable registry (no Postgres).
+  //    Config + seed rules go into the client's own base; nothing touches PG. ──
+  if (controlEnabled()) {
+    const orgId = await createOrgRegistry({
+      slug,
+      name: input.name.trim(),
+      vertical,
+      defaultEngagementType: input.defaultEngagementType,
+      allowedEngagementTypes: JSON.stringify(allowed),
+      aiAuthority: input.aiAuthority,
+      settings,
+      airtableBaseId,
+    });
+    if (input.adminName.trim()) {
+      await createControlTeamMember(slug, {
+        name: input.adminName.trim(),
+        email: input.adminEmail.trim(),
+        role: "admin",
+      });
+    }
+    try {
+      await mirrorConfigToBase(slug, categories, rules);
+    } catch (err) {
+      logger.warn("Airtable config mirror skipped", { slug, ...errMeta(err) });
+    }
+    return { ok: true, orgId, slug };
+  }
+
   const orgId = await prisma.$transaction(async (tx) => {
     // ── Instance Setup ──────────────────────────────────────────────
     const org = await tx.platOrganisation.create({
       data: {
         slug,
         name: input.name.trim(),
-        vertical: input.vertical ?? "construction",
+        vertical,
         defaultEngagementType: input.defaultEngagementType,
         allowedEngagementTypes: JSON.stringify(allowed),
         aiAuthority: input.aiAuthority,
-        settings: JSON.stringify({
-          assistant: {
-            name: input.assistantName.trim() || "Assistant",
-            persona:
-              input.assistantPersona.trim() ||
-              `You are the AI project coordinator for ${input.name.trim()}. Be precise, data-driven, and flag risks proactively.`,
-          },
-          features: { ...DEFAULT_FEATURES, ...input.features },
-        }),
+        settings,
         airtableBaseId,
       },
     });

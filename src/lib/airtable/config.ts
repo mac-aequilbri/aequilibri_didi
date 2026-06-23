@@ -51,10 +51,19 @@ function baseRegistry(): Record<string, string> {
  *  The DB lookup is best-effort: if Postgres is unreachable we still fall back
  *  to the env map, and the cost is negligible next to the Airtable round-trip. */
 export async function resolveBaseId(orgSlug: string): Promise<string> {
-  const org = await prisma.platOrganisation
-    .findUnique({ where: { slug: orgSlug }, select: { airtableBaseId: true } })
-    .catch(() => null);
-  if (org?.airtableBaseId) return org.airtableBaseId;
+  // Control plane first: when the org registry lives in Airtable, the slug→base
+  // mapping comes from there (no Postgres). Dynamic import avoids a config↔
+  // control module cycle.
+  const { controlEnabled, getOrgRegistry } = await import("./control");
+  if (controlEnabled()) {
+    const entry = await getOrgRegistry(orgSlug).catch(() => null);
+    if (entry?.airtableBaseId) return entry.airtableBaseId;
+  } else {
+    const org = await prisma.platOrganisation
+      .findUnique({ where: { slug: orgSlug }, select: { airtableBaseId: true } })
+      .catch(() => null);
+    if (org?.airtableBaseId) return org.airtableBaseId;
+  }
 
   const registry = baseRegistry();
   if (registry[orgSlug]) return registry[orgSlug];

@@ -11,6 +11,7 @@
 //    for the current week — opt-in per org (costs AI tokens) via the
 //    PlatCfgSetting "automation.weekly_reports" = true
 
+import { controlEnabled, listOrgRegistry } from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { getOrgCtx } from "@/lib/platform/org-context";
 import { generateWeeklyReport } from "./construction/reports";
@@ -53,7 +54,12 @@ export async function runScheduledTasks(now = new Date()): Promise<SchedulerRunR
     errors: [],
   };
 
-  const orgs = await prisma.platOrganisation.findMany({ where: { isActive: true } });
+  const orgs: { id: number; slug: string }[] = controlEnabled()
+    ? (await listOrgRegistry()).map((o) => ({ id: o.orgId, slug: o.slug }))
+    : await prisma.platOrganisation.findMany({
+        where: { isActive: true },
+        select: { id: true, slug: true },
+      });
   for (const org of orgs) {
     const ctx = await getOrgCtx(org.slug);
     if (!ctx) continue;
