@@ -3,25 +3,6 @@
 //   node scripts/airtable-gen-schema.mjs
 
 export const CORE_SCHEMA = {
-  // Added by scripts/airtable-add-assessments-table.mjs (P3). Addressed by NAME,
-  // so these ids are placeholders; re-run airtable-gen-schema.mjs to capture the
-  // real ids once the table exists in the template base.
-  ASSESSMENTS: {
-    tableId: "tblAssessments00000",
-    fields: [
-      { name: "Assessment_Name", id: "fldAssessName000000", type: "singleLineText" },
-      { name: "Engagement_Type", id: "fldAssessEngType000", type: "singleLineText" },
-      { name: "Address", id: "fldAssessAddress000", type: "singleLineText" },
-      { name: "Suburb", id: "fldAssessSuburb0000", type: "singleLineText" },
-      { name: "Size_Sqm", id: "fldAssessSize000000", type: "number" },
-      { name: "Scope", id: "fldAssessScope00000", type: "multilineText" },
-      { name: "Result", id: "fldAssessResult0000", type: "multilineText" },
-      { name: "Status", id: "fldAssessStatus0000", type: "singleSelect" },
-      { name: "Prompt_Version", id: "fldAssessPromptVer0", type: "singleLineText" },
-      { name: "Created_By", id: "fldAssessCreatedBy0", type: "singleLineText" },
-      { name: "Job", id: "fldAssessJobLink000", type: "multipleRecordLinks" },
-    ],
-  },
   ORGANISATIONS: {
     tableId: "tblhkggy89SSAjF2y",
     fields: [
@@ -96,9 +77,7 @@ export const CORE_SCHEMA = {
       { name: "Alternatives_Rejected", id: "fld6bddEWs7EQHqGp", type: "multilineText" },
       { name: "Rationale", id: "fldXH5tHvUC8RpuCi", type: "multilineText" },
       { name: "Domain", id: "fldQOD6FVY3WY2lCV", type: "singleLineText" },
-      // Added by scripts/airtable-add-decision-job-link.mjs (addressed by name —
-      // placeholder id; re-run airtable-gen-schema.mjs to capture the real id).
-      { name: "Job", id: "fldDecisionJobLink00", type: "multipleRecordLinks" },
+      { name: "Job", id: "fldSMPaGDMcUxxUKO", type: "multipleRecordLinks" },
     ],
   },
   ACTION_HUB: {
@@ -152,10 +131,7 @@ export const CORE_SCHEMA = {
       { name: "Corrected_By", id: "fldtPQNq766YT6dwr", type: "singleLineText" },
       { name: "Rule_Generated", id: "fldttqS321zeFEbHE", type: "checkbox" },
       { name: "Notes", id: "fldGP71ILWQvF5ASz", type: "multilineText" },
-      // Added by scripts/airtable-add-hypothesis-link.mjs. Fields are addressed
-      // by NAME (clone-stable), so this placeholder id is never used on the wire;
-      // re-run airtable-gen-schema.mjs against the template to capture the real id.
-      { name: "Hypothesis", id: "fldHypothesisLink000", type: "multipleRecordLinks" },
+      { name: "Hypothesis", id: "fldWa0mLMiNkoRwTc", type: "multipleRecordLinks" },
     ],
   },
   JOBS: {
@@ -190,6 +166,8 @@ export const CORE_SCHEMA = {
       { name: "WEEKLY_REPORTS", id: "fldJm4mQMmQtLBOIg", type: "multipleRecordLinks" },
       { name: "PHASE_EVIDENCE", id: "fldXSxJkhZgnCiUBG", type: "multipleRecordLinks" },
       { name: "BIM_MODELS", id: "fldYl7rElmrIjBirZ", type: "multipleRecordLinks" },
+      { name: "ASSESSMENTS", id: "fldGrn4FL8b1BqlgL", type: "multipleRecordLinks" },
+      { name: "DECISIONS", id: "fldUquk2e9tuTlbxP", type: "multipleRecordLinks" },
     ],
   },
   HYPOTHESES: {
@@ -209,6 +187,7 @@ export const CORE_SCHEMA = {
       { name: "Confidence", id: "fldMuYvz0YIpPhY4Y", type: "number" },
       { name: "Promote_to_Rule", id: "fldg1UrqXVTV4V6C3", type: "checkbox" },
       { name: "_TIER", id: "fld4546f5R5vGbYYR", type: "singleLineText" },
+      { name: "Corrections", id: "fldUCa6YMQRb1nOGx", type: "multipleRecordLinks" },
     ],
   },
   LEARNING_RULES: {
@@ -267,6 +246,22 @@ export const CORE_SCHEMA = {
       { name: "Known_Gaps", id: "fldpXZ730MfzhIpj3", type: "multilineText" },
       { name: "Accuracy_Summary", id: "fldvgGICdoDBe3NQM", type: "multilineText" },
       { name: "_TIER", id: "fldqH6rl7PTGhdwp9", type: "singleLineText" },
+    ],
+  },
+  ASSESSMENTS: {
+    tableId: "tblRMXKdV2ewscNd4",
+    fields: [
+      { name: "Assessment_Name", id: "fldxAxIwct0ZbozDo", type: "singleLineText" },
+      { name: "Engagement_Type", id: "fldRIksgRp3Q6CaKN", type: "singleLineText" },
+      { name: "Address", id: "fldCd1YzeXVUjKqlb", type: "singleLineText" },
+      { name: "Suburb", id: "fldSyTBVebVr0ll7s", type: "singleLineText" },
+      { name: "Size_Sqm", id: "fldQQS0EkrNKn1Nta", type: "number" },
+      { name: "Scope", id: "fld6yAs2usutv16n8", type: "multilineText" },
+      { name: "Result", id: "fldP8ifZ1sJ3wWFEo", type: "multilineText" },
+      { name: "Status", id: "fldeGQhVOsgbIPsSg", type: "singleSelect" },
+      { name: "Prompt_Version", id: "fldR0jtbOlpamDXM0", type: "singleLineText" },
+      { name: "Created_By", id: "fldzMrlpEnRXMp2KN", type: "singleLineText" },
+      { name: "Job", id: "fldNqAMqKvuKVLILe", type: "multipleRecordLinks" },
     ],
   },
   RISKS: {
