@@ -106,20 +106,20 @@ async function rulesFromAirtable(ctx: OrgCtx): Promise<RuleView[]> {
     .sort((a, b) => Number(b.isActive) - Number(a.isActive) || b.confidence - a.confidence);
 }
 
-/** Loop machinery — Postgres engine state in both modes. */
-async function enginePartsFromPostgres(ctx: OrgCtx): Promise<Omit<LearningData, "rules">> {
-  const [hypotheses, correctionsCount, unclustered, snapshots] = await Promise.all([
+interface EngineCounts {
+  hypotheses: HypothesisView[];
+  correctionsCount: number;
+  unclustered: number;
+}
+
+async function engineFromPostgres(ctx: OrgCtx): Promise<EngineCounts> {
+  const [hypotheses, correctionsCount, unclustered] = await Promise.all([
     prisma.platHypothesis.findMany({
       where: { orgId: ctx.orgId, status: "pending" },
       orderBy: { confidence: "desc" },
     }),
     prisma.platCorrection.count({ where: { orgId: ctx.orgId } }),
     prisma.platCorrection.count({ where: { orgId: ctx.orgId, hypothesisId: null } }),
-    prisma.platIntelligenceSnapshot.findMany({
-      where: { orgId: ctx.orgId },
-      orderBy: { capturedAt: "desc" },
-      take: 24,
-    }),
   ]);
   return {
     hypotheses: hypotheses.map((h) => ({
@@ -132,24 +132,65 @@ async function enginePartsFromPostgres(ctx: OrgCtx): Promise<Omit<LearningData, 
     })),
     correctionsCount,
     unclustered,
-    snapshots: snapshots.map((s) => ({
-      id: String(s.id),
-      capturedAt: s.capturedAt,
-      accuracyRatePct: s.accuracyRatePct,
-      activeRules: s.activeRules,
-      autoApplyRules: s.autoApplyRules,
-      avgConfidence: s.avgConfidence,
-      gaps: parseGaps(s.gaps),
-    })),
   };
 }
 
-/** Load the learning-loop data: rules from the active backend, loop machinery
- *  always from Postgres. */
-export async function loadLearning(ctx: OrgCtx): Promise<LearningData> {
-  const [rules, engine] = await Promise.all([
-    airtableEnabled() ? rulesFromAirtable(ctx) : rulesFromPostgres(ctx),
-    enginePartsFromPostgres(ctx),
+async function engineFromAirtable(ctx: OrgCtx): Promise<EngineCounts> {
+  const [hypRows, corrRows] = await Promise.all([
+    core.list(ctx.orgSlug, "HYPOTHESES", { maxRecords: 500 }),
+    core.list(ctx.orgSlug, "CORRECTIONS", { maxRecords: 1000 }),
   ]);
-  return { rules, ...engine };
+  const hypotheses: HypothesisView[] = hypRows
+    .filter((h) => (str(h["Status"]) || "pending") === "pending")
+    .map((h) => {
+      let meta: Record<string, unknown> = {};
+      try {
+        meta = (JSON.parse(str(h["Evidence"]) || "{}") as Record<string, unknown>) || {};
+      } catch {
+        /* malformed Evidence */
+      }
+      return {
+        id: h.id,
+        description: str(h["Summary_of_Findings"]) || str(h["Hypothesis_Name"]),
+        dimension: typeof meta.dimension === "string" ? meta.dimension : "",
+        sampleCount: num(h["Evidence_Count"]),
+        avgVariancePct: typeof meta.avgVariancePct === "number" ? meta.avgVariancePct : 0,
+        confidence: num(h["Confidence"]),
+      };
+    })
+    .sort((a, b) => b.confidence - a.confidence);
+  const unclustered = corrRows.filter(
+    (c) => !Array.isArray(c["Hypothesis"]) || (c["Hypothesis"] as unknown[]).length === 0,
+  ).length;
+  return { hypotheses, correctionsCount: corrRows.length, unclustered };
+}
+
+/** Snapshots are a local metric log — Postgres in both modes. */
+async function snapshotsFromPostgres(ctx: OrgCtx): Promise<SnapshotView[]> {
+  const snapshots = await prisma.platIntelligenceSnapshot.findMany({
+    where: { orgId: ctx.orgId },
+    orderBy: { capturedAt: "desc" },
+    take: 24,
+  });
+  return snapshots.map((s) => ({
+    id: String(s.id),
+    capturedAt: s.capturedAt,
+    accuracyRatePct: s.accuracyRatePct,
+    activeRules: s.activeRules,
+    autoApplyRules: s.autoApplyRules,
+    avgConfidence: s.avgConfidence,
+    gaps: parseGaps(s.gaps),
+  }));
+}
+
+/** Load the learning-loop data: rules + the corrections/hypotheses loop from the
+ *  active backend; the snapshot history always from Postgres. */
+export async function loadLearning(ctx: OrgCtx): Promise<LearningData> {
+  const on = airtableEnabled();
+  const [rules, engine, snapshots] = await Promise.all([
+    on ? rulesFromAirtable(ctx) : rulesFromPostgres(ctx),
+    on ? engineFromAirtable(ctx) : engineFromPostgres(ctx),
+    snapshotsFromPostgres(ctx),
+  ]);
+  return { rules, ...engine, snapshots };
 }

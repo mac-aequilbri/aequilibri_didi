@@ -8,6 +8,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { prisma } from "@/lib/db";
+import type { RecordId } from "@/lib/platform/recordWriter";
 import { OrgCtx } from "@/lib/platform/types";
 
 const S = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
@@ -88,6 +89,188 @@ function parseContext(raw: string): Record<string, string> {
   }
 }
 
+// ── Airtable corrections/hypotheses (the loop machinery, mirrored into the
+// base once scripts/airtable-add-hypothesis-link.mjs has added the link) ──────
+
+const HYP_OPEN_STATUSES = new Set(["pending", "active"]);
+
+interface AirCorrection {
+  id: string;
+  dimension: string;
+  rootCause: string;
+  variancePct: number | null;
+  context: Record<string, string>;
+  clustered: boolean;
+}
+function airCorrection(r: Record<string, unknown> & { id: string }): AirCorrection {
+  let context: Record<string, string> = {};
+  try {
+    const n = JSON.parse(S(r["Notes"]) || "{}") as { context?: unknown };
+    if (n && typeof n.context === "object" && n.context) context = n.context as Record<string, string>;
+  } catch {
+    /* malformed Notes */
+  }
+  const v = r["Variance_Percent"];
+  return {
+    id: r.id,
+    dimension: S(r["Field_Corrected"]),
+    rootCause: S(r["Root_Cause"]),
+    variancePct: typeof v === "number" ? v : null,
+    context,
+    clustered: Array.isArray(r["Hypothesis"]) && (r["Hypothesis"] as unknown[]).length > 0,
+  };
+}
+
+interface AirHypothesis {
+  id: string;
+  description: string;
+  dimension: string;
+  rootCausePattern: string;
+  triggerCondition: string;
+  sampleCount: number;
+  avgVariancePct: number;
+  confidence: number;
+  status: string;
+}
+function airHypothesis(r: Record<string, unknown> & { id: string }): AirHypothesis {
+  let meta: Record<string, unknown> = {};
+  try {
+    meta = (JSON.parse(S(r["Evidence"]) || "{}") as Record<string, unknown>) || {};
+  } catch {
+    /* malformed Evidence */
+  }
+  return {
+    id: r.id,
+    description: S(r["Summary_of_Findings"]) || S(r["Hypothesis_Name"]),
+    dimension: S(meta.dimension),
+    rootCausePattern: S(meta.rootCausePattern),
+    triggerCondition: S(meta.triggerCondition) || "{}",
+    sampleCount: N(r["Evidence_Count"]),
+    avgVariancePct: N(meta.avgVariancePct),
+    confidence: N(r["Confidence"]),
+    status: S(r["Status"]) || "pending",
+  };
+}
+function hypFields(h: Omit<AirHypothesis, "id">): Record<string, unknown> {
+  return {
+    Hypothesis_Name: h.description.slice(0, 120) || "Hypothesis",
+    Summary_of_Findings: h.description,
+    Status: h.status,
+    Evidence_Count: h.sampleCount,
+    Confidence: h.confidence,
+    Evidence: JSON.stringify({
+      dimension: h.dimension,
+      rootCausePattern: h.rootCausePattern,
+      avgVariancePct: h.avgVariancePct,
+      triggerCondition: h.triggerCondition,
+    }),
+  };
+}
+
+/** Airtable port of the clustering engine. Same statistics as the Postgres
+ *  path; persistence via core.* (no transaction — corrections are low-volume). */
+async function runHypothesisEngineAirtable(
+  ctx: OrgCtx,
+  settings: LearningSettings,
+): Promise<{ created: number; updated: number }> {
+  const [corrRows, hypRows] = await Promise.all([
+    core.list(ctx.orgSlug, "CORRECTIONS", { maxRecords: 1000 }),
+    core.list(ctx.orgSlug, "HYPOTHESES", { maxRecords: 500 }),
+  ]);
+  const corrections = corrRows.map(airCorrection).filter((c) => !c.clustered && c.rootCause);
+  const existing = hypRows.map(airHypothesis);
+
+  const groups = new Map<string, AirCorrection[]>();
+  for (const c of corrections) {
+    const key = `${c.dimension}::${norm(c.rootCause)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(c);
+  }
+
+  let created = 0;
+  let updated = 0;
+  for (const [key, group] of groups) {
+    if (group.length < settings.hypothesisMinSamples) continue;
+    const [dimension, cause] = key.split("::");
+
+    const variances = group.map((c) => c.variancePct).filter((v): v is number => v != null);
+    const avgVar = variances.length
+      ? Math.round((variances.reduce((s, v) => s + Math.abs(v), 0) / variances.length) * 10) / 10
+      : 0;
+    const signedAvg = variances.length ? variances.reduce((s, v) => s + v, 0) / variances.length : 0;
+
+    const trigger: Record<string, string> = {};
+    const keyCounts = new Map<string, Map<string, number>>();
+    for (const c of group) {
+      for (const [k, v] of Object.entries(c.context)) {
+        if (!v) continue;
+        if (!keyCounts.has(k)) keyCounts.set(k, new Map());
+        const m = keyCounts.get(k)!;
+        m.set(norm(String(v)), (m.get(norm(String(v))) ?? 0) + 1);
+      }
+    }
+    for (const [k, values] of keyCounts) {
+      let best = "";
+      let n = 0;
+      for (const [v, count] of values) if (count > n) { best = v; n = count; }
+      if (n / group.length >= 0.6) trigger[k] = best;
+    }
+
+    const direction = signedAvg >= 0 ? "under" : "over";
+    const description =
+      avgVar > 0
+        ? `${dimension.replace(/[._]/g, " ")} ${direction}estimated by ~${avgVar}% on average — ${cause || "no root cause"}.`
+        : `${dimension.replace(/[._]/g, " ")} repeatedly corrected — ${cause || "no root cause"}.`;
+
+    const prior = existing.find(
+      (h) => h.dimension === dimension && h.rootCausePattern === cause && HYP_OPEN_STATUSES.has(h.status),
+    );
+
+    let hypId: string;
+    if (prior) {
+      const sampleCount = group.length + prior.sampleCount;
+      await core.update(
+        ctx.orgSlug,
+        "HYPOTHESES",
+        prior.id,
+        hypFields({
+          description,
+          dimension,
+          rootCausePattern: cause,
+          triggerCondition: JSON.stringify(trigger),
+          sampleCount,
+          avgVariancePct: avgVar,
+          confidence: Math.min(95, sampleCount * 12),
+          status: prior.status,
+        }),
+      );
+      hypId = prior.id;
+      updated++;
+    } else {
+      const rec = await core.create(
+        ctx.orgSlug,
+        "HYPOTHESES",
+        hypFields({
+          description,
+          dimension,
+          rootCausePattern: cause,
+          triggerCondition: JSON.stringify(trigger),
+          sampleCount: group.length,
+          avgVariancePct: avgVar,
+          confidence: Math.min(95, group.length * 12),
+          status: "pending",
+        }),
+      );
+      hypId = rec.id;
+      created++;
+    }
+    for (const c of group) {
+      await core.update(ctx.orgSlug, "CORRECTIONS", c.id, { Hypothesis: [hypId] });
+    }
+  }
+  return { created, updated };
+}
+
 // ── Hypothesis engine ───────────────────────────────────────────────
 // Cluster the org's un-linked corrections by (dimension + normalised root
 // cause); form or update a hypothesis once enough similar corrections exist.
@@ -96,6 +279,7 @@ export async function runHypothesisEngine(
   ctx: OrgCtx,
 ): Promise<{ created: number; updated: number }> {
   const settings = await getLearningSettings(ctx);
+  if (airtableEnabled()) return runHypothesisEngineAirtable(ctx, settings);
   const corrections = await prisma.platCorrection.findMany({
     where: { orgId: ctx.orgId, hypothesisId: null, rootCause: { not: "" } },
   });
@@ -198,11 +382,18 @@ export async function runHypothesisEngine(
 
 export async function setHypothesisStatus(
   ctx: OrgCtx,
-  id: number,
+  id: RecordId,
   status: "active" | "rejected",
 ): Promise<void> {
+  if (airtableEnabled()) {
+    await core.update(ctx.orgSlug, "HYPOTHESES", String(id), {
+      Status: status,
+      Date_Closed: status === "rejected" ? new Date().toISOString() : undefined,
+    });
+    return;
+  }
   await prisma.platHypothesis.updateMany({
-    where: { id, orgId: ctx.orgId },
+    where: { id: Number(id), orgId: ctx.orgId },
     data: { status, reviewedAt: new Date() },
   });
 }
@@ -267,10 +458,51 @@ export async function createRuleWithCode(
 
 export async function promoteHypothesisToRule(
   ctx: OrgCtx,
-  id: number,
+  id: RecordId,
   kind: "adjustment" | "guidance" = "adjustment",
 ): Promise<string | null> {
-  const h = await prisma.platHypothesis.findFirst({ where: { id, orgId: ctx.orgId } });
+  if (airtableEnabled()) {
+    const rec = await core.get(ctx.orgSlug, "HYPOTHESES", String(id)).catch(() => null);
+    if (!rec) return null;
+    const h = airHypothesis(rec);
+    const effectiveKind = h.avgVariancePct !== 0 && kind === "adjustment" ? "adjustment" : "guidance";
+    let adjustment = "{}";
+    if (effectiveKind === "adjustment") {
+      const variances = (await core.list(ctx.orgSlug, "CORRECTIONS", { maxRecords: 1000 }))
+        .filter(
+          (c) =>
+            Array.isArray(c["Hypothesis"]) &&
+            (c["Hypothesis"] as unknown[]).map(String).includes(String(id)),
+        )
+        .map((c) => (typeof c["Variance_Percent"] === "number" ? (c["Variance_Percent"] as number) : null))
+        .filter((v): v is number => v != null);
+      const signed = variances.length
+        ? variances.reduce((s, v) => s + v, 0) / variances.length
+        : h.avgVariancePct;
+      const mult = Math.round((1 + signed / 100) * 1000) / 1000;
+      const adj: Adjustment =
+        h.dimension === "contingency"
+          ? { type: "contingency_pct", value: Math.abs(h.avgVariancePct) }
+          : { type: "dimension_multiplier", value: mult, dimension: h.dimension };
+      adjustment = JSON.stringify(adj);
+    }
+    const rule = await createRuleWithCode(ctx, {
+      kind: effectiveKind,
+      description: h.description,
+      dimension: h.dimension,
+      triggerCondition: h.triggerCondition,
+      adjustment,
+      priority: 3,
+      confidence: Math.max(72, h.confidence),
+      isActive: true,
+      autoApply: false,
+      dateActivated: new Date(),
+    });
+    await core.update(ctx.orgSlug, "HYPOTHESES", String(id), { Status: "promoted" });
+    return rule.id;
+  }
+
+  const h = await prisma.platHypothesis.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!h) return null;
 
   const effectiveKind = h.avgVariancePct !== 0 && kind === "adjustment" ? "adjustment" : "guidance";
@@ -492,18 +724,41 @@ export async function learningPromptText(ctx: OrgCtx): Promise<string> {
 
 // ── Contextual Intelligence snapshot ────────────────────────────────
 
+/** Corrections with a variance, from the active backend. */
+async function snapshotCorrections(ctx: OrgCtx): Promise<{ variancePct: number | null }[]> {
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "CORRECTIONS", { maxRecords: 1000 });
+    return rows
+      .map((r) => ({
+        variancePct: typeof r["Variance_Percent"] === "number" ? (r["Variance_Percent"] as number) : null,
+      }))
+      .filter((c) => c.variancePct != null);
+  }
+  return prisma.platCorrection.findMany({
+    where: { orgId: ctx.orgId, variancePct: { not: null } },
+    select: { variancePct: true },
+  });
+}
+
+/** Count of pending hypotheses, from the active backend. */
+async function snapshotPendingHyp(ctx: OrgCtx): Promise<number> {
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "HYPOTHESES", { maxRecords: 500 });
+    return rows.filter((r) => (S(r["Status"]) || "pending") === "pending").length;
+  }
+  return prisma.platHypothesis.count({ where: { orgId: ctx.orgId, status: "pending" } });
+}
+
 export async function snapshotIntelligence(ctx: OrgCtx): Promise<number> {
+  // Rules + corrections + hypotheses come from the active backend (Airtable when
+  // on); job counts + the snapshot history stay Postgres (snapshots are a local
+  // metric log, not migrated).
   const [totalJobs, completedJobs, rules, corrections, pendingHyp, prevSnap] = await Promise.all([
     prisma.platJob.count({ where: { orgId: ctx.orgId } }),
     prisma.platJob.count({ where: { orgId: ctx.orgId, status: { in: ["completed", "archived"] } } }),
-    // Rules from the active backend (Airtable when on); corrections/hypotheses
-    // remain Postgres engine state, so the snapshot bridges both.
     getActiveRules(ctx),
-    prisma.platCorrection.findMany({
-      where: { orgId: ctx.orgId, variancePct: { not: null } },
-      select: { variancePct: true },
-    }),
-    prisma.platHypothesis.count({ where: { orgId: ctx.orgId, status: "pending" } }),
+    snapshotCorrections(ctx),
+    snapshotPendingHyp(ctx),
     prisma.platIntelligenceSnapshot.findFirst({
       where: { orgId: ctx.orgId },
       orderBy: { capturedAt: "desc" },
