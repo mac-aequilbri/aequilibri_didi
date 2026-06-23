@@ -77,6 +77,9 @@ export const CORE_SCHEMA = {
       { name: "Alternatives_Rejected", id: "fld6bddEWs7EQHqGp", type: "multilineText" },
       { name: "Rationale", id: "fldXH5tHvUC8RpuCi", type: "multilineText" },
       { name: "Domain", id: "fldQOD6FVY3WY2lCV", type: "singleLineText" },
+      // Added by scripts/airtable-add-decision-job-link.mjs (addressed by name —
+      // placeholder id; re-run airtable-gen-schema.mjs to capture the real id).
+      { name: "Job", id: "fldDecisionJobLink00", type: "multipleRecordLinks" },
     ],
   },
   ACTION_HUB: {

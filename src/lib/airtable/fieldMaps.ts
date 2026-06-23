@@ -114,6 +114,10 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Rationale", from: "rationale", to: S, createDefault: "" },
       { air: "Status", from: "status", createDefault: "proposed", to: (v) => DECISION_STATUS[S(v)] ?? "Pending" },
       { air: "Decision_Date", from: "decidedAt", to: DATE },
+      // Direct Job link (added by airtable-add-decision-job-link.mjs); the
+      // canonical schema hangs decisions off WORKSTREAMS/ACTION_HUB, but the app
+      // associates them with a job. LINK no-ops on a non-rec id (Postgres mode).
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   workstream: {
