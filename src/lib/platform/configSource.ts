@@ -1,0 +1,70 @@
+// Customer Config reads — Postgres (default) or Airtable when the flag is on.
+// Backs the reference dropdowns (budget categories on decisions/new + budget/
+// new) and the vendor dropdown (procurement/new), plus the learning-engine
+// threshold settings. These are Customer Config tier (PLAT_CFG_* / VENDORS in
+// Airtable); onboarding mirrors them into the per-client base (see onboarding).
+//
+// Transitional resilience: during the Postgres→Airtable cutover an org's config
+// may exist only in Postgres (provisioned before the mirror shipped). So the
+// Airtable reads fall back to Postgres when the base returns nothing, rather
+// than showing an empty dropdown. Once a base is fully seeded the fallback is
+// inert.
+
+import { airtableEnabled, core } from "@/lib/airtable";
+import { prisma } from "@/lib/db";
+import type { OrgCtx } from "./types";
+
+export interface RefOption {
+  id: string;
+  name: string;
+}
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+function num(v: unknown): number {
+  return typeof v === "number" ? v : 0;
+}
+
+async function referencesFromPostgres(ctx: OrgCtx, type: string): Promise<RefOption[]> {
+  const rows = await prisma.platCfgReference.findMany({
+    where: { orgId: ctx.orgId, type, isActive: true },
+    orderBy: { sortOrder: "asc" },
+  });
+  return rows.map((r) => ({ id: String(r.id), name: r.name }));
+}
+
+/** Reference values of a given type (e.g. "budget_category") for a picker. */
+export async function loadReferenceOptions(ctx: OrgCtx, type: string): Promise<RefOption[]> {
+  if (!airtableEnabled()) return referencesFromPostgres(ctx, type);
+  const rows = await core.list(ctx.orgSlug, "PLAT_CFG_REFERENCE", { maxRecords: 500 });
+  const out = rows
+    .filter((r) => str(r["Ref_Type"]) === type && r["Is_Active"] !== false)
+    .sort((a, b) => num(a["Sort_Order"]) - num(b["Sort_Order"]))
+    .map((r) => ({ id: r.id, name: str(r["Name"]) }))
+    .filter((o) => o.name);
+  // Transitional fallback: base not yet seeded → use Postgres so the dropdown
+  // isn't empty for an org provisioned before the config mirror.
+  return out.length ? out : referencesFromPostgres(ctx, type);
+}
+
+async function vendorsFromPostgres(ctx: OrgCtx): Promise<RefOption[]> {
+  const rows = await prisma.platConVendor.findMany({
+    where: { orgId: ctx.orgId, isActive: true },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return rows.map((v) => ({ id: String(v.id), name: v.name }));
+}
+
+/** Active vendors for the procurement vendor picker. */
+export async function loadVendorOptions(ctx: OrgCtx): Promise<RefOption[]> {
+  if (!airtableEnabled()) return vendorsFromPostgres(ctx);
+  const rows = await core.list(ctx.orgSlug, "VENDORS", { maxRecords: 500 });
+  const out = rows
+    .filter((v) => v["Is_Active"] !== false)
+    .map((v) => ({ id: v.id, name: str(v["Vendor_Name"]) }))
+    .filter((o) => o.name)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return out.length ? out : vendorsFromPostgres(ctx);
+}

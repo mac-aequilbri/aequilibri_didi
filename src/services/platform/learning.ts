@@ -5,6 +5,7 @@
 // ("adjustment" = numeric, applied by the assessment engine; "guidance" =
 // text, injected into the assistant prompt); thresholds live in PlatCfgSetting.
 
+import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { OrgCtx } from "@/lib/platform/types";
 
@@ -35,16 +36,38 @@ const SETTING_KEYS: Record<keyof LearningSettings, string> = {
   autoApplyTriggers: "learning.auto_apply_min_triggers",
 };
 
-export async function getLearningSettings(ctx: OrgCtx): Promise<LearningSettings> {
+async function settingsByKey(ctx: OrgCtx): Promise<Map<string, string>> {
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "PLAT_CFG_SETTING", { maxRecords: 500 });
+    const m = new Map<string, string>();
+    for (const r of rows) {
+      const key = typeof r["Setting_Key"] === "string" ? (r["Setting_Key"] as string) : "";
+      if (key) m.set(key, typeof r["Value"] === "string" ? (r["Value"] as string) : String(r["Value"] ?? ""));
+    }
+    return m;
+  }
   const rows = await prisma.platCfgSetting.findMany({
     where: { orgId: ctx.orgId, key: { in: Object.values(SETTING_KEYS) } },
   });
-  const byKey = new Map(rows.map((r) => [r.key, r.value]));
+  return new Map(rows.map((r) => [r.key, r.value]));
+}
+
+export async function getLearningSettings(ctx: OrgCtx): Promise<LearningSettings> {
+  const byKey = await settingsByKey(ctx);
   const out = { ...DEFAULTS };
   for (const [field, key] of Object.entries(SETTING_KEYS) as [keyof LearningSettings, string][]) {
     const raw = byKey.get(key);
     if (raw == null) continue;
-    const n = Number(JSON.parse(raw));
+    // Settings are stored as a JSON-encoded scalar in Postgres; the Airtable
+    // mirror stores the plain value. Parse defensively for both.
+    let n = Number(raw);
+    if (!Number.isFinite(n)) {
+      try {
+        n = Number(JSON.parse(raw));
+      } catch {
+        continue;
+      }
+    }
     if (Number.isFinite(n) && n > 0) out[field] = n;
   }
   return out;

@@ -8,11 +8,40 @@
 //     as guidance learning rules before any jobs run, so the assistant
 //     starts with something to work from.
 
-import { airtableEnabled } from "@/lib/airtable";
+import { airtableEnabled, core } from "@/lib/airtable";
 import { provisionClientBase } from "@/lib/airtable/provision";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { DEFAULT_FEATURES, EngagementType, AiAuthority } from "@/lib/platform/types";
+
+/** The learning-engine threshold settings seeded for every new org. */
+const SEED_SETTINGS: Array<{ key: string; value: string }> = [
+  { key: "learning.hypothesis_min_samples", value: "3" },
+  { key: "learning.rule_min_samples", value: "5" },
+  { key: "learning.auto_apply_min_confidence", value: "85" },
+  { key: "learning.auto_apply_min_triggers", value: "50" },
+];
+
+/** Mirror the org's Customer Config (budget categories + learning settings)
+ *  into its Airtable base, so the Airtable-backed reads (configSource,
+ *  getLearningSettings) see the same data the Postgres txn just wrote. Best
+ *  effort: a mirror failure must not fail onboarding (Postgres remains the
+ *  fallback during the cutover), so callers swallow errors. */
+async function mirrorConfigToBase(orgSlug: string, categories: string[]): Promise<void> {
+  for (let i = 0; i < categories.length; i++) {
+    const name = categories[i];
+    await core.create(orgSlug, "PLAT_CFG_REFERENCE", {
+      Name: name,
+      Ref_Type: "budget_category",
+      Code: name.toLowerCase().replace(/\s+/g, "_").slice(0, 100),
+      Sort_Order: i,
+      Is_Active: true,
+    });
+  }
+  for (const s of SEED_SETTINGS) {
+    await core.create(orgSlug, "PLAT_CFG_SETTING", { Setting_Key: s.key, Value: s.value });
+  }
+}
 
 export interface ProvisionInput {
   slug: string;
@@ -80,6 +109,9 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
     }
   }
 
+  const categories = input.budgetCategories.map((c) => c.trim()).filter(Boolean);
+  const rules = input.initialRules.map((r) => r.trim()).filter(Boolean);
+
   const orgId = await prisma.$transaction(async (tx) => {
     // ── Instance Setup ──────────────────────────────────────────────
     const org = await tx.platOrganisation.create({
@@ -114,7 +146,6 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
       });
     }
 
-    const categories = input.budgetCategories.map((c) => c.trim()).filter(Boolean);
     if (categories.length) {
       await tx.platCfgReference.createMany({
         data: categories.map((name, i) => ({
@@ -128,16 +159,10 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
     }
 
     await tx.platCfgSetting.createMany({
-      data: [
-        { orgId: org.id, key: "learning.hypothesis_min_samples", value: "3" },
-        { orgId: org.id, key: "learning.rule_min_samples", value: "5" },
-        { orgId: org.id, key: "learning.auto_apply_min_confidence", value: "85" },
-        { orgId: org.id, key: "learning.auto_apply_min_triggers", value: "50" },
-      ],
+      data: SEED_SETTINGS.map((s) => ({ orgId: org.id, key: s.key, value: s.value })),
     });
 
     // ── Domain Knowledge Initialisation ─────────────────────────────
-    const rules = input.initialRules.map((r) => r.trim()).filter(Boolean);
     let seq = 0;
     for (const description of rules) {
       seq += 1;
@@ -179,6 +204,17 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
 
     return org.id;
   });
+
+  // Mirror Customer Config into the org's Airtable base (best effort — the
+  // Postgres txn already succeeded, and configSource falls back to Postgres if
+  // the base isn't seeded). Seed learning rules are mirrored separately.
+  if (airtableEnabled()) {
+    try {
+      await mirrorConfigToBase(slug, categories);
+    } catch (err) {
+      logger.warn("Airtable config mirror skipped", { slug, ...errMeta(err) });
+    }
+  }
 
   return { ok: true, orgId, slug };
 }
