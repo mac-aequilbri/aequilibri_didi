@@ -19,16 +19,16 @@ export async function runEngineAction(formData: FormData): Promise<void> {
 
 export async function promoteHypothesisAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const id = Number(formData.get("hypothesisId"));
+  const id = recordIdParam(formData.get("hypothesisId"));
   const kind = String(formData.get("kind") ?? "adjustment") as "adjustment" | "guidance";
-  if (id) await promoteHypothesisToRule(ctx, id, kind);
+  if (id != null) await promoteHypothesisToRule(ctx, id, kind);
   revalidatePath(orgPath(ctx.orgSlug, "/learning-rules"));
 }
 
 export async function rejectHypothesisAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const id = Number(formData.get("hypothesisId"));
-  if (id) await setHypothesisStatus(ctx, id, "rejected");
+  const id = recordIdParam(formData.get("hypothesisId"));
+  if (id != null) await setHypothesisStatus(ctx, id, "rejected");
   revalidatePath(orgPath(ctx.orgSlug, "/learning-rules"));
 }
 

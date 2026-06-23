@@ -130,6 +130,10 @@ export const CORE_SCHEMA = {
       { name: "Corrected_By", id: "fldtPQNq766YT6dwr", type: "singleLineText" },
       { name: "Rule_Generated", id: "fldttqS321zeFEbHE", type: "checkbox" },
       { name: "Notes", id: "fldGP71ILWQvF5ASz", type: "multilineText" },
+      // Added by scripts/airtable-add-hypothesis-link.mjs. Fields are addressed
+      // by NAME (clone-stable), so this placeholder id is never used on the wire;
+      // re-run airtable-gen-schema.mjs against the template to capture the real id.
+      { name: "Hypothesis", id: "fldHypothesisLink000", type: "multipleRecordLinks" },
     ],
   },
   JOBS: {
