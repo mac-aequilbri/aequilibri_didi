@@ -121,9 +121,11 @@ describe("RBAC — demo mode resolves the org's admin", () => {
     await prisma.platCfgTeamMember.create({
       data: { orgId: A.orgId, name: "Boss", role: "admin", email: "boss@iso.test" },
     });
+    // Legacy "admin" normalizes to "owner" (see normalizeTeamRole), which is the
+    // role the admin gate (isAdminRole) recognises.
     const user = await getCurrentUser(A);
-    expect(user.role).toBe("admin");
+    expect(user.role).toBe("owner");
     const admin = await requireAdmin(A);
-    expect(admin.role).toBe("admin");
+    expect(admin.role).toBe("owner");
   });
 });
