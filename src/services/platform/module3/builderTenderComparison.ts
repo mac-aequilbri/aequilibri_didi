@@ -40,7 +40,7 @@ function parseLines(text: string, tradeNames: string[]): TradeMatch[] {
     const lower = line.toLowerCase();
     const trade = tradeNames.find((t) => lower.includes(t.toLowerCase()));
     out.push({
-      item: trade ?? line.trim().slice(0, 80) || "unspecified",
+      item: trade ?? (line.trim().slice(0, 80) || "unspecified"),
       amount,
       provisional: /\b(pc|ps|provisional)\b/i.test(line),
     });

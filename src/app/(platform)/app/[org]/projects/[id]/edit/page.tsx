@@ -25,7 +25,7 @@ export default async function EditProjectPage({
     id: detail.id,
     code: detail.code,
     name: detail.name,
-    status: detail.status,
+    status: pgJob?.status ?? (airJob && typeof airJob["Status"] === "string" ? airJob["Status"] : "intake"),
     completionPct: detail.completionPct,
     healthScore: detail.healthScore,
     budgetTotal: detail.budget,

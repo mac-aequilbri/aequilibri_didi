@@ -1,4 +1,4 @@
-import { airtableEnabled, core } from "@/lib/airtable";
+import { airtableEnabled, core, type CoreRow } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import type { RecordId } from "@/lib/platform/recordWriter";
 import type { OrgCtx } from "@/lib/platform/types";
@@ -34,7 +34,7 @@ export async function loadCapabilityDocuments(
         .map((id) => core.get(ctx.orgSlug, "DOCUMENTS", id).catch(() => null)),
     );
     return docs
-      .filter((d): d is Record<string, unknown> => Boolean(d))
+      .filter((d): d is CoreRow => Boolean(d))
       .filter((d) => (jobId == null ? true : hasLinkedId(d["Job"], jobId)))
       .map((d) => ({
         id: String(d.id),

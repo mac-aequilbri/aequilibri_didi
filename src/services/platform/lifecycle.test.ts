@@ -130,7 +130,7 @@ describe("recordWriter lifecycle", () => {
     expect(action?.status).toBe("done");
 
     const pending = await prisma.platPendingWrite.findFirst({
-      where: { id: proposed.proposalId!, orgId: ctx.orgId },
+      where: { id: Number(proposed.proposalId), orgId: ctx.orgId },
     });
     expect(pending?.status).toBe("executed");
     expect(pending?.resolvedBy).toBe("Approver");
@@ -169,7 +169,7 @@ describe("recordWriter lifecycle", () => {
       requireApproval: true,
     });
     await prisma.platPendingWrite.updateMany({
-      where: { id: proposed.proposalId!, orgId: ctx.orgId },
+      where: { id: Number(proposed.proposalId), orgId: ctx.orgId },
       data: { expiresAt: new Date(Date.now() - 1000) },
     });
     await expect(executeProposal(ctx, proposed.proposalId!, "Approver")).rejects.toThrow(

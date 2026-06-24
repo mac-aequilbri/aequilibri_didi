@@ -243,8 +243,8 @@ async function routeOperationalWrites(
   actorName: string,
   suggestions: RouteSuggestion[],
   sourceDocumentId?: RecordId,
-): Promise<Module2Metadata["routeSuggestions"]> {
-  const out: Module2Metadata["routeSuggestions"] = [];
+): Promise<NonNullable<Module2Metadata["routeSuggestions"]>> {
+  const out: NonNullable<Module2Metadata["routeSuggestions"]> = [];
   for (const suggestion of suggestions) {
     const payload =
       sourceDocumentId != null && (suggestion.table === "decision" || suggestion.table === "action")
