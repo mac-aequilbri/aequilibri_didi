@@ -221,3 +221,162 @@ export async function provisionClientBase(
 
   return newBaseId;
 }
+
+export interface MigrationResult {
+  baseId: string;
+  templateBaseId: string;
+  createdTables: string[];
+  addedFields: { table: string; field: string }[];
+  createdLinks: { table: string; field: string }[];
+  skipped: { item: string; reason: string }[];
+  errors: string[];
+  changed: boolean;
+}
+
+const errMsg = (e: unknown): string =>
+  (e instanceof Error ? e.message : String(e)).slice(0, 160);
+
+/**
+ * Bring an existing client base UP to the template's provisionable schema —
+ * the "migrate this base" action behind the schema-drift dashboard. Additive
+ * only: it creates missing tables, missing simple fields, and missing link
+ * fields (deduping symmetric pairs and renaming the auto-created reverse, same
+ * as provisionClientBase). It NEVER deletes or alters existing fields, so it is
+ * safe to re-run and cannot lose data. Computed fields and TEAM/PRICING links
+ * are skipped exactly as in provisioning, so a base reads in-sync afterwards.
+ */
+export async function migrateBaseToTemplate(
+  baseId: string,
+  opts: { templateBaseId?: string } = {},
+): Promise<MigrationResult> {
+  const from = opts.templateBaseId ?? templateBaseId();
+  const res: MigrationResult = {
+    baseId,
+    templateBaseId: from,
+    createdTables: [],
+    addedFields: [],
+    createdLinks: [],
+    skipped: [],
+    errors: [],
+    changed: false,
+  };
+
+  const all = await readBaseSchema(from);
+  const platformTemplate = all.filter((t) => PLATFORM_TABLES.has(t.name));
+  const copiedNames = new Set(platformTemplate.map((t) => t.name));
+
+  const target = await readBaseSchema(baseId);
+  const targetByName = new Set(target.map((t) => t.name));
+  const idByName = new Map(target.map((t) => [t.name, t.id]));
+  const targetFields = new Map(target.map((t) => [t.name, new Set(t.fields.map((f) => f.name))]));
+
+  const templateFieldName = (fieldId: string): string | undefined => {
+    for (const t of all) {
+      const f = t.fields.find((x) => x.id === fieldId);
+      if (f) return f.name;
+    }
+    return undefined;
+  };
+
+  // Phase A — create missing tables with their simple fields.
+  for (const t of platformTemplate) {
+    if (targetByName.has(t.name)) continue;
+    const simple = t.fields.filter(isSimple);
+    const primary = simple[0];
+    if (!primary) {
+      res.skipped.push({ item: `table ${t.name}`, reason: "no creatable primary field" });
+      continue;
+    }
+    try {
+      await sleep();
+      const created = (await metaFetch(`bases/${baseId}/tables`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: t.name,
+          fields: [simpleSpec(primary), ...simple.slice(1).map(simpleSpec)],
+        }),
+      })) as { id: string };
+      idByName.set(t.name, created.id);
+      targetFields.set(t.name, new Set(simple.map((f) => f.name)));
+      res.createdTables.push(t.name);
+      res.changed = true;
+    } catch (e) {
+      res.errors.push(`create table ${t.name}: ${errMsg(e)}`);
+    }
+  }
+
+  // Phase B — add missing simple fields to tables that already existed.
+  for (const t of platformTemplate) {
+    if (res.createdTables.includes(t.name)) continue; // created above with all simple fields
+    const tableId = idByName.get(t.name);
+    const have = targetFields.get(t.name);
+    if (!tableId || !have) continue;
+    for (const f of t.fields) {
+      if (!isSimple(f) || have.has(f.name)) continue;
+      try {
+        await sleep();
+        await metaFetch(`bases/${baseId}/tables/${tableId}/fields`, {
+          method: "POST",
+          body: JSON.stringify(simpleSpec(f)),
+        });
+        have.add(f.name);
+        res.addedFields.push({ table: t.name, field: f.name });
+        res.changed = true;
+      } catch (e) {
+        res.errors.push(`add ${t.name}.${f.name}: ${errMsg(e)}`);
+      }
+    }
+  }
+
+  // Phase C — link fields: one side per symmetric pair, skip when the
+  // relationship is already present, skip targets we don't copy (TEAM/PRICING).
+  const handled = new Set<string>();
+  for (const t of platformTemplate) {
+    const tableId = idByName.get(t.name);
+    if (!tableId) continue;
+    for (const f of t.fields.filter(isLink)) {
+      if (handled.has(f.id)) continue;
+      const invId = f.options?.inverseLinkFieldId;
+      handled.add(f.id);
+      if (invId) handled.add(invId);
+
+      const targetTableName = all.find((x) => x.id === f.options?.linkedTableId)?.name ?? null;
+      if (!targetTableName || !copiedNames.has(targetTableName)) continue; // not copied
+      const linkedTableId = idByName.get(targetTableName);
+      if (!linkedTableId) {
+        res.errors.push(`link ${t.name}.${f.name}: target ${targetTableName} absent`);
+        continue;
+      }
+
+      const invName = invId ? templateFieldName(invId) : undefined;
+      const haveSrc = targetFields.get(t.name)?.has(f.name) ?? false;
+      const haveInv = invName ? (targetFields.get(targetTableName)?.has(invName) ?? false) : false;
+      if (haveSrc || haveInv) continue; // relationship already exists on a side
+
+      try {
+        await sleep();
+        const created = (await metaFetch(`bases/${baseId}/tables/${tableId}/fields`, {
+          method: "POST",
+          body: JSON.stringify({ name: f.name, type: "multipleRecordLinks", options: { linkedTableId } }),
+        })) as { options?: { inverseLinkFieldId?: string } };
+        targetFields.get(t.name)?.add(f.name);
+        res.createdLinks.push({ table: t.name, field: f.name });
+        res.changed = true;
+        // Rename the auto-created reverse to the template's inverse name.
+        const newInvId = created.options?.inverseLinkFieldId;
+        if (invName && newInvId) {
+          await sleep();
+          await metaFetch(`bases/${baseId}/tables/${linkedTableId}/fields/${newInvId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ name: invName }),
+          });
+          targetFields.get(targetTableName)?.add(invName);
+        }
+      } catch (e) {
+        res.errors.push(`create link ${t.name}.${f.name}: ${errMsg(e)}`);
+      }
+    }
+  }
+
+  return res;
+}

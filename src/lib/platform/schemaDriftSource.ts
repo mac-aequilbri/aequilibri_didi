@@ -148,6 +148,14 @@ async function driftForOrg(
   }
 }
 
+/** Base ids of every managed org (control registry or Postgres). Used to guard
+ *  the migrate action so it can only target a base the platform actually owns. */
+export async function listManagedBaseIds(): Promise<Set<string>> {
+  if (!airtableEnabled()) return new Set();
+  const { orgs } = await enumerateOrgs();
+  return new Set(orgs.map((o) => o.baseId).filter((b): b is string => !!b));
+}
+
 export async function loadSchemaDrift(): Promise<SchemaDriftReport> {
   const expectedCoreVersion = MODULE1_CORE_SCHEMA_VERSION;
   const template = templateBaseId();

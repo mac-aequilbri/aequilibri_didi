@@ -8,8 +8,26 @@ import { PageHeader } from "@/components/PageHeader";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { loadSchemaDrift, type OrgDrift } from "@/lib/platform/schemaDriftSource";
+import { migrateBaseAction } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+function MigrateResultBanner({ sp }: { sp: Record<string, string | string[] | undefined> }) {
+  const status = typeof sp.status === "string" ? sp.status : undefined;
+  if (!status) return null;
+  const migrated = typeof sp.migrated === "string" ? sp.migrated : "";
+  const applied = typeof sp.applied === "string" ? sp.applied : "0";
+  const map: Record<string, { cls: string; text: string }> = {
+    ok: { cls: "bg-emerald-50 text-emerald-800 border-emerald-200", text: `Migrated ${migrated} — applied ${applied} schema change(s).` },
+    partial: { cls: "bg-amber-50 text-amber-800 border-amber-200", text: `Migrated ${migrated} with errors — applied ${applied} change(s). See the row for remaining drift.` },
+    noop: { cls: "bg-neutral-50 text-neutral-700 border-neutral-200", text: `${migrated} was already in sync — nothing to apply.` },
+    unavailable: { cls: "bg-neutral-50 text-neutral-700 border-neutral-200", text: "Migration unavailable (Airtable mode off or no base id)." },
+    unknown_base: { cls: "bg-rose-50 text-rose-800 border-rose-200", text: "Refused: that base id is not managed by this platform." },
+  };
+  const m = map[status];
+  if (!m) return null;
+  return <div className={`mb-4 rounded-md border px-3 py-2 text-sm ${m.cls}`}>{m.text}</div>;
+}
 
 function StatusBadge({ org }: { org: OrgDrift }) {
   if (!org.reachable) {
@@ -33,8 +51,15 @@ function StatusBadge({ org }: { org: OrgDrift }) {
   );
 }
 
-export default async function SchemaDriftPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function SchemaDriftPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { org } = await params;
+  const sp = await searchParams;
   const ctx = await requireOrgCtx(org);
   await requireAdmin(ctx);
 
@@ -48,6 +73,8 @@ export default async function SchemaDriftPage({ params }: { params: Promise<{ or
         title="Schema drift"
         subtitle="Which customer bases have fallen behind the template schema."
       />
+
+      <MigrateResultBanner sp={sp} />
 
       <section className="ae-card p-5 mb-6 space-y-2 text-sm">
         <div className="flex justify-between">
@@ -98,7 +125,8 @@ export default async function SchemaDriftPage({ params }: { params: Promise<{ or
                 <th className="py-1 pr-2">Base</th>
                 <th className="py-1 pr-2 text-center">Status</th>
                 <th className="py-1 pr-2 text-right">Missing tables</th>
-                <th className="py-1 text-right">Missing fields</th>
+                <th className="py-1 pr-2 text-right">Missing fields</th>
+                <th className="py-1 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -130,8 +158,24 @@ export default async function SchemaDriftPage({ params }: { params: Promise<{ or
                   <td className="py-2 pr-2 text-right font-mono">
                     {o.reachable ? o.missingTables.length : "—"}
                   </td>
-                  <td className="py-2 text-right font-mono">
+                  <td className="py-2 pr-2 text-right font-mono">
                     {o.reachable ? o.missingFieldCount : "—"}
+                  </td>
+                  <td className="py-2 text-right">
+                    {o.reachable && !o.inSync && o.baseId ? (
+                      <form action={migrateBaseAction}>
+                        <input type="hidden" name="org" value={ctx.orgSlug} />
+                        <input type="hidden" name="baseId" value={o.baseId} />
+                        <button
+                          type="submit"
+                          className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50"
+                        >
+                          Migrate ↑
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="text-xs text-neutral-300">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
