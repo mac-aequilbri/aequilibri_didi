@@ -12,7 +12,7 @@
 // client URL-encodes them) and the control base id comes from the environment,
 // never resolved (it would be circular).
 
-import { createRecords, listRecords } from "./client";
+import { createRecords, deleteRecords, listRecords } from "./client";
 import { airtableEnabled } from "./config";
 
 const S = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
@@ -156,6 +156,40 @@ export async function createOrgRegistry(entry: NewOrgRegistry): Promise<number> 
     },
   ]);
   return orgId;
+}
+
+export interface OrgDeletionResult {
+  slug: string;
+  /** The org's Airtable base id, if it had one — the caller surfaces this so an
+   *  operator can delete the base manually (the API can't delete bases). */
+  baseId: string | null;
+  removedRegistry: number;
+  removedTeam: number;
+}
+
+/**
+ * Remove an org from the control registry: its PLAT_ORG_REGISTRY row plus every
+ * PLAT_TEAM row for the slug. This is how a (test or broken) client is offboarded
+ * so it stops appearing in the picker. It does NOT delete the org's per-customer
+ * Airtable base — Airtable's API has no base-delete — so the base id is returned
+ * for the operator to remove manually in the Airtable UI.
+ */
+export async function deleteOrgFromRegistry(slug: string): Promise<OrgDeletionResult> {
+  const base = controlBaseId();
+  if (!base) throw new Error("AIRTABLE_CONTROL_BASE_ID is not set");
+  const safe = formulaSafe(slug);
+  const regRecs = await listRecords(base, REGISTRY, {
+    filterByFormula: `{Slug}='${safe}'`,
+    maxRecords: 10,
+  });
+  const baseId = regRecs.length ? S(regRecs[0].fields["Airtable_Base_Id"]) || null : null;
+  const teamRecs = await listRecords(base, TEAM, {
+    filterByFormula: `{Org_Slug}='${safe}'`,
+    maxRecords: 1000,
+  });
+  if (regRecs.length) await deleteRecords(base, REGISTRY, regRecs.map((r) => r.id));
+  if (teamRecs.length) await deleteRecords(base, TEAM, teamRecs.map((r) => r.id));
+  return { slug, baseId, removedRegistry: regRecs.length, removedTeam: teamRecs.length };
 }
 
 /** Add a team member to the control base. */

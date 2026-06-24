@@ -7,6 +7,8 @@ import Link from "next/link";
 import { controlEnabled, listControlTeam, listOrgRegistry } from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { getAuthEmail, isPlatformAdmin } from "@/lib/platform/org-context";
+import { deleteOrgAction } from "./actions";
+import { DeleteClientButton } from "./DeleteClientButton";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +25,9 @@ interface OrgCard {
 export default async function OrgPickerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ denied?: string }>;
+  searchParams: Promise<{ denied?: string; deleted?: string; base?: string }>;
 }) {
-  const { denied } = await searchParams;
+  const { denied, deleted, base } = await searchParams;
   const email = await getAuthEmail();
   const canProvision = await isPlatformAdmin();
 
@@ -78,6 +80,17 @@ export default async function OrgPickerPage({
           </Link>
         )}
       </div>
+      {deleted ? (
+        <p className="mb-6 text-sm text-emerald-700">
+          Removed <strong>{deleted}</strong> from the registry.
+          {base ? (
+            <>
+              {" "}Its Airtable base <code>{base}</code> was <strong>not</strong> deleted (Airtable has no
+              base-delete API) — remove it manually in Airtable if you want it gone.
+            </>
+          ) : null}
+        </p>
+      ) : null}
       {denied === "admin" ? (
         <p className="mb-6 text-sm text-red-600">
           Provisioning new organisations requires a platform operator (PLATFORM_ADMIN_EMAILS).
@@ -100,17 +113,20 @@ export default async function OrgPickerPage({
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
           {visible.map((org) => (
-            <Link
-              key={org.slug}
-              href={`/app/${org.slug}`}
-              className="ae-card p-6 block hover:shadow-md transition-shadow"
-            >
-              <h2 className="text-lg font-semibold mb-1">{org.name}</h2>
-              <p className="text-sm text-neutral-600 capitalize">
-                {org.vertical} · {org.defaultEngagementType.replace("_", " ")}
-                {org.jobs !== null ? ` · ${org.jobs} job${org.jobs === 1 ? "" : "s"}` : ""}
-              </p>
-            </Link>
+            <div key={org.slug} className="ae-card p-6 flex flex-col">
+              <Link href={`/app/${org.slug}`} className="block hover:opacity-80 transition-opacity">
+                <h2 className="text-lg font-semibold mb-1">{org.name}</h2>
+                <p className="text-sm text-neutral-600 capitalize">
+                  {org.vertical} · {org.defaultEngagementType.replace("_", " ")}
+                  {org.jobs !== null ? ` · ${org.jobs} job${org.jobs === 1 ? "" : "s"}` : ""}
+                </p>
+              </Link>
+              {canProvision && (
+                <div className="mt-4 pt-3 border-t border-neutral-100">
+                  <DeleteClientButton action={deleteOrgAction} slug={org.slug} name={org.name} />
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
