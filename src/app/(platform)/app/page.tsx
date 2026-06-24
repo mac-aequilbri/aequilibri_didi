@@ -85,8 +85,17 @@ export default async function OrgPickerPage({
           Removed <strong>{deleted}</strong> from the registry.
           {base ? (
             <>
-              {" "}Its Airtable base <code>{base}</code> was <strong>not</strong> deleted (Airtable has no
-              base-delete API) — remove it manually in Airtable if you want it gone.
+              {" "}Its Airtable base was <strong>not</strong> deleted — Airtable has no base-delete API on
+              this plan, so remove it by hand:{" "}
+              <a
+                href={`https://airtable.com/${base}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline font-mono"
+              >
+                open {base} ↗
+              </a>{" "}
+              then base options → Delete base.
             </>
           ) : null}
         </p>
