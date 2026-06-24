@@ -16,7 +16,7 @@ import {
   getOrgRegistry,
 } from "@/lib/airtable/control";
 import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
-import { provisionClientBase } from "@/lib/airtable/provision";
+import { probeBaseDataAccess, provisionClientBase } from "@/lib/airtable/provision";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { defaultModule1Governance, normalizeTeamRole, type TeamRole } from "@/lib/platform/module1Governance";
@@ -205,6 +205,26 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
       return {
         ok: false,
         error: `Could not provision the Airtable base: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    // The base cloned (meta API), but verify the token can read/write its
+    // RECORDS (data API) before registering the org. Otherwise we'd create an
+    // org whose every page 403s on first load. Fail loudly with the base id so
+    // it can be cleaned up and the cause (token data scope/access) fixed.
+    try {
+      await probeBaseDataAccess(airtableBaseId);
+    } catch (err) {
+      logger.error("Provisioned base is not data-accessible", {
+        slug,
+        baseId: airtableBaseId,
+        ...errMeta(err),
+      });
+      return {
+        ok: false,
+        error:
+          `Base ${airtableBaseId} was provisioned but the API token cannot read/write its records: ` +
+          `${err instanceof Error ? err.message : String(err)}. ` +
+          `Check the token's data.records scope and base access, then delete this base and retry.`,
       };
     }
   }

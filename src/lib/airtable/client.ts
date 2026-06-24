@@ -17,12 +17,23 @@ import type { AirtableRecord, ListOptions } from "./types";
 
 const API_ROOT = "https://api.airtable.com/v0";
 
+export interface AirtableErrorContext {
+  baseId?: string;
+  method?: string;
+  /** Table segment of the path (the resource being addressed), if derivable. */
+  resource?: string;
+}
+
 export class AirtableError extends Error {
   constructor(
     readonly status: number,
     readonly body: string,
+    readonly context?: AirtableErrorContext,
   ) {
-    super(`Airtable API error ${status}: ${body}`);
+    const ctx = context
+      ? ` [${context.method ?? "GET"} ${context.baseId ?? "?"}/${context.resource ?? "?"}]`
+      : "";
+    super(`Airtable API error ${status}${ctx}: ${body}`);
     this.name = "AirtableError";
   }
 }
@@ -38,7 +49,14 @@ async function request(baseId: string, path: string, init: RequestInit): Promise
       },
     });
     if (!res.ok) {
-      throw new AirtableError(res.status, await res.text());
+      // Surface which base + resource failed — a bare "403" is undiagnosable.
+      const afterBase = path.startsWith(`${baseId}/`) ? path.slice(baseId.length + 1) : path;
+      const resource = decodeURIComponent(afterBase.split("?")[0].split("/")[0] || "");
+      throw new AirtableError(res.status, await res.text(), {
+        baseId,
+        method: init.method ?? "GET",
+        resource,
+      });
     }
     // DELETE/204 has no JSON body for some endpoints; guard accordingly.
     const text = await res.text();

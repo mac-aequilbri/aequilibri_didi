@@ -13,6 +13,7 @@
 // tool for ad-hoc/dry-run provisioning). Keep the two in sync.
 
 import { airtablePat, DEMO_BASE_ID } from "./config";
+import { createRecords, deleteRecords, listRecords } from "./client";
 import { logger } from "@/lib/logger";
 
 const META = "https://api.airtable.com/v0/meta";
@@ -220,6 +221,39 @@ export async function provisionClientBase(
   }
 
   return newBaseId;
+}
+
+/**
+ * Verify the API token can actually READ and WRITE records on a base via the
+ * data API — not just provision its schema (meta API). A base can clone fine
+ * (meta scope) yet 403 on records if the token lacks data scope/access, which
+ * otherwise surfaces as an opaque error on the first page load. Probes a table
+ * that always exists in a platform clone, with a short retry for any transient
+ * post-creation delay. Throws (with base+resource context via AirtableError) if
+ * the base is not usable.
+ */
+export async function probeBaseDataAccess(
+  baseId: string,
+  opts: { attempts?: number; delayMs?: number } = {},
+): Promise<void> {
+  const attempts = opts.attempts ?? 3;
+  const delayMs = opts.delayMs ?? 1500;
+  const PROBE_TABLE = "PLAT_CFG_SETTING";
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await listRecords(baseId, PROBE_TABLE, { maxRecords: 1 });
+      const [rec] = await createRecords(baseId, PROBE_TABLE, [
+        { Setting_Key: "__provision_probe__" },
+      ]);
+      if (rec?.id) await deleteRecords(baseId, PROBE_TABLE, [rec.id]);
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) await sleep(delayMs);
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 export interface MigrationResult {
