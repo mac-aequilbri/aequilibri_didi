@@ -1,8 +1,10 @@
 // Delay cascade analysis — results are logged to the execution log; this
 // page shows the latest analyses alongside the trigger form.
 
+import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import type { CascadeResult } from "@/services/platform/construction/delay";
 import { runDelayCascade } from "./actions";
@@ -12,16 +14,14 @@ export const dynamic = "force-dynamic";
 export default async function DelayCascadePage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
   const [jobs, analyses] = await Promise.all([
-    prisma.platJob.findMany({
-      where: { orgId: ctx.orgId },
-      select: { id: true, code: true, name: true },
-      orderBy: { code: "asc" },
-    }),
-    prisma.platExecutionLog.findMany({
-      where: { orgId: ctx.orgId, targetTable: "delay_cascade" },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    }),
+    loadJobOptions(ctx),
+    airtableEnabled()
+      ? core.list(ctx.orgSlug, "EXECUTION_LOG", { maxRecords: 100 })
+      : prisma.platExecutionLog.findMany({
+          where: { orgId: ctx.orgId, targetTable: "delay_cascade" },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        }),
   ]);
 
   const parse = <T,>(raw: string): T | null => {
@@ -31,6 +31,16 @@ export default async function DelayCascadePage({ params }: { params: Promise<{ o
       return null;
     }
   };
+  const logs: { id: string | number; payload: string; result: string }[] = airtableEnabled()
+    ? (analyses as Array<{ id: string; [k: string]: unknown }>)
+        .filter((r) => String(r["Tables_Affected"] ?? "") === "delay_cascade")
+        .slice(0, 5)
+        .map((r) => ({
+          id: r.id,
+          payload: JSON.stringify(parse<{ input?: { trigger: string; delayDays: number } }>(String(r["Summary"] ?? ""))?.input ?? {}),
+          result: JSON.stringify(parse<{ result?: CascadeResult }>(String(r["Summary"] ?? ""))?.result ?? {}),
+        }))
+    : (analyses as Array<{ id: number; payload: string; result: string }>);
 
   return (
     <div className="p-6 max-w-2xl">
@@ -46,7 +56,7 @@ export default async function DelayCascadePage({ params }: { params: Promise<{ o
             <select name="jobId" required className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
-                  {j.code} — {j.name}
+                  {j.label}
                 </option>
               ))}
             </select>
@@ -65,12 +75,16 @@ export default async function DelayCascadePage({ params }: { params: Promise<{ o
             className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
           />
         </label>
+        <label className="flex items-center gap-2 text-xs text-neutral-600">
+          <input type="checkbox" name="createFollowUps" value="1" defaultChecked />
+          Propose follow-up actions/risks for approval
+        </label>
         <button type="submit" className="btn-ae">
           Analyse cascade
         </button>
       </form>
 
-      {analyses.map((log) => {
+      {logs.map((log) => {
         const input = parse<{ trigger: string; delayDays: number }>(log.payload);
         const result = parse<CascadeResult>(log.result);
         if (!result) return null;
@@ -102,7 +116,7 @@ export default async function DelayCascadePage({ params }: { params: Promise<{ o
           </section>
         );
       })}
-      {analyses.length === 0 && (
+      {logs.length === 0 && (
         <p className="text-sm text-neutral-500">No analyses yet — run one above.</p>
       )}
     </div>

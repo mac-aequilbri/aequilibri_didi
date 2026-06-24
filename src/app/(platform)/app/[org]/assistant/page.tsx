@@ -1,10 +1,11 @@
 // Conversational Assistant — one screen for every org; persona, approval
 // policy and rule injection come from org configuration.
 
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { getActiveRules } from "@/services/platform/learning";
+import { loadJobsList } from "@/lib/platform/jobsListSource";
+import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
 import { getOrCreateSession, listMessages } from "@/services/platform/assistant/chat";
 import AssistantClient, { ChatMessageView } from "./AssistantClient";
 
@@ -12,21 +13,16 @@ export const dynamic = "force-dynamic";
 
 export default async function AssistantPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
+  const currentViewer = await getCurrentViewer(ctx);
   const sessionId = await getOrCreateSession(ctx);
-  const [rows, rules, proposals, topJob] = await Promise.all([
+  const [rows, rules, pending, jobs] = await Promise.all([
     listMessages(ctx, sessionId),
     getActiveRules(ctx),
-    prisma.platPendingWrite.findMany({
-      where: { orgId: ctx.orgId, status: "proposed" },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-    }),
-    prisma.platJob.findFirst({
-      where: { orgId: ctx.orgId },
-      orderBy: { updatedAt: "desc" },
-      select: { name: true },
-    }),
+    loadPendingWrites(ctx),
+    loadJobsList(ctx),
   ]);
+  const proposals = pending.filter((p) => p.status === "proposed").slice(0, 10);
+  const topJob = jobs[0];
 
   // Starter prompts, grounded in this org's features and live data, to lower
   // the blank-canvas barrier on the assistant's headline screen.
@@ -52,13 +48,14 @@ export default async function AssistantPage({ params }: { params: Promise<{ org:
     ctx.aiAuthority === "auto_low_risk"
       ? "low-risk writes apply immediately; the rest need approval"
       : "every write needs your approval";
+  const roleLabel = currentViewer.role === "broker" ? "read-only conversational mode" : "write-enabled mode";
 
   return (
     <div className="p-6 grid gap-6 lg:grid-cols-[1fr_240px]">
       <div>
         <PageHeader
           title={ctx.config.assistant.name}
-          subtitle={`In-context assistant — ${authorityLabel}.`}
+          subtitle={`In-context assistant — ${authorityLabel}; ${roleLabel}.`}
         />
         <AssistantClient
           orgSlug={ctx.orgSlug}
@@ -72,6 +69,7 @@ export default async function AssistantPage({ params }: { params: Promise<{ org:
             payload: p.payload,
           }))}
           suggestions={suggestions}
+          defaultJobId={topJob?.id}
         />
       </div>
       <aside className="hidden lg:block pt-16">

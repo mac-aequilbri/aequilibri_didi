@@ -1,9 +1,9 @@
 // Document detail + AI analysis (read-only intelligence on the source).
 
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
+import { loadDocumentDetail } from "@/lib/platform/documentsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { analyzeDocumentAction } from "../actions";
@@ -17,15 +17,13 @@ export default async function DocumentDetailPage({
 }) {
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
-  const doc = await prisma.platDocument.findFirst({
-    where: { id: Number(id), orgId: ctx.orgId },
-    include: { job: { select: { code: true, name: true } } },
-  });
+  const doc = await loadDocumentDetail(ctx, id);
   if (!doc) notFound();
 
   let analysis: { risks?: string[]; obligations?: string[]; key_terms?: Record<string, string> } = {};
   try {
-    analysis = JSON.parse(doc.aiAnalysis);
+    const parsed = JSON.parse(doc.aiAnalysis) as Record<string, unknown>;
+    analysis = ((parsed.document_intelligence ?? parsed) as typeof analysis) || {};
   } catch {
     /* none yet */
   }
@@ -34,7 +32,7 @@ export default async function DocumentDetailPage({
     <div className="p-6 max-w-3xl">
       <PageHeader
         title={doc.title}
-        subtitle={`${doc.classification || doc.docType || "unclassified"} · ${doc.job?.code ?? "org-level"} · added ${formatDate(doc.createdAt)}${doc.uploadedBy ? ` by ${doc.uploadedBy}` : ""}`}
+        subtitle={`${doc.classification || doc.docType || "unclassified"} · ${doc.jobCode ?? "org-level"} · v${doc.version} · added ${formatDate(doc.createdAt)}${doc.uploadedBy ? ` by ${doc.uploadedBy}` : ""}`}
         actions={[{ href: orgPath(ctx.orgSlug, "/documents"), label: "All documents", variant: "outline" }]}
       />
 
@@ -49,17 +47,45 @@ export default async function DocumentDetailPage({
           )}
         </div>
 
-        {doc.storageProvider === "gdrive" && doc.storageRef && (
+        {(doc.storageProvider === "gdrive" || doc.storageProvider === "external") && doc.storageRef && (
           <p className="text-sm">
             <a
-              href={`https://drive.google.com/file/d/${encodeURIComponent(doc.storageRef)}/view`}
+              href={
+                doc.storageProvider === "gdrive"
+                  ? `https://drive.google.com/file/d/${encodeURIComponent(doc.storageRef)}/view`
+                  : doc.storageRef
+              }
               target="_blank"
               rel="noreferrer"
               className="hover:underline font-medium"
             >
-              Open in Google Drive ↗
+              {doc.storageProvider === "gdrive" ? "Open in Google Drive" : "Open source link"} ↗
             </a>
           </p>
+        )}
+
+        <div className="text-xs text-neutral-500">
+          Lineage key <span className="font-mono">{doc.lineageKey}</span>
+        </div>
+        {doc.immutableSnapshot && (
+          <p className="text-xs text-neutral-500">
+            Module 4 snapshot · immutable
+            {doc.outputType ? ` · ${doc.outputType.replace(/_/g, " ")}` : ""}
+          </p>
+        )}
+
+        {doc.routeSuggestions.length > 0 && (
+          <div className="text-sm">
+            <span className="font-semibold">Module 2 routing</span>
+            <ul className="list-disc ml-5 text-neutral-700">
+              {doc.routeSuggestions.map((s, i) => (
+                <li key={`${s.table}-${i}`}>
+                  {s.summary}
+                  {s.proposalId != null ? ` (proposal ${s.proposalId})` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {doc.aiSummary && (
@@ -89,7 +115,7 @@ export default async function DocumentDetailPage({
           </div>
         )}
 
-        {doc.textContent ? (
+        {doc.textContent && !doc.immutableSnapshot ? (
           <form action={analyzeDocumentAction}>
             <input type="hidden" name="org" value={ctx.orgSlug} />
             <input type="hidden" name="recordId" value={doc.id} />
@@ -97,6 +123,10 @@ export default async function DocumentDetailPage({
               {doc.status === "analyzed" ? "Re-analyse with AI" : "Analyse with AI"}
             </button>
           </form>
+        ) : doc.textContent ? (
+          <p className="text-xs text-neutral-500">
+            Snapshot documents are immutable — analysis is disabled.
+          </p>
         ) : (
           <p className="text-xs text-neutral-500">
             No extractable text in this document — analysis unavailable.

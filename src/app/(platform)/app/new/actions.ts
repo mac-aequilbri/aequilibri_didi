@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { clerkEnabled } from "@/lib/platform/authConfig";
+import { normalizeTeamRole, type TeamRole } from "@/lib/platform/module1Governance";
 import { AiAuthority, DEFAULT_FEATURES, EngagementType } from "@/lib/platform/types";
 import { provisionOrganisation } from "@/services/platform/onboarding";
 
@@ -14,6 +15,7 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
 
   const defaultEngagementType = String(formData.get("defaultEngagementType") ?? "long_project");
   const aiAuthority = String(formData.get("aiAuthority") ?? "approve_required");
+  const adminRole = normalizeTeamRole(String(formData.get("adminRole") ?? "owner")) as TeamRole;
 
   const allowedEngagementTypes = ENGAGEMENT_TYPES.filter(
     (t) => formData.get(`engagement_${t}`) === "on",
@@ -28,7 +30,7 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
       .map((l) => l.trim())
       .filter(Boolean);
 
-  // With Clerk active, default the first admin to the signing-in user so the
+  // With Clerk active, default the first team member to the signing-in user so the
   // creator is a member of (and can access) the org they just provisioned.
   let adminName = String(formData.get("adminName") ?? "");
   let adminEmail = String(formData.get("adminEmail") ?? "");
@@ -54,7 +56,10 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
     features,
     adminName,
     adminEmail,
+    adminRole,
     budgetCategories: lines("budgetCategories"),
+    clientPriorities: lines("clientPriorities"),
+    tradeReferences: lines("tradeReferences"),
     initialRules: lines("initialRules"),
   });
 

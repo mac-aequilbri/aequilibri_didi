@@ -1,10 +1,10 @@
 // Execution log — the audit trail AND the AI-write approval queue.
 // Pending proposals can be approved (the deferred write executes) or rejected.
 
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadExecLogHistory } from "@/lib/platform/execLogSource";
+import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
 import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -24,14 +24,8 @@ function Payload({ raw }: { raw: string }) {
 export default async function ExecLogPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
 
-  const [proposals, logs] = await Promise.all([
-    // App-internal approval queue — always Postgres (no Airtable equivalent).
-    prisma.platPendingWrite.findMany({
-      where: { orgId: ctx.orgId, status: "proposed" },
-      orderBy: { createdAt: "desc" },
-    }),
-    loadExecLogHistory(ctx),
-  ]);
+  const [pending, logs] = await Promise.all([loadPendingWrites(ctx), loadExecLogHistory(ctx)]);
+  const proposals = pending.filter((p) => p.status === "proposed");
 
   const tableLabel = (t: string) => t.replace(/^plat_(core|con|cfg)_/, "");
 

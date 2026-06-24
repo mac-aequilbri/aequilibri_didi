@@ -29,6 +29,17 @@ const DATE = (v: unknown): string | undefined => (v ? S(v) : undefined);
 const LINK = (v: unknown): string[] | undefined =>
   typeof v === "string" && v.startsWith("rec") ? [v] : undefined;
 
+const DOC_WORKSTREAM_LINK = (data: Record<string, unknown>): string[] | undefined => {
+  const raw = typeof data.aiAnalysis === "string" ? data.aiAnalysis : "";
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as { module4?: { traceability?: { workstreamId?: unknown } } };
+    return LINK(parsed.module4?.traceability?.workstreamId);
+  } catch {
+    return undefined;
+  }
+};
+
 const present = (d: Record<string, unknown>, k: string): boolean =>
   k in d && d[k] !== undefined && d[k] !== "";
 
@@ -173,7 +184,18 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
     specs: [
       { air: "Document_Name", from: "title", to: (v) => S(v) || "Untitled document" },
       { air: "Document_Type", from: "docType", to: S },
+      { air: "Upload_Date", createOnly: true, to: () => new Date().toISOString() },
       { air: "Drive_URL", from: "storageRef", to: S },
+      { air: "Doc_Status", from: "status", to: S },
+      { air: "Uploaded_By", from: "uploadedBy", to: S },
+      { air: "Storage_Provider", from: "storageProvider", to: S },
+      { air: "Text_Content", from: "textContent", to: S },
+      { air: "AI_Summary", from: "aiSummary", to: S },
+      { air: "AI_Analysis", from: "aiAnalysis", to: S },
+      { air: "Confidence", from: "confidence", to: (v) => (v == null || v === "" ? undefined : NUM(v)) },
+      { air: "Analyzed_At", from: "analyzedAt", to: DATE },
+      { air: "Job", from: "jobId", to: LINK },
+      { air: "Related_Workstream", to: (_v, data) => DOC_WORKSTREAM_LINK(data) },
     ],
   },
   learning_rule: {

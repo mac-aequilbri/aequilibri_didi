@@ -1,12 +1,8 @@
 // Execution-log history source — Postgres (default) or the canonical Airtable
 // EXECUTION_LOG table when AIRTABLE_MIGRATION is enabled.
 //
-// Scope note: ONLY the audit *history* is source-switched. The pending-write
-// approval queue (PlatPendingWrite) is app-internal workflow state with no
-// Airtable table, so it always reads from Postgres — see the page.
-//
-// ⚠️ Airtable field mappings are best-guess (flagged ASSUMPTION) pending the
-// §8/§11 design decisions.
+// Scope note: this source returns audit history only; pending approvals are
+// loaded separately from pendingWritesSource.
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";

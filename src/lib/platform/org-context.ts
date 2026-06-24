@@ -4,8 +4,9 @@
 //
 // Authentication: when Clerk is configured (lib/platform/authConfig), the
 // signed-in user's email must match an active PlatCfgTeamMember of the org —
-// view access for any role, writes for editor/admin only. Without Clerk the
-// platform runs in open demo mode (first admin acts as the current user).
+// view access for any role, writes for owner/builder/architect only. Without
+// Clerk the platform runs in open demo mode (highest-privilege member acts as
+// the current user).
 
 import { redirect } from "next/navigation";
 import {
@@ -16,6 +17,13 @@ import {
 } from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { clerkEnabled, platformAdminEmails } from "./authConfig";
+import {
+  defaultModule1Governance,
+  isAdminRole,
+  isWriteRole,
+  normalizeTeamRole,
+  rolePriority,
+} from "./module1Governance";
 import {
   AiAuthority,
   DEFAULT_FEATURES,
@@ -42,6 +50,7 @@ function parseConfig(settingsRaw: string): OrgConfig {
         "You are the AI project coordinator for this organisation. Be precise, data-driven, and flag risks proactively.",
     },
     features: { ...DEFAULT_FEATURES, ...(settings.features ?? {}) },
+    module1: settings.module1 ?? defaultModule1Governance(),
   };
 }
 
@@ -57,13 +66,14 @@ export async function getAuthEmail(): Promise<string | null> {
 async function findMember(ctx: OrgCtx, email: string): Promise<ControlTeamMember | null> {
   if (controlEnabled()) {
     const members = await listControlTeam(ctx.orgSlug);
-    return members.find((m) => m.email.toLowerCase() === email) ?? null;
+    const member = members.find((m) => m.email.toLowerCase() === email) ?? null;
+    return member ? { ...member, role: normalizeTeamRole(member.role) } : null;
   }
   const members = await prisma.platCfgTeamMember.findMany({
     where: { orgId: ctx.orgId, isActive: true },
   });
   const m = members.find((x) => x.email.toLowerCase() === email);
-  return m ? { name: m.name, email: m.email, role: m.role, isActive: m.isActive } : null;
+  return m ? { name: m.name, email: m.email, role: normalizeTeamRole(m.role), isActive: m.isActive } : null;
 }
 
 export async function getOrgCtx(orgSlug: string): Promise<OrgCtx | null> {
@@ -121,41 +131,46 @@ export interface CurrentUser {
   email: string;
 }
 
-/** Current user for actor stamping. Called on every mutation path, so with
- *  Clerk active it doubles as the write gate: non-members are bounced and
- *  read-only members cannot mutate. Demo mode returns the first active admin. */
-export async function getCurrentUser(ctx: OrgCtx): Promise<CurrentUser> {
+export async function getCurrentViewer(ctx: OrgCtx): Promise<CurrentUser> {
   const email = await getAuthEmail();
   if (email !== null) {
     const member = await findMember(ctx, email);
     if (!member) redirect("/app?denied=1");
-    if (member.role === "readonly") {
-      throw new Error("Your role in this organisation is read-only — writes are not permitted.");
-    }
-    return { name: member.name, role: member.role, email: member.email };
+    return { name: member.name, role: normalizeTeamRole(member.role), email: member.email };
   }
-
-  // Demo mode: the first active admin (admins sort before editor/readonly).
   if (controlEnabled()) {
     const members = await listControlTeam(ctx.orgSlug);
-    const member = [...members].sort((a, b) => a.role.localeCompare(b.role))[0];
+    const member = [...members].sort((a, b) => rolePriority(a.role) - rolePriority(b.role))[0];
     return member
-      ? { name: member.name, role: member.role, email: member.email }
-      : { name: "Demo User", role: "admin", email: "" };
+      ? { name: member.name, role: normalizeTeamRole(member.role), email: member.email }
+      : { name: "Demo User", role: "owner", email: "" };
   }
-  const member = await prisma.platCfgTeamMember.findFirst({
+  const members = await prisma.platCfgTeamMember.findMany({
     where: { orgId: ctx.orgId, isActive: true },
-    orderBy: [{ role: "asc" }, { id: "asc" }], // "admin" sorts before "editor"/"readonly"
+    orderBy: [{ id: "asc" }],
   });
+  const member = [...members].sort((a, b) => rolePriority(a.role) - rolePriority(b.role))[0];
   return member
-    ? { name: member.name, role: member.role, email: member.email }
-    : { name: "Demo User", role: "admin", email: "" };
+    ? { name: member.name, role: normalizeTeamRole(member.role), email: member.email }
+    : { name: "Demo User", role: "owner", email: "" };
+}
+
+/** Current user for actor stamping. Called on every mutation path, so with
+ *  Clerk active it doubles as the write gate: non-members are bounced and
+ *  broker/read-only members cannot mutate. Demo mode returns the highest
+ *  privilege active member. */
+export async function getCurrentUser(ctx: OrgCtx): Promise<CurrentUser> {
+  const user = await getCurrentViewer(ctx);
+  if (!isWriteRole(user.role)) {
+    throw new Error("Your role in this organisation is read-only — writes are not permitted.");
+  }
+  return user;
 }
 
 /** Admin-only gate for destructive/config operations. */
 export async function requireAdmin(ctx: OrgCtx): Promise<CurrentUser> {
   const user = await getCurrentUser(ctx);
-  if (clerkEnabled() && user.role !== "admin") {
+  if (clerkEnabled() && !isAdminRole(user.role)) {
     throw new Error("This operation requires the admin role.");
   }
   return user;

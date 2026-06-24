@@ -11,10 +11,13 @@ export type ActorType = "ai" | "human" | "system";
 
 export type ExecStatus = "proposed" | "approved" | "executed" | "rejected" | "failed";
 
+import type { Module1Governance } from "./module1Governance";
+
 /** Parsed PlatOrganisation.settings. */
 export interface OrgConfig {
   assistant: { name: string; persona: string };
   features: Record<string, boolean>;
+  module1?: Module1Governance;
 }
 
 /** Request context every platform service takes as its first argument. */
@@ -32,6 +35,7 @@ export interface OrgCtx {
 export interface Actor {
   type: ActorType;
   name: string;
+  role?: string;
   /** Chat message that produced this write, for provenance. */
   sourceMessageId?: number;
 }

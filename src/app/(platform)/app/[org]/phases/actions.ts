@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { recordIdParam, writeRecord } from "@/lib/platform/recordWriter";
 import {
   addPhaseEvidence,
   applyEvidenceSuggestion,
@@ -50,9 +50,9 @@ export async function rejectPhase(formData: FormData): Promise<void> {
 export async function uploadPhaseEvidenceAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const phaseId = Number(formData.get("phaseId"));
+  const phaseId = recordIdParam(formData.get("phaseId"));
   const file = formData.get("file");
-  if (!phaseId || !(file instanceof File) || file.size === 0) return;
+  if (phaseId == null || !(file instanceof File) || file.size === 0) return;
   if (file.size > MAX_UPLOAD_BYTES) {
     redirect(orgPath(ctx.orgSlug, "/phases?err=File too large (max 5 MB)"));
   }
@@ -69,8 +69,8 @@ export async function uploadPhaseEvidenceAction(formData: FormData): Promise<voi
 export async function assessPhaseEvidenceAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const phaseId = Number(formData.get("phaseId"));
-  if (!phaseId) return;
+  const phaseId = recordIdParam(formData.get("phaseId"));
+  if (phaseId == null) return;
   const res = await assessPhaseEvidence(ctx, user.name, phaseId);
   if (!res.ok) redirect(orgPath(ctx.orgSlug, `/phases?err=${encodeURIComponent(res.error ?? "Review failed")}`));
   revalidatePath(orgPath(ctx.orgSlug, "/phases"));
@@ -79,9 +79,9 @@ export async function assessPhaseEvidenceAction(formData: FormData): Promise<voi
 export async function applyEvidenceSuggestionAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const phaseId = Number(formData.get("phaseId"));
+  const phaseId = recordIdParam(formData.get("phaseId"));
   const finalPct = Number(formData.get("finalPct"));
-  if (!phaseId || !Number.isFinite(finalPct)) return;
+  if (phaseId == null || !Number.isFinite(finalPct)) return;
   const res = await applyEvidenceSuggestion(ctx, user.name, phaseId, finalPct);
   if (!res.ok) redirect(orgPath(ctx.orgSlug, `/phases?err=${encodeURIComponent(res.error ?? "Apply failed")}`));
   revalidatePath(orgPath(ctx.orgSlug, "/phases"));
@@ -90,8 +90,8 @@ export async function applyEvidenceSuggestionAction(formData: FormData): Promise
 export async function dismissEvidenceSuggestionAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const phaseId = Number(formData.get("phaseId"));
-  if (!phaseId) return;
+  const phaseId = recordIdParam(formData.get("phaseId"));
+  if (phaseId == null) return;
   const res = await dismissEvidenceSuggestion(ctx, user.name, phaseId);
   if (!res.ok) redirect(orgPath(ctx.orgSlug, `/phases?err=${encodeURIComponent(res.error ?? "Dismiss failed")}`));
   revalidatePath(orgPath(ctx.orgSlug, "/phases"));

@@ -1,8 +1,8 @@
 // Org dashboard data — Postgres (default) or Airtable when the flag is on.
 // The landing page after the org picker, so it must run Postgres-free. Reuses
 // loadJobsList (jobs + derived completion) and getActiveRules; the rest is
-// counted/aggregated from the org's base. pendingProposals is 0 in Airtable
-// mode (the approval queue is still Postgres — assistant-only).
+// counted/aggregated from the org's base, including pending proposals from
+// PENDING_WRITES in Airtable mode.
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
@@ -52,13 +52,14 @@ function num(v: unknown): number {
 }
 
 async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
-  const [jobList, rules, actionRows, budgetRows, cashflowRows, logRows] = await Promise.all([
+  const [jobList, rules, actionRows, budgetRows, cashflowRows, logRows, pendingRows] = await Promise.all([
     loadJobsList(ctx),
     getActiveRules(ctx),
     core.list(ctx.orgSlug, "ACTION_HUB", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "BUDGET", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "CASHFLOW", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "EXECUTION_LOG", { maxRecords: 200 }),
+    core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
   ]);
 
   const openSet = new Set(["Open", "In Progress"]);
@@ -90,7 +91,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     })),
     openActions: openActionRows.length,
     overdueActions,
-    pendingProposals: 0,
+    pendingProposals: pendingRows.filter((r) => str(r["Status"]).toLowerCase() === "proposed").length,
     budget: budgetRows.reduce((s, b) => s + num(b["Budget_Amount"]), 0),
     actual: budgetRows.reduce((s, b) => s + num(b["Actual_Amount"]), 0),
     recentLogs: logRows.slice(0, 8).map((l) => ({

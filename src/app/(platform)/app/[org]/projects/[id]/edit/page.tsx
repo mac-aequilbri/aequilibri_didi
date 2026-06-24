@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
-import { toNum } from "@/lib/format";
+import { airtableEnabled, core } from "@/lib/airtable";
+import { prisma } from "@/lib/db";
+import { loadJobDetail } from "@/lib/platform/jobDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { updateJob } from "../../actions";
 
@@ -14,8 +15,24 @@ export default async function EditProjectPage({
 }) {
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
-  const job = await prisma.platJob.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
-  if (!job) notFound();
+  const detail = await loadJobDetail(ctx, id);
+  if (!detail) notFound();
+  const pgJob = !airtableEnabled()
+    ? await prisma.platJob.findFirst({ where: { id: Number(id), orgId: ctx.orgId } })
+    : null;
+  const airJob = airtableEnabled() ? await core.get(ctx.orgSlug, "JOBS", detail.id).catch(() => null) : null;
+  const job = {
+    id: detail.id,
+    code: detail.code,
+    name: detail.name,
+    status: detail.status,
+    completionPct: detail.completionPct,
+    healthScore: detail.healthScore,
+    budgetTotal: detail.budget,
+    startDate: pgJob?.startDate ?? (airJob ? (typeof airJob["Date_Estimated"] === "string" ? new Date(airJob["Date_Estimated"]) : null) : null),
+    targetEndDate: pgJob?.targetEndDate ?? (airJob ? (typeof airJob["Target_Completion"] === "string" ? new Date(airJob["Target_Completion"]) : null) : null),
+    summary: detail.summary,
+  };
 
   const dateVal = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
 
@@ -50,7 +67,7 @@ export default async function EditProjectPage({
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Budget total $</span>
-            <input type="number" step="0.01" name="budgetTotal" defaultValue={toNum(job.budgetTotal)} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="number" step="0.01" name="budgetTotal" defaultValue={job.budgetTotal} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Start date</span>

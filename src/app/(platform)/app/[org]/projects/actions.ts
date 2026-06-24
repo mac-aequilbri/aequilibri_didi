@@ -6,7 +6,7 @@ import { normalizeBimxEmbedUrl } from "@/lib/platform/bimx";
 import { formToObject } from "@/lib/platform/forms";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { recordIdParam, writeRecord } from "@/lib/platform/recordWriter";
 
 export async function createJob(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
@@ -24,8 +24,8 @@ export async function createJob(formData: FormData): Promise<void> {
 export async function updateJob(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
-  if (!recordId) return;
+  const recordId = recordIdParam(formData.get("recordId"));
+  if (recordId == null) return;
   const data = formToObject(formData);
   delete data.recordId;
   await writeRecord(ctx, {
@@ -46,10 +46,10 @@ export async function updateJob(formData: FormData): Promise<void> {
 export async function addBimModel(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const jobId = Number(formData.get("jobId"));
+  const jobId = recordIdParam(formData.get("jobId"));
   const name = String(formData.get("name") ?? "").trim();
   const base = orgPath(ctx.orgSlug, `/projects/${jobId}/models`);
-  if (!jobId) redirect(orgPath(ctx.orgSlug, "/projects"));
+  if (jobId == null) redirect(orgPath(ctx.orgSlug, "/projects"));
   if (!name) redirect(`${base}/new?error=name_required`);
 
   const embedUrl = normalizeBimxEmbedUrl(String(formData.get("embedUrl") ?? ""));
@@ -75,9 +75,9 @@ export async function addBimModel(formData: FormData): Promise<void> {
 export async function setBimModelVisibility(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
-  const jobId = Number(formData.get("jobId"));
-  if (!recordId) return;
+  const recordId = recordIdParam(formData.get("recordId"));
+  const jobId = recordIdParam(formData.get("jobId"));
+  if (recordId == null) return;
   await writeRecord(ctx, {
     table: "bim_model",
     op: "update",
@@ -85,20 +85,20 @@ export async function setBimModelVisibility(formData: FormData): Promise<void> {
     data: { clientVisible: formData.get("clientVisible") === "true" },
     actor: { type: "human", name: user.name },
   });
-  revalidatePath(orgPath(ctx.orgSlug, `/projects/${jobId}/models`));
+  revalidatePath(orgPath(ctx.orgSlug, jobId == null ? "/projects" : `/projects/${jobId}/models`));
 }
 
 export async function deleteBimModel(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const recordId = Number(formData.get("recordId"));
-  const jobId = Number(formData.get("jobId"));
-  if (!recordId) return;
+  const recordId = recordIdParam(formData.get("recordId"));
+  const jobId = recordIdParam(formData.get("jobId"));
+  if (recordId == null) return;
   await writeRecord(ctx, {
     table: "bim_model",
     op: "delete",
     recordId,
     actor: { type: "human", name: user.name },
   });
-  revalidatePath(orgPath(ctx.orgSlug, `/projects/${jobId}/models`));
+  revalidatePath(orgPath(ctx.orgSlug, jobId == null ? "/projects" : `/projects/${jobId}/models`));
 }

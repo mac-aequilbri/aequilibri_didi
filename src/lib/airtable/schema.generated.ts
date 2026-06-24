@@ -264,6 +264,44 @@ export const CORE_SCHEMA = {
       { name: "Job", id: "fldNqAMqKvuKVLILe", type: "multipleRecordLinks" },
     ],
   },
+  PENDING_WRITES: {
+    tableId: "PENDING_WRITES",
+    fields: [
+      { name: "Table_Key", id: "Table_Key", type: "singleLineText" },
+      { name: "Op", id: "Op", type: "singleSelect" },
+      { name: "Record_Id", id: "Record_Id", type: "singleLineText" },
+      { name: "Payload", id: "Payload", type: "multilineText" },
+      { name: "Actor_Type", id: "Actor_Type", type: "singleLineText" },
+      { name: "Actor_Name", id: "Actor_Name", type: "singleLineText" },
+      { name: "Status", id: "Status", type: "singleSelect" },
+      { name: "Created_At", id: "Created_At", type: "dateTime" },
+      { name: "Expires_At", id: "Expires_At", type: "dateTime" },
+      { name: "Job_Id", id: "Job_Id", type: "singleLineText" },
+      { name: "Resolved_By", id: "Resolved_By", type: "singleLineText" },
+      { name: "Resolved_At", id: "Resolved_At", type: "dateTime" },
+      { name: "Error", id: "Error", type: "multilineText" },
+    ],
+  },
+  CHAT_SESSIONS: {
+    tableId: "CHAT_SESSIONS",
+    fields: [
+      { name: "Session_Title", id: "Session_Title", type: "singleLineText" },
+      { name: "Job_Id", id: "Job_Id", type: "singleLineText" },
+      { name: "Started_At", id: "Started_At", type: "dateTime" },
+      { name: "Ended_At", id: "Ended_At", type: "dateTime" },
+      { name: "Summary", id: "Summary", type: "multilineText" },
+    ],
+  },
+  CHAT_MESSAGES: {
+    tableId: "CHAT_MESSAGES",
+    fields: [
+      { name: "Session_Id", id: "Session_Id", type: "singleLineText" },
+      { name: "Role", id: "Role", type: "singleLineText" },
+      { name: "Content", id: "Content", type: "multilineText" },
+      { name: "Tool_Calls", id: "Tool_Calls", type: "multilineText" },
+      { name: "Created_At", id: "Created_At", type: "dateTime" },
+    ],
+  },
   RISKS: {
     tableId: "tblEbI90SA3szwngA",
     fields: [

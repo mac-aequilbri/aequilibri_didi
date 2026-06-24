@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { uploadDocument } from "../actions";
 
@@ -14,11 +14,7 @@ export default async function NewDocumentPage({
 }) {
   const ctx = await requireOrgCtx((await params).org);
   const { error } = await searchParams;
-  const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId },
-    select: { id: true, code: true, name: true },
-    orderBy: { code: "asc" },
-  });
+  const jobs = await loadJobOptions(ctx);
 
   return (
     <div className="p-6 max-w-xl">
@@ -38,15 +34,29 @@ export default async function NewDocumentPage({
             <select name="jobId" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
               <option value="">—</option>
               {jobs.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.code} — {j.name}
-                </option>
+                <option key={j.id} value={j.id}>{j.label}</option>
               ))}
             </select>
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Title</span>
             <input name="title" placeholder="(defaults to filename)" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+          </label>
+          <label className="block text-sm">
+            <span className="text-neutral-600">Topic hint</span>
+            <input name="topic" placeholder="Vendor or topic" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+          </label>
+          <label className="block text-sm">
+            <span className="text-neutral-600">Reference hint</span>
+            <input name="reference" placeholder="Invoice-123 / Quote-AB1" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+          </label>
+          <label className="block text-sm">
+            <span className="text-neutral-600">Document date</span>
+            <input name="documentDate" type="date" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+          </label>
+          <label className="block text-sm">
+            <span className="text-neutral-600">Document type override</span>
+            <input name="docType" placeholder="Optional for links" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
         </div>
         <label className="block text-sm">

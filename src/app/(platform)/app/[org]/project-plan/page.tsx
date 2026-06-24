@@ -1,22 +1,24 @@
 // Project plan — workstreams (core tier) with their linked actions.
 
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadProjectPlan } from "@/lib/platform/projectPlanSource";
+import type { PriorityBand } from "@/lib/platform/projectIntelligence";
 
 export const dynamic = "force-dynamic";
 
+function priorityTone(priority: PriorityBand): string {
+  if (priority === "CRITICAL") return "bg-red-100 text-red-800";
+  if (priority === "URGENT") return "bg-orange-100 text-orange-800";
+  if (priority === "HIGH") return "bg-amber-100 text-amber-800";
+  if (priority === "MED") return "bg-blue-100 text-blue-800";
+  return "bg-neutral-100 text-neutral-700";
+}
+
 export default async function ProjectPlanPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const workstreams = await prisma.platWorkstream.findMany({
-    where: { orgId: ctx.orgId },
-    orderBy: { lastUpdated: "desc" },
-    include: {
-      job: { select: { code: true } },
-      actions: { orderBy: { dueDate: "asc" }, take: 10 },
-    },
-  });
+  const workstreams = await loadProjectPlan(ctx);
 
   return (
     <div className="p-6">
@@ -29,13 +31,21 @@ export default async function ProjectPlanPage({ params }: { params: Promise<{ or
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
               <h2 className="font-semibold">
-                {ws.name} <span className="text-xs font-normal text-neutral-400">{ws.job?.code}</span>
+                {ws.name} <span className="text-xs font-normal text-neutral-400">{ws.jobCode}</span>
               </h2>
               {ws.milestone && (
                 <p className="text-xs text-neutral-500">Milestone: {ws.milestone}</p>
               )}
+              {ws.attentionReason && (
+                <p className="text-xs text-neutral-500">Needs attention: {ws.attentionReason}</p>
+              )}
             </div>
-            <StatusBadge status={ws.status} />
+            <div className="flex items-center gap-2">
+              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${priorityTone(ws.priority)}`}>
+                {ws.priority}
+              </span>
+              <StatusBadge status={ws.status} />
+            </div>
           </div>
           {ws.description && <p className="text-sm text-neutral-600 mb-2">{ws.description}</p>}
           {ws.actions.length > 0 && (

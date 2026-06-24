@@ -1,7 +1,7 @@
 // DriveStorer interface (Platform Architecture doc: "drive storer with
 // taxonomy"). Local filesystem implementation for dev/demo; a Google Drive
 // adapter slots in behind the same interface later. Files live under
-// var/storage/<orgSlug>/<jobCode|org>/<docType>/<name> (gitignored).
+// var/storage/<orgSlug>/<top-folder>/<jobCode|org>/<type>/<name> (gitignored).
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -14,7 +14,13 @@ export interface StoredRef {
 
 export interface DriveStorer {
   provider: string;
-  put(parts: { orgSlug: string; jobCode?: string; docType?: string; name: string }, buf: Buffer): Promise<StoredRef>;
+  put(parts: {
+    orgSlug: string;
+    jobCode?: string;
+    docType?: string;
+    folderSegments?: string[];
+    name: string;
+  }, buf: Buffer): Promise<StoredRef>;
   get(ref: string): Promise<Buffer>;
 }
 
@@ -28,13 +34,15 @@ class LocalFsStorer implements DriveStorer {
   provider = "local";
 
   async put(
-    parts: { orgSlug: string; jobCode?: string; docType?: string; name: string },
+    parts: { orgSlug: string; jobCode?: string; docType?: string; folderSegments?: string[]; name: string },
     buf: Buffer,
   ): Promise<StoredRef> {
     const rel = path.posix.join(
       safe(parts.orgSlug),
+      ...(parts.folderSegments?.length
+        ? parts.folderSegments.map((s) => safe(s))
+        : [safe(parts.docType || "uncategorised")]),
       safe(parts.jobCode ?? "org"),
-      safe(parts.docType || "uncategorised"),
       `${Date.now()}-${safe(parts.name)}`,
     );
     const abs = path.join(ROOT, rel);

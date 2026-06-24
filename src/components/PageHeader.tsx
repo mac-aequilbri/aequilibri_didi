@@ -108,11 +108,11 @@ const STATUS_TONE: Record<string, string> = {
   // finished / closed → blue
   complete: "complete", closed: "complete",
   // in-flight / needs attention → amber
-  pending: "pending", open: "pending", submitted: "pending", proposed: "pending", intake: "pending",
+  pending: "pending", open: "pending", submitted: "pending", proposed: "pending", intake: "pending", pending_routing: "pending",
   // negative → red
   overdue: "overdue", rejected: "rejected", cancelled: "cancelled", failed: "failed",
   // inert → muted
-  draft: "draft", deferred: "draft", superseded: "draft", expired: "expired",
+  draft: "draft", deferred: "draft", superseded: "draft", expired: "expired", captured: "draft", classified: "draft", uploaded: "draft", generated: "active", analyzed: "active",
 };
 
 export function StatusBadge({ status }: { status: string }) {

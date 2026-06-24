@@ -63,6 +63,7 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
       pg: await r.pg(ctx.orgId).catch(() => "err"),
     })),
   );
+  const module1 = ctx.config.module1;
 
   return (
     <div className="p-6 max-w-3xl">
@@ -82,6 +83,22 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
           <span className="text-neutral-600">Resolved base</span>
           <span className="font-mono text-xs">{baseId}</span>
         </div>
+        {module1 && (
+          <>
+            <div className="flex justify-between">
+              <span className="text-neutral-600">Core schema version</span>
+              <span className="font-mono text-xs">{module1.schema.coreVersion}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-600">Project delivery version</span>
+              <span className="font-mono text-xs">{module1.schema.projectDeliveryVersion}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-600">Module 1 migration status</span>
+              <span className="font-mono text-xs">{module1.schema.migrationStatus}</span>
+            </div>
+          </>
+        )}
       </section>
 
       <section className="ae-card p-5 mb-6">

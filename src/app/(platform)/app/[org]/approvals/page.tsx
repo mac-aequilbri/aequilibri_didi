@@ -7,10 +7,10 @@
 // for an update, a removal notice for a delete — so you approve a concrete change,
 // not an opaque payload.
 
-import { prisma } from "@/lib/db";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { isWritableTable, readRecord } from "@/lib/platform/recordWriter";
+import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
 import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -88,17 +88,12 @@ export default async function ApprovalsPage({
 }) {
   const ctx = await requireOrgCtx((await params).org);
 
-  const [pending, recent] = await Promise.all([
-    prisma.platPendingWrite.findMany({
-      where: { orgId: ctx.orgId, status: "proposed" },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.platPendingWrite.findMany({
-      where: { orgId: ctx.orgId, status: { in: ["executed", "rejected", "expired", "failed"] } },
-      orderBy: { resolvedAt: "desc" },
-      take: 8,
-    }),
-  ]);
+  const all = await loadPendingWrites(ctx);
+  const pending = all.filter((p) => p.status === "proposed");
+  const recent = all
+    .filter((p) => ["executed", "rejected", "expired", "failed"].includes(p.status))
+    .sort((a, b) => (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0))
+    .slice(0, 8);
 
   // Resolve each proposal into a concrete diff (fetching the current row for
   // updates/deletes so we can show what actually changes).

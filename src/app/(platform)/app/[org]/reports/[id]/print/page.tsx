@@ -4,9 +4,10 @@
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/format";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
+import { reportModeFor, reportingCapabilities } from "@/lib/platform/reportingPolicy";
+import { loadReportDetail } from "@/lib/platform/reportDetailSource";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +18,9 @@ export default async function ReportPrintPage({
 }) {
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
-  const report = await prisma.platConWeeklyReport.findFirst({
-    where: { id: Number(id), orgId: ctx.orgId },
-    include: { job: { select: { code: true, name: true } } },
-  });
+  const viewer = await getCurrentViewer(ctx);
+  const reportCaps = reportingCapabilities(viewer.role);
+  const report = await loadReportDetail(ctx, id);
   if (!report) notFound();
 
   return (
@@ -31,7 +31,10 @@ export default async function ReportPrintPage({
           {report.title || `Weekly report — ${formatDate(report.weekEnding)}`}
         </h1>
         <p className="text-sm text-neutral-500 mt-1">
-          {report.job?.code} — {report.job?.name} · week ending {formatDate(report.weekEnding)}
+          {report.jobCode} — {report.jobName} · week ending {formatDate(report.weekEnding)}
+        </p>
+        <p className="text-xs text-neutral-400 mt-1">
+          {reportModeFor("weekly_report")} output · {reportCaps.audienceLabel}
         </p>
       </header>
       <main className="prose prose-sm max-w-none">

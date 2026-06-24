@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { BimxViewer } from "@/components/BimxViewer";
 import { PageHeader } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
+import { loadJobBimModels } from "@/lib/platform/bimModelsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { deleteBimModel, setBimModelVisibility } from "../../actions";
@@ -19,19 +19,10 @@ export default async function ProjectModelsPage({
   const { org, id } = await params;
   const { error } = await searchParams;
   const ctx = await requireOrgCtx(org);
-  const jobId = Number(id);
-  if (isNaN(jobId)) notFound();
-
-  const job = await prisma.platJob.findFirst({
-    where: { id: jobId, orgId: ctx.orgId },
-    select: { id: true, name: true },
-  });
-  if (!job) notFound();
-
-  const models = await prisma.platConBimModel.findMany({
-    where: { jobId, orgId: ctx.orgId },
-    orderBy: { createdAt: "desc" },
-  });
+  const data = await loadJobBimModels(ctx, id);
+  if (!data) notFound();
+  const { job, models } = data;
+  const jobId = job.id;
   const p = (path: string) => orgPath(ctx.orgSlug, path);
 
   return (

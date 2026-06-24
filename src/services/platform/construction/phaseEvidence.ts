@@ -5,11 +5,12 @@
 // and adjustments/dismissals emit corrections into the learning loop.
 
 import { callClaude, callClaudeVisionMulti, VisionImage } from "@/lib/claude";
+import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { emitCorrection } from "@/lib/platform/corrections";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
-import { writeRecord } from "@/lib/platform/recordWriter";
+import { type RecordId, writeRecord } from "@/lib/platform/recordWriter";
 import { getStorerFor } from "@/lib/platform/storage";
 import { OrgCtx } from "@/lib/platform/types";
 import { ingestDocumentFile } from "@/services/platform/documents";
@@ -42,9 +43,27 @@ export function parseSuggestion(json: string): EvidenceSuggestion | null {
   }
 }
 
-async function getPhase(ctx: OrgCtx, phaseId: number) {
+async function getPhase(ctx: OrgCtx, phaseId: RecordId) {
+  if (airtableEnabled()) {
+    const phaseRecId = String(phaseId);
+    if (!phaseRecId.startsWith("rec")) return null;
+    const phase = await core.get(ctx.orgSlug, "PHASES", phaseRecId).catch(() => null);
+    if (!phase) return null;
+    const jobId = Array.isArray(phase["Job"]) && phase["Job"][0] ? String(phase["Job"][0]) : "";
+    if (!jobId) return null;
+    const job = await core.get(ctx.orgSlug, "JOBS", jobId).catch(() => null);
+    if (!job) return null;
+    return {
+      id: phaseRecId,
+      jobId,
+      name: String(phase["Phase_Name"] ?? ""),
+      completionPct: Number(phase["Completion_Pct"] ?? 0),
+      evidenceSuggestion: String(phase["Evidence_Suggestion"] ?? "{}"),
+      job: { id: jobId, code: "", name: String(job["Job_Name"] ?? "") },
+    };
+  }
   return prisma.platConPhase.findFirst({
-    where: { id: phaseId, orgId: ctx.orgId },
+    where: { id: Number(phaseId), orgId: ctx.orgId },
     include: { job: { select: { id: true, code: true, name: true } } },
   });
 }
@@ -54,7 +73,7 @@ async function getPhase(ctx: OrgCtx, phaseId: number) {
 export async function addPhaseEvidence(
   ctx: OrgCtx,
   userName: string,
-  input: { phaseId: number; title?: string; name: string; mimeType: string; buf: Buffer; note?: string },
+  input: { phaseId: RecordId; title?: string; name: string; mimeType: string; buf: Buffer; note?: string },
 ): Promise<{ ok: boolean; error?: string }> {
   const phase = await getPhase(ctx, input.phaseId);
   if (!phase) return { ok: false, error: "Phase not found" };
@@ -89,16 +108,36 @@ export async function addPhaseEvidence(
 export async function assessPhaseEvidence(
   ctx: OrgCtx,
   userName: string,
-  phaseId: number,
+  phaseId: RecordId,
 ): Promise<{ ok: boolean; demoMode: boolean; error?: string }> {
   const phase = await getPhase(ctx, phaseId);
   if (!phase) return { ok: false, demoMode: false, error: "Phase not found" };
 
-  const evidence = await prisma.platConPhaseEvidence.findMany({
-    where: { phaseId: phase.id, orgId: ctx.orgId },
-    include: { document: true },
-    orderBy: { createdAt: "asc" },
-  });
+  const evidence = airtableEnabled()
+    ? await core.list(ctx.orgSlug, "PHASE_EVIDENCE", { maxRecords: 500 }).then(async (rows) =>
+        Promise.all(
+          rows
+            .filter((r) => Array.isArray(r["Phase"]) && r["Phase"].map(String).includes(String(phase.id)))
+            .map(async (r) => {
+              const docId = Array.isArray(r["Document"]) && r["Document"][0] ? String(r["Document"][0]) : "";
+              const doc = docId ? await core.get(ctx.orgSlug, "DOCUMENTS", docId).catch(() => null) : null;
+              return {
+                document: {
+                  title: String(doc?.["Document_Name"] ?? ""),
+                  mimeType: String(doc?.["Mime_Type"] ?? ""),
+                  textContent: String(doc?.["Text_Content"] ?? ""),
+                  storageProvider: String(doc?.["Storage_Provider"] ?? ""),
+                  storageRef: String(doc?.["Drive_URL"] ?? ""),
+                },
+              };
+            }),
+        ),
+      )
+    : await prisma.platConPhaseEvidence.findMany({
+        where: { phaseId: Number(phase.id), orgId: ctx.orgId },
+        include: { document: true },
+        orderBy: { createdAt: "asc" },
+      });
   if (evidence.length === 0) {
     return { ok: false, demoMode: false, error: "No evidence attached to this phase yet" };
   }
@@ -110,7 +149,7 @@ export async function assessPhaseEvidence(
   let unreadable = 0;
   for (const ev of evidence) {
     const doc = ev.document;
-    if (VISION_MIMES.has(doc.mimeType) && images.length < MAX_IMAGES) {
+    if (VISION_MIMES.has(doc.mimeType) && images.length < MAX_IMAGES && doc.storageProvider && doc.storageRef) {
       try {
         const buf = await getStorerFor(doc.storageProvider).get(doc.storageRef);
         if (buf.length <= MAX_IMAGE_BYTES) {
@@ -126,11 +165,27 @@ export async function assessPhaseEvidence(
     }
   }
 
-  const siblings = await prisma.platConPhase.findMany({
-    where: { jobId: phase.jobId, orgId: ctx.orgId, isAiDraft: false },
-    orderBy: { sortOrder: "asc" },
-    select: { name: true, status: true, completionPct: true },
-  });
+  const siblings = airtableEnabled()
+    ? await core.list(ctx.orgSlug, "PHASES", { maxRecords: 1000 }).then((rows) =>
+        rows
+          .filter(
+            (p) =>
+              Array.isArray(p["Job"]) &&
+              p["Job"].map(String).includes(String(phase.jobId)) &&
+              p["Is_AI_Draft"] !== true,
+          )
+          .sort((a, b) => Number(a["Sort_Order"] ?? 0) - Number(b["Sort_Order"] ?? 0))
+          .map((p) => ({
+            name: String(p["Phase_Name"] ?? ""),
+            status: String(p["Status"] ?? "pending"),
+            completionPct: Number(p["Completion_Pct"] ?? 0),
+          })),
+      )
+    : await prisma.platConPhase.findMany({
+        where: { jobId: Number(phase.jobId), orgId: ctx.orgId, isAiDraft: false },
+        orderBy: { sortOrder: "asc" },
+        select: { name: true, status: true, completionPct: true },
+      });
 
   const { system, version } = getPrompt("phase.evidence_assess", {
     phaseName: phase.name,
@@ -188,10 +243,12 @@ export async function assessPhaseEvidence(
     actor: { type: "ai", name: "Phase Evidence Review" },
     requireApproval: false, // annotation only — completionPct is untouched
   });
-  await prisma.platExecutionLog.updateMany({
-    where: { orgId: ctx.orgId, targetTable: "plat_con_phase", targetId: phase.id, promptVersion: "" },
-    data: { promptVersion: version },
-  });
+  if (!airtableEnabled()) {
+    await prisma.platExecutionLog.updateMany({
+      where: { orgId: ctx.orgId, targetTable: "plat_con_phase", targetId: Number(phase.id), promptVersion: "" },
+      data: { promptVersion: version },
+    });
+  }
   return { ok: true, demoMode: suggestion.demoMode };
 }
 
@@ -200,7 +257,7 @@ export async function assessPhaseEvidence(
 export async function applyEvidenceSuggestion(
   ctx: OrgCtx,
   userName: string,
-  phaseId: number,
+  phaseId: RecordId,
   finalPct: number,
 ): Promise<{ ok: boolean; error?: string }> {
   const phase = await getPhase(ctx, phaseId);
@@ -223,9 +280,9 @@ export async function applyEvidenceSuggestion(
       ctx,
       { type: "human", name: userName },
       {
-        jobId: phase.jobId,
+        jobId: typeof phase.jobId === "number" ? phase.jobId : undefined,
         entityType: "phase",
-        entityId: phase.id,
+        entityId: typeof phase.id === "number" ? phase.id : undefined,
         dimension: "phase.completion_pct",
         aiValue: suggestion.suggestedPct,
         humanValue: pct,
@@ -241,7 +298,7 @@ export async function applyEvidenceSuggestion(
 export async function dismissEvidenceSuggestion(
   ctx: OrgCtx,
   userName: string,
-  phaseId: number,
+  phaseId: RecordId,
 ): Promise<{ ok: boolean; error?: string }> {
   const phase = await getPhase(ctx, phaseId);
   if (!phase) return { ok: false, error: "Phase not found" };
@@ -259,9 +316,9 @@ export async function dismissEvidenceSuggestion(
     ctx,
     { type: "human", name: userName },
     {
-      jobId: phase.jobId,
+      jobId: typeof phase.jobId === "number" ? phase.jobId : undefined,
       entityType: "phase",
-      entityId: phase.id,
+      entityId: typeof phase.id === "number" ? phase.id : undefined,
       dimension: "phase.completion_pct",
       aiValue: suggestion.suggestedPct,
       humanValue: phase.completionPct,

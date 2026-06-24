@@ -108,7 +108,7 @@ export async function listControlTeam(slug: string): Promise<ControlTeamMember[]
       return {
         name: S(f["Name"]),
         email: S(f["Email"]),
-        role: S(f["Role"]) || "admin",
+        role: S(f["Role"]) || "owner",
         isActive: f["Is_Active"] !== false,
       };
     })

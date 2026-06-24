@@ -3,8 +3,7 @@
 // Postgres in a Postgres-free deployment. Counts are derived by listing the
 // org's base tables and filtering in app (fine at these volumes).
 //
-// pending (approval queue) is 0 in Airtable mode: the propose/confirm queue is
-// only exercised by the AI assistant and hasn't been moved off Postgres yet.
+// pending (approval queue) is counted from PENDING_WRITES in Airtable mode.
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
@@ -23,16 +22,17 @@ function str(v: unknown): string {
 }
 
 async function fromAirtable(ctx: OrgCtx, f: Record<string, boolean>): Promise<NavCounts> {
-  const [jobRows, actionRows, riskRows, variationRows] = await Promise.all([
+  const [jobRows, actionRows, riskRows, variationRows, pendingRows] = await Promise.all([
     core.list(ctx.orgSlug, "JOBS", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "ACTION_HUB", { maxRecords: 1000 }),
     f.risks ? core.list(ctx.orgSlug, "RISKS", { maxRecords: 1000 }) : Promise.resolve([]),
     f.variations ? core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 1000 }) : Promise.resolve([]),
+    core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
   ]);
   const openAction = new Set(["Open", "In Progress"]);
   return {
     jobs: jobRows.length,
-    pending: 0,
+    pending: pendingRows.filter((p) => (str(p["Status"]) || "").toLowerCase() === "proposed").length,
     openActions: actionRows.filter((a) => openAction.has(str(a["Status"]))).length,
     openRisks: riskRows.filter((r) => (str(r["Status"]) || "open") === "open").length,
     openVariations: variationRows.filter((v) => (str(v["Status"]) || "submitted") === "submitted").length,

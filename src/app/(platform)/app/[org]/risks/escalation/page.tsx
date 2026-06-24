@@ -1,15 +1,13 @@
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { loadRisks } from "@/lib/platform/risksSource";
 import { escalateHighRisks } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function RiskEscalationPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
-  const open = await prisma.platConRisk.findMany({
-    where: { orgId: ctx.orgId, status: "open", escalatedAt: null },
-  });
+  const open = (await loadRisks(ctx)).filter((r) => r.status === "open" && !r.escalatedAt);
   const buckets = [12, 15, 20].map((t) => ({
     threshold: t,
     count: open.filter((r) => r.likelihood * r.impact >= t).length,

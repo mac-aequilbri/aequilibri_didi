@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
-import { executeProposal, rejectProposal } from "@/lib/platform/recordWriter";
+import { executeProposal, recordIdParam, rejectProposal } from "@/lib/platform/recordWriter";
 
 // Approve/reject the same PlatPendingWrite proposals the assistant queues —
 // just from a dedicated inbox instead of inline in the chat. Revalidate the
@@ -16,7 +16,7 @@ async function revalidate(slug: string) {
 export async function approveProposalAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const proposalId = Number(formData.get("proposalId"));
+  const proposalId = recordIdParam(formData.get("proposalId"));
   if (proposalId) {
     try {
       await executeProposal(ctx, proposalId, user.name);
@@ -30,7 +30,7 @@ export async function approveProposalAction(formData: FormData): Promise<void> {
 export async function rejectProposalAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const proposalId = Number(formData.get("proposalId"));
+  const proposalId = recordIdParam(formData.get("proposalId"));
   if (proposalId) {
     try {
       await rejectProposal(ctx, proposalId, user.name);

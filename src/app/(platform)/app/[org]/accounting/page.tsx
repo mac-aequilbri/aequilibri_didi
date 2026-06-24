@@ -23,6 +23,16 @@ export default async function AccountingPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
+  if (!ctx.config.features.accounting) {
+    return (
+      <div className="p-6 max-w-3xl">
+        <PageHeader
+          title="Accounting"
+          subtitle="Accounting integration is disabled for this organisation."
+        />
+      </div>
+    );
+  }
   const { error } = await searchParams;
   const connection = await prisma.platConAccountingConnection.findFirst({
     where: { orgId: ctx.orgId },

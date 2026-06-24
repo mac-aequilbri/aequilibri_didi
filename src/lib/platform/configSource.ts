@@ -68,3 +68,11 @@ export async function loadVendorOptions(ctx: OrgCtx): Promise<RefOption[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
   return out.length ? out : vendorsFromPostgres(ctx);
 }
+
+export function loadTradeOptions(ctx: OrgCtx): Promise<RefOption[]> {
+  return loadReferenceOptions(ctx, "trade_item");
+}
+
+export function loadClientPriorityOptions(ctx: OrgCtx): Promise<RefOption[]> {
+  return loadReferenceOptions(ctx, "client_priority");
+}

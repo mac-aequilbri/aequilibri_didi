@@ -16,7 +16,7 @@ import { Actor, OrgCtx } from "./types";
 
 // ── field helpers (typecast layer) ────────────────────────────────────
 
-const id = z.coerce.number().int().positive();
+const id = z.union([z.coerce.number().int().positive(), z.string().trim().regex(/^rec[\w]+$/)]);
 const optId = z.preprocess((v) => (v === "" || v == null ? undefined : v), id.optional());
 const num = z.coerce.number();
 const optNum = z.preprocess((v) => (v === "" || v == null ? undefined : v), num.optional());
@@ -178,7 +178,10 @@ const documentSchema = z.object({
   textContent: z.string().default(""),
   aiSummary: z.string().default(""),
   aiAnalysis: jsonStr.default("{}"),
-  confidence: optId.pipe(z.number().min(0).max(100).optional()).optional(),
+  confidence: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.number().min(0).max(100).optional(),
+  ),
   status: str(30).default("uploaded"),
   uploadedBy: str(200).default(""),
   analyzedAt: optDate,
@@ -449,7 +452,7 @@ export interface WriteResult {
   /** Audit row id (executed writes). */
   execLogId?: number;
   /** Approval-queue row id (proposed writes). */
-  proposalId?: number;
+  proposalId?: RecordId;
 }
 
 /** Proposals not resolved within this window expire (stale data risk). */
@@ -459,6 +462,16 @@ function validated(def: TableDef, op: WriteRequest["op"], data: unknown): Record
   if (op === "delete") return {};
   const schema = op === "create" ? def.create : def.update;
   return schema.parse(data ?? {}) as Record<string, unknown>;
+}
+
+function isImmutableSnapshot(aiAnalysisRaw: unknown): boolean {
+  if (typeof aiAnalysisRaw !== "string" || !aiAnalysisRaw.trim()) return false;
+  try {
+    const parsed = JSON.parse(aiAnalysisRaw) as { module4?: { immutableSnapshot?: boolean } };
+    return parsed.module4?.immutableSnapshot === true;
+  } catch {
+    return false;
+  }
 }
 
 /** Validate + typecast without writing — used by forms and unit tests. */
@@ -627,7 +640,40 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
   const airRecordId =
     typeof req.recordId === "string" && req.recordId.startsWith("rec") ? req.recordId : undefined;
 
+  if (req.table === "document" && req.op !== "create" && req.recordId != null) {
+    const existing = await readRecord(ctx, "document", req.recordId);
+    const immutable = isImmutableSnapshot(existing?.aiAnalysis ?? existing?.["AI_Analysis"]);
+    if (immutable) {
+      if (req.op === "delete") {
+        throw new Error("Immutable snapshot documents cannot be deleted.");
+      }
+      const keys = Object.keys(data);
+      const supersedeOnly = keys.length === 1 && data.status === "superseded";
+      if (!supersedeOnly) {
+        throw new Error(
+          "Immutable snapshot documents cannot be edited. Create a new version instead.",
+        );
+      }
+    }
+  }
+
   if (req.requireApproval) {
+    if (airtableEnabled()) {
+      const expiresAt = new Date(Date.now() + PROPOSAL_TTL_DAYS * 86_400_000).toISOString();
+      const pending = await core.create(ctx.orgSlug, "PENDING_WRITES", {
+        Table_Key: req.table,
+        Op: req.op,
+        Record_Id: req.recordId == null ? "" : String(req.recordId),
+        Payload: JSON.stringify(airRecordId ? { __recId: airRecordId, ...data } : data),
+        Actor_Type: req.actor.type,
+        Actor_Name: req.actor.name,
+        Status: "proposed",
+        Created_At: new Date().toISOString(),
+        Expires_At: expiresAt,
+        Job_Id: jobId == null ? "" : String(jobId),
+      });
+      return { status: "proposed", proposalId: pending.id };
+    }
     const pending = await prisma.platPendingWrite.create({
       data: {
         orgId: ctx.orgId,
@@ -687,9 +733,43 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
   }
 }
 
-async function resolvePending(ctx: OrgCtx, proposalId: number) {
+interface PendingProposal {
+  id: RecordId;
+  tableKey: string;
+  op: string;
+  recordId: number | null;
+  payload: string;
+  actorType: string;
+  actorName: string;
+  sourceMessageId: number | null;
+  status: string;
+  expiresAt: Date;
+  jobId: number | null;
+}
+
+async function resolvePending(ctx: OrgCtx, proposalId: RecordId): Promise<PendingProposal> {
+  if (airtableEnabled()) {
+    const row = await core.get(ctx.orgSlug, "PENDING_WRITES", String(proposalId));
+    const status = typeof row["Status"] === "string" ? row["Status"] : "";
+    if (status !== "proposed") throw new Error("Proposal not found (already resolved?)");
+    const expiresAtRaw = typeof row["Expires_At"] === "string" ? row["Expires_At"] : "";
+    const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : new Date(0);
+    return {
+      id: row.id,
+      tableKey: typeof row["Table_Key"] === "string" ? row["Table_Key"] : "",
+      op: typeof row["Op"] === "string" ? row["Op"] : "",
+      recordId: null,
+      payload: typeof row["Payload"] === "string" ? row["Payload"] : "{}",
+      actorType: typeof row["Actor_Type"] === "string" ? row["Actor_Type"] : "system",
+      actorName: typeof row["Actor_Name"] === "string" ? row["Actor_Name"] : "",
+      sourceMessageId: null,
+      status,
+      expiresAt,
+      jobId: null,
+    };
+  }
   const pending = await prisma.platPendingWrite.findFirst({
-    where: { id: proposalId, orgId: ctx.orgId, status: "proposed" },
+    where: { id: Number(proposalId), orgId: ctx.orgId, status: "proposed" },
   });
   if (!pending) throw new Error("Proposal not found (already resolved?)");
   return pending;
@@ -700,16 +780,24 @@ async function resolvePending(ctx: OrgCtx, proposalId: number) {
  *  row's workflow status mutates. */
 export async function executeProposal(
   ctx: OrgCtx,
-  proposalId: number,
+  proposalId: RecordId,
   approvedBy: string,
 ): Promise<WriteResult> {
   const pending = await resolvePending(ctx, proposalId);
 
   if (pending.expiresAt < new Date()) {
-    await prisma.platPendingWrite.update({
-      where: { id: pending.id },
-      data: { status: "expired", resolvedBy: approvedBy, resolvedAt: new Date() },
-    });
+    if (airtableEnabled()) {
+      await core.update(ctx.orgSlug, "PENDING_WRITES", String(pending.id), {
+        Status: "expired",
+        Resolved_By: approvedBy,
+        Resolved_At: new Date().toISOString(),
+      });
+    } else {
+      await prisma.platPendingWrite.update({
+        where: { id: Number(pending.id) },
+        data: { status: "expired", resolvedBy: approvedBy, resolvedAt: new Date() },
+      });
+    }
     throw new Error(
       `Proposal #${pending.id} expired on ${pending.expiresAt.toISOString().slice(0, 10)} — the underlying data may have changed. Ask the assistant to re-propose.`,
     );
@@ -740,7 +828,7 @@ export async function executeProposal(
     const execLogId = await writeExecutedLog(ctx, {
       jobId: pending.jobId ?? undefined,
       actor: {
-        type: pending.actorType as Actor["type"],
+        type: (pending.actorType as Actor["type"]) ?? "system",
         name: pending.actorName,
         sourceMessageId: pending.sourceMessageId ?? undefined,
       },
@@ -752,10 +840,18 @@ export async function executeProposal(
       approvedBy,
       result: `Deferred write approved (proposal #${pending.id})`,
     });
-    await prisma.platPendingWrite.update({
-      where: { id: pending.id },
-      data: { status: "executed", resolvedBy: approvedBy, resolvedAt: new Date(), execLogId },
-    });
+    if (airtableEnabled()) {
+      await core.update(ctx.orgSlug, "PENDING_WRITES", String(pending.id), {
+        Status: "executed",
+        Resolved_By: approvedBy,
+        Resolved_At: new Date().toISOString(),
+      });
+    } else {
+      await prisma.platPendingWrite.update({
+        where: { id: Number(pending.id) },
+        data: { status: "executed", resolvedBy: approvedBy, resolvedAt: new Date(), execLogId },
+      });
+    }
     return { status: "executed", recordId, execLogId, proposalId: pending.id };
   } catch (err) {
     const message = String(err instanceof Error ? err.message : err).slice(0, 1000);
@@ -766,10 +862,19 @@ export async function executeProposal(
       op: pending.op,
       ...errMeta(err),
     });
-    await prisma.platPendingWrite.update({
-      where: { id: pending.id },
-      data: { status: "failed", resolvedBy: approvedBy, resolvedAt: new Date(), error: message },
-    });
+    if (airtableEnabled()) {
+      await core.update(ctx.orgSlug, "PENDING_WRITES", String(pending.id), {
+        Status: "failed",
+        Resolved_By: approvedBy,
+        Resolved_At: new Date().toISOString(),
+        Error: message,
+      });
+    } else {
+      await prisma.platPendingWrite.update({
+        where: { id: Number(pending.id) },
+        data: { status: "failed", resolvedBy: approvedBy, resolvedAt: new Date(), error: message },
+      });
+    }
     throw err;
   }
 }
@@ -777,13 +882,33 @@ export async function executeProposal(
 /** Reject a pending proposal; the write is never performed. */
 export async function rejectProposal(
   ctx: OrgCtx,
-  proposalId: number,
+  proposalId: RecordId,
   rejectedBy: string,
   reason = "",
 ): Promise<void> {
   const pending = await resolvePending(ctx, proposalId);
+  if (airtableEnabled()) {
+    await core.update(ctx.orgSlug, "PENDING_WRITES", String(pending.id), {
+      Status: "rejected",
+      Resolved_By: rejectedBy,
+      Resolved_At: new Date().toISOString(),
+      Error: reason,
+    });
+    await core
+      .create(ctx.orgSlug, "EXECUTION_LOG", {
+        Log_Entry: `reject ${pending.tableKey}`.slice(0, 200),
+        Action_Type: "reject",
+        Tables_Affected: pending.tableKey,
+        Summary: reason || `Proposal #${pending.id} rejected`,
+        Initiated_By: "Owner",
+        Status: "rejected",
+        Date_Time: new Date().toISOString(),
+      })
+      .catch(() => {});
+    return;
+  }
   await prisma.platPendingWrite.update({
-    where: { id: pending.id },
+    where: { id: Number(pending.id) },
     data: { status: "rejected", resolvedBy: rejectedBy, resolvedAt: new Date(), error: reason },
   });
   await prisma.platExecutionLog

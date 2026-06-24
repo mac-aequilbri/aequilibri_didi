@@ -6,12 +6,12 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
-import { executeProposal, rejectProposal } from "@/lib/platform/recordWriter";
+import { executeProposal, recordIdParam, rejectProposal } from "@/lib/platform/recordWriter";
 
 async function ctxFrom(formData: FormData) {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const proposalId = Number(formData.get("proposalId"));
+  const proposalId = recordIdParam(formData.get("proposalId"));
   return { ctx, user, proposalId };
 }
 

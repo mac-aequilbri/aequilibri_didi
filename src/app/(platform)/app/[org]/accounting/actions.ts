@@ -16,6 +16,7 @@ function back(slug: string, error: string | null): never {
 
 export async function connectAccountingAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  if (!ctx.config.features.accounting) back(ctx.orgSlug, "Accounting integration is disabled.");
   const user = await getCurrentUser(ctx);
   const error = await connectAccounting(ctx, user.name);
   revalidatePath(orgPath(ctx.orgSlug, "/accounting"));
@@ -24,6 +25,7 @@ export async function connectAccountingAction(formData: FormData): Promise<void>
 
 export async function syncAccountingAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  if (!ctx.config.features.accounting) back(ctx.orgSlug, "Accounting integration is disabled.");
   const user = await getCurrentUser(ctx);
   const error = await syncAccounting(ctx, user.name);
   revalidatePath(orgPath(ctx.orgSlug, "/accounting"));
@@ -32,6 +34,7 @@ export async function syncAccountingAction(formData: FormData): Promise<void> {
 
 export async function disconnectAccountingAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  if (!ctx.config.features.accounting) back(ctx.orgSlug, "Accounting integration is disabled.");
   const user = await getCurrentUser(ctx);
   await disconnectAccounting(ctx, user.name);
   revalidatePath(orgPath(ctx.orgSlug, "/accounting"));

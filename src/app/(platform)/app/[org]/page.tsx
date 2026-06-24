@@ -5,9 +5,11 @@ import Link from "next/link";
 import { TrendChart } from "@/components/charts";
 import { AttentionBanner, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import type { AttentionItem } from "@/components/PageHeader";
+import { loadCoordinationQueue } from "@/lib/platform/coordinationSource";
 import { loadDashboard } from "@/lib/platform/dashboardSource";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
+import { reportingCapabilities } from "@/lib/platform/reportingPolicy";
 import { currency } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +20,12 @@ export default async function OrgDashboard({
   params: Promise<{ org: string }>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
+  const viewer = await getCurrentViewer(ctx);
+  const reportCaps = reportingCapabilities(viewer.role);
   const p = (path: string) => orgPath(ctx.orgSlug, path);
 
-  const { jobs, openActions, overdueActions, pendingProposals, budget, actual, recentLogs, activeRules, cashflow } =
-    await loadDashboard(ctx);
+  const [{ jobs, openActions, overdueActions, pendingProposals, budget, actual, recentLogs, activeRules, cashflow }, coordination] =
+    await Promise.all([loadDashboard(ctx), loadCoordinationQueue(ctx)]);
   const periods = cashflow.map((c) => [c.period, { projected: c.projected, actual: c.actual }] as const);
   const variancePct = budget > 0 ? Math.round(((actual - budget) / budget) * 1000) / 10 : 0;
   // Overspend (actual above budget) is the only variance that demands action.
@@ -41,21 +45,29 @@ export default async function OrgDashboard({
       href: p("/approvals"),
       tone: "warn",
     });
-  if (overBudget)
+  if (overBudget && reportCaps.showFinancialDetail)
     attention.push({ label: `Budget over by ${variancePct}%`, href: p("/budget"), tone: "bad" });
+  const criticalCoordination = coordination.filter((item) => item.priority === "CRITICAL").length;
+  if (criticalCoordination > 0) {
+    attention.push({
+      label: `${criticalCoordination} critical coordination item${criticalCoordination === 1 ? "" : "s"}`,
+      href: p("/coordination"),
+      tone: "bad",
+    });
+  }
 
   return (
     <div className="p-6">
       <PageHeader
         title={ctx.orgName}
-        subtitle={`${ctx.vertical} · ${ctx.defaultEngagementType.replace("_", " ")} · ${jobs.length} active job${jobs.length === 1 ? "" : "s"} shown`}
+        subtitle={`${ctx.vertical} · ${ctx.defaultEngagementType.replace("_", " ")} · ${jobs.length} active job${jobs.length === 1 ? "" : "s"} shown · ${reportCaps.audienceLabel}`}
         actions={[{ href: p("/assistant"), label: `Ask ${ctx.config.assistant.name}` }]}
       />
 
       <AttentionBanner items={attention} />
 
       {/* Attention-first: alert metrics lead and only colour up when non-zero. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8">
         <MetricCard
           value={overdueActions}
           label={overdueActions === 1 ? "Overdue action" : "Overdue actions"}
@@ -75,9 +87,15 @@ export default async function OrgDashboard({
           tone={activeRules > 0 ? "good" : "neutral"}
           href={p("/learning-rules")}
         />
+        <MetricCard
+          value={coordination.length}
+          label="Coordination queue"
+          tone={criticalCoordination > 0 ? "bad" : "neutral"}
+          href={p("/coordination")}
+        />
       </div>
 
-      {periods.length >= 2 && (
+      {reportCaps.showCashflowChart && periods.length >= 2 && (
         <section className="ae-card p-5 mb-6">
           <h2 className="font-semibold mb-3">Cashflow — projected vs actual</h2>
           <TrendChart
@@ -94,10 +112,14 @@ export default async function OrgDashboard({
         <section className="ae-card p-5">
           <h2 className="font-semibold mb-3">
             {jobs.length === 1 ? "Project" : "Jobs"}{" "}
-            <span className="text-xs font-normal text-neutral-500">
-              budget {currency(budget)} · actual {currency(actual)} ({variancePct > 0 ? "+" : ""}
-              {variancePct}%)
-            </span>
+            {reportCaps.showFinancialDetail ? (
+              <span className="text-xs font-normal text-neutral-500">
+                budget {currency(budget)} · actual {currency(actual)} ({variancePct > 0 ? "+" : ""}
+                {variancePct}%)
+              </span>
+            ) : (
+              <span className="text-xs font-normal text-neutral-500">financial detail hidden for this audience</span>
+            )}
           </h2>
           <div className="divide-y divide-neutral-100">
             {jobs.map((job) => (

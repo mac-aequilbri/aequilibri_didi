@@ -6,20 +6,21 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   approveFromChatAction,
+  closeSessionReviewAction,
   rejectFromChatAction,
-  resetSessionAction,
+  saveConversationNoteFromChatAction,
   sendMessageAction,
 } from "./actions";
 
 export interface ChatMessageView {
-  id: number;
+  id: number | string;
   role: string;
   content: string;
-  toolCalls: { tool: string; ok: boolean; status?: string; proposalId?: number }[];
+  toolCalls: { tool: string; ok: boolean; status?: string; proposalId?: number | string }[];
 }
 
 export interface PendingProposalView {
-  id: number;
+  id: number | string;
   operation: string;
   targetTable: string;
   payload: string;
@@ -56,10 +57,12 @@ export default function AssistantClient({
   messages,
   pendingProposals,
   suggestions = [],
+  defaultJobId,
 }: {
   orgSlug: string;
   assistantName: string;
-  sessionId: number;
+  sessionId: number | string;
+  defaultJobId?: number | string;
   messages: ChatMessageView[];
   pendingProposals: PendingProposalView[];
   /** Data-grounded starter prompts shown in the empty state. */
@@ -224,13 +227,84 @@ export default function AssistantClient({
         />
         <SendButton />
       </form>
-      <form action={resetSessionAction} className="mt-2 text-right">
-        <input type="hidden" name="org" value={orgSlug} />
-        <input type="hidden" name="sessionId" value={sessionId} />
-        <button type="submit" className="text-xs text-neutral-400 hover:text-neutral-600">
-          End session &amp; start fresh
-        </button>
-      </form>
+      <details className="mt-2 ae-card p-4">
+        <summary className="cursor-pointer text-sm font-medium">End session with review</summary>
+        <form action={closeSessionReviewAction} className="mt-3 space-y-3">
+          <input type="hidden" name="org" value={orgSlug} />
+          <input type="hidden" name="sessionId" value={sessionId} />
+          {defaultJobId != null && <input type="hidden" name="jobId" value={defaultJobId} />}
+          <label className="block text-xs text-neutral-600">
+            Session close summary
+            <textarea
+              name="reviewSummary"
+              rows={3}
+              required
+              placeholder="What happened in this session, and what should be remembered for next time?"
+              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="block text-xs text-neutral-600">
+            Correction capture
+            <select
+              name="correctionStatus"
+              defaultValue="none"
+              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            >
+              <option value="none">No correction to capture</option>
+              <option value="captured">Capture one correction</option>
+            </select>
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              name="dimension"
+              defaultValue="assistant.session"
+              placeholder="Correction dimension"
+              className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            />
+            <input
+              name="rootCause"
+              placeholder="Root cause (required if capturing correction)"
+              className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <textarea
+              name="aiOutput"
+              rows={3}
+              placeholder="AI output that was wrong"
+              className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            />
+            <textarea
+              name="humanCorrection"
+              rows={3}
+              placeholder="Human correction applied"
+              className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <button type="submit" className="btn-ae">
+            Close session &amp; start fresh
+          </button>
+        </form>
+      </details>
+      <details className="mt-3 ae-card p-4">
+        <summary className="cursor-pointer text-sm font-medium">Capture a source note</summary>
+        <form action={saveConversationNoteFromChatAction} className="mt-3 space-y-3">
+          <input type="hidden" name="org" value={orgSlug} />
+          <input type="hidden" name="sessionId" value={sessionId} />
+          <input
+            name="title"
+            placeholder="Optional note title"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          />
+          <textarea
+            name="note"
+            rows={4}
+            placeholder="Paste the source note, call summary, or important context to preserve as a document."
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          />
+          <button type="submit" className="btn-ae">Save note to documents</button>
+        </form>
+      </details>
     </div>
   );
 }

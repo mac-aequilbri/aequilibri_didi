@@ -3,6 +3,7 @@
 // Returns a small, typed, grouped result set the client renders directly.
 
 import { NextRequest, NextResponse } from "next/server";
+import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -18,6 +19,14 @@ interface Hit {
 
 const PER_TYPE = 5;
 
+function str(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+function contains(v: unknown, q: string): boolean {
+  return str(v).toLowerCase().includes(q.toLowerCase());
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ org: string }> },
@@ -28,9 +37,57 @@ export async function GET(
   if (q.length < 2) return NextResponse.json({ results: [] });
 
   const p = (path: string) => orgPath(ctx.orgSlug, path);
-  const where = { orgId: ctx.orgId };
   const take = PER_TYPE;
+  if (airtableEnabled()) {
+    const [jobs, actions, risks, decisions, variations, documents, vendors, quotes] =
+      await Promise.all([
+        core.list(ctx.orgSlug, "JOBS", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "ACTION_HUB", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "DECISIONS", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "DOCUMENTS", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "VENDORS", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "QUOTES", { maxRecords: 500 }),
+      ]);
+    const results: Hit[] = [
+      ...jobs
+        .filter((j) => contains(j["Job_Name"], q))
+        .slice(0, take)
+        .map((j) => ({ type: "Project", label: str(j["Job_Name"]), sublabel: "", href: p(`/projects/${j.id}`) })),
+      ...actions
+        .filter((a) => contains(a["Action_Name"], q))
+        .slice(0, take)
+        .map((a) => ({ type: "Action", label: str(a["Action_Name"]), sublabel: str(a["Status"]), href: p("/actions") })),
+      ...risks
+        .filter((r) => contains(r["Risk"], q))
+        .slice(0, take)
+        .map((r) => ({ type: "Risk", label: str(r["Risk"]), sublabel: str(r["Status"]), href: p("/risks") })),
+      ...decisions
+        .filter((d) => contains(d["Decision_Name"], q) || contains(d["Decision_Description"], q))
+        .slice(0, take)
+        .map((d) => ({ type: "Decision", label: str(d["Decision_Name"]), sublabel: str(d["Status"]), href: p("/decisions") })),
+      ...variations
+        .filter((v) => contains(v["Title"], q) || contains(v["Ref_Number"], q))
+        .slice(0, take)
+        .map((v) => ({ type: "Variation", label: str(v["Title"]), sublabel: str(v["Ref_Number"]) || str(v["Status"]), href: p(`/variations/${v.id}`) })),
+      ...documents
+        .filter((d) => contains(d["Document_Name"], q))
+        .slice(0, take)
+        .map((d) => ({ type: "Document", label: str(d["Document_Name"]), sublabel: str(d["Document_Type"]), href: p(`/documents/${d.id}`) })),
+      ...vendors
+        .filter((v) => contains(v["Vendor_Name"], q))
+        .slice(0, take)
+        .map((v) => ({ type: "Vendor", label: str(v["Vendor_Name"]), sublabel: str(v["Category"]), href: p("/vendors") })),
+      ...quotes
+        .filter((q2) => contains(q2["Title"], q) || contains(q2["Ref_Number"], q))
+        .slice(0, take)
+        .map((q2) => ({ type: "Quote", label: str(q2["Title"]), sublabel: str(q2["Ref_Number"]) || str(q2["Status"]), href: p(`/quotes/${q2.id}`) })),
+    ];
+    return NextResponse.json({ results });
+  }
 
+  const where = { orgId: ctx.orgId };
   const [jobs, actions, risks, decisions, variations, documents, vendors, quotes] =
     await Promise.all([
       prisma.platJob.findMany({

@@ -37,6 +37,10 @@ export default async function AssessPage({
       <PageHeader
         title="New Job Assessment"
         subtitle="Intake → source cascade → AI analysis → learning rules → structured output. Accepting the assessment creates the job."
+        actions={[
+          { href: `/app/${ctx.orgSlug}/assess/tender`, label: "Tender comparison", variant: "outline" },
+          { href: `/app/${ctx.orgSlug}/assess/architectural`, label: "Architectural scope", variant: "outline" },
+        ]}
       />
 
       {!assessment && (

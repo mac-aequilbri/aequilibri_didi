@@ -9,8 +9,8 @@ import {
   getAssessment,
   refineAssessmentPhases,
   refineAssessmentBudget,
-  runConstructionAssessment,
 } from "@/services/platform/construction/assess";
+import { runModule3Capability } from "@/services/platform/module3/engine";
 import type { PhaseInput } from "@/services/platform/construction/phaseTemplates";
 import {
   checkPhaseFeasibility,
@@ -32,16 +32,20 @@ export async function runAssessmentAction(formData: FormData): Promise<void> {
   const lngStr = String(formData.get("lng") ?? "").trim();
   const lat = latStr ? Number(latStr) : NaN;
   const lng = lngStr ? Number(lngStr) : NaN;
-  const assessmentId = await runConstructionAssessment(ctx, user.name, {
-    name,
-    engagementType: String(formData.get("engagementType") ?? ctx.defaultEngagementType),
-    address: String(formData.get("address") ?? "").trim(),
-    suburb: String(formData.get("suburb") ?? "").trim(),
-    sizeSqm: Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : undefined,
-    scope,
-    category: String(formData.get("category") ?? "").trim() || undefined,
-    ...(Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : {}),
+  const { resultId } = await runModule3Capability(ctx, user.name, {
+    capability: "construction_intake",
+    input: {
+      name,
+      engagementType: String(formData.get("engagementType") ?? ctx.defaultEngagementType),
+      address: String(formData.get("address") ?? "").trim(),
+      suburb: String(formData.get("suburb") ?? "").trim(),
+      sizeSqm: Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : undefined,
+      scope,
+      category: String(formData.get("category") ?? "").trim() || undefined,
+      ...(Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : {}),
+    },
   });
+  const assessmentId = String(resultId);
   redirect(orgPath(ctx.orgSlug, `/assess?run=${assessmentId}`));
 }
 
@@ -105,15 +109,18 @@ export async function reestimateWithRoofAreaAction(formData: FormData): Promise<
   if (!stored) return;
 
   const { input } = stored;
-  const newId = await runConstructionAssessment(ctx, user.name, {
-    name: input.name,
-    engagementType: input.engagementType,
-    address: input.address,
-    suburb: input.suburb,
-    sizeSqm: Math.round(areaSqm),
-    scope: input.scope,
-    category: stored.category,
-    ...(Number.isFinite(input.lat) && Number.isFinite(input.lng) ? { lat: input.lat, lng: input.lng } : {}),
+  const { resultId: newId } = await runModule3Capability(ctx, user.name, {
+    capability: "construction_intake",
+    input: {
+      name: input.name,
+      engagementType: input.engagementType,
+      address: input.address,
+      suburb: input.suburb,
+      sizeSqm: Math.round(areaSqm),
+      scope: input.scope,
+      category: stored.category,
+      ...(Number.isFinite(input.lat) && Number.isFinite(input.lng) ? { lat: input.lat, lng: input.lng } : {}),
+    },
   });
   redirect(orgPath(ctx.orgSlug, `/assess?run=${newId}`));
 }

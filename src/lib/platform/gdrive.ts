@@ -7,8 +7,8 @@
 //   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY  the PEM key ("\n" escapes accepted)
 //   GOOGLE_DRIVE_FOLDER_ID              a folder shared with the SA email
 //
-// Taxonomy: <root>/<orgSlug>/<jobCode>/<docType>/<file> — folders are created
-// on demand and cached. storageRef = the Drive file id.
+// Taxonomy: <root>/<orgSlug>/<top-folder>/<jobCode>/<type>/<file> — folders are
+// created on demand and cached. storageRef = the Drive file id.
 
 import { createSign } from "node:crypto";
 import type { DriveStorer, StoredRef } from "./storage";
@@ -108,11 +108,15 @@ export class GoogleDriveStorer implements DriveStorer {
   provider = "gdrive";
 
   async put(
-    parts: { orgSlug: string; jobCode?: string; docType?: string; name: string },
+    parts: { orgSlug: string; jobCode?: string; docType?: string; folderSegments?: string[]; name: string },
     buf: Buffer,
   ): Promise<StoredRef> {
     let parent = process.env.GOOGLE_DRIVE_FOLDER_ID!;
-    for (const segment of [parts.orgSlug, parts.jobCode ?? "org", parts.docType || "uncategorised"]) {
+    for (const segment of [
+      parts.orgSlug,
+      ...(parts.folderSegments?.length ? parts.folderSegments : [parts.docType || "uncategorised"]),
+      parts.jobCode ?? "org",
+    ]) {
       parent = await ensureFolder(safe(segment), parent);
     }
 

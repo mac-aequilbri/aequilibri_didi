@@ -19,6 +19,7 @@ import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { provisionClientBase } from "@/lib/airtable/provision";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
+import { defaultModule1Governance, normalizeTeamRole, type TeamRole } from "@/lib/platform/module1Governance";
 import { DEFAULT_FEATURES, EngagementType, AiAuthority } from "@/lib/platform/types";
 
 /** The learning-engine threshold settings seeded for every new org. */
@@ -29,6 +30,48 @@ const SEED_SETTINGS: Array<{ key: string; value: string }> = [
   { key: "learning.auto_apply_min_triggers", value: "50" },
 ];
 
+function refCode(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 100);
+}
+
+function parseTradeLine(line: string): { trade: string; category: string; item: string } | null {
+  const parts = line.split(/\s*(?:>|[|])\s*/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return { trade: parts[0], category: "", item: parts[0] };
+  if (parts.length === 2) return { trade: parts[0], category: parts[1], item: parts[1] };
+  return { trade: parts[0], category: parts[1], item: parts.slice(2).join(" / ") };
+}
+
+function referenceSeedRows(
+  categories: string[],
+  clientPriorities: string[],
+  tradeReferences: string[],
+): Array<{ type: string; code: string; name: string; value: string; sortOrder: number }> {
+  const rows: Array<{ type: string; code: string; name: string; value: string; sortOrder: number }> = [];
+  const seen = new Set<string>();
+  const push = (type: string, name: string, value: string, sortOrder: number) => {
+    const code = refCode(name || value || type);
+    const key = `${type}:${code}`;
+    if (!name || seen.has(key)) return;
+    seen.add(key);
+    rows.push({ type, code, name, value, sortOrder });
+  };
+
+  categories.forEach((name, i) => push("budget_category", name, "{}", i));
+  clientPriorities.forEach((name, i) =>
+    push("client_priority", name, JSON.stringify({ source: "onboarding", priority: i + 1 }), i),
+  );
+  tradeReferences.forEach((line, i) => {
+    const parsed = parseTradeLine(line);
+    if (!parsed) return;
+    push("trade", parsed.trade, JSON.stringify(parsed), i);
+    if (parsed.category) push("trade_category", `${parsed.trade} / ${parsed.category}`, JSON.stringify(parsed), i);
+    push("trade_item", `${parsed.trade} / ${parsed.item}`, JSON.stringify(parsed), i);
+  });
+
+  return rows;
+}
+
 /** Mirror the org's Customer Config (budget categories + learning settings)
  *  into its Airtable base, so the Airtable-backed reads (configSource,
  *  getLearningSettings) see the same data the Postgres txn just wrote. Best
@@ -38,14 +81,16 @@ async function mirrorConfigToBase(
   orgSlug: string,
   categories: string[],
   rules: string[],
+  clientPriorities: string[],
+  tradeReferences: string[],
 ): Promise<void> {
-  for (let i = 0; i < categories.length; i++) {
-    const name = categories[i];
+  for (const row of referenceSeedRows(categories, clientPriorities, tradeReferences)) {
     await core.create(orgSlug, "PLAT_CFG_REFERENCE", {
-      Name: name,
-      Ref_Type: "budget_category",
-      Code: name.toLowerCase().replace(/\s+/g, "_").slice(0, 100),
-      Sort_Order: i,
+      Name: row.name,
+      Ref_Type: row.type,
+      Code: row.code,
+      Value: row.value,
+      Sort_Order: row.sortOrder,
       Is_Active: true,
     });
   }
@@ -87,8 +132,13 @@ export interface ProvisionInput {
   features: Record<string, boolean>;
   adminName: string;
   adminEmail: string;
+  adminRole: TeamRole;
   /** One per line from the form: budget categories for the cfg reference tier. */
   budgetCategories: string[];
+  /** One per line: client priorities / budget principles for later reference. */
+  clientPriorities: string[];
+  /** One per line: Trade > Category > Item. */
+  tradeReferences: string[];
   /** Domain knowledge init: expert rules of thumb, one per line. */
   initialRules: string[];
 }
@@ -128,6 +178,7 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
         `You are the AI project coordinator for ${input.name.trim()}. Be precise, data-driven, and flag risks proactively.`,
     },
     features: { ...DEFAULT_FEATURES, ...input.features },
+    module1: defaultModule1Governance(),
   });
 
   // Slug uniqueness — checked in whichever store owns the org registry.
@@ -159,6 +210,8 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
   }
 
   const categories = input.budgetCategories.map((c) => c.trim()).filter(Boolean);
+  const clientPriorities = input.clientPriorities.map((c) => c.trim()).filter(Boolean);
+  const tradeReferences = input.tradeReferences.map((c) => c.trim()).filter(Boolean);
   const rules = input.initialRules.map((r) => r.trim()).filter(Boolean);
 
   // ── Control plane: org identity lives in the Airtable registry (no Postgres).
@@ -178,11 +231,11 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
       await createControlTeamMember(slug, {
         name: input.adminName.trim(),
         email: input.adminEmail.trim(),
-        role: "admin",
+        role: normalizeTeamRole(input.adminRole),
       });
     }
     try {
-      await mirrorConfigToBase(slug, categories, rules);
+      await mirrorConfigToBase(slug, categories, rules, clientPriorities, tradeReferences);
     } catch (err) {
       logger.warn("Airtable config mirror skipped", { slug, ...errMeta(err) });
     }
@@ -209,20 +262,22 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
         data: {
           orgId: org.id,
           name: input.adminName.trim(),
-          role: "admin",
+          role: normalizeTeamRole(input.adminRole),
           email: input.adminEmail.trim(),
         },
       });
     }
 
-    if (categories.length) {
+    const referenceRows = referenceSeedRows(categories, clientPriorities, tradeReferences);
+    if (referenceRows.length) {
       await tx.platCfgReference.createMany({
-        data: categories.map((name, i) => ({
+        data: referenceRows.map((row) => ({
           orgId: org.id,
-          type: "budget_category",
-          code: name.toLowerCase().replace(/\s+/g, "_").slice(0, 100),
-          name,
-          sortOrder: i,
+          type: row.type,
+          code: row.code,
+          name: row.name,
+          value: row.value,
+          sortOrder: row.sortOrder,
         })),
       });
     }
@@ -264,6 +319,8 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
           aiAuthority: input.aiAuthority,
           initialRules: rules.length,
           budgetCategories: categories.length,
+          clientPriorities: clientPriorities.length,
+          tradeReferences: tradeReferences.length,
         }),
         status: "executed",
         executedAt: new Date(),
@@ -279,7 +336,7 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
   // the base isn't seeded). Seed learning rules are mirrored separately.
   if (airtableEnabled()) {
     try {
-      await mirrorConfigToBase(slug, categories, rules);
+      await mirrorConfigToBase(slug, categories, rules, clientPriorities, tradeReferences);
     } catch (err) {
       logger.warn("Airtable config mirror skipped", { slug, ...errMeta(err) });
     }

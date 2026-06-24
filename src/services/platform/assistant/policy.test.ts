@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { WRITABLE_TABLES } from "@/lib/platform/recordWriter";
 import { requiresApproval } from "./executor";
-import { ASSISTANT_TOOLS, TOOL_POLICY } from "./tools";
+import { ASSISTANT_TOOLS, roleCanUseTool, TOOL_POLICY } from "./tools";
 
 describe("aiAuthority policy matrix", () => {
   it("reads never require approval", () => {
@@ -50,5 +50,20 @@ describe("tool policy registry consistency", () => {
 
   it("rule proposals are always high-risk (prompt-injection reach)", () => {
     expect(TOOL_POLICY.propose_rule.risk).toBe("high_write");
+  });
+});
+
+describe("assistant role-scoped access", () => {
+  it("broker role can read but cannot write", () => {
+    expect(roleCanUseTool("broker", "query_records")).toBe(true);
+    expect(roleCanUseTool("broker", "create_action")).toBe(false);
+    expect(roleCanUseTool("broker", "update_budget_line")).toBe(false);
+  });
+
+  it("owner/builder/architect roles can use write tools", () => {
+    for (const role of ["owner", "builder", "architect"]) {
+      expect(roleCanUseTool(role, "create_action")).toBe(true);
+      expect(roleCanUseTool(role, "save_decision")).toBe(true);
+    }
   });
 });

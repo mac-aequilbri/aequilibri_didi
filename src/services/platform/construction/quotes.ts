@@ -10,9 +10,11 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { loadJobContext } from "@/lib/platform/jobContextSource";
+import { loadQuoteDetail } from "@/lib/platform/quoteDetailSource";
 import { mulMoney, sumMoney } from "@/lib/platform/money";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { OrgCtx } from "@/lib/platform/types";
+import { generateManagedDocument } from "@/services/platform/documents";
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
 
@@ -260,6 +262,53 @@ export async function setQuoteStatus(
     data,
     actor: { type: "human", name: userName },
   });
+  if (status === "sent") {
+    const linkedJobId = airtableEnabled()
+      ? (await core.get(ctx.orgSlug, "QUOTES", String(quoteId)).catch(() => null))?.["Job"]
+      : (
+          await prisma.platConQuote.findFirst({
+            where: { id: Number(quoteId), orgId: ctx.orgId },
+            select: { jobId: true },
+          })
+        )?.jobId;
+    const jobId =
+      Array.isArray(linkedJobId) && linkedJobId.length > 0
+        ? String(linkedJobId[0])
+        : typeof linkedJobId === "number"
+          ? linkedJobId
+          : undefined;
+    const detail = await loadQuoteDetail(ctx, String(quoteId));
+    if (detail) {
+      const lines = detail.lines
+        .map((l) => `- ${l.description} (${l.qty} ${l.unit}) @ ${l.unitPrice.toFixed(2)} = ${l.lineTotal.toFixed(2)}`)
+        .join("\n");
+      await generateManagedDocument(ctx, userName, {
+        jobId,
+        title: `${detail.refNumber || "Quote"} - ${detail.title}`,
+        docType: "quote",
+        outputType: "client_quote_snapshot",
+        format: "docx",
+        body: [
+          `Client: ${detail.clientName || "-"}`,
+          `Status: ${detail.status}`,
+          `Subtotal: ${detail.subtotal.toFixed(2)}`,
+          `GST: ${detail.gstAmount.toFixed(2)}`,
+          `Total: ${detail.total.toFixed(2)}`,
+          "",
+          "Line items",
+          lines || "- None",
+          "",
+          detail.notes ? `Notes\n${detail.notes}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        traceability: {
+          sourceModule: "module4.quotes",
+          sourceRecordId: quoteId,
+        },
+      });
+    }
+  }
 }
 
 export async function updateQuoteMeta(

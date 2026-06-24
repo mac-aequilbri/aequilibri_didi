@@ -2,6 +2,7 @@
 
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { priorityBandForRiskScore } from "@/lib/platform/projectIntelligence";
 import { loadRisks } from "@/lib/platform/risksSource";
 import { orgPath } from "@/lib/platform/paths";
 import { setRiskStatus } from "./actions";
@@ -63,6 +64,7 @@ export default async function RisksPage({ params }: { params: Promise<{ org: str
                     <span className="ml-1 text-xs text-neutral-400">
                       L{r.likelihood}×I{r.impact}
                     </span>
+                    <span className="ml-1 text-xs text-neutral-500">{priorityBandForRiskScore(score)}</span>
                   </td>
                   <td className="py-2 pr-2 whitespace-nowrap text-xs">{r.owner || "—"}</td>
                   <td className="py-2 pr-2 text-xs">

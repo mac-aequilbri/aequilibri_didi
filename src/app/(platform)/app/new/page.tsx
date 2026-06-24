@@ -103,12 +103,21 @@ export default async function NewOrganisationPage({
           </fieldset>
           <div className="grid grid-cols-2 gap-4">
             <label className="block text-sm">
-              <span className="text-neutral-600">First admin name</span>
+              <span className="text-neutral-600">First team member name</span>
               <input name="adminName" placeholder="Pat Builder" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
             </label>
             <label className="block text-sm">
-              <span className="text-neutral-600">Admin email</span>
+              <span className="text-neutral-600">Team member email</span>
               <input type="email" name="adminEmail" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600">Initial role</span>
+              <select name="adminRole" defaultValue="owner" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+                <option value="owner">Owner</option>
+                <option value="builder">Builder</option>
+                <option value="architect">Architect</option>
+                <option value="broker">Broker</option>
+              </select>
             </label>
           </div>
         </section>
@@ -165,6 +174,24 @@ export default async function NewOrganisationPage({
               name="budgetCategories"
               rows={3}
               placeholder={"Preliminaries\nStructure\nServices\nFinishes"}
+              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-xs font-mono"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-neutral-600">Client priorities / budget principles (one per line)</span>
+            <textarea
+              name="clientPriorities"
+              rows={3}
+              placeholder={"Prioritise long-life exterior materials\nKeep variation exposure low\nProtect landscaping budget"}
+              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-xs font-mono"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-neutral-600">Trades / categories / items (Trade &gt; Category &gt; Item)</span>
+            <textarea
+              name="tradeReferences"
+              rows={4}
+              placeholder={"Tiling > Floor > Porcelain tiles\nJoinery > Kitchen > Pantry cabinetry\nElectrical > Lighting > Pendant lights"}
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-xs font-mono"
             />
           </label>

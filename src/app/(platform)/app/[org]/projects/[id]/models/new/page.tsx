@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { loadJobDetail } from "@/lib/platform/jobDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { addBimModel } from "../../../actions";
@@ -17,13 +17,9 @@ export default async function NewBimModelPage({
   const { org, id } = await params;
   const { error } = await searchParams;
   const ctx = await requireOrgCtx(org);
-  const jobId = Number(id);
-  if (isNaN(jobId)) notFound();
-  const job = await prisma.platJob.findFirst({
-    where: { id: jobId, orgId: ctx.orgId },
-    select: { id: true, name: true },
-  });
+  const job = await loadJobDetail(ctx, id);
   if (!job) notFound();
+  const jobId = job.id;
 
   return (
     <div className="p-6 max-w-xl">
