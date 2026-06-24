@@ -21,7 +21,7 @@ const sleep = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 /** Tables that make up a platform (UC2/UC3) base — the ones the app's fieldMaps
  *  read/write. TEAM and PRICING exist in the template (Core links to them) but
  *  team/identity is kept Postgres-side, so they are intentionally not copied. */
-const PLATFORM_TABLES = new Set([
+export const PLATFORM_TABLES = new Set([
   "ORGANISATIONS", "CONTACTS", "WORKSTREAMS", "DECISIONS", "ACTION_HUB",
   "EXECUTION_LOG", "CORRECTIONS", "JOBS", "HYPOTHESES", "LEARNING_RULES",
   "DOCUMENTS", "INTELLIGENCE_SNAPSHOT", "ASSESSMENTS",
@@ -88,6 +88,44 @@ async function metaFetch(path: string, init?: RequestInit): Promise<unknown> {
 /** The base whose structure new client bases are cloned from. */
 export function templateBaseId(): string {
   return process.env.AIRTABLE_TEMPLATE_BASE_ID || DEMO_BASE_ID;
+}
+
+export type { AirField, AirTable };
+
+/** Read a base's full table+field schema via the meta API. */
+export async function readBaseSchema(baseId: string): Promise<AirTable[]> {
+  return ((await metaFetch(`bases/${baseId}/tables`)) as { tables: AirTable[] }).tables;
+}
+
+/**
+ * The schema a freshly provisioned base is *expected* to have, derived from the
+ * template using the SAME copy rules as provisionClientBase: platform tables
+ * only, and only fields the provisioner can actually create (no computed fields,
+ * and no link fields whose target table isn't itself copied — e.g. TEAM/PRICING).
+ * Schema drift is measured against this, so a correctly-cloned base shows zero
+ * drift rather than false positives for fields that are never cloned.
+ *
+ * Returns a map of table name → set of expected field names.
+ */
+export function expectedPlatformSchema(templateTables: AirTable[]): Map<string, Set<string>> {
+  const copiedTableNames = new Set(
+    templateTables.filter((t) => PLATFORM_TABLES.has(t.name)).map((t) => t.name),
+  );
+  const out = new Map<string, Set<string>>();
+  for (const t of templateTables) {
+    if (!PLATFORM_TABLES.has(t.name)) continue;
+    const fields = new Set<string>();
+    for (const f of t.fields) {
+      if (isComputed(f)) continue;
+      if (isLink(f)) {
+        const target = templateTables.find((x) => x.id === f.options?.linkedTableId)?.name;
+        if (!target || !copiedTableNames.has(target)) continue;
+      }
+      fields.add(f.name);
+    }
+    out.set(t.name, fields);
+  }
+  return out;
 }
 
 /**

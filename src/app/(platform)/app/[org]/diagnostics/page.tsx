@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { airtableEnabled, core, resolveBaseId, type CoreTableName } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
+import { orgPath } from "@/lib/platform/paths";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,11 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
             </div>
           </>
         )}
+        <div className="pt-2 border-t border-neutral-100">
+          <a className="text-xs underline text-neutral-600" href={orgPath(ctx.orgSlug, "/schema-drift")}>
+            Cross-org schema drift →
+          </a>
+        </div>
       </section>
 
       <section className="ae-card p-5 mb-6">
