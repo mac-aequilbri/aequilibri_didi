@@ -12,7 +12,7 @@ import { callClaude } from "@/lib/claude";
 import { prisma } from "@/lib/db";
 import { emitCorrection } from "@/lib/platform/corrections";
 import { geocodeProviders } from "@/lib/platform/geocode";
-import { mulMoney } from "@/lib/platform/money";
+import { mulMoney, sumMoney } from "@/lib/platform/money";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
@@ -395,6 +395,24 @@ export async function getAssessment(
   return row?.stored ?? null;
 }
 
+/** Move an assessment along its lifecycle (draft → proposed → accepted)
+ *  without touching its Result blob. Used when a proposal is generated. */
+export async function setAssessmentStatus(
+  ctx: OrgCtx,
+  assessmentId: RecordId,
+  status: string,
+): Promise<void> {
+  if (airtableEnabled()) {
+    const map = airtableMapFor("assessment")!;
+    await core.update(ctx.orgSlug, map.table, String(assessmentId), toFields(map, { status }, "update"));
+    return;
+  }
+  await prisma.platAssessment.update({
+    where: { id: Number(assessmentId) },
+    data: { status },
+  });
+}
+
 /** Refine the draft assessment's phase plan before acceptance — rename,
  *  re-time, add, remove or reorder. Persisted onto the working set; the
  *  generated snapshot is kept so acceptance can diff and emit a correction. */
@@ -488,14 +506,22 @@ async function createJobWithCode(
   throw new Error("unreachable");
 }
 
-export async function acceptAssessment(
+/** Materialize the managed project from an assessment — the job + phases +
+ *  budget lines + risks — and mark the assessment accepted. This is the back
+ *  half of the UC1-style flow (assessment → proposal → accept → project): it
+ *  runs at *acceptance*, never at assessment time. Budget comes from the
+ *  accepted proposal's lines (passed in) so the project reflects what the client
+ *  actually agreed to; absent those, it falls back to the assessment's own
+ *  breakdown scaled to any edited total. A delta from the AI estimate emits a
+ *  correction, closing the learning loop. */
+export async function materializeProjectFromAssessment(
   ctx: OrgCtx,
   userName: string,
   assessmentId: RecordId,
-  edits: { budgetTotal?: number } = {},
+  opts: { budgetTotal?: number; budgetLines?: { category: string; amount: number }[] } = {},
 ): Promise<RecordId> {
   const found = await readAssessment(ctx, assessmentId);
-  if (!found || found.status !== "draft") {
+  if (!found || found.status === "accepted") {
     throw new Error("Assessment not found (already accepted or discarded?)");
   }
   const assessment = found.stored;
@@ -504,7 +530,12 @@ export async function acceptAssessment(
   const pgAssessmentId = typeof assessmentId === "number" ? assessmentId : undefined;
 
   const aiBudget = Number(assessment.fields.budget_total?.value) || 0;
-  const finalBudget = edits.budgetTotal ?? aiBudget;
+  // Budget source of truth at acceptance: the accepted proposal's lines, if
+  // supplied (already final amounts — not scaled). Without them, fall back to
+  // the assessment's own breakdown, scaled to any edited total.
+  const proposalLines = opts.budgetLines;
+  const linesTotal = proposalLines ? sumMoney(proposalLines.map((l) => l.amount)) : 0;
+  const finalBudget = opts.budgetTotal ?? (proposalLines ? linesTotal : aiBudget);
 
   const jobId = await createJobWithCode(ctx, userName, {
     name: assessment.input.name,
@@ -530,7 +561,6 @@ export async function acceptAssessment(
   // in the client's Airtable base, linked via the rec id on the child records.
   const pgJobId = typeof jobId === "number" ? jobId : undefined;
 
-  const scale = aiBudget > 0 ? finalBudget / aiBudget : 1;
   let sortOrder = 0;
   for (const phase of assessment.detail.phases) {
     sortOrder += 1;
@@ -541,15 +571,24 @@ export async function acceptAssessment(
       actor: { type: "ai", name: "Assessment Engine" },
     });
   }
-  for (const line of assessment.detail.budgetBreakdown) {
+  // Budget lines: the accepted proposal's lines verbatim; else the assessment
+  // breakdown scaled to the (possibly edited) total.
+  const scale = aiBudget > 0 ? finalBudget / aiBudget : 1;
+  const budgetLines = proposalLines
+    ? proposalLines.map((l) => ({ category: l.category, amount: l.amount }))
+    : assessment.detail.budgetBreakdown.map((l) => ({
+        category: l.category,
+        amount: mulMoney(l.amount, scale),
+      }));
+  for (const line of budgetLines) {
     await writeRecord(ctx, {
       table: "budget_line",
       op: "create",
       data: {
         jobId,
         category: line.category,
-        description: "From intake assessment",
-        budgetAmount: mulMoney(line.amount, scale),
+        description: "From accepted proposal",
+        budgetAmount: line.amount,
       },
       actor: { type: "ai", name: "Assessment Engine" },
     });
@@ -590,7 +629,7 @@ export async function acceptAssessment(
         dimension: "budget.total",
         aiValue: aiBudget,
         humanValue: finalBudget,
-        rootCause: "estimator adjusted intake assessment budget",
+        rootCause: "client-accepted proposal differed from intake estimate",
         context: {
           suburb: assessment.input.suburb,
           engagement_type: assessment.input.engagementType,

@@ -11,6 +11,7 @@ import { loadQuoteDetail } from "@/lib/platform/quoteDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import {
+  acceptProposalAction,
   addLineAction,
   removeLineAction,
   setStatusAction,
@@ -32,12 +33,19 @@ export default async function QuoteDetailPage({
 
   const slug = ctx.orgSlug;
   const locked = quote.status === "accepted" || quote.status === "rejected";
+  // A proposal (UC1-style) is sourced from an assessment and has no project
+  // yet; accepting it is what materializes the managed project.
+  const isProposal = quote.assessmentId != null && quote.status !== "accepted";
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl">
       <PageHeader
         title={`${quote.refNumber} · ${quote.title}`}
-        subtitle={`${quote.jobCode ? `${quote.jobCode} — ` : ""}${quote.jobName}`}
+        subtitle={
+          isProposal
+            ? "Proposal — awaiting client acceptance (no project created yet)"
+            : `${quote.jobCode ? `${quote.jobCode} — ` : ""}${quote.jobName}`
+        }
         actions={[
           { href: orgPath(slug, `/quotes/${quote.id}/print`), label: "Print / PDF", variant: "outline" },
           { href: orgPath(slug, "/quotes"), label: "Back to quotes", variant: "outline" },
@@ -55,11 +63,14 @@ export default async function QuoteDetailPage({
           {quote.status === "draft" && (
             <StatusButton org={slug} id={quote.id} status="sent" label="Mark as sent" />
           )}
+          {/* Acceptance: a proposal materializes the managed project; an
+              in-project quote (variation / re-quote) just records the decision. */}
+          {isProposal && <AcceptProposalButton org={slug} id={quote.id} />}
+          {quote.status === "sent" && !isProposal && (
+            <StatusButton org={slug} id={quote.id} status="accepted" label="Mark accepted" />
+          )}
           {quote.status === "sent" && (
-            <>
-              <StatusButton org={slug} id={quote.id} status="accepted" label="Mark accepted" />
-              <StatusButton org={slug} id={quote.id} status="rejected" label="Mark rejected" outline />
-            </>
+            <StatusButton org={slug} id={quote.id} status="rejected" label="Mark rejected" outline />
           )}
           {locked && <StatusButton org={slug} id={quote.id} status="draft" label="Reopen as draft" outline />}
         </div>
@@ -223,6 +234,20 @@ function StatusButton({
       <input type="hidden" name="status" value={status} />
       <button type="submit" className={`${outline ? "btn-ae-outline" : "btn-ae"} text-xs`}>
         {label}
+      </button>
+    </form>
+  );
+}
+
+/** Accept a proposal on the client's behalf — this materializes the managed
+ *  project and redirects to it. */
+function AcceptProposalButton({ org, id }: { org: string; id: string }) {
+  return (
+    <form action={acceptProposalAction}>
+      <input type="hidden" name="org" value={org} />
+      <input type="hidden" name="quoteId" value={id} />
+      <button type="submit" className="btn-ae text-xs">
+        Mark accepted (creates project)
       </button>
     </form>
   );

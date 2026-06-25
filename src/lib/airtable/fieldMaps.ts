@@ -393,6 +393,9 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Notes", from: "notes", to: S },
       { air: "Valid_Until", from: "validUntil", to: DATE },
       { air: "Job", from: "jobId", to: LINK },
+      // A proposal links to its source assessment before any Job exists; Job is
+      // backfilled on acceptance. See generateProposalFromAssessment.
+      { air: "Assessment", from: "assessmentId", to: LINK },
     ],
   },
   quote_line: {

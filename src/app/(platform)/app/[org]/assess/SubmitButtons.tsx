@@ -102,17 +102,16 @@ export function RunAssessmentButton() {
   );
 }
 
-export function AcceptAssessmentButton() {
+export function GenerateProposalButton() {
   return (
     <PendingSubmitButton
-      label="Accept — create job"
-      pendingTitle="Creating job"
+      label="Generate proposal"
+      pendingTitle="Generating proposal"
       stages={[
-        "Registering the job…",
-        "Standing up the phases…",
-        "Allocating budget lines…",
-        "Recording the risk register…",
-        "Handing over the keys…",
+        "Pricing the scope…",
+        "Drafting the line items…",
+        "Totalling the proposal…",
+        "Preparing it to send…",
       ]}
     />
   );
