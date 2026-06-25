@@ -1351,9 +1351,13 @@ model PlatConVariationOrder {
 // Client-facing priced quote for a job. Lines hold the priced scope; totals
 // (subtotal, GST, total) are computed by the service whenever lines change.
 model PlatConQuote {
-  id          Int       @id @default(autoincrement())
-  orgId       Int       @map("org_id")
-  jobId       Int       @map("job_id")
+  id           Int       @id @default(autoincrement())
+  orgId        Int       @map("org_id")
+  // Optional: a proposal (UC1-style assessment → proposal → accept) exists
+  // before any project does. jobId is backfilled when the proposal is accepted
+  // and the managed project is materialized; assessmentId records the source.
+  jobId        Int?      @map("job_id")
+  assessmentId Int?      @map("assessment_id")
   refNumber   String    @default("") @map("ref_number") @db.VarChar(30)
   title       String    @db.VarChar(300)
   clientName  String    @default("") @map("client_name") @db.VarChar(200)
@@ -1372,10 +1376,11 @@ model PlatConQuote {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   org   PlatOrganisation   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  job   PlatJob            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job   PlatJob?           @relation(fields: [jobId], references: [id], onDelete: Cascade)
   lines PlatConQuoteLine[]
 
   @@index([jobId, status])
+  @@index([orgId, assessmentId])
   @@map("plat_con_quote")
 }
 

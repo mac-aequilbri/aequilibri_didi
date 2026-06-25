@@ -40,6 +40,8 @@ export interface QuoteDetailView {
   sentAt: Date | null;
   decidedAt: Date | null;
   createdAt: Date | null;
+  /** Source assessment, when this quote is a proposal awaiting acceptance. */
+  assessmentId: string | null;
   jobName: string;
   jobCode: string;
   jobAddress: string;
@@ -79,6 +81,7 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<QuoteDetailView | 
     },
   });
   if (!quote) return null;
+  // A proposal has no job yet (jobId/assessmentId carry the pre-acceptance state).
   return {
     id: String(quote.id),
     refNumber: quote.refNumber,
@@ -94,10 +97,11 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<QuoteDetailView | 
     sentAt: quote.sentAt,
     decidedAt: quote.decidedAt,
     createdAt: quote.createdAt,
-    jobName: quote.job.name,
-    jobCode: quote.job.code,
-    jobAddress: quote.job.address ?? "",
-    jobSuburb: quote.job.suburb ?? "",
+    assessmentId: quote.assessmentId != null ? String(quote.assessmentId) : null,
+    jobName: quote.job?.name ?? "",
+    jobCode: quote.job?.code ?? "",
+    jobAddress: quote.job?.address ?? "",
+    jobSuburb: quote.job?.suburb ?? "",
     lines: quote.lines.map((l) => ({
       id: String(l.id),
       description: l.description,
@@ -160,6 +164,7 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<QuoteDetailView | 
     sentAt: null, // not tracked on Airtable QUOTES
     decidedAt: null,
     createdAt: null,
+    assessmentId: firstLink(quote["Assessment"]),
     jobName,
     jobCode: "", // Airtable JOBS has no code field (see plan P4)
     jobAddress: "",

@@ -5,11 +5,11 @@ import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { recordIdParam } from "@/lib/platform/recordWriter";
 import {
-  acceptAssessment,
   getAssessment,
   refineAssessmentPhases,
   refineAssessmentBudget,
 } from "@/services/platform/construction/assess";
+import { generateProposalFromAssessment } from "@/services/platform/construction/quotes";
 import { runModule3Capability } from "@/services/platform/module3/engine";
 import type { PhaseInput } from "@/services/platform/construction/phaseTemplates";
 import {
@@ -159,14 +159,17 @@ export async function checkBudgetAction(args: {
   return reviewBudget(lines, args.context ?? {});
 }
 
-export async function acceptAssessmentAction(formData: FormData): Promise<void> {
+/** Turn the reviewed assessment into a client-facing proposal (a quote, no
+ *  project yet). The managed project is created only once the client accepts
+ *  the proposal — see acceptProposalAction in the quotes module. */
+export async function generateProposalAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
   const assessmentId = recordIdParam(formData.get("assessmentId"));
   if (assessmentId == null) return;
   const budgetRaw = Number(formData.get("budgetTotal"));
-  const jobId = await acceptAssessment(ctx, user.name, assessmentId, {
+  const quoteId = await generateProposalFromAssessment(ctx, user.name, assessmentId, {
     budgetTotal: Number.isFinite(budgetRaw) && budgetRaw > 0 ? budgetRaw : undefined,
   });
-  redirect(orgPath(ctx.orgSlug, `/projects/${jobId}`));
+  redirect(orgPath(ctx.orgSlug, `/quotes/${quoteId}`));
 }

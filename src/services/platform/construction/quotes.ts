@@ -15,6 +15,11 @@ import { mulMoney, sumMoney } from "@/lib/platform/money";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { OrgCtx } from "@/lib/platform/types";
 import { generateManagedDocument } from "@/services/platform/documents";
+import {
+  getAssessment,
+  materializeProjectFromAssessment,
+  setAssessmentStatus,
+} from "./assess";
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
 
@@ -85,7 +90,11 @@ export async function recalcQuoteTotals(ctx: OrgCtx, quoteId: RecordId): Promise
 }
 
 export interface CreateQuoteInput {
-  jobId: RecordId;
+  /** A quote belongs to a job (an in-project quote) OR an assessment (a
+   *  proposal awaiting acceptance). Exactly one is set; the project link is
+   *  backfilled when a proposal is accepted. */
+  jobId?: RecordId;
+  assessmentId?: RecordId;
   title: string;
   clientName?: string;
   notes?: string;
@@ -104,6 +113,7 @@ export async function createQuote(
     op: "create",
     data: {
       jobId: input.jobId,
+      assessmentId: input.assessmentId,
       refNumber,
       title: input.title,
       clientName: input.clientName ?? "",
@@ -157,6 +167,97 @@ export async function generateQuoteFromBudget(
   }
   await recalcQuoteTotals(ctx, quoteId);
   return quoteId;
+}
+
+/** UC1-style proposal generation: turn a draft assessment into a client-facing
+ *  proposal (a quote with NO project yet) — one line per budget breakdown
+ *  category, scaled to any edited total. The assessment moves draft → proposed;
+ *  the managed project is only created later, when the proposal is accepted
+ *  (see acceptProposal). */
+export async function generateProposalFromAssessment(
+  ctx: OrgCtx,
+  userName: string,
+  assessmentId: RecordId,
+  opts: { budgetTotal?: number } = {},
+): Promise<RecordId> {
+  const assessment = await getAssessment(ctx, assessmentId);
+  if (!assessment) throw new Error("Assessment not found");
+
+  const aiBudget = Number(assessment.fields.budget_total?.value) || 0;
+  const finalTotal = opts.budgetTotal ?? aiBudget;
+  const scale = aiBudget > 0 ? finalTotal / aiBudget : 1;
+
+  const quoteId = await createQuote(ctx, userName, {
+    assessmentId,
+    title: `${assessment.input.name} — proposal`,
+    notes: assessment.detail.summary,
+  });
+
+  let sortOrder = 0;
+  for (const line of assessment.detail.budgetBreakdown) {
+    sortOrder += 1;
+    const unitPrice = mulMoney(line.amount, scale);
+    await writeRecord(ctx, {
+      table: "quote_line",
+      op: "create",
+      data: {
+        // The budget category is the client-facing label (it carries through to
+        // the project's budget lines verbatim when the proposal is accepted).
+        quoteId,
+        description: line.category || "Item",
+        category: "",
+        qty: 1,
+        unit: "item",
+        unitPrice,
+        lineTotal: unitPrice,
+        sortOrder,
+      },
+      actor: { type: "human", name: userName },
+    });
+  }
+  await recalcQuoteTotals(ctx, quoteId);
+  await setAssessmentStatus(ctx, assessmentId, "proposed");
+  return quoteId;
+}
+
+/** Accept a proposal on the client's behalf. For an assessment-sourced proposal
+ *  this is the gate that materializes the managed project (job + phases + budget
+ *  + risks) from the accepted lines, then backfills the project link and records
+ *  the decision — returning the new job id. For an in-project quote (a variation
+ *  or re-quote, no source assessment) it just records acceptance and returns
+ *  null (no project to create). */
+export async function acceptProposal(
+  ctx: OrgCtx,
+  userName: string,
+  quoteId: RecordId,
+): Promise<RecordId | null> {
+  const detail = await loadQuoteDetail(ctx, String(quoteId));
+  if (!detail) throw new Error("Quote not found");
+
+  if (!detail.assessmentId) {
+    await setQuoteStatus(ctx, userName, quoteId, "accepted");
+    return null;
+  }
+
+  // Keep a numeric id in Postgres mode so the correction backlink resolves.
+  const assessmentId: RecordId = /^\d+$/.test(detail.assessmentId)
+    ? Number(detail.assessmentId)
+    : detail.assessmentId;
+  const budgetLines = detail.lines.map((l) => ({ category: l.description, amount: l.lineTotal }));
+
+  const jobId = await materializeProjectFromAssessment(ctx, userName, assessmentId, {
+    budgetTotal: detail.subtotal,
+    budgetLines,
+  });
+
+  await writeRecord(ctx, {
+    table: "quote",
+    op: "update",
+    recordId: quoteId,
+    data: { jobId, status: "accepted", decidedAt: new Date().toISOString() },
+    actor: { type: "human", name: userName },
+  });
+  return jobId;
 }
 
 export interface QuoteLineInput {

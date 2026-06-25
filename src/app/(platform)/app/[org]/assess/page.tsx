@@ -7,8 +7,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { currency } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { getAssessment } from "@/services/platform/construction/assess";
-import { acceptAssessmentAction } from "./actions";
-import { AcceptAssessmentButton } from "./SubmitButtons";
+import { generateProposalAction } from "./actions";
+import { GenerateProposalButton } from "./SubmitButtons";
 import { IntakeForm } from "./IntakeForm";
 import { PhaseRefiner } from "./PhaseRefiner";
 import { BudgetRefiner } from "./BudgetRefiner";
@@ -216,11 +216,11 @@ export default async function AssessPage({
           </section>
 
           <section className="ae-card p-5 relative">
-            <form action={acceptAssessmentAction} className="flex flex-wrap items-end gap-4">
+            <form action={generateProposalAction} className="flex flex-wrap items-end gap-4">
               <input type="hidden" name="org" value={ctx.orgSlug} />
               <input type="hidden" name="assessmentId" value={run} />
               <label className="block text-sm">
-                <span className="text-neutral-600">Final budget total (edit to correct the AI)</span>
+                <span className="text-neutral-600">Proposal total (edit to correct the AI)</span>
                 <input
                   type="number"
                   step="0.01"
@@ -229,14 +229,15 @@ export default async function AssessPage({
                   className="mt-1 w-48 rounded border border-neutral-300 px-3 py-2"
                 />
               </label>
-              <AcceptAssessmentButton />
+              <GenerateProposalButton />
               <a href={`/app/${ctx.orgSlug}/assess`} className="btn-ae-outline">
                 Discard / start over
               </a>
             </form>
             <p className="text-xs text-neutral-500 mt-2">
-              Editing the budget before accepting records a correction, which feeds the learning
-              loop for future assessments in this region.
+              This creates a proposal to send to the client — no project is created yet. The managed
+              project is set up only once the client accepts. Editing the total records a correction
+              that feeds the learning loop for future assessments in this region.
             </p>
           </section>
         </div>

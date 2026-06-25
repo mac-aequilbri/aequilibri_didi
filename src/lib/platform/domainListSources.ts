@@ -161,7 +161,7 @@ export async function loadQuotes(ctx: OrgCtx): Promise<QuoteView[]> {
       refNumber: q.refNumber,
       title: q.title,
       clientName: q.clientName,
-      jobCode: q.job.code,
+      jobCode: q.job?.code ?? "",
       validUntil: q.validUntil,
       total: toNum(q.total),
       status: q.status,

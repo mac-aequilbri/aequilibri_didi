@@ -325,7 +325,10 @@ const bimModelSchema = z.object({
 });
 
 const quoteSchema = z.object({
-  jobId: id,
+  // Optional: a proposal exists before its project does (jobId backfilled on
+  // acceptance). assessmentId records the source assessment for that handoff.
+  jobId: optId,
+  assessmentId: optId,
   refNumber: str(30).default(""),
   title: str(300).min(1),
   clientName: str(200).default(""),

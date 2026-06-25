@@ -6,6 +6,7 @@ import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { recordIdParam } from "@/lib/platform/recordWriter";
 import {
+  acceptProposal,
   addQuoteLine,
   createQuote,
   generateQuoteFromBudget,
@@ -84,6 +85,21 @@ export async function removeLineAction(formData: FormData): Promise<void> {
   const lineId = recordIdParam(formData.get("lineId"));
   if (quoteId == null || lineId == null) return;
   await removeQuoteLine(ctx, user.name, quoteId, lineId);
+  revalidatePath(orgPath(ctx.orgSlug, `/quotes/${quoteId}`));
+}
+
+/** Accept the proposal on the client's behalf. For an assessment-sourced
+ *  proposal this materializes the managed project and redirects to it; for an
+ *  in-project quote it just records acceptance and stays on the quote. */
+export async function acceptProposalAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  const user = await getCurrentUser(ctx);
+  const quoteId = recordIdParam(formData.get("quoteId"));
+  if (quoteId == null) return;
+  const jobId = await acceptProposal(ctx, user.name, quoteId);
+  if (jobId != null) {
+    redirect(orgPath(ctx.orgSlug, `/projects/${jobId}`));
+  }
   revalidatePath(orgPath(ctx.orgSlug, `/quotes/${quoteId}`));
 }
 
