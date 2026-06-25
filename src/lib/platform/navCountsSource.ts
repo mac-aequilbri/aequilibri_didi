@@ -7,7 +7,16 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { logger, errMeta } from "@/lib/logger";
 import type { OrgCtx } from "./types";
+
+const ZERO_COUNTS: NavCounts = {
+  jobs: 0,
+  pending: 0,
+  openActions: 0,
+  openRisks: 0,
+  openVariations: 0,
+};
 
 export interface NavCounts {
   jobs: number;
@@ -56,8 +65,19 @@ async function fromPostgres(ctx: OrgCtx, f: Record<string, boolean>): Promise<Na
   return { jobs, pending, openActions, openRisks, openVariations };
 }
 
-/** Sidebar badge counts from whichever backend is active. */
-export function loadNavCounts(ctx: OrgCtx): Promise<NavCounts> {
+/** Sidebar badge counts from whichever backend is active. These render in the
+ *  org layout on every page, so a read failure (e.g. a base missing a table)
+ *  must NOT crash the whole shell — degrade to zeros so admin/diagnostic pages
+ *  stay reachable to fix the underlying problem. */
+export async function loadNavCounts(ctx: OrgCtx): Promise<NavCounts> {
   const f = ctx.config.features;
-  return airtableEnabled() ? fromAirtable(ctx, f) : fromPostgres(ctx, f);
+  try {
+    return await (airtableEnabled() ? fromAirtable(ctx, f) : fromPostgres(ctx, f));
+  } catch (err) {
+    logger.warn("Nav counts unavailable — degrading to zeros", {
+      org: ctx.orgSlug,
+      ...errMeta(err),
+    });
+    return ZERO_COUNTS;
+  }
 }
