@@ -48,6 +48,7 @@ export function buildNav(ctx: OrgCtx, jobCount: number, counts: NavCounts = {}):
         ...(f.procurement ? [{ href: p("/procurement"), label: "Procurement" }] : []),
         ...(f.project_plan ? [{ href: p("/project-plan"), label: "Project Plan" }] : []),
         { href: p("/coordination"), label: "Coordination" },
+        { href: p("/comms"), label: "Comms" },
         ...(f.room_matrix ? [{ href: p("/room-matrix"), label: "Room Matrix" }] : []),
         ...(f.delay_cascade ? [{ href: p("/delay-cascade"), label: "Schedule impact" }] : []),
       ],

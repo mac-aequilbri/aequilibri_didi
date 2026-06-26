@@ -44,8 +44,10 @@ const jsonStr = z
 interface TableDef {
   /** Physical table name recorded in the execution log. */
   physical: string;
-  /** Prisma model delegate accessor. */
-  delegate: () => {
+  /** Prisma model delegate accessor. Omitted for Airtable-only Core tables
+   *  (e.g. COMMS) that have no 1:1 Postgres model — those route exclusively
+   *  through the field-map branch of performWrite, which never touches it. */
+  delegate?: () => {
     create: (args: { data: Record<string, unknown> }) => Promise<{ id: number }>;
     findFirst: (args: { where: Record<string, unknown> }) => Promise<{ id: number } | null>;
     update: (args: {
@@ -59,7 +61,7 @@ interface TableDef {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const d = (m: any) => () => m as ReturnType<TableDef["delegate"]>;
+const d = (m: any) => () => m as ReturnType<NonNullable<TableDef["delegate"]>>;
 
 // Update schema = create schema with every field optional AND defaults
 // stripped — otherwise a partial update would silently reset omitted fields
@@ -84,11 +86,38 @@ const actionSchema = z.object({
   detail: z.string().default(""),
   priority: z.enum(["P1", "P2", "P3"]).default("P2"),
   status: z.enum(["open", "in_progress", "done", "deferred"]).default("open"),
+  // Spec 10 ISSUES classifier (Airtable Issue_Type single-select; typecast
+  // reconciles the option). String, not enum, so ingestion/assistant writes
+  // that omit or vary it don't fail validation.
+  issueType: str(40).default("Open Action"),
+  phaseId: optId,
+  riskId: optId,
   owner: str(200).default(""),
   dueDate: optDate,
   sourceType: str(30).default("manual"),
   sourceId: optId,
   context: jsonStr.default("{}"),
+});
+
+// COMMS (Spec 10 Core) — the coordination layer: who gets told what, by when.
+// Airtable-only (no Postgres model); routed through the field-map branch.
+const commsSchema = z.object({
+  jobId: optId,
+  topic: str(300).min(1),
+  messageType: z
+    .enum(["Decision Notification", "Status Update", "Action Required", "Approval Request", "Escalation"])
+    .default("Status Update"),
+  stakeholderRole: z
+    .enum(["Owner", "Builder", "Architect", "Broker", "Supplier", "Regulatory", "Other"])
+    .default("Owner"),
+  stakeholderId: optId,
+  status: z.enum(["pending", "sent", "acknowledged", "overdue"]).default("pending"),
+  dueDate: optDate,
+  phaseId: optId,
+  linkedIssueId: optId,
+  linkedDecisionId: optId,
+  sentBy: str(200).default(""),
+  notes: z.string().default(""),
 });
 
 const decisionSchema = z.object({
@@ -371,6 +400,7 @@ const REGISTRY = {
   workstream: { physical: "plat_core_workstream", delegate: d(prisma.platWorkstream), create: workstreamSchema, update: upd(workstreamSchema) },
   action: { physical: "plat_core_actionhub", delegate: d(prisma.platActionHub), create: actionSchema, update: upd(actionSchema) },
   decision: { physical: "plat_core_decision", delegate: d(prisma.platDecision), create: decisionSchema, update: upd(decisionSchema) },
+  comms: { physical: "COMMS", create: commsSchema, update: upd(commsSchema) },
   learning_rule: { physical: "plat_core_learningrule", delegate: d(prisma.platLearningRule), create: learningRuleSchema, update: upd(learningRuleSchema) },
   document: { physical: "plat_core_document", delegate: d(prisma.platDocument), create: documentSchema, update: upd(documentSchema) },
   phase: { physical: "plat_con_phase", delegate: d(prisma.platConPhase), create: phaseSchema, update: upd(phaseSchema) },
@@ -414,7 +444,9 @@ export async function readRecord(
       return null;
     }
   }
-  const row = await REGISTRY[table].delegate().findFirst({
+  const def: TableDef = REGISTRY[table];
+  if (!def.delegate) return null; // Airtable-only table read via a numeric id — n/a
+  const row = await def.delegate().findFirst({
     where: { id: Number(recordId), orgId: ctx.orgId },
   });
   return (row as Record<string, unknown> | null) ?? null;
@@ -521,6 +553,11 @@ async function performWrite(
     return rid;
   }
 
+  if (!def.delegate) {
+    throw new Error(
+      `${table} is Airtable-only (no Postgres model); set AIRTABLE_MIGRATION=true`,
+    );
+  }
   const delegate = def.delegate();
   if (op === "create") {
     // Learning-rule codes are allocated at WRITE time (deferred proposals

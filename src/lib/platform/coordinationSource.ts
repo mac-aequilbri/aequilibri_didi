@@ -1,5 +1,6 @@
 import { orgPath } from "@/lib/platform/paths";
 import { loadActions } from "./actionsSource";
+import { loadComms } from "./commsSource";
 import { loadPendingWrites } from "./pendingWritesSource";
 import {
   comparePriority,
@@ -20,10 +21,11 @@ export interface CoordinationItemView {
 }
 
 export async function loadCoordinationQueue(ctx: OrgCtx): Promise<CoordinationItemView[]> {
-  const [actionsData, risks, pendingWrites] = await Promise.all([
+  const [actionsData, risks, pendingWrites, comms] = await Promise.all([
     loadActions(ctx),
     loadRisks(ctx),
     loadPendingWrites(ctx),
+    loadComms(ctx),
   ]);
 
   const p = (path: string) => orgPath(ctx.orgSlug, path);
@@ -56,6 +58,22 @@ export async function loadCoordinationQueue(ctx: OrgCtx): Promise<CoordinationIt
       detail: `Risk score ${score} (L${risk.likelihood}×I${risk.impact})`,
       priority,
       href: p("/risks"),
+    });
+  }
+
+  for (const c of comms) {
+    if (c.status === "sent" || c.status === "acknowledged") continue;
+    const priority = strongerBand(
+      priorityBandForActionDueDate(c.dueDate),
+      c.isOverdue ? "URGENT" : "LOW",
+    );
+    if (priority === "LOW") continue;
+    items.push({
+      id: `comms:${c.id}`,
+      title: c.topic,
+      detail: `${c.messageType} → ${c.stakeholderRole}${c.isOverdue ? " (overdue)" : c.dueDate ? ` due ${c.dueDate.toISOString().slice(0, 10)}` : ""}`,
+      priority,
+      href: p("/comms"),
     });
   }
 

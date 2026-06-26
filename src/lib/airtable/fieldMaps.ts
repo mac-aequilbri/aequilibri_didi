@@ -60,6 +60,12 @@ const ACTION_PRIORITY: Record<string, string> = {
   P2: "Medium",
   P3: "Low",
 };
+const COMMS_STATUS: Record<string, string> = {
+  pending: "Pending",
+  sent: "Sent",
+  acknowledged: "Acknowledged",
+  overdue: "Overdue",
+};
 
 // ── spec model ──────────────────────────────────────────────────────────────
 type Op = "create" | "update";
@@ -113,8 +119,31 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Description", from: "detail", to: S, createDefault: "" },
       { air: "Status", from: "status", createDefault: "open", to: (v) => ACTION_STATUS[S(v)] ?? "Open" },
       { air: "Priority", from: "priority", createDefault: "P2", to: (v) => ACTION_PRIORITY[S(v)] ?? "Medium" },
+      // Spec 10 ISSUES fields (typecast creates the option; links no-op on non-rec ids).
+      { air: "Issue_Type", from: "issueType", createDefault: "Open Action", to: S },
+      { air: "Phase", from: "phaseId", to: LINK },
+      { air: "Linked_Risk", from: "riskId", to: LINK },
       { air: "Due_Date", from: "dueDate", to: DATE },
       { air: "Notes", from: "owner", to: (v) => (v ? `Owner: ${S(v)}` : undefined) },
+    ],
+  },
+  comms: {
+    // COMMS (Spec 10 Core) — the coordination layer. Presence-driven like the
+    // others; links no-op on non-rec ids. Status maps app→Airtable option names.
+    table: "COMMS",
+    specs: [
+      { air: "Topic", from: "topic", to: (v) => S(v).slice(0, 300) || "Communication" },
+      { air: "Message_Type", from: "messageType", to: S },
+      { air: "Stakeholder_Role", from: "stakeholderRole", to: S },
+      { air: "Status", from: "status", createDefault: "pending", to: (v) => COMMS_STATUS[S(v)] ?? "Pending" },
+      { air: "Due_Date", from: "dueDate", to: DATE },
+      { air: "Sent_By", from: "sentBy", to: S },
+      { air: "Notes", from: "notes", to: S },
+      { air: "Job", from: "jobId", to: LINK },
+      { air: "Stakeholder", from: "stakeholderId", to: LINK },
+      { air: "Phase", from: "phaseId", to: LINK },
+      { air: "Linked_Issue", from: "linkedIssueId", to: LINK },
+      { air: "Linked_Decision", from: "linkedDecisionId", to: LINK },
     ],
   },
   decision: {

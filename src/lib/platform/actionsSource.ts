@@ -17,6 +17,8 @@ export interface ActionView {
   priority: string;
   sourceType: string;
   status: string;
+  /** Spec 10 ISSUES classifier (Airtable Issue_Type); "" on the Postgres path. */
+  issueType: string;
 }
 
 export interface ActionsData {
@@ -67,6 +69,7 @@ async function fromPostgres(ctx: OrgCtx, status?: string): Promise<ActionsData> 
       priority: a.priority,
       sourceType: a.sourceType,
       status: a.status,
+      issueType: "", // no Postgres column — Issue_Type is an Airtable-only field
     })),
     metrics: { open, overdue, fromChat },
   };
@@ -95,6 +98,7 @@ async function fromAirtable(ctx: OrgCtx, status?: string): Promise<ActionsData> 
       priority: str(r["Priority"]) || "—",
       sourceType: "airtable",
       status: AIR_TO_APP_STATUS[str(r["Status"])] ?? "open",
+      issueType: str(r["Issue_Type"]),
     };
   });
   const isOpen = (a: ActionView) => a.status === "open" || a.status === "in_progress";

@@ -1,0 +1,90 @@
+// COMMS coordination layer (Spec 10 Module 5) — the forward-looking schedule of
+// required communications: who gets told what, by when. Pending items sort to
+// the top by due date; overdue items are flagged.
+
+import { EmptyState, PageHeader } from "@/components/PageHeader";
+import { loadComms } from "@/lib/platform/commsSource";
+import { requireOrgCtx } from "@/lib/platform/org-context";
+import { orgPath } from "@/lib/platform/paths";
+import { setCommStatus } from "./actions";
+
+export const dynamic = "force-dynamic";
+
+const STATUSES = ["pending", "sent", "acknowledged", "overdue"];
+
+export default async function CommsPage({ params }: { params: Promise<{ org: string }> }) {
+  const ctx = await requireOrgCtx((await params).org);
+  const comms = await loadComms(ctx);
+
+  return (
+    <div className="p-6">
+      <PageHeader
+        title="Coordination Schedule"
+        subtitle="COMMS — who needs to be told what, by when."
+        actions={[{ href: orgPath(ctx.orgSlug, "/comms/new"), label: "+ New communication" }]}
+      />
+      <div className="ae-card p-5">
+        <table className="w-full text-sm">
+          <thead className="text-left text-xs text-neutral-500">
+            <tr>
+              <th className="py-1 pr-2">Topic</th>
+              <th className="py-1 pr-2">Type</th>
+              <th className="py-1 pr-2">Role</th>
+              <th className="py-1 pr-2">Due</th>
+              <th className="py-1">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comms.map((c) => (
+              <tr key={c.id} className="border-t border-neutral-100 align-top">
+                <td className="py-2 pr-2">
+                  <span className="font-medium">{c.topic}</span>
+                  {c.notes && <span className="block text-xs text-neutral-500">{c.notes}</span>}
+                </td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs">{c.messageType}</td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs">{c.stakeholderRole}</td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs">
+                  {c.dueDate ? (
+                    <span className={c.isOverdue ? "text-red-600 font-medium" : ""}>
+                      {c.dueDate.toISOString().slice(0, 10)}
+                      {c.isOverdue && " (overdue)"}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="py-2 whitespace-nowrap">
+                  <form action={setCommStatus} className="flex items-center gap-1">
+                    <input type="hidden" name="org" value={ctx.orgSlug} />
+                    <input type="hidden" name="recordId" value={c.id} />
+                    <select name="status" defaultValue={c.status} className="text-xs border border-neutral-200 rounded px-1 py-0.5">
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="submit" className="btn-ae-outline text-xs">
+                      Set
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+            {comms.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-6">
+                  <EmptyState
+                    title="No communications scheduled"
+                    hint="Track who needs to be told what, by when — notifications, approvals, escalations."
+                    action={{ href: orgPath(ctx.orgSlug, "/comms/new"), label: "+ New communication" }}
+                  />
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
