@@ -43,6 +43,16 @@ export default async function NewActionPage({ params }: { params: Promise<{ org:
             </select>
           </label>
           <label className="block text-sm">
+            <span className="text-neutral-600">Issue type</span>
+            <select name="issueType" defaultValue="Open Action" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+              {["Open Action", "Blocker", "Risk Materialised", "Decision Required", "Scope Change Trigger"].map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
             <span className="text-neutral-600">Owner</span>
             <input name="owner" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>

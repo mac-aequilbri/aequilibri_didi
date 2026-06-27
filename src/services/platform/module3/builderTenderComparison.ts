@@ -1,5 +1,8 @@
+import { callClaude } from "@/lib/claude";
 import { loadTradeOptions } from "@/lib/platform/configSource";
 import { emitCorrection } from "@/lib/platform/corrections";
+import { modelFor } from "@/lib/platform/modelRouter";
+import { getPrompt } from "@/lib/platform/prompts";
 import { type RecordId } from "@/lib/platform/recordWriter";
 import type { OrgCtx } from "@/lib/platform/types";
 import { generateManagedDocument } from "@/services/platform/documents";
@@ -48,6 +51,55 @@ function parseLines(text: string, tradeNames: string[]): TradeMatch[] {
   return out;
 }
 
+/** Coerce the model's lineItems array into validated TradeMatch rows. */
+function coerceRows(parsed: unknown): TradeMatch[] {
+  if (!parsed || typeof parsed !== "object") return [];
+  const li = (parsed as { lineItems?: unknown }).lineItems;
+  if (!Array.isArray(li)) return [];
+  const out: TradeMatch[] = [];
+  for (const raw of li as Array<{ item?: unknown; amount?: unknown; provisional?: unknown }>) {
+    const amount = Number(raw?.amount);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    out.push({
+      item: String(raw?.item ?? "").slice(0, 120) || "unspecified",
+      amount,
+      provisional: raw?.provisional === true,
+    });
+  }
+  return out;
+}
+
+/** Normalise one tender document into structured rows + builder name using
+ *  Claude (the spec's tender-normalisation + firm/provisional flagging). Returns
+ *  null when the model is unavailable (no API key) or the reply can't be parsed,
+ *  so the caller can fall back to the heuristic line parser. */
+async function extractViaClaude(
+  docTitle: string,
+  docText: string,
+  tradeNames: string[],
+): Promise<{ builder: string; rows: TradeMatch[] } | null> {
+  const { system } = getPrompt("tender.extract");
+  const user =
+    `Canonical trades:\n${tradeNames.join(", ") || "(none provided)"}\n\n` +
+    `Tender document "${docTitle}":\n${docText.slice(0, 12000)}`;
+  let res;
+  try {
+    res = await callClaude(system, user, { model: modelFor("extraction"), maxTokens: 2000 });
+  } catch {
+    return null;
+  }
+  if (res.demo_mode) return null;
+  try {
+    const parsed = JSON.parse(res.content.replace(/^```(json)?|```$/g, "").trim());
+    const rows = coerceRows(parsed);
+    if (!rows.length) return null;
+    const builder = String((parsed as { builder?: unknown }).builder ?? "").slice(0, 120);
+    return { builder, rows };
+  } catch {
+    return null;
+  }
+}
+
 export async function runBuilderTenderComparison(
   ctx: OrgCtx,
   userName: string,
@@ -60,19 +112,25 @@ export async function runBuilderTenderComparison(
   const tradeOptions = await loadTradeOptions(ctx);
   const tradeNames = tradeOptions.map((t) => t.name).filter(Boolean);
 
-  const perBuilder = docs.map((doc) => {
-    const rows = parseLines(doc.text, tradeNames);
+  const perBuilder = [];
+  let aiExtractions = 0;
+  for (const doc of docs) {
+    const ai = await extractViaClaude(doc.title, doc.text, tradeNames);
+    const rows = ai ? ai.rows : parseLines(doc.text, tradeNames);
+    const builder = (ai?.builder || normaliseBuilderName(doc.title)).trim() || normaliseBuilderName(doc.title);
+    if (ai) aiExtractions += 1;
     const total = rows.reduce((sum, r) => sum + r.amount, 0);
     const provisionalTotal = rows.filter((r) => r.provisional).reduce((sum, r) => sum + r.amount, 0);
-    return {
-      builder: normaliseBuilderName(doc.title),
+    perBuilder.push({
+      builder,
       sourceDocumentId: doc.id,
+      extraction: ai ? "ai" : "heuristic",
       rows,
       total,
       provisionalTotal,
       provisionalPct: total > 0 ? Math.round((provisionalTotal / total) * 1000) / 10 : 0,
-    };
-  });
+    });
+  }
 
   const canonicalItems = Array.from(
     new Set(perBuilder.flatMap((b) => b.rows.map((r) => r.item)).filter((x) => x && x !== "unspecified")),
@@ -95,6 +153,7 @@ export async function runBuilderTenderComparison(
   const payload = {
     capability: "builder_tender_comparison",
     generatedAt: new Date().toISOString(),
+    extraction: { method: aiExtractions === docs.length ? "ai" : aiExtractions > 0 ? "mixed" : "heuristic", aiDocuments: aiExtractions, totalDocuments: docs.length },
     canonicalItems,
     builders: perBuilder,
     gaps,
@@ -139,11 +198,14 @@ export async function runBuilderTenderComparison(
   }
 
   if (!generated.id) throw new Error("Failed to persist tender comparison output.");
+  const method = aiExtractions === docs.length ? "AI" : aiExtractions > 0 ? "mixed AI/heuristic" : "heuristic";
+  // AI extraction earns a confidence floor lift; pure-heuristic stays cautious.
+  const aiBonus = aiExtractions === docs.length ? 10 : aiExtractions > 0 ? 5 : 0;
   return {
     capability: "builder_tender_comparison",
     resultId: generated.id,
-    overallConfidence: Math.max(30, Math.min(95, 45 + perBuilder.length * 10 - riskBuilders.length * 5)),
-    outputVersion: "module3.builder-tender@1.0",
-    notes: `Compared ${perBuilder.length} tender documents.`,
+    overallConfidence: Math.max(30, Math.min(95, 45 + aiBonus + perBuilder.length * 10 - riskBuilders.length * 5)),
+    outputVersion: "module3.builder-tender@2.0",
+    notes: `Compared ${perBuilder.length} tender documents (${method} extraction).`,
   };
 }

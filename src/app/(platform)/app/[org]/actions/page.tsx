@@ -74,6 +74,11 @@ export default async function ActionsPage({
               <tr key={a.id} className="border-t border-neutral-100">
                 <td className="py-2 pr-2">
                   <span className="font-medium">{a.title}</span>
+                  {a.issueType && a.issueType !== "Open Action" && (
+                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-amber-100 text-amber-800">
+                      {a.issueType}
+                    </span>
+                  )}
                   {a.jobCode && (
                     <span className="ml-1 text-xs text-neutral-400">{a.jobCode}</span>
                   )}
