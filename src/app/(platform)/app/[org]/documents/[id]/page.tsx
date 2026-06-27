@@ -6,16 +6,19 @@ import { formatDate } from "@/lib/format";
 import { loadDocumentDetail } from "@/lib/platform/documentsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
-import { analyzeDocumentAction } from "../actions";
+import { analyzeDocumentAction, verifyDocumentAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function DocumentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ org: string; id: string }>;
+  searchParams: Promise<{ verify?: string }>;
 }) {
   const { org, id } = await params;
+  const { verify } = await searchParams;
   const ctx = await requireOrgCtx(org);
   const doc = await loadDocumentDetail(ctx, id);
   if (!doc) notFound();
@@ -68,10 +71,42 @@ export default async function DocumentDetailPage({
           Lineage key <span className="font-mono">{doc.lineageKey}</span>
         </div>
         {doc.immutableSnapshot && (
-          <p className="text-xs text-neutral-500">
-            Module 4 snapshot · immutable
-            {doc.outputType ? ` · ${doc.outputType.replace(/_/g, " ")}` : ""}
-          </p>
+          <div className="text-xs text-neutral-500 space-y-1">
+            <p>
+              Module 4 snapshot · immutable
+              {doc.outputType ? ` · ${doc.outputType.replace(/_/g, " ")}` : ""}
+            </p>
+            {doc.contentHash && (
+              <p>
+                Fingerprint{" "}
+                <span className="font-mono">
+                  {(doc.hashAlgo || "sha256")}:{doc.contentHash.slice(0, 16)}…
+                </span>
+              </p>
+            )}
+            {verify === "ok" && (
+              <p className="text-emerald-700">
+                ✓ Integrity verified — the stored file matches its registered fingerprint.
+              </p>
+            )}
+            {verify === "fail" && (
+              <p className="text-rose-700">
+                ✗ Integrity check FAILED — the stored file no longer matches its fingerprint.
+              </p>
+            )}
+            {verify === "error" && (
+              <p className="text-amber-700">Could not verify — no fingerprint or stored file available.</p>
+            )}
+            {doc.contentHash && (
+              <form action={verifyDocumentAction} className="pt-1">
+                <input type="hidden" name="org" value={ctx.orgSlug} />
+                <input type="hidden" name="recordId" value={doc.id} />
+                <button type="submit" className="underline">
+                  Verify integrity
+                </button>
+              </form>
+            )}
+          </div>
         )}
 
         {doc.routeSuggestions.length > 0 && (

@@ -22,8 +22,14 @@ import {
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
-import { getStorer } from "@/lib/platform/storage";
+import { getStorer, getStorerFor } from "@/lib/platform/storage";
 import { type OrgCtx } from "@/lib/platform/types";
+import { createHash } from "node:crypto";
+
+/** SHA-256 hex digest — the immutable-snapshot fingerprint for generated docs. */
+export function sha256Hex(buf: Buffer | string): string {
+  return createHash("sha256").update(buf).digest("hex");
+}
 
 interface Module2Metadata {
   canonicalName: string;
@@ -54,6 +60,9 @@ interface Module4Metadata {
   outputType?: string;
   brandLabel?: string;
   traceability?: Module4Traceability;
+  /** Fingerprint of the rendered file at registration (immutable snapshot). */
+  contentHash?: string;
+  hashAlgo?: string;
 }
 
 interface ExistingDocumentLite {
@@ -107,6 +116,8 @@ function parseModule4(raw: string): Module4Metadata | null {
     traceability: typeof m4.traceability === "object" && m4.traceability
       ? (m4.traceability as Module4Traceability)
       : undefined,
+    contentHash: typeof m4.contentHash === "string" ? m4.contentHash : undefined,
+    hashAlgo: typeof m4.hashAlgo === "string" ? m4.hashAlgo : undefined,
   };
 }
 
@@ -573,6 +584,8 @@ export async function generateManagedDocument(
     outputType: input.outputType,
     brandLabel,
     traceability: input.traceability,
+    contentHash: sha256Hex(rendered.buf),
+    hashAlgo: "sha256",
   };
   const created = await createDocumentRecord(ctx, actorName, {
     jobId: job.jobId,
@@ -600,6 +613,41 @@ export async function generateManagedDocument(
   });
   const v = created.title.match(/_v(\d+)$/i);
   return { id: created.id, title: created.title, version: v ? Number(v[1]) : 1 };
+}
+
+export interface IntegrityResult {
+  verified: boolean;
+  expectedHash: string;
+  actualHash: string | null;
+  error?: string;
+}
+
+/** Re-hash a generated document's stored file and compare to the fingerprint
+ *  recorded at registration — proves an immutable snapshot has not silently
+ *  changed since a decision was made on it (the Module 4 snapshot guarantee). */
+export async function verifyStoredSnapshot(
+  provider: string,
+  ref: string,
+  expectedHash: string,
+): Promise<IntegrityResult> {
+  if (!expectedHash) {
+    return { verified: false, expectedHash, actualHash: null, error: "no fingerprint recorded" };
+  }
+  if (!ref) {
+    return { verified: false, expectedHash, actualHash: null, error: "no stored file to verify" };
+  }
+  try {
+    const buf = await getStorerFor(provider).get(ref);
+    const actualHash = sha256Hex(buf);
+    return { verified: actualHash === expectedHash, expectedHash, actualHash };
+  } catch (err) {
+    return {
+      verified: false,
+      expectedHash,
+      actualHash: null,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 export async function ingestUnreadEmails(

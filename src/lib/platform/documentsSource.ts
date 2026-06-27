@@ -28,6 +28,8 @@ export interface DocumentDetailView extends DocumentView {
   routeSuggestions: Array<{ table: string; summary: string; proposalId?: number | string; status?: string }>;
   immutableSnapshot: boolean;
   outputType: string;
+  contentHash: string;
+  hashAlgo: string;
 }
 
 function str(v: unknown): string {
@@ -67,6 +69,8 @@ function module2Meta(row: { title: string; aiAnalysis: string; version?: number 
   routeSuggestions: DocumentDetailView["routeSuggestions"];
   immutableSnapshot: boolean;
   outputType: string;
+  contentHash: string;
+  hashAlgo: string;
 } {
   const parsed = parseAnalysis(row.aiAnalysis);
   const module2 = (parsed.module2 ?? {}) as Record<string, unknown>;
@@ -82,6 +86,8 @@ function module2Meta(row: { title: string; aiAnalysis: string; version?: number 
       : [],
     immutableSnapshot: module4.immutableSnapshot === true,
     outputType: typeof module4.outputType === "string" ? module4.outputType : "",
+    contentHash: typeof module4.contentHash === "string" ? module4.contentHash : "",
+    hashAlgo: typeof module4.hashAlgo === "string" ? module4.hashAlgo : "",
   };
 }
 
@@ -168,6 +174,8 @@ async function fromPostgresDetail(ctx: OrgCtx, id: string): Promise<DocumentDeta
     routeSuggestions: module2Meta({ title: doc.title, aiAnalysis: doc.aiAnalysis, version: doc.version }).routeSuggestions,
     immutableSnapshot: module2Meta({ title: doc.title, aiAnalysis: doc.aiAnalysis, version: doc.version }).immutableSnapshot,
     outputType: module2Meta({ title: doc.title, aiAnalysis: doc.aiAnalysis, version: doc.version }).outputType,
+    contentHash: module2Meta({ title: doc.title, aiAnalysis: doc.aiAnalysis, version: doc.version }).contentHash,
+    hashAlgo: module2Meta({ title: doc.title, aiAnalysis: doc.aiAnalysis, version: doc.version }).hashAlgo,
   };
 }
 
@@ -203,6 +211,8 @@ async function fromAirtableDetail(ctx: OrgCtx, id: string): Promise<DocumentDeta
     routeSuggestions: module2.routeSuggestions,
     immutableSnapshot: module2.immutableSnapshot,
     outputType: module2.outputType,
+    contentHash: module2.contentHash,
+    hashAlgo: module2.hashAlgo,
   };
 }
 

@@ -11,7 +11,9 @@ import {
   ingestDocumentFile,
   ingestDocumentLink,
   ingestUnreadEmails,
+  verifyStoredSnapshot,
 } from "@/services/platform/documents";
+import { loadDocumentDetail } from "@/lib/platform/documentsSource";
 import { prisma } from "@/lib/db";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -77,6 +79,20 @@ export async function ingestInboxAction(formData: FormData): Promise<void> {
       `/documents?processed=${result.processed}&documents=${result.documents}&proposals=${result.proposals}`,
     ),
   );
+}
+
+export async function verifyDocumentAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  const id = String(formData.get("recordId") ?? "");
+  if (!id) return;
+  const doc = await loadDocumentDetail(ctx, id);
+  let verify = "error";
+  if (doc) {
+    const result = await verifyStoredSnapshot(doc.storageProvider, doc.storageRef, doc.contentHash);
+    verify = result.verified ? "ok" : doc.contentHash ? "fail" : "error";
+  }
+  revalidatePath(orgPath(ctx.orgSlug, `/documents/${id}`));
+  redirect(orgPath(ctx.orgSlug, `/documents/${id}?verify=${verify}`));
 }
 
 export async function analyzeDocumentAction(formData: FormData): Promise<void> {
