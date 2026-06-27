@@ -27,6 +27,8 @@
     "@react-three/fiber": "^9.6.1",
     "decimal.js": "^10.6.0",
     "geotiff": "^3.0.5",
+    "imapflow": "^1.4.3",
+    "mailparser": "^3.9.12",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -41,6 +43,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/google.maps": "^3.65.0",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

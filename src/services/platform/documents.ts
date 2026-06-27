@@ -608,59 +608,63 @@ export async function ingestUnreadEmails(
   opts: { jobId?: RecordId } = {},
 ): Promise<{ processed: number; documents: number; proposals: number }> {
   const reader = getEmailReader();
-  const emails = await reader.fetchUnread();
   let processed = 0;
   let documents = 0;
   let proposals = 0;
 
-  const job = await resolveJobContext(ctx, opts.jobId);
+  try {
+    const emails = await reader.fetchUnread();
+    const job = await resolveJobContext(ctx, opts.jobId);
 
-  for (const email of emails) {
-    const bodyId = await createDocumentRecord(ctx, actorName, {
-      jobId: job.jobId,
-      jobCode: job.jobCode,
-      rawName: `${email.subject}.txt`,
-      title: email.subject,
-      textContent: [email.subject, email.body].filter(Boolean).join("\n\n"),
-      docType: "correspondence",
-      classification: "correspondence",
-      mimeType: "text/plain",
-      sizeBytes: Buffer.byteLength(email.body || "", "utf8"),
-      channel: "email",
-      storageProvider: "email",
-      storageRef: `email:${email.id}`,
-      sourceRef: email.id,
-      topicHint: email.from.split("@")[0],
-      dateHint: email.receivedAt,
-      sender: email.from,
-      kind: "generated",
-    });
-    documents += bodyId.id ? 1 : 0;
-    proposals += bodyId.proposals;
-
-    for (const attachment of email.attachments) {
-      const created = await ingestDocumentFile(ctx, actorName, {
+    for (const email of emails) {
+      const bodyId = await createDocumentRecord(ctx, actorName, {
         jobId: job.jobId,
         jobCode: job.jobCode,
-        title: attachment.name,
-        name: attachment.name,
-        mimeType: attachment.mimeType,
-        buf: attachment.buf,
+        rawName: `${email.subject}.txt`,
+        title: email.subject,
+        textContent: [email.subject, email.body].filter(Boolean).join("\n\n"),
+        docType: "correspondence",
+        classification: "correspondence",
+        mimeType: "text/plain",
+        sizeBytes: Buffer.byteLength(email.body || "", "utf8"),
         channel: "email",
+        storageProvider: "email",
+        storageRef: `email:${email.id}`,
+        sourceRef: email.id,
         topicHint: email.from.split("@")[0],
         dateHint: email.receivedAt,
         sender: email.from,
-        sourceRef: email.id,
+        kind: "generated",
       });
-      documents += created.id ? 1 : 0;
-      proposals += created.proposals;
+      documents += bodyId.id ? 1 : 0;
+      proposals += bodyId.proposals;
+
+      for (const attachment of email.attachments) {
+        const created = await ingestDocumentFile(ctx, actorName, {
+          jobId: job.jobId,
+          jobCode: job.jobCode,
+          title: attachment.name,
+          name: attachment.name,
+          mimeType: attachment.mimeType,
+          buf: attachment.buf,
+          channel: "email",
+          topicHint: email.from.split("@")[0],
+          dateHint: email.receivedAt,
+          sender: email.from,
+          sourceRef: email.id,
+        });
+        documents += created.id ? 1 : 0;
+        proposals += created.proposals;
+      }
+
+      await reader.markProcessed(email.id);
+      processed += 1;
     }
 
-    await reader.markProcessed(email.id);
-    processed += 1;
+    return { processed, documents, proposals };
+  } finally {
+    await reader.close?.();
   }
-
-  return { processed, documents, proposals };
 }
 
 /** AI document intelligence — read-only analysis, never mutates the source. */
