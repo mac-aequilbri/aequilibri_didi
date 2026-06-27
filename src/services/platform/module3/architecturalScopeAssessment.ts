@@ -1,5 +1,8 @@
+import { callClaude } from "@/lib/claude";
 import { loadTradeOptions } from "@/lib/platform/configSource";
 import { emitCorrection } from "@/lib/platform/corrections";
+import { modelFor } from "@/lib/platform/modelRouter";
+import { getPrompt } from "@/lib/platform/prompts";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import type { OrgCtx } from "@/lib/platform/types";
 import { generateManagedDocument } from "@/services/platform/documents";
@@ -60,6 +63,56 @@ function extractRooms(text: string, trades: string[]): RoomExtract[] {
   return out;
 }
 
+/** Coerce the model's rooms array into validated RoomExtract rows. */
+function coerceRooms(parsed: unknown): RoomExtract[] {
+  if (!parsed || typeof parsed !== "object") return [];
+  const rs = (parsed as { rooms?: unknown }).rooms;
+  if (!Array.isArray(rs)) return [];
+  const out: RoomExtract[] = [];
+  for (const raw of rs as Array<{ room?: unknown; areaSqm?: unknown; impliedTrades?: unknown }>) {
+    const room = String(raw?.room ?? "").trim().slice(0, 80);
+    if (!room) continue;
+    const areaNum = Number(raw?.areaSqm);
+    const areaSqm = Number.isFinite(areaNum) && areaNum > 0 ? Math.round(areaNum * 100) / 100 : undefined;
+    const impliedTrades = Array.isArray(raw?.impliedTrades)
+      ? Array.from(
+          new Set((raw.impliedTrades as unknown[]).map((t) => String(t).trim()).filter(Boolean)),
+        ).slice(0, 20)
+      : [];
+    out.push({ room, areaSqm, impliedTrades });
+  }
+  return out;
+}
+
+/** Recognise rooms + implied scope from one architectural document using Claude
+ *  (the spec's room-by-room recognition + scope inference). Returns null when
+ *  the model is unavailable or the reply can't be parsed, so the caller falls
+ *  back to the heuristic line scanner. */
+async function extractRoomsViaClaude(
+  docTitle: string,
+  docText: string,
+  trades: string[],
+): Promise<RoomExtract[] | null> {
+  const { system } = getPrompt("scope.extract");
+  const user =
+    `Canonical trades:\n${trades.join(", ") || "(none provided)"}\n\n` +
+    `Architectural document "${docTitle}":\n${docText.slice(0, 12000)}`;
+  let res;
+  try {
+    res = await callClaude(system, user, { model: modelFor("extraction"), maxTokens: 2000 });
+  } catch {
+    return null;
+  }
+  if (res.demo_mode) return null;
+  try {
+    const parsed = JSON.parse(res.content.replace(/^```(json)?|```$/g, "").trim());
+    const rooms = coerceRooms(parsed);
+    return rooms.length ? rooms : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function runArchitecturalScopeAssessment(
   ctx: OrgCtx,
   userName: string,
@@ -71,10 +124,23 @@ export async function runArchitecturalScopeAssessment(
 
   const tradeOptions = await loadTradeOptions(ctx);
   const trades = tradeOptions.map((t) => t.name).filter(Boolean);
-  const rooms = docs.flatMap((d) => extractRooms(d.text, trades));
+
+  const rooms: RoomExtract[] = [];
+  let aiExtractions = 0;
+  for (const d of docs) {
+    const ai = await extractRoomsViaClaude(d.title, d.text, trades);
+    if (ai) {
+      aiExtractions += 1;
+      rooms.push(...ai);
+    } else {
+      rooms.push(...extractRooms(d.text, trades));
+    }
+  }
   if (rooms.length === 0) {
     throw new Error("No room/scope signals found in selected documents.");
   }
+  const extractionMethod =
+    aiExtractions === docs.length ? "ai" : aiExtractions > 0 ? "mixed" : "heuristic";
 
   const uniqueRooms = Array.from(
     new Map(
@@ -131,6 +197,7 @@ export async function runArchitecturalScopeAssessment(
   const payload = {
     capability: "architectural_scope_assessment",
     generatedAt: new Date().toISOString(),
+    extraction: { method: extractionMethod, aiDocuments: aiExtractions, totalDocuments: docs.length },
     sourceDocumentIds: docs.map((d) => d.id),
     rooms: uniqueRooms,
     createdRooms,
@@ -167,11 +234,13 @@ export async function runArchitecturalScopeAssessment(
     );
   }
 
+  const method = extractionMethod === "ai" ? "AI" : extractionMethod === "mixed" ? "mixed AI/heuristic" : "heuristic";
+  const aiBonus = extractionMethod === "ai" ? 10 : extractionMethod === "mixed" ? 5 : 0;
   return {
     capability: "architectural_scope_assessment",
     resultId: generated.id,
-    overallConfidence: Math.max(35, Math.min(95, 55 + uniqueRooms.length - missingArea.length * 5)),
-    outputVersion: "module3.architectural-scope@1.0",
-    notes: `Created ${createdRooms} room scope rows.`,
+    overallConfidence: Math.max(35, Math.min(95, 55 + aiBonus + uniqueRooms.length - missingArea.length * 5)),
+    outputVersion: "module3.architectural-scope@2.0",
+    notes: `Created ${createdRooms} room scope rows (${method} extraction).`,
   };
 }

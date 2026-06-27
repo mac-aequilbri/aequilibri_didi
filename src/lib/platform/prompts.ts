@@ -69,6 +69,20 @@ approval before they execute; tell the user when something is pending approval.
       "}]}. Include every priced line item. Exclude subtotals, running totals, and GST-only lines. " +
       "amount must be a number. No prose outside the JSON.",
   },
+  "scope.extract": {
+    key: "scope.extract",
+    version: "1.0",
+    system:
+      "You read an architectural drawing's or specification's text and recognise rooms and the scope " +
+      "each implies. Given the document text and a list of canonical trade/category names, reply with " +
+      "strict JSON: " +
+      '{"rooms": [{' +
+      '"room": "the room name/label, e.g. \\"Master Bedroom\\" or \\"Ensuite 2\\"", ' +
+      '"areaSqm": number of square metres, or null if not stated (derive from W x L dimensions when given), ' +
+      '"impliedTrades": ["canonical trade names whose work this room implies"]' +
+      "}]}. One entry per distinct room. Map implied trades onto the canonical list where one fits. " +
+      "Use null (not 0) for an unknown area. No prose outside the JSON.",
+  },
   "reports.weekly": {
     key: "reports.weekly",
     version: "1.0",
