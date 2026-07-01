@@ -35,24 +35,28 @@ services:
       # ── Airtable migration (system of record) ─────────────────────────────
       # When AIRTABLE_MIGRATION=true the migrated functionalities read/write the
       # org's Airtable base instead of Postgres. AIRTABLE_PAT is a secret and
-      # MUST be set manually in the Render dashboard (sync: false below).
-      # AIRTABLE_BASES maps orgSlug -> baseId; in production an unmapped org
-      # throws (no demo-base fallback). The three demo orgs all point at the
-      # shared demo base here — give each REAL customer its own cloned base.
+      # MUST be set manually in the Render dashboard (sync: false below) — it must
+      # be a token that can reach the new workspace + all three template bases.
+      # AIRTABLE_BASES is a legacy orgSlug -> baseId override; real customers get
+      # their base id stored at onboarding (PlatOrganisation.airtableBaseId), so
+      # the map is normally empty. In production an org with no resolvable base
+      # throws (no demo-base fallback).
       - key: AIRTABLE_MIGRATION
         value: "true"
       - key: AIRTABLE_BASES
-        value: '{"dulong-downs":"appharWaojouHgMeW","northshore-builders":"appharWaojouHgMeW","coastal-fitouts":"appharWaojouHgMeW"}'
+        value: "{}"
       - key: AIRTABLE_PAT
         sync: false
-      # Onboarding provisions each new customer's base by cloning the template's
-      # structure into this workspace. Provisioning needs a PAT with
-      # schema.bases:write + workspace-creator access. AIRTABLE_TEMPLATE_BASE_ID
-      # defaults to the demo base if unset.
+      # Spec 12 onboarding: a human duplicates the vertical template base natively
+      # in Airtable (preserves computed/rollup fields), pastes the new base id in
+      # /app/new, and the app ensures its runtime tables + registers the org. No
+      # API base-cloning on the onboarding path, so AIRTABLE_WORKSPACE_ID is only
+      # used by the deprecated provisionClientBase ops fallback.
+      # AIRTABLE_TEMPLATE_BASE_ID is the base schema-drift compares against.
       - key: AIRTABLE_WORKSPACE_ID
-        value: "wsppysXBoesIgMtpA"
+        value: "wsp0SwxU3j8IwLZJ1"
       - key: AIRTABLE_TEMPLATE_BASE_ID
-        value: "appharWaojouHgMeW"
+        value: "appXfwBLE6zBEL5Zr"
 
       # ── Auth (Clerk) ────────────────────────────────────────────────────────
       # The platform FAILS CLOSED without these: /app/* returns 503 unless
