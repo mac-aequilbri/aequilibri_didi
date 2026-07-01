@@ -4,6 +4,7 @@
 
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { VERTICAL_TEMPLATE_BASE_IDS } from "@/lib/airtable/config";
 import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { DEFAULT_FEATURES } from "@/lib/platform/types";
 import { PendingSubmitButton } from "@/app/(platform)/app/[org]/assess/SubmitButtons";
@@ -27,6 +28,12 @@ const FEATURE_LABELS: Record<string, string> = {
   vendors: "Vendors",
   learning_rules: "Learning rules",
 };
+
+const VERTICAL_LABELS: Record<string, string> = {
+  construction: "Construction (Project Delivery)",
+  roofing: "Roofing (PCR Estimation)",
+};
+const VERTICALS = Object.keys(VERTICAL_TEMPLATE_BASE_IDS);
 
 const ENGAGEMENTS = [
   ["long_project", "Long project (phases, budget vs actual, variations)"],
@@ -55,6 +62,17 @@ export default async function NewOrganisationPage({
       <form action={provisionOrgAction} className="relative space-y-8">
         <section className="ae-card p-5 space-y-4">
           <h2 className="font-semibold text-sm">1 · Instance setup</h2>
+          <div className="rounded border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 space-y-1">
+            <p className="font-medium text-neutral-700">Before submitting: duplicate the vertical template in Airtable.</p>
+            <p>Use Airtable&apos;s &ldquo;Duplicate base&rdquo; on the template for this customer&apos;s vertical, then paste the new base id below. Templates:</p>
+            <ul className="font-mono">
+              {VERTICALS.map((v) => (
+                <li key={v}>
+                  {VERTICAL_LABELS[v] ?? v}: {VERTICAL_TEMPLATE_BASE_IDS[v]}
+                </li>
+              ))}
+            </ul>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <label className="block text-sm">
               <span className="text-neutral-600">Customer name *</span>
@@ -70,6 +88,32 @@ export default async function NewOrganisationPage({
                 className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs"
               />
               <span className="block mt-1 text-xs text-neutral-500">Becomes /app/&lt;slug&gt; — lowercase, hyphens.</span>
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600">Industry vertical *</span>
+              <select name="vertical" required defaultValue={VERTICALS[0]} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+                {VERTICALS.map((v) => (
+                  <option key={v} value={v}>
+                    {VERTICAL_LABELS[v] ?? v}
+                  </option>
+                ))}
+              </select>
+              <span className="block mt-1 text-xs text-neutral-500">
+                Determines which Airtable template to duplicate for this customer.
+              </span>
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600">Airtable base ID *</span>
+              <input
+                name="airtableBaseId"
+                required
+                pattern="app[A-Za-z0-9]{14,}"
+                placeholder="appXXXXXXXXXXXXXX"
+                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs"
+              />
+              <span className="block mt-1 text-xs text-neutral-500">
+                First duplicate the vertical template in Airtable (Duplicate base), then paste the new base id here.
+              </span>
             </label>
             <label className="block text-sm">
               <span className="text-neutral-600">Default engagement type</span>
@@ -201,12 +245,12 @@ export default async function NewOrganisationPage({
           label="Provision customer instance"
           pendingTitle="Provisioning instance"
           stages={[
-            "Creating the customer's Airtable base…",
-            "Building the data tables…",
-            "Wiring up the table links…",
+            "Verifying the duplicated base…",
+            "Ensuring app runtime tables…",
+            "Checking record access…",
             "Writing instance configuration…",
             "Encoding domain knowledge rules…",
-            "Handing over the keys…",
+            "Registering the organisation…",
           ]}
         />
       </form>

@@ -83,7 +83,7 @@ const AIR_TO_APP_STATUS: Record<string, AppStatus> = {
 };
 
 async function fromAirtable(ctx: OrgCtx, status?: string): Promise<ActionsData> {
-  const rows = await core.list(ctx.orgSlug, "ACTION_HUB", { maxRecords: 200 });
+  const rows = await core.list(ctx.orgSlug, "ISSUES", { maxRecords: 200 });
   const now = Date.now();
   const all: ActionView[] = rows.map((r) => {
     const due = str(r["Due_Date"]);

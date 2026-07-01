@@ -105,7 +105,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<ProjectPlanWorkstreamView[]> {
   const [jobs, phases, actions, risks] = await Promise.all([
     core.list(ctx.orgSlug, "JOBS", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "PHASES", { maxRecords: 1000 }),
-    core.list(ctx.orgSlug, "ACTION_HUB", { maxRecords: 500 }),
+    core.list(ctx.orgSlug, "ISSUES", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
   ]);
 

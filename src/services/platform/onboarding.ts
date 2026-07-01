@@ -9,6 +9,7 @@
 //     starts with something to work from.
 
 import { airtableEnabled, core } from "@/lib/airtable";
+import { templateBaseIdForVertical } from "@/lib/airtable/config";
 import {
   controlEnabled,
   createControlTeamMember,
@@ -16,7 +17,7 @@ import {
   getOrgRegistry,
 } from "@/lib/airtable/control";
 import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
-import { probeBaseDataAccess, provisionClientBase } from "@/lib/airtable/provision";
+import { ensureAppRuntimeTables, probeBaseDataAccess } from "@/lib/airtable/provision";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { defaultModule1Governance, normalizeTeamRole, type TeamRole } from "@/lib/platform/module1Governance";
@@ -133,6 +134,10 @@ export interface ProvisionInput {
   adminName: string;
   adminEmail: string;
   adminRole: TeamRole;
+  /** The Airtable base the admin duplicated from the vertical template (Spec 12
+   *  onboarding: duplicate natively in Airtable, then the app verifies it).
+   *  Required in Airtable mode. */
+  airtableBaseId?: string;
   /** One per line from the form: budget categories for the cfg reference tier. */
   budgetCategories: string[];
   /** One per line: client priorities / budget principles for later reference. */
@@ -189,42 +194,65 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
     return { ok: false, error: `An organisation with slug "${slug}" already exists.` };
   }
 
-  // Airtable mode: provision the customer's own base BEFORE the DB transaction
-  // (it's a slow external call — don't hold a txn open across it). The base is
-  // the org in Airtable terms, so a provisioning failure fails onboarding
-  // rather than leaving a half-created org with no base. Org identity/team stay
-  // in Postgres (auth + tenancy); Customer Config + seed rules are written to
-  // Postgres in the txn AND mirrored into the base afterwards (the Airtable
-  // reads prefer the base, falling back to Postgres during the cutover).
+  // Airtable mode (Spec 12 onboarding): the admin has already duplicated the
+  // vertical template base natively in Airtable — which correctly carries Core
+  // + Domain Extension + computed/rollup fields the API cannot reproduce — and
+  // supplies its base id here. The app's role is to (1) confirm a base was
+  // given and its vertical has a template, (2) create the app-runtime tables
+  // the template doesn't carry, (3) verify record-level read/write access, then
+  // register the org. Org identity/team stay in Postgres; Customer Config +
+  // seed rules are mirrored into the base afterwards.
   let airtableBaseId: string | null = null;
   if (airtableEnabled()) {
+    // Vertical must have a built template (this is what the admin duplicated).
     try {
-      airtableBaseId = await provisionClientBase(input.name.trim());
+      templateBaseIdForVertical(vertical);
     } catch (err) {
-      logger.error("Airtable base provisioning failed", { slug, ...errMeta(err) });
-      return {
-        ok: false,
-        error: `Could not provision the Airtable base: ${err instanceof Error ? err.message : String(err)}`,
-      };
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
-    // The base cloned (meta API), but verify the token can read/write its
-    // RECORDS (data API) before registering the org. Otherwise we'd create an
-    // org whose every page 403s on first load. Fail loudly with the base id so
-    // it can be cleaned up and the cause (token data scope/access) fixed.
-    try {
-      await probeBaseDataAccess(airtableBaseId);
-    } catch (err) {
-      logger.error("Provisioned base is not data-accessible", {
-        slug,
-        baseId: airtableBaseId,
-        ...errMeta(err),
-      });
+    airtableBaseId = (input.airtableBaseId ?? "").trim();
+    if (!airtableBaseId) {
       return {
         ok: false,
         error:
-          `Base ${airtableBaseId} was provisioned but the API token cannot read/write its records: ` +
+          "An Airtable base id is required: duplicate the vertical template base in Airtable, " +
+          "then paste the new base id (starts with \"app\") here.",
+      };
+    }
+    if (!/^app[A-Za-z0-9]{14,}$/.test(airtableBaseId)) {
+      return { ok: false, error: `"${airtableBaseId}" is not a valid Airtable base id (expected e.g. appXXXXXXXXXXXXXX).` };
+    }
+
+    // Create the app-runtime tables the duplicated template doesn't carry.
+    try {
+      const rt = await ensureAppRuntimeTables(airtableBaseId);
+      if (rt.errors.length) {
+        logger.error("App-runtime table setup had errors", { slug, baseId: airtableBaseId, errors: rt.errors });
+        return {
+          ok: false,
+          error: `Could not prepare the base's app tables: ${rt.errors.join("; ")}`,
+        };
+      }
+    } catch (err) {
+      logger.error("App-runtime table setup failed", { slug, baseId: airtableBaseId, ...errMeta(err) });
+      return {
+        ok: false,
+        error: `Could not prepare the base's app tables: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+
+    // Verify the token can read/write RECORDS (data API) — not just schema —
+    // before registering the org, so we never create an org whose pages 403.
+    try {
+      await probeBaseDataAccess(airtableBaseId);
+    } catch (err) {
+      logger.error("Base is not data-accessible", { slug, baseId: airtableBaseId, ...errMeta(err) });
+      return {
+        ok: false,
+        error:
+          `Base ${airtableBaseId} was prepared but the API token cannot read/write its records: ` +
           `${err instanceof Error ? err.message : String(err)}. ` +
-          `Check the token's data.records scope and base access, then delete this base and retry.`,
+          `Confirm the token has data.records scope and access to this base, then retry.`,
       };
     }
   }

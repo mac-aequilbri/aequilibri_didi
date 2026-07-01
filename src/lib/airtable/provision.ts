@@ -12,22 +12,29 @@
 // This is the importable twin of scripts/airtable-provision-base.mjs (an ops
 // tool for ad-hoc/dry-run provisioning). Keep the two in sync.
 
-import { airtablePat, DEMO_BASE_ID } from "./config";
+import { airtablePat, VERTICAL_TEMPLATE_BASE_IDS } from "./config";
 import { createRecords, deleteRecords, listRecords } from "./client";
 import { logger } from "@/lib/logger";
 
 const META = "https://api.airtable.com/v0/meta";
 const sleep = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 
-/** Tables that make up a platform (UC2/UC3) base — the ones the app's fieldMaps
+/** Tables that make up a platform base — the ones the app's fieldMaps
  *  read/write. TEAM and PRICING exist in the template (Core links to them) but
- *  team/identity is kept Postgres-side, so they are intentionally not copied. */
+ *  team/identity is kept Postgres-side, so they are intentionally not copied.
+ *
+ *  NOTE (Spec 12): onboarding no longer API-rebuilds bases (see
+ *  provisionClientBase deprecation) — this set now only feeds schema-drift's
+ *  "expected schema". The rename (ISSUES/CASHFLOWS) is applied; the broader
+ *  reconciliation of this set to the real Spec 12 templates (drop legacy
+ *  VENDORS/VARIATIONS/QUOTES/…, add Core CHANGE_LOG/PLAN/REGIONS/DOMAIN_LABELS/
+ *  ENGAGEMENT_TYPE_CONFIG + Domain Extension) is deferred. */
 export const PLATFORM_TABLES = new Set([
-  "ORGANISATIONS", "CONTACTS", "WORKSTREAMS", "DECISIONS", "ACTION_HUB",
+  "ORGANISATIONS", "CONTACTS", "WORKSTREAMS", "DECISIONS", "ISSUES",
   "EXECUTION_LOG", "CORRECTIONS", "JOBS", "HYPOTHESES", "LEARNING_RULES",
   "DOCUMENTS", "INTELLIGENCE_SNAPSHOT", "ASSESSMENTS", "COMMS",
   "PENDING_WRITES", "CHAT_SESSIONS", "CHAT_MESSAGES",
-  "RISKS", "VENDORS", "BUDGET", "CASHFLOW", "PROCUREMENT", "PHASES",
+  "RISKS", "VENDORS", "BUDGET", "CASHFLOWS", "PROCUREMENT", "PHASES",
   "VARIATIONS", "QUOTES", "QUOTE_LINES", "ROOM_MATRIX", "MEETING_MINUTES",
   "WEEKLY_REPORTS", "PHASE_EVIDENCE", "BIM_MODELS",
   "PLAT_CFG_REFERENCE", "PLAT_CFG_REGION", "PLAT_CFG_NOMENCLATURE", "PLAT_CFG_SETTING",
@@ -86,9 +93,11 @@ async function metaFetch(path: string, init?: RequestInit): Promise<unknown> {
   return text ? JSON.parse(text) : undefined;
 }
 
-/** The base whose structure new client bases are cloned from. */
+/** The canonical template base schema-drift compares against. Defaults to the
+ *  Construction Template (Spec 12, reachable) rather than the retired demo base;
+ *  AIRTABLE_TEMPLATE_BASE_ID overrides. */
 export function templateBaseId(): string {
-  return process.env.AIRTABLE_TEMPLATE_BASE_ID || DEMO_BASE_ID;
+  return process.env.AIRTABLE_TEMPLATE_BASE_ID || VERTICAL_TEMPLATE_BASE_IDS.construction;
 }
 
 export type { AirField, AirTable };
@@ -130,9 +139,14 @@ export function expectedPlatformSchema(templateTables: AirTable[]): Map<string, 
 }
 
 /**
+ * @deprecated Spec 12 onboarding duplicates the vertical template base natively
+ * in Airtable (which preserves computed/rollup fields this API rebuild cannot),
+ * then calls {@link ensureAppRuntimeTables}. This API table-by-table rebuild is
+ * retained as an ops-only fallback for bases that can't be duplicated in the UI;
+ * it is no longer on the onboarding path.
+ *
  * Provision a new client base by replicating the template's structure. Returns
- * the new base id. Throws on any hard failure (caller must treat onboarding as
- * failed — a customer without its base is unusable in Airtable mode).
+ * the new base id. Throws on any hard failure.
  */
 export async function provisionClientBase(
   name: string,
@@ -254,6 +268,156 @@ export async function probeBaseDataAccess(
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+// ── App-runtime tables ──────────────────────────────────────────────────────
+// Tables the app reads/writes at runtime that are NOT part of any Spec 12
+// template (they are application artifacts, not business-domain tables): the
+// approval queue, assistant chat state, the assessment intake draft, and the
+// customer-config tables the config source + onboarding mirror depend on.
+// Since Spec 12 onboarding duplicates a vertical template natively in Airtable
+// (which carries only Core + Domain Extension), these must be created on the
+// duplicated base before the app can use it.
+const APP_RUNTIME_TABLES: Array<{ name: string; fields: FieldSpec[] }> = [
+  {
+    name: "PENDING_WRITES",
+    fields: [
+      { name: "Table_Key", type: "singleLineText" },
+      { name: "Op", type: "singleSelect", options: { choices: [{ name: "create" }, { name: "update" }, { name: "delete" }] } },
+      { name: "Record_Id", type: "singleLineText" },
+      { name: "Payload", type: "multilineText" },
+      { name: "Actor_Type", type: "singleLineText" },
+      { name: "Actor_Name", type: "singleLineText" },
+      { name: "Status", type: "singleSelect", options: { choices: [{ name: "proposed" }, { name: "executed" }, { name: "rejected" }, { name: "expired" }, { name: "failed" }] } },
+      { name: "Created_At", type: "dateTime", options: { dateFormat: { name: "iso" }, timeZone: "utc", timeFormat: { name: "24hour" } } },
+      { name: "Expires_At", type: "dateTime", options: { dateFormat: { name: "iso" }, timeZone: "utc", timeFormat: { name: "24hour" } } },
+      { name: "Job_Id", type: "singleLineText" },
+      { name: "Resolved_By", type: "singleLineText" },
+      { name: "Resolved_At", type: "dateTime", options: { dateFormat: { name: "iso" }, timeZone: "utc", timeFormat: { name: "24hour" } } },
+      { name: "Error", type: "multilineText" },
+    ],
+  },
+  {
+    name: "CHAT_SESSIONS",
+    fields: [
+      { name: "Session_Title", type: "singleLineText" },
+      { name: "Job_Id", type: "singleLineText" },
+      { name: "Started_At", type: "dateTime", options: { dateFormat: { name: "iso" }, timeZone: "utc", timeFormat: { name: "24hour" } } },
+      { name: "Ended_At", type: "dateTime", options: { dateFormat: { name: "iso" }, timeZone: "utc", timeFormat: { name: "24hour" } } },
+      { name: "Summary", type: "multilineText" },
+    ],
+  },
+  {
+    name: "CHAT_MESSAGES",
+    fields: [
+      { name: "Session_Id", type: "singleLineText" },
+      { name: "Role", type: "singleLineText" },
+      { name: "Content", type: "multilineText" },
+      { name: "Tool_Calls", type: "multilineText" },
+      { name: "Created_At", type: "dateTime", options: { dateFormat: { name: "iso" }, timeZone: "utc", timeFormat: { name: "24hour" } } },
+    ],
+  },
+  {
+    name: "ASSESSMENTS",
+    fields: [
+      { name: "Assessment_Name", type: "singleLineText" },
+      { name: "Engagement_Type", type: "singleLineText" },
+      { name: "Address", type: "singleLineText" },
+      { name: "Suburb", type: "singleLineText" },
+      { name: "Size_Sqm", type: "number", options: { precision: 0 } },
+      { name: "Scope", type: "multilineText" },
+      { name: "Result", type: "multilineText" },
+      { name: "Status", type: "singleSelect", options: { choices: [{ name: "draft" }, { name: "accepted" }, { name: "discarded" }] } },
+      { name: "Prompt_Version", type: "singleLineText" },
+      { name: "Created_By", type: "singleLineText" },
+    ],
+  },
+  {
+    name: "PLAT_CFG_REFERENCE",
+    fields: [
+      { name: "Name", type: "singleLineText" },
+      { name: "Ref_Type", type: "singleLineText" },
+      { name: "Code", type: "singleLineText" },
+      { name: "Value", type: "multilineText" },
+      { name: "Sort_Order", type: "number", options: { precision: 0 } },
+      { name: "Is_Active", type: "checkbox", options: { icon: "check", color: "greenBright" } },
+    ],
+  },
+  {
+    name: "PLAT_CFG_SETTING",
+    fields: [
+      { name: "Setting_Key", type: "singleLineText" },
+      { name: "Value", type: "multilineText" },
+    ],
+  },
+];
+
+export interface AppRuntimeResult {
+  baseId: string;
+  createdTables: string[];
+  createdLinks: { table: string; field: string }[];
+  skipped: string[];
+  errors: string[];
+}
+
+/**
+ * Ensure the app-runtime tables exist on a base. Spec 12 onboarding duplicates
+ * a vertical template natively in Airtable — that base carries Core + Domain
+ * Extension but NOT the app's own runtime tables (approval queue, chat, intake,
+ * customer-config). This creates any that are missing, idempotently (existing
+ * tables are left untouched, so it is safe to re-run). ASSESSMENTS also gets a
+ * Job link to JOBS, with the auto-created reverse renamed to "ASSESSMENTS".
+ */
+export async function ensureAppRuntimeTables(baseId: string): Promise<AppRuntimeResult> {
+  const res: AppRuntimeResult = { baseId, createdTables: [], createdLinks: [], skipped: [], errors: [] };
+  const existing = await readBaseSchema(baseId);
+  const byName = new Map(existing.map((t) => [t.name, t]));
+
+  for (const def of APP_RUNTIME_TABLES) {
+    if (byName.has(def.name)) { res.skipped.push(def.name); continue; }
+    try {
+      await sleep();
+      const created = (await metaFetch(`bases/${baseId}/tables`, {
+        method: "POST",
+        body: JSON.stringify({ name: def.name, fields: def.fields }),
+      })) as { id: string };
+      byName.set(def.name, { id: created.id, name: def.name, fields: [] });
+      res.createdTables.push(def.name);
+    } catch (e) {
+      res.errors.push(`create ${def.name}: ${errMsg(e)}`);
+    }
+  }
+
+  // ASSESSMENTS.Job → JOBS link (reverse renamed to "ASSESSMENTS"), if both
+  // tables exist and the link isn't already present.
+  const assessments = byName.get("ASSESSMENTS");
+  const jobs = byName.get("JOBS");
+  const assessmentsFresh = res.createdTables.includes("ASSESSMENTS")
+    ? undefined
+    : existing.find((t) => t.name === "ASSESSMENTS");
+  const hasJobLink = assessmentsFresh?.fields.some((f) => f.name === "Job") ?? false;
+  if (assessments && jobs && !hasJobLink) {
+    try {
+      await sleep();
+      const created = (await metaFetch(`bases/${baseId}/tables/${assessments.id}/fields`, {
+        method: "POST",
+        body: JSON.stringify({ name: "Job", type: "multipleRecordLinks", options: { linkedTableId: jobs.id } }),
+      })) as { options?: { inverseLinkFieldId?: string } };
+      res.createdLinks.push({ table: "ASSESSMENTS", field: "Job" });
+      const reverseId = created.options?.inverseLinkFieldId;
+      if (reverseId) {
+        await sleep();
+        await metaFetch(`bases/${baseId}/tables/${jobs.id}/fields/${reverseId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ name: "ASSESSMENTS" }),
+        });
+      }
+    } catch (e) {
+      res.errors.push(`create ASSESSMENTS.Job: ${errMsg(e)}`);
+    }
+  }
+
+  return res;
 }
 
 export interface MigrationResult {

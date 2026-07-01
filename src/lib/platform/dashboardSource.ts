@@ -55,9 +55,9 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
   const [jobList, rules, actionRows, budgetRows, cashflowRows, logRows, pendingRows] = await Promise.all([
     loadJobsList(ctx),
     getActiveRules(ctx),
-    core.list(ctx.orgSlug, "ACTION_HUB", { maxRecords: 1000 }),
+    core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "BUDGET", { maxRecords: 1000 }),
-    core.list(ctx.orgSlug, "CASHFLOW", { maxRecords: 1000 }),
+    core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "EXECUTION_LOG", { maxRecords: 200 }),
     core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
   ]);

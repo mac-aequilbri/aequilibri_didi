@@ -42,7 +42,7 @@ export async function GET(
     const [jobs, actions, risks, decisions, variations, documents, vendors, quotes] =
       await Promise.all([
         core.list(ctx.orgSlug, "JOBS", { maxRecords: 500 }),
-        core.list(ctx.orgSlug, "ACTION_HUB", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "ISSUES", { maxRecords: 500 }),
         core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
         core.list(ctx.orgSlug, "DECISIONS", { maxRecords: 500 }),
         core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 }),

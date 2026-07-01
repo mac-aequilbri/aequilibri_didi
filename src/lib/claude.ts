@@ -223,7 +223,7 @@ function demoResponse(userMessage: string): ChatResult {
 
   return {
     content: reply,
-    tool_uses: [{ name: "get_records", input: { table: "ACTION_HUB", filter: "" } }],
+    tool_uses: [{ name: "get_records", input: { table: "ISSUES", filter: "" } }],
     demo_mode: true,
   };
 }

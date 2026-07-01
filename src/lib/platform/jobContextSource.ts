@@ -136,7 +136,7 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
     core.list(ctx.orgSlug, "PHASES", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "BUDGET", { maxRecords: 500 }),
-    core.list(ctx.orgSlug, "CASHFLOW", { maxRecords: 500 }),
+    core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 }),
   ]);
 

@@ -8,17 +8,22 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 const CORE = [
-  // Core tier
-  "ORGANISATIONS", "CONTACTS", "WORKSTREAMS", "DECISIONS", "ACTION_HUB",
+  // Core tier (Spec 12 — 21-table Core, renamed ISSUES/PLAN/CASHFLOWS applied)
+  "ORGANISATIONS", "CONTACTS", "WORKSTREAMS", "DECISIONS", "ISSUES",
   "EXECUTION_LOG", "CORRECTIONS", "JOBS", "HYPOTHESES", "LEARNING_RULES",
-  "DOCUMENTS", "INTELLIGENCE_SNAPSHOT", "ASSESSMENTS", "COMMS",
-  "PENDING_WRITES", "CHAT_SESSIONS", "CHAT_MESSAGES",
-  // Domain Extension — Residential Project Delivery (skipped if absent)
-  "RISKS", "VENDORS", "BUDGET", "CASHFLOW", "PROCUREMENT", "PHASES",
-  "VARIATIONS", "QUOTES", "QUOTE_LINES", "ROOM_MATRIX", "MEETING_MINUTES",
-  "WEEKLY_REPORTS", "PHASE_EVIDENCE", "BIM_MODELS",
-  // Customer Config — app-shaped (skipped if absent)
+  "DOCUMENTS", "INTELLIGENCE_SNAPSHOT", "COMMS",
+  "RISKS", "BUDGET", "CASHFLOWS", "PROCUREMENT", "PHASES", "PLAN",
+  "CHANGE_LOG", "REGIONS", "DOMAIN_LABELS", "ENGAGEMENT_TYPE_CONFIG",
+  // App-runtime tables — not in any spec template; provisioned by
+  // ensureAppRuntimeTables (skipped here if absent from the base).
+  "ASSESSMENTS", "PENDING_WRITES", "CHAT_SESSIONS", "CHAT_MESSAGES",
   "PLAT_CFG_REFERENCE", "PLAT_CFG_REGION", "PLAT_CFG_NOMENCLATURE", "PLAT_CFG_SETTING",
+  // Construction Domain Extension (skipped if absent)
+  "REF_ZONES", "REF_BUDGET", "MATERIALS_CATALOGUE", "ROOM_MATRIX",
+  "QUANTITY_TAKEOFF", "TRADE_PACKAGES", "CONTRACTOR_BIDS", "BID_LINE_ITEMS",
+  // Legacy UC2/UC3 tables — retained until reconciled to Spec 12 (skipped if absent)
+  "VENDORS", "VARIATIONS", "QUOTES", "QUOTE_LINES", "MEETING_MINUTES",
+  "WEEKLY_REPORTS", "PHASE_EVIDENCE", "BIM_MODELS",
   // Domain Extension — Roofing Estimation (UC1; skipped if absent)
   "ROOFING_CONTACTS", "ROOFING_RATE_CARDS", "ROOFING_FINANCE_PROVIDERS",
   "ROOFING_GUTTERING_RATES", "ROOFING_REGIONS", "ROOFING_TEAM",
@@ -39,7 +44,11 @@ function loadPat() {
   return line.slice("AIRTABLE_PAT=".length).trim();
 }
 
-const baseId = process.argv[2] ?? "appharWaojouHgMeW";
+// Default to the Construction Template (Spec 12 canonical: Core + Domain
+// Extension). App-runtime + legacy tables are skipped-if-absent; regenerate
+// against a base that also carries them (a duplicated template with
+// ensureAppRuntimeTables run) to emit those blocks too.
+const baseId = process.argv[2] ?? "appXfwBLE6zBEL5Zr";
 const res = await fetch(`https://api.airtable.com/v0/meta/bases/${baseId}/tables`, {
   headers: { Authorization: `Bearer ${loadPat()}` },
 });

@@ -18,6 +18,31 @@ export const DEMO_BASE_ID = "appharWaojouHgMeW";
 /** Master Template per the build spec — not reachable with the demo PAT yet. */
 export const MASTER_TEMPLATE_BASE_ID = "appIf959oh38fgKYp";
 
+/** Vertical template bases (Spec 12, confirmed production-ready 29 June 2026).
+ *  MASTER_TEMPLATE_BASE_ID is the canonical schema reference only and is never
+ *  cloned directly for customers — every vertical clones its own template
+ *  (Core + that vertical's Domain Extension tables). Add an entry here only
+ *  once a vertical's Domain Extension (reference tables + DOMAIN_LABELS +
+ *  assessment module) has actually been built. */
+export const VERTICAL_TEMPLATE_BASE_IDS: Record<string, string> = {
+  construction: "appXfwBLE6zBEL5Zr",
+  roofing: "appDSGE0EcAf2pRDZ",
+};
+
+/** Resolve a customer's vertical to the template its base should be cloned
+ *  from. Throws for any vertical without a built template — onboarding must
+ *  fail loudly rather than silently fall back to the Core Template. */
+export function templateBaseIdForVertical(vertical: string): string {
+  const id = VERTICAL_TEMPLATE_BASE_IDS[vertical];
+  if (!id) {
+    throw new Error(
+      `No Airtable template exists yet for vertical "${vertical}" — build its Domain Extension ` +
+        `(reference tables + DOMAIN_LABELS + assessment module) before onboarding a customer in it.`,
+    );
+  }
+  return id;
+}
+
 /** Feature flag. Nothing in this layer activates unless explicitly enabled. */
 export function airtableEnabled(): boolean {
   return process.env.AIRTABLE_MIGRATION === "true";

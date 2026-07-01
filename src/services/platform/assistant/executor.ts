@@ -60,11 +60,11 @@ async function runQuery(ctx: OrgCtx, input: Record<string, unknown>): Promise<st
   if (airtableEnabled()) {
     const map = {
       jobs: "JOBS",
-      actions: "ACTION_HUB",
+      actions: "ISSUES",
       decisions: "DECISIONS",
       phases: "PHASES",
       budget_lines: "BUDGET",
-      cashflows: "CASHFLOW",
+      cashflows: "CASHFLOWS",
       risks: "RISKS",
       variations: "VARIATIONS",
       procurement: "PROCUREMENT",

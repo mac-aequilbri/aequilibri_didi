@@ -53,7 +53,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<JobCashflow[]> {
 async function fromAirtable(ctx: OrgCtx): Promise<JobCashflow[]> {
   const [jobRows, cfRows] = await Promise.all([
     core.list(ctx.orgSlug, "JOBS", { maxRecords: 200 }),
-    core.list(ctx.orgSlug, "CASHFLOW", { maxRecords: 500 }),
+    core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 500 }),
   ]);
   const byJob = new Map<string, CashflowRow[]>();
   for (const c of cfRows) {

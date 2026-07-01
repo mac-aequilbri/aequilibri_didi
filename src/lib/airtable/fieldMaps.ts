@@ -113,16 +113,16 @@ export function toFields(
 export const FIELD_MAPS: Record<string, AirtableMap> = {
   // ---- Core ----
   action: {
-    table: "ACTION_HUB",
+    table: "ISSUES",
     specs: [
       { air: "Action_Name", from: "title", to: (v) => S(v).slice(0, 200) || "Untitled action" },
       { air: "Description", from: "detail", to: S, createDefault: "" },
       { air: "Status", from: "status", createDefault: "open", to: (v) => ACTION_STATUS[S(v)] ?? "Open" },
       { air: "Priority", from: "priority", createDefault: "P2", to: (v) => ACTION_PRIORITY[S(v)] ?? "Medium" },
-      // Spec 10 ISSUES fields (typecast creates the option; links no-op on non-rec ids).
+      // Spec 12 ISSUES fields (typecast creates the option; links no-op on non-rec ids).
+      // Real ISSUES has no Phase field, and its risk link is named RISKS (not Linked_Risk).
       { air: "Issue_Type", from: "issueType", createDefault: "Open Action", to: S },
-      { air: "Phase", from: "phaseId", to: LINK },
-      { air: "Linked_Risk", from: "riskId", to: LINK },
+      { air: "RISKS", from: "riskId", to: LINK },
       { air: "Due_Date", from: "dueDate", to: DATE },
       { air: "Notes", from: "owner", to: (v) => (v ? `Owner: ${S(v)}` : undefined) },
     ],
@@ -317,11 +317,15 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
     ],
   },
   cashflow: {
-    table: "CASHFLOW",
+    table: "CASHFLOWS",
+    // NOTE (Spec 12 deferred): the real CASHFLOWS table models per-transaction
+    // rows (Type In/Out · Amount · Source_Or_Payee · Status), not the old
+    // forecast/actual-per-period shape. Only Period/Notes/Job overlap, so the
+    // Projected/Actual specs are dropped to keep writes valid. Reconciling the
+    // cashflow data model to Type/Amount is part of the deferred config/schema
+    // reconciliation, not this rename pass.
     specs: [
       { air: "Period", from: "period", to: S },
-      { air: "Projected", from: "projected", to: (v) => NUM(v) },
-      { air: "Actual", from: "actual", to: (v) => NUM(v) },
       { air: "Notes", from: "notes", to: S },
       { air: "Job", from: "jobId", to: LINK },
     ],

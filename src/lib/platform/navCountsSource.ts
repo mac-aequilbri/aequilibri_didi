@@ -33,7 +33,7 @@ function str(v: unknown): string {
 async function fromAirtable(ctx: OrgCtx, f: Record<string, boolean>): Promise<NavCounts> {
   const [jobRows, actionRows, riskRows, variationRows, pendingRows] = await Promise.all([
     core.list(ctx.orgSlug, "JOBS", { maxRecords: 1000 }),
-    core.list(ctx.orgSlug, "ACTION_HUB", { maxRecords: 1000 }),
+    core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
     f.risks ? core.list(ctx.orgSlug, "RISKS", { maxRecords: 1000 }) : Promise.resolve([]),
     f.variations ? core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 1000 }) : Promise.resolve([]),
     core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),

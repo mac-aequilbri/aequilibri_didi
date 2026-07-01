@@ -107,7 +107,7 @@ async function dataContext(ctx: OrgCtx): Promise<string> {
   if (airtableEnabled()) {
     const [jobs, actions, pending] = await Promise.all([
       core.list(ctx.orgSlug, "JOBS", { maxRecords: 10 }),
-      core.list(ctx.orgSlug, "ACTION_HUB", { maxRecords: 1000 }),
+      core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
       core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
     ]);
     const openActions = actions.filter((a) => {

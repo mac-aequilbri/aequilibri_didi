@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { VERTICAL_TEMPLATE_BASE_IDS } from "@/lib/airtable/config";
 import { clerkEnabled } from "@/lib/platform/authConfig";
 import { normalizeTeamRole, type TeamRole } from "@/lib/platform/module1Governance";
 import { AiAuthority, DEFAULT_FEATURES, EngagementType } from "@/lib/platform/types";
@@ -8,6 +9,7 @@ import { provisionOrganisation } from "@/services/platform/onboarding";
 
 const ENGAGEMENT_TYPES: EngagementType[] = ["short_job", "long_project", "ongoing", "seasonal"];
 const AUTHORITIES: AiAuthority[] = ["propose_only", "approve_required", "auto_low_risk"];
+const VERTICALS = Object.keys(VERTICAL_TEMPLATE_BASE_IDS);
 
 export async function provisionOrgAction(formData: FormData): Promise<void> {
   const { isPlatformAdmin } = await import("@/lib/platform/org-context");
@@ -41,9 +43,13 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
     adminName = adminName.trim() || user?.fullName || adminEmail.split("@")[0] || "Admin";
   }
 
+  const vertical = String(formData.get("vertical") ?? "");
+
   const result = await provisionOrganisation({
     slug: String(formData.get("slug") ?? ""),
     name: String(formData.get("name") ?? ""),
+    vertical: VERTICALS.includes(vertical) ? vertical : VERTICALS[0],
+    airtableBaseId: String(formData.get("airtableBaseId") ?? ""),
     defaultEngagementType: (ENGAGEMENT_TYPES.includes(defaultEngagementType as EngagementType)
       ? defaultEngagementType
       : "long_project") as EngagementType,
