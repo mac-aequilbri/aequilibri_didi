@@ -63,8 +63,8 @@ export default async function NewOrganisationPage({
         <section className="ae-card p-5 space-y-4">
           <h2 className="font-semibold text-sm">1 · Instance setup</h2>
           <div className="rounded border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 space-y-1">
-            <p className="font-medium text-neutral-700">Before submitting: duplicate the vertical template in Airtable.</p>
-            <p>Use Airtable&apos;s &ldquo;Duplicate base&rdquo; on the template for this customer&apos;s vertical, then paste the new base id below. Templates:</p>
+            <p className="font-medium text-neutral-700">The customer&apos;s Airtable base is created automatically.</p>
+            <p>On submit, a new base is cloned from the vertical template below. Leave the base-id field blank to auto-create; only fill it to reuse an existing base.</p>
             <ul className="font-mono">
               {VERTICALS.map((v) => (
                 <li key={v}>
@@ -103,16 +103,15 @@ export default async function NewOrganisationPage({
               </span>
             </label>
             <label className="block text-sm">
-              <span className="text-neutral-600">Airtable base ID *</span>
+              <span className="text-neutral-600">Airtable base ID (optional)</span>
               <input
                 name="airtableBaseId"
-                required
                 pattern="app[A-Za-z0-9]{14,}"
-                placeholder="appXXXXXXXXXXXXXX"
+                placeholder="auto-created if blank"
                 className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs"
               />
               <span className="block mt-1 text-xs text-neutral-500">
-                First duplicate the vertical template in Airtable (Duplicate base), then paste the new base id here.
+                Leave blank to auto-create the base from the vertical template. Provide an id only to reuse an existing base.
               </span>
             </label>
             <label className="block text-sm">
@@ -245,11 +244,11 @@ export default async function NewOrganisationPage({
           label="Provision customer instance"
           pendingTitle="Provisioning instance"
           stages={[
-            "Verifying the duplicated base…",
+            "Creating the customer's Airtable base…",
+            "Cloning the template tables…",
             "Ensuring app runtime tables…",
             "Checking record access…",
             "Writing instance configuration…",
-            "Encoding domain knowledge rules…",
             "Registering the organisation…",
           ]}
         />

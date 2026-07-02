@@ -17,7 +17,7 @@ import {
   getOrgRegistry,
 } from "@/lib/airtable/control";
 import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
-import { ensureAppRuntimeTables, probeBaseDataAccess } from "@/lib/airtable/provision";
+import { ensureAppRuntimeTables, probeBaseDataAccess, provisionClientBase } from "@/lib/airtable/provision";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { defaultModule1Governance, normalizeTeamRole, type TeamRole } from "@/lib/platform/module1Governance";
@@ -194,36 +194,43 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
     return { ok: false, error: `An organisation with slug "${slug}" already exists.` };
   }
 
-  // Airtable mode (Spec 12 onboarding): the admin has already duplicated the
-  // vertical template base natively in Airtable — which correctly carries Core
-  // + Domain Extension + computed/rollup fields the API cannot reproduce — and
-  // supplies its base id here. The app's role is to (1) confirm a base was
-  // given and its vertical has a template, (2) create the app-runtime tables
-  // the template doesn't carry, (3) verify record-level read/write access, then
-  // register the org. Org identity/team stay in Postgres; Customer Config +
-  // seed rules are mirrored into the base afterwards.
+  // Airtable mode: provision the customer's own base by cloning the vertical
+  // template's structure via the API (the app computes the template's few
+  // rollup/formula values itself — see budgetActuals — so it doesn't depend on
+  // those fields existing natively in the clone). An existing base id may be
+  // supplied to skip creation (e.g. a base duplicated manually in Airtable).
+  // Then create the app-runtime tables the template doesn't carry, verify
+  // record-level read/write access, and register the org. Org identity/team
+  // stay in Postgres; Customer Config + seed rules are mirrored in afterwards.
   let airtableBaseId: string | null = null;
   if (airtableEnabled()) {
-    // Vertical must have a built template (this is what the admin duplicated).
+    let templateBaseId: string;
     try {
-      templateBaseIdForVertical(vertical);
+      templateBaseId = templateBaseIdForVertical(vertical);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
-    airtableBaseId = (input.airtableBaseId ?? "").trim();
-    if (!airtableBaseId) {
-      return {
-        ok: false,
-        error:
-          "An Airtable base id is required: duplicate the vertical template base in Airtable, " +
-          "then paste the new base id (starts with \"app\") here.",
-      };
-    }
-    if (!/^app[A-Za-z0-9]{14,}$/.test(airtableBaseId)) {
-      return { ok: false, error: `"${airtableBaseId}" is not a valid Airtable base id (expected e.g. appXXXXXXXXXXXXXX).` };
+
+    const supplied = (input.airtableBaseId ?? "").trim();
+    if (supplied) {
+      if (!/^app[A-Za-z0-9]{14,}$/.test(supplied)) {
+        return { ok: false, error: `"${supplied}" is not a valid Airtable base id (expected e.g. appXXXXXXXXXXXXXX).` };
+      }
+      airtableBaseId = supplied;
+    } else {
+      try {
+        airtableBaseId = await provisionClientBase(input.name.trim(), { templateBaseId });
+      } catch (err) {
+        logger.error("Airtable base provisioning failed", { slug, ...errMeta(err) });
+        return {
+          ok: false,
+          error: `Could not provision the Airtable base: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
     }
 
-    // Create the app-runtime tables the duplicated template doesn't carry.
+    // Create the app-runtime tables the template doesn't carry (idempotent, so
+    // it also tops up a manually-supplied base).
     try {
       const rt = await ensureAppRuntimeTables(airtableBaseId);
       if (rt.errors.length) {

@@ -139,14 +139,13 @@ export function expectedPlatformSchema(templateTables: AirTable[]): Map<string, 
 }
 
 /**
- * @deprecated Spec 12 onboarding duplicates the vertical template base natively
- * in Airtable (which preserves computed/rollup fields this API rebuild cannot),
- * then calls {@link ensureAppRuntimeTables}. This API table-by-table rebuild is
- * retained as an ops-only fallback for bases that can't be duplicated in the UI;
- * it is no longer on the onboarding path.
- *
- * Provision a new client base by replicating the template's structure. Returns
- * the new base id. Throws on any hard failure.
+ * Provision a new client base by replicating the vertical template's structure
+ * via the API, then {@link ensureAppRuntimeTables} adds the app-runtime tables.
+ * Computed fields (the template's BUDGET.Actual rollup, PROCUREMENT.Total_Cost
+ * formula, etc.) cannot be created via the API and are omitted — the app
+ * computes those values itself (see budgetActuals), so the clone is fully
+ * usable. Returns the new base id. Throws on any hard failure (caller treats
+ * onboarding as failed — a customer without a base is unusable in Airtable mode).
  */
 export async function provisionClientBase(
   name: string,
