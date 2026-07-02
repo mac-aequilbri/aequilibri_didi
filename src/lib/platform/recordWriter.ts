@@ -249,9 +249,13 @@ const budgetLineSchema = z.object({
 
 const cashflowSchema = z.object({
   jobId: id,
+  name: str(200).default(""),
   period: z.string().regex(/^\d{4}-\d{2}$/, "period must be YYYY-MM"),
-  projected: num.default(0),
-  actual: num.default(0),
+  type: z.enum(["In", "Out"]).default("Out"),
+  amount: num.default(0),
+  sourceOrPayee: str(200).default(""),
+  category: str(100).default(""),
+  status: z.enum(["Forecast", "Confirmed", "Paid", "Overdue"]).default("Forecast"),
   notes: z.string().default(""),
 });
 

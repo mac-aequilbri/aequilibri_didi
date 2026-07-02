@@ -270,15 +270,16 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
   },
   procurement: {
     table: "PROCUREMENT",
+    // Spec 12 PROCUREMENT. Total_Cost is an Airtable formula (Quantity ×
+    // Unit_Cost) — never written. Supplier + Budget_Category are links; the
+    // text `category`/`vendorName` payload keys have no home here and are
+    // dropped (wiring those links from the form is out of scope).
     specs: [
-      { air: "Item", from: "item", to: (v) => S(v).slice(0, 300) || "Untitled item" },
-      { air: "Category", from: "category", to: S },
-      { air: "Vendor_Name", from: "vendorName", to: S },
-      { air: "Qty", from: "qty", to: (v) => NUM(v, 1) },
-      { air: "Unit_Price", from: "unitPrice", to: (v) => NUM(v) },
-      { air: "Total", from: "total", to: (v) => NUM(v) },
-      { air: "Status", from: "status", createDefault: "pending", to: S },
-      { air: "Due_Date", from: "dueDate", to: DATE },
+      { air: "Procurement_Name", from: "item", to: (v) => S(v).slice(0, 300) || "Untitled item" },
+      { air: "Quantity", from: "qty", to: (v) => NUM(v, 1) },
+      { air: "Unit_Cost", from: "unitPrice", to: (v) => NUM(v) },
+      { air: "Status", from: "status", createDefault: "Ordered", to: S },
+      { air: "Expected_Date", from: "dueDate", to: DATE },
       { air: "Job", from: "jobId", to: LINK },
     ],
   },
@@ -306,26 +307,29 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
   },
   budget_line: {
     table: "BUDGET",
+    // Spec 12 BUDGET. Actual is an Airtable rollup (computed from PROCUREMENT) —
+    // never written. Committed has no Spec 12 field. Variance is derived in the
+    // read layer (Forecast − Estimated), so it isn't written either.
     specs: [
-      { air: "Budget_Line", from: "description", to: (v) => S(v) || "Budget line" },
-      { air: "Category", from: "category", to: S },
-      { air: "Description", from: "description", to: S },
-      { air: "Budget_Amount", from: "budgetAmount", to: (v) => NUM(v) },
-      { air: "Committed_Amount", from: "committedAmount", to: (v) => NUM(v) },
-      { air: "Actual_Amount", from: "actualAmount", to: (v) => NUM(v) },
+      { air: "Budget_Category", from: "category", to: (v) => S(v) || "Budget line" },
+      { air: "Estimated", from: "budgetAmount", to: (v) => NUM(v) },
+      { air: "Forecast", from: "forecast", to: (v) => NUM(v) },
+      { air: "RAG", from: "rag", to: S },
+      { air: "Notes", from: "description", to: S },
       { air: "Job", from: "jobId", to: LINK },
     ],
   },
   cashflow: {
     table: "CASHFLOWS",
-    // NOTE (Spec 12 deferred): the real CASHFLOWS table models per-transaction
-    // rows (Type In/Out · Amount · Source_Or_Payee · Status), not the old
-    // forecast/actual-per-period shape. Only Period/Notes/Job overlap, so the
-    // Projected/Actual specs are dropped to keep writes valid. Reconciling the
-    // cashflow data model to Type/Amount is part of the deferred config/schema
-    // reconciliation, not this rename pass.
+    // Spec 12 per-transaction ledger.
     specs: [
+      { air: "Cashflow_Name", from: "name", to: (v) => S(v) || "Cashflow entry" },
       { air: "Period", from: "period", to: S },
+      { air: "Type", from: "type", createDefault: "Out", to: (v) => (S(v) === "In" ? "In" : "Out") },
+      { air: "Amount", from: "amount", to: (v) => NUM(v) },
+      { air: "Source_Or_Payee", from: "sourceOrPayee", to: S },
+      { air: "Category", from: "category", to: S },
+      { air: "Status", from: "status", createDefault: "Forecast", to: S },
       { air: "Notes", from: "notes", to: S },
       { air: "Job", from: "jobId", to: LINK },
     ],

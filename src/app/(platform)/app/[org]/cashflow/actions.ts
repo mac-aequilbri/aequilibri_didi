@@ -19,21 +19,3 @@ export async function createCashflowEntry(formData: FormData): Promise<void> {
   revalidatePath(orgPath(ctx.orgSlug, "/cashflow"));
   redirect(orgPath(ctx.orgSlug, "/cashflow"));
 }
-
-export async function updateCashflowActual(formData: FormData): Promise<void> {
-  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const user = await getCurrentUser(ctx);
-  const recordIdRaw = String(formData.get("recordId") ?? "");
-  const actual = Number(formData.get("actual"));
-  if (!recordIdRaw || !Number.isFinite(actual)) return;
-
-  // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
-  await writeRecord(ctx, {
-    table: "cashflow",
-    op: "update",
-    recordId: recordIdRaw,
-    data: { actual },
-    actor: { type: "human", name: user.name },
-  });
-  revalidatePath(orgPath(ctx.orgSlug, "/cashflow"));
-}

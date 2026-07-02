@@ -1,18 +1,28 @@
 // Cashflow data source — Postgres (default) or Airtable when the flag is on.
-// Cashflow is grouped per job, so the Airtable branch resolves the CASHFLOW
-// rows' Job link against the JOBS table (Airtable JOBS has no "code" field, so
-// code is left blank). Returns the same job-with-rows shape the page renders.
+// Grouped per job (CASHFLOWS rows' Job link resolved against JOBS).
+//
+// Spec 12 CASHFLOWS is a per-transaction ledger: Cashflow_Name · Period ·
+// Type(In/Out) · Amount · Source_Or_Payee · Category · Status · Job · Notes.
+// (The old projected/actual-per-period shape is gone.) The Postgres branch is
+// legacy — its projected/actual columns are mapped best-effort into txns so the
+// page still renders in Postgres mode; production runs Airtable mode.
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import type { OrgCtx } from "./types";
 
-export interface CashflowRow {
+export type CashflowType = "In" | "Out";
+
+export interface CashflowTxn {
   id: string;
+  name: string;
   period: string;
-  projected: number;
-  actual: number;
+  type: CashflowType;
+  amount: number;
+  sourceOrPayee: string;
+  category: string;
+  status: string;
   notes: string;
 }
 
@@ -20,7 +30,7 @@ export interface JobCashflow {
   id: string;
   name: string;
   code: string;
-  conCashflows: CashflowRow[];
+  conCashflows: CashflowTxn[];
 }
 
 function str(v: unknown): string {
@@ -28,6 +38,9 @@ function str(v: unknown): string {
 }
 function num(v: unknown): number {
   return typeof v === "number" ? v : 0;
+}
+function asType(v: unknown): CashflowType {
+  return str(v) === "In" ? "In" : "Out";
 }
 
 async function fromPostgres(ctx: OrgCtx): Promise<JobCashflow[]> {
@@ -40,13 +53,15 @@ async function fromPostgres(ctx: OrgCtx): Promise<JobCashflow[]> {
     id: String(j.id),
     name: j.name,
     code: j.code,
-    conCashflows: j.conCashflows.map((c) => ({
-      id: String(c.id),
-      period: c.period,
-      projected: toNum(c.projected),
-      actual: toNum(c.actual),
-      notes: c.notes,
-    })),
+    // Legacy mapping: one forecast "Out" txn (projected) + one paid "Out" txn
+    // (actual) per period row, so the per-transaction view still renders.
+    conCashflows: j.conCashflows.flatMap((c): CashflowTxn[] => {
+      const base = { period: c.period, type: "Out" as const, sourceOrPayee: "", category: "", notes: c.notes };
+      const txns: CashflowTxn[] = [];
+      if (toNum(c.projected)) txns.push({ id: `${c.id}-f`, name: `${c.period} forecast`, amount: toNum(c.projected), status: "Forecast", ...base });
+      if (toNum(c.actual)) txns.push({ id: `${c.id}-a`, name: `${c.period} actual`, amount: toNum(c.actual), status: "Paid", ...base });
+      return txns;
+    }),
   }));
 }
 
@@ -55,15 +70,19 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobCashflow[]> {
     core.list(ctx.orgSlug, "JOBS", { maxRecords: 200 }),
     core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 500 }),
   ]);
-  const byJob = new Map<string, CashflowRow[]>();
+  const byJob = new Map<string, CashflowTxn[]>();
   for (const c of cfRows) {
     const link = c["Job"];
     const key = Array.isArray(link) && link.length > 0 ? String(link[0]) : "_unassigned";
-    const row: CashflowRow = {
+    const row: CashflowTxn = {
       id: c.id,
+      name: str(c["Cashflow_Name"]),
       period: str(c["Period"]),
-      projected: num(c["Projected"]),
-      actual: num(c["Actual"]),
+      type: asType(c["Type"]),
+      amount: num(c["Amount"]),
+      sourceOrPayee: str(c["Source_Or_Payee"]),
+      category: str(c["Category"]),
+      status: str(c["Status"]) || "Forecast",
       notes: str(c["Notes"]),
     };
     (byJob.get(key) ?? byJob.set(key, []).get(key)!).push(row);

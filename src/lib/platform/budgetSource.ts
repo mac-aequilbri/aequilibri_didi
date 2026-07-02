@@ -1,19 +1,28 @@
 // Budget data source — Postgres (default) or Airtable when the flag is on.
-// Grouped per job (BUDGET rows' Job link resolved against JOBS). The Airtable
-// BUDGET table has no phase link, so phaseName is blank in that mode.
+// Grouped per job (BUDGET rows' Job link resolved against JOBS).
+//
+// Spec 12 BUDGET: Budget_Category · Estimated · Actual(rollup) · Forecast ·
+// Variance · RAG · Phase · Job. `Actual` is an Airtable rollup we can't create
+// via the API, so in Airtable mode it is computed app-side from linked
+// PROCUREMENT (see budgetActuals). Variance is derived as Forecast − Estimated.
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { sumMoney } from "./money";
+import { budgetActuals, loadProcurement } from "./procurementSource";
 import type { OrgCtx } from "./types";
 
 export interface BudgetLineView {
   id: string;
   category: string;
   description: string;
-  budgetAmount: number;
-  committedAmount: number;
-  actualAmount: number;
+  budgetAmount: number; // Estimated
+  committedAmount: number; // no Spec 12 field — 0 in Airtable mode
+  actualAmount: number; // Actual — computed from PROCUREMENT in Airtable mode
+  forecast: number;
+  variance: number; // Forecast − Estimated
+  rag: string;
   phaseName: string;
 }
 
@@ -50,27 +59,37 @@ async function fromPostgres(ctx: OrgCtx): Promise<JobBudget[]> {
       budgetAmount: toNum(b.budgetAmount),
       committedAmount: toNum(b.committedAmount),
       actualAmount: toNum(b.actualAmount),
+      forecast: toNum(b.budgetAmount),
+      variance: 0,
+      rag: "",
       phaseName: b.phase?.name ?? "",
     })),
   }));
 }
 
 async function fromAirtable(ctx: OrgCtx): Promise<JobBudget[]> {
-  const [jobRows, bRows] = await Promise.all([
+  const [jobRows, bRows, procRows] = await Promise.all([
     core.list(ctx.orgSlug, "JOBS", { maxRecords: 200 }),
     core.list(ctx.orgSlug, "BUDGET", { maxRecords: 500 }),
+    loadProcurement(ctx),
   ]);
+  const actuals = budgetActuals(procRows); // BUDGET rec id → computed Actual
   const byJob = new Map<string, BudgetLineView[]>();
   for (const b of bRows) {
     const link = b["Job"];
     const key = Array.isArray(link) && link.length > 0 ? String(link[0]) : "_unassigned";
+    const estimated = num(b["Estimated"]);
+    const forecast = num(b["Forecast"]);
     const row: BudgetLineView = {
       id: b.id,
-      category: str(b["Category"]),
-      description: str(b["Description"]),
-      budgetAmount: num(b["Budget_Amount"]),
-      committedAmount: num(b["Committed_Amount"]),
-      actualAmount: num(b["Actual_Amount"]),
+      category: str(b["Budget_Category"]),
+      description: str(b["Notes"]),
+      budgetAmount: estimated,
+      committedAmount: 0,
+      actualAmount: actuals.get(b.id) ?? 0,
+      forecast,
+      variance: sumMoney([forecast, -estimated]),
+      rag: str(b["RAG"]),
       phaseName: "",
     };
     (byJob.get(key) ?? byJob.set(key, []).get(key)!).push(row);

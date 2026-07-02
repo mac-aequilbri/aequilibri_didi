@@ -13,6 +13,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { budgetActuals, loadProcurement } from "./procurementSource";
 import type { RecordId } from "./recordWriter";
 import type { OrgCtx } from "./types";
 
@@ -132,13 +133,15 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
     return null;
   }
 
-  const [phaseRows, riskRows, budgetRows, cashflowRows, variationRows] = await Promise.all([
+  const [phaseRows, riskRows, budgetRows, cashflowRows, variationRows, procRows] = await Promise.all([
     core.list(ctx.orgSlug, "PHASES", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "BUDGET", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 }),
+    loadProcurement(ctx),
   ]);
+  const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual
 
   const phases: JobContextPhase[] = phaseRows
     .filter((p) => linksTo(p["Job"], id) && p["Is_AI_Draft"] !== true)
@@ -160,22 +163,30 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
   const budget: JobContextBudget[] = budgetRows
     .filter((b) => linksTo(b["Job"], id))
     .map((b) => ({
-      category: str(b["Category"]),
-      description: str(b["Description"]) || str(b["Budget_Line"]),
-      budgetAmount: num(b["Budget_Amount"]),
-      committedAmount: num(b["Committed_Amount"]),
-      actualAmount: num(b["Actual_Amount"]),
+      category: str(b["Budget_Category"]),
+      description: str(b["Notes"]),
+      budgetAmount: num(b["Estimated"]),
+      committedAmount: 0, // no Spec 12 field
+      actualAmount: actualsByBudget.get(b.id) ?? 0, // computed from PROCUREMENT
     }));
 
-  const cashflow: JobContextCashflow[] = cashflowRows
-    .filter((c) => linksTo(c["Job"], id))
-    .sort((a, b) => str(b["Period"]).localeCompare(str(a["Period"])))
+  // Spec 12 CASHFLOWS is a per-transaction ledger; roll the job's rows up into
+  // a projected-vs-actual-per-period summary for the AI context (Paid = actual).
+  const cfByPeriod = new Map<string, { projected: number; actual: number }>();
+  for (const c of cashflowRows) {
+    if (!linksTo(c["Job"], id)) continue;
+    const period = str(c["Period"]);
+    if (!period) continue;
+    const agg = cfByPeriod.get(period) ?? { projected: 0, actual: 0 };
+    const amount = num(c["Amount"]);
+    if (str(c["Status"]) === "Paid") agg.actual += amount;
+    else agg.projected += amount;
+    cfByPeriod.set(period, agg);
+  }
+  const cashflow: JobContextCashflow[] = [...cfByPeriod.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
     .slice(0, 3)
-    .map((c) => ({
-      period: str(c["Period"]),
-      projected: num(c["Projected"]),
-      actual: num(c["Actual"]),
-    }));
+    .map(([period, v]) => ({ period, projected: v.projected, actual: v.actual }));
 
   const variations: JobContextVariation[] = variationRows
     .filter(

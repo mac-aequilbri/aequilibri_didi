@@ -13,6 +13,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { budgetActuals, loadProcurement } from "./procurementSource";
 import { toNum } from "@/lib/format";
 import type { OrgCtx } from "./types";
 
@@ -135,11 +136,13 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<JobDetailView | nu
 
   // Related rows live in the canonical tables; filter by their Job link rather
   // than trusting the (possibly stale) linked-record arrays on the job record.
-  const [phaseRows, riskRows, budgetRows] = await Promise.all([
+  const [phaseRows, riskRows, budgetRows, procRows] = await Promise.all([
     core.list(ctx.orgSlug, "PHASES", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "BUDGET", { maxRecords: 500 }),
+    loadProcurement(ctx),
   ]);
+  const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual
 
   const phases: JobPhaseRow[] = phaseRows
     .filter((p) => linksTo(p["Job"], id) && p["Is_AI_Draft"] !== true)
@@ -162,8 +165,8 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<JobDetailView | nu
     }));
 
   const jobBudget = budgetRows.filter((b) => linksTo(b["Job"], id));
-  const budget = jobBudget.reduce((s, b) => s + num(b["Budget_Amount"]), 0);
-  const actual = jobBudget.reduce((s, b) => s + num(b["Actual_Amount"]), 0);
+  const budget = jobBudget.reduce((s, b) => s + num(b["Estimated"]), 0);
+  const actual = jobBudget.reduce((s, b) => s + (actualsByBudget.get(b.id) ?? 0), 0);
 
   // No completion field on Airtable JOBS — derive from non-draft phases.
   const completionPct = phases.length

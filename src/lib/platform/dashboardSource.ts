@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { getActiveRules } from "@/services/platform/learning";
 import { toNum } from "@/lib/format";
 import { loadJobsList } from "./jobsListSource";
+import { budgetActuals, loadProcurement } from "./procurementSource";
 import type { OrgCtx } from "./types";
 
 export interface DashJob {
@@ -52,7 +53,7 @@ function num(v: unknown): number {
 }
 
 async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
-  const [jobList, rules, actionRows, budgetRows, cashflowRows, logRows, pendingRows] = await Promise.all([
+  const [jobList, rules, actionRows, budgetRows, cashflowRows, logRows, pendingRows, procRows] = await Promise.all([
     loadJobsList(ctx),
     getActiveRules(ctx),
     core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
@@ -60,7 +61,9 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "EXECUTION_LOG", { maxRecords: 200 }),
     core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
+    loadProcurement(ctx),
   ]);
+  const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual
 
   const openSet = new Set(["Open", "In Progress"]);
   const now = Date.now();
@@ -70,13 +73,16 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     return d && new Date(d).getTime() < now;
   }).length;
 
+  // Spec 12 CASHFLOWS is a per-transaction ledger; derive the period
+  // projected-vs-actual chart from it — Paid rows are actual, the rest projected.
   const byPeriod = new Map<string, { projected: number; actual: number }>();
   for (const c of cashflowRows) {
     const period = str(c["Period"]);
     if (!period) continue;
     const agg = byPeriod.get(period) ?? { projected: 0, actual: 0 };
-    agg.projected += num(c["Projected"]);
-    agg.actual += num(c["Actual"]);
+    const amount = num(c["Amount"]);
+    if (str(c["Status"]) === "Paid") agg.actual += amount;
+    else agg.projected += amount;
     byPeriod.set(period, agg);
   }
 
@@ -92,8 +98,8 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     openActions: openActionRows.length,
     overdueActions,
     pendingProposals: pendingRows.filter((r) => str(r["Status"]).toLowerCase() === "proposed").length,
-    budget: budgetRows.reduce((s, b) => s + num(b["Budget_Amount"]), 0),
-    actual: budgetRows.reduce((s, b) => s + num(b["Actual_Amount"]), 0),
+    budget: budgetRows.reduce((s, b) => s + num(b["Estimated"]), 0),
+    actual: budgetRows.reduce((s, b) => s + (actualsByBudget.get(b.id) ?? 0), 0),
     recentLogs: logRows.slice(0, 8).map((l) => ({
       id: l.id,
       operation: str(l["Action_Type"]),
