@@ -5,6 +5,7 @@
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { VERTICAL_TEMPLATE_BASE_IDS } from "@/lib/airtable/config";
+import { listTemplateRegistry } from "@/lib/airtable/control";
 import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { DEFAULT_FEATURES } from "@/lib/platform/types";
 import { PendingSubmitButton } from "@/app/(platform)/app/[org]/assess/SubmitButtons";
@@ -50,6 +51,15 @@ export default async function NewOrganisationPage({
   const { error } = await searchParams;
   if (!(await isPlatformAdmin())) redirect("/app?denied=admin");
 
+  // Industry options come from the template registry (control base). Fall back
+  // to the hardcoded vertical map if the registry is empty/unreachable. Option
+  // value = registry recordId (resolved server-side), or a bare vertical key in
+  // the fallback case.
+  const registry = await listTemplateRegistry();
+  const verticalOptions = registry.length
+    ? registry.map((r) => ({ value: r.recordId, label: `${r.industry} — ${r.subIndustry}`, baseId: r.templateBaseId }))
+    : VERTICALS.map((v) => ({ value: v, label: VERTICAL_LABELS[v] ?? v, baseId: VERTICAL_TEMPLATE_BASE_IDS[v] }));
+
   return (
     <main className="max-w-2xl mx-auto px-6 py-10">
       <PageHeader
@@ -64,11 +74,11 @@ export default async function NewOrganisationPage({
           <h2 className="font-semibold text-sm">1 · Instance setup</h2>
           <div className="rounded border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 space-y-1">
             <p className="font-medium text-neutral-700">The customer&apos;s Airtable base is created automatically.</p>
-            <p>On submit, a new base is cloned from the vertical template below. Leave the base-id field blank to auto-create; only fill it to reuse an existing base.</p>
+            <p>On submit, a new base is cloned from the selected industry&apos;s template. Leave the base-id field blank to auto-create; only fill it to reuse an existing base.</p>
             <ul className="font-mono">
-              {VERTICALS.map((v) => (
-                <li key={v}>
-                  {VERTICAL_LABELS[v] ?? v}: {VERTICAL_TEMPLATE_BASE_IDS[v]}
+              {verticalOptions.map((o) => (
+                <li key={o.value}>
+                  {o.label}: {o.baseId}
                 </li>
               ))}
             </ul>
@@ -90,16 +100,16 @@ export default async function NewOrganisationPage({
               <span className="block mt-1 text-xs text-neutral-500">Becomes /app/&lt;slug&gt; — lowercase, hyphens.</span>
             </label>
             <label className="block text-sm">
-              <span className="text-neutral-600">Industry vertical *</span>
-              <select name="vertical" required defaultValue={VERTICALS[0]} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
-                {VERTICALS.map((v) => (
-                  <option key={v} value={v}>
-                    {VERTICAL_LABELS[v] ?? v}
+              <span className="text-neutral-600">Industry · sub-industry *</span>
+              <select name="templateOption" required defaultValue={verticalOptions[0]?.value} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+                {verticalOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
                   </option>
                 ))}
               </select>
               <span className="block mt-1 text-xs text-neutral-500">
-                Determines which Airtable template to duplicate for this customer.
+                Determines which Airtable template the customer&apos;s base is cloned from. Manage the list under Templates.
               </span>
             </label>
             <label className="block text-sm">

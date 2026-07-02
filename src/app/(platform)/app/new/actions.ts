@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { VERTICAL_TEMPLATE_BASE_IDS } from "@/lib/airtable/config";
+import { getTemplateRegistryEntry } from "@/lib/airtable/control";
 import { clerkEnabled } from "@/lib/platform/authConfig";
 import { normalizeTeamRole, type TeamRole } from "@/lib/platform/module1Governance";
 import { AiAuthority, DEFAULT_FEATURES, EngagementType } from "@/lib/platform/types";
@@ -43,12 +44,26 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
     adminName = adminName.trim() || user?.fullName || adminEmail.split("@")[0] || "Admin";
   }
 
-  const vertical = String(formData.get("vertical") ?? "");
+  // Resolve the selected industry option. A registry recordId ("rec…") resolves
+  // to its vertical key + template base; a bare vertical key is the fallback
+  // when the registry is empty (template then resolved by the hardcoded map).
+  const option = String(formData.get("templateOption") ?? "");
+  let vertical = VERTICALS[0];
+  let templateBaseId = "";
+  if (option.startsWith("rec")) {
+    const entry = await getTemplateRegistryEntry(option);
+    if (!entry) redirect(`/app/new?error=${encodeURIComponent("Selected industry mapping not found — refresh and retry.")}`);
+    vertical = entry.verticalKey || VERTICALS[0];
+    templateBaseId = entry.templateBaseId;
+  } else if (VERTICALS.includes(option)) {
+    vertical = option;
+  }
 
   const result = await provisionOrganisation({
     slug: String(formData.get("slug") ?? ""),
     name: String(formData.get("name") ?? ""),
-    vertical: VERTICALS.includes(vertical) ? vertical : VERTICALS[0],
+    vertical,
+    templateBaseId: templateBaseId || undefined,
     airtableBaseId: String(formData.get("airtableBaseId") ?? ""),
     defaultEngagementType: (ENGAGEMENT_TYPES.includes(defaultEngagementType as EngagementType)
       ? defaultEngagementType

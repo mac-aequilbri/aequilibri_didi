@@ -134,10 +134,13 @@ export interface ProvisionInput {
   adminName: string;
   adminEmail: string;
   adminRole: TeamRole;
-  /** The Airtable base the admin duplicated from the vertical template (Spec 12
-   *  onboarding: duplicate natively in Airtable, then the app verifies it).
-   *  Required in Airtable mode. */
+  /** An existing Airtable base to reuse instead of provisioning a fresh one
+   *  (blank = auto-create by cloning the template). */
   airtableBaseId?: string;
+  /** Template base to clone from, resolved from the template registry by the
+   *  onboarding action. When set it wins; otherwise the vertical is resolved via
+   *  the hardcoded VERTICAL_TEMPLATE_BASE_IDS fallback. */
+  templateBaseId?: string;
   /** One per line from the form: budget categories for the cfg reference tier. */
   budgetCategories: string[];
   /** One per line: client priorities / budget principles for later reference. */
@@ -204,9 +207,11 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
   // stay in Postgres; Customer Config + seed rules are mirrored in afterwards.
   let airtableBaseId: string | null = null;
   if (airtableEnabled()) {
+    // Prefer the registry-resolved template (passed by the onboarding action);
+    // fall back to the hardcoded per-vertical map when absent.
     let templateBaseId: string;
     try {
-      templateBaseId = templateBaseIdForVertical(vertical);
+      templateBaseId = input.templateBaseId?.trim() || templateBaseIdForVertical(vertical);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }

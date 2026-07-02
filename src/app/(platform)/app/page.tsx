@@ -75,9 +75,14 @@ export default async function OrgPickerPage({
           </p>
         </div>
         {canProvision && (
-          <Link href="/app/new" className="btn-ae">
-            + Onboard new customer
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/app/templates" className="btn-ae-outline">
+              Templates
+            </Link>
+            <Link href="/app/new" className="btn-ae">
+              + Onboard new customer
+            </Link>
+          </div>
         )}
       </div>
       {deleted ? (

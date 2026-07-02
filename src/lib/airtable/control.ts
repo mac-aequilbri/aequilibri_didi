@@ -12,7 +12,7 @@
 // client URL-encodes them) and the control base id comes from the environment,
 // never resolved (it would be circular).
 
-import { createRecords, deleteRecords, listRecords } from "./client";
+import { createRecords, deleteRecords, getRecord, listRecords, updateRecords } from "./client";
 import { airtableEnabled } from "./config";
 
 const S = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
@@ -20,6 +20,7 @@ const N = (v: unknown): number => (typeof v === "number" ? v : Number(v) || 0);
 
 const REGISTRY = "PLAT_ORG_REGISTRY";
 const TEAM = "PLAT_TEAM";
+const TEMPLATE_REGISTRY = "PLAT_TEMPLATE_REGISTRY";
 
 /** The shared control base id, or null when not configured. */
 export function controlBaseId(): string | null {
@@ -208,4 +209,108 @@ export async function createControlTeamMember(
       Is_Active: true,
     },
   ]);
+}
+
+// ── Template registry ───────────────────────────────────────────────────────
+// Industry → Sub-industry → template-base mapping, in the control base so new
+// industries can be onboarded by adding a row (via the admin page) instead of a
+// code change. Vertical_Key is the industry-level routing key (DOMAIN_LABELS +
+// assessment module); Template_Base_Id is the base a new customer clones from.
+
+export interface TemplateRegistryEntry {
+  recordId: string;
+  industry: string;
+  subIndustry: string;
+  verticalKey: string;
+  templateBaseId: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+function toTemplateEntry(r: { id: string; fields: Record<string, unknown> }): TemplateRegistryEntry {
+  const f = r.fields;
+  return {
+    recordId: r.id,
+    industry: S(f["Industry"]),
+    subIndustry: S(f["Sub_Industry"]),
+    verticalKey: S(f["Vertical_Key"]),
+    templateBaseId: S(f["Template_Base_Id"]),
+    sortOrder: N(f["Sort_Order"]),
+    isActive: f["Is_Active"] !== false,
+  };
+}
+
+/** Active industry→template mappings, sorted for the dropdown + admin list.
+ *  Empty when control is off (callers fall back to the hardcoded map). */
+export async function listTemplateRegistry(opts: { includeInactive?: boolean } = {}): Promise<TemplateRegistryEntry[]> {
+  const base = controlBaseId();
+  if (!base) return [];
+  const recs = await listRecords(base, TEMPLATE_REGISTRY, { maxRecords: 1000 });
+  return recs
+    .map(toTemplateEntry)
+    .filter((e) => e.templateBaseId && (opts.includeInactive || e.isActive))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.industry.localeCompare(b.industry));
+}
+
+/** Resolve one mapping by its Airtable record id (used by the onboarding action
+ *  to turn the selected dropdown option into a template + vertical key). */
+export async function getTemplateRegistryEntry(recordId: string): Promise<TemplateRegistryEntry | null> {
+  const base = controlBaseId();
+  if (!base || !recordId) return null;
+  try {
+    const rec = await getRecord(base, TEMPLATE_REGISTRY, recordId);
+    return toTemplateEntry(rec);
+  } catch {
+    return null;
+  }
+}
+
+export interface NewTemplateRegistry {
+  industry: string;
+  subIndustry: string;
+  verticalKey: string;
+  templateBaseId: string;
+  sortOrder?: number;
+  notes?: string;
+}
+
+/** Add a mapping (admin page). */
+export async function createTemplateRegistry(entry: NewTemplateRegistry): Promise<void> {
+  const base = controlBaseId();
+  if (!base) throw new Error("AIRTABLE_CONTROL_BASE_ID is not set");
+  await createRecords(base, TEMPLATE_REGISTRY, [
+    {
+      Industry: entry.industry,
+      Sub_Industry: entry.subIndustry,
+      Vertical_Key: entry.verticalKey,
+      Template_Base_Id: entry.templateBaseId,
+      Sort_Order: entry.sortOrder ?? 0,
+      Notes: entry.notes ?? "",
+      Is_Active: true,
+    },
+  ]);
+}
+
+/** Patch a mapping's mutable fields (admin page: repoint template, toggle active). */
+export async function updateTemplateRegistry(
+  recordId: string,
+  patch: Partial<{ templateBaseId: string; verticalKey: string; sortOrder: number; isActive: boolean; notes: string }>,
+): Promise<void> {
+  const base = controlBaseId();
+  if (!base) throw new Error("AIRTABLE_CONTROL_BASE_ID is not set");
+  const fields: Record<string, unknown> = {};
+  if (patch.templateBaseId !== undefined) fields["Template_Base_Id"] = patch.templateBaseId;
+  if (patch.verticalKey !== undefined) fields["Vertical_Key"] = patch.verticalKey;
+  if (patch.sortOrder !== undefined) fields["Sort_Order"] = patch.sortOrder;
+  if (patch.isActive !== undefined) fields["Is_Active"] = patch.isActive;
+  if (patch.notes !== undefined) fields["Notes"] = patch.notes;
+  if (Object.keys(fields).length === 0) return;
+  await updateRecords(base, TEMPLATE_REGISTRY, [{ id: recordId, fields }]);
+}
+
+/** Remove a mapping (admin page). */
+export async function deleteTemplateRegistry(recordId: string): Promise<void> {
+  const base = controlBaseId();
+  if (!base) throw new Error("AIRTABLE_CONTROL_BASE_ID is not set");
+  await deleteRecords(base, TEMPLATE_REGISTRY, [recordId]);
 }
