@@ -59,14 +59,24 @@ const sleep = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 // base IS the org), so they are intentionally NOT copied — links pointing at
 // them are skipped in pass 2. Add them here if client bases should carry team.
 const PLATFORM_TABLES = new Set([
+  // Core (Spec 12 21-table Core; PRICING/TEAM excluded by design).
   "ORGANISATIONS", "CONTACTS", "WORKSTREAMS", "DECISIONS", "ISSUES",
   "EXECUTION_LOG", "CORRECTIONS", "JOBS", "HYPOTHESES", "LEARNING_RULES",
-  "DOCUMENTS", "INTELLIGENCE_SNAPSHOT", "ASSESSMENTS", "COMMS",
-  "PENDING_WRITES", "CHAT_SESSIONS", "CHAT_MESSAGES",
-  "RISKS", "VENDORS", "BUDGET", "CASHFLOWS", "PROCUREMENT", "PHASES",
-  "VARIATIONS", "QUOTES", "QUOTE_LINES", "ROOM_MATRIX", "MEETING_MINUTES",
-  "WEEKLY_REPORTS", "PHASE_EVIDENCE", "BIM_MODELS",
+  "DOCUMENTS", "INTELLIGENCE_SNAPSHOT", "COMMS", "RISKS", "BUDGET",
+  "CASHFLOWS", "PROCUREMENT", "PHASES", "PLAN", "CHANGE_LOG",
+  "REGIONS", "DOMAIN_LABELS", "ENGAGEMENT_TYPE_CONFIG",
+  // App-runtime (created by ensureAppRuntimeTables; listed so drift expects them).
+  "ASSESSMENTS", "PENDING_WRITES", "CHAT_SESSIONS", "CHAT_MESSAGES",
   "PLAT_CFG_REFERENCE", "PLAT_CFG_REGION", "PLAT_CFG_NOMENCLATURE", "PLAT_CFG_SETTING",
+  // Roofing Domain Extension (cloned only from the Roofing template).
+  "RATE_CARD", "REFERENCE_DATA", "PROPERTIES", "MATERIALS_CATALOGUE", "POLYGONS",
+  "QUOTES", "MATERIALS_ORDERS",
+  // Construction Domain Extension (cloned only from the Construction template).
+  "REF_ZONES", "REF_BUDGET", "ROOM_MATRIX", "QUANTITY_TAKEOFF", "TRADE_PACKAGES",
+  "CONTRACTOR_BIDS", "BID_LINE_ITEMS",
+  // Legacy UC2/UC3 names — inert (present in no current template).
+  "VENDORS", "VARIATIONS", "QUOTE_LINES", "MEETING_MINUTES",
+  "WEEKLY_REPORTS", "PHASE_EVIDENCE", "BIM_MODELS",
 ]);
 const isRoofing = (name) => name.startsWith("ROOFING_");
 const wanted = (name) =>

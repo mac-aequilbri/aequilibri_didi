@@ -19,25 +19,33 @@ import { logger } from "@/lib/logger";
 const META = "https://api.airtable.com/v0/meta";
 const sleep = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 
-/** Tables that make up a platform base — the ones the app's fieldMaps
- *  read/write. TEAM and PRICING exist in the template (Core links to them) but
- *  team/identity is kept Postgres-side, so they are intentionally not copied.
- *
- *  NOTE (Spec 12): onboarding no longer API-rebuilds bases (see
- *  provisionClientBase deprecation) — this set now only feeds schema-drift's
- *  "expected schema". The rename (ISSUES/CASHFLOWS) is applied; the broader
- *  reconciliation of this set to the real Spec 12 templates (drop legacy
- *  VENDORS/VARIATIONS/QUOTES/…, add Core CHANGE_LOG/PLAN/REGIONS/DOMAIN_LABELS/
- *  ENGAGEMENT_TYPE_CONFIG + Domain Extension) is deferred. */
+/** Tables provisionClientBase clones from a vertical template (also the
+ *  schema-drift "expected" set). The provisioner copies only the intersection
+ *  of this set and the template, so listing every vertical's Domain Extension
+ *  tables is safe — each clone picks up only the ones its template actually has.
+ *  TEAM and PRICING exist in the templates but are intentionally NOT copied
+ *  (team/identity stays Postgres-side). App-runtime tables are created by
+ *  ensureAppRuntimeTables, not cloned. */
 export const PLATFORM_TABLES = new Set([
+  // Core (Spec 12 21-table Core; PRICING/TEAM excluded by design).
   "ORGANISATIONS", "CONTACTS", "WORKSTREAMS", "DECISIONS", "ISSUES",
   "EXECUTION_LOG", "CORRECTIONS", "JOBS", "HYPOTHESES", "LEARNING_RULES",
-  "DOCUMENTS", "INTELLIGENCE_SNAPSHOT", "ASSESSMENTS", "COMMS",
-  "PENDING_WRITES", "CHAT_SESSIONS", "CHAT_MESSAGES",
-  "RISKS", "VENDORS", "BUDGET", "CASHFLOWS", "PROCUREMENT", "PHASES",
-  "VARIATIONS", "QUOTES", "QUOTE_LINES", "ROOM_MATRIX", "MEETING_MINUTES",
-  "WEEKLY_REPORTS", "PHASE_EVIDENCE", "BIM_MODELS",
+  "DOCUMENTS", "INTELLIGENCE_SNAPSHOT", "COMMS", "RISKS", "BUDGET",
+  "CASHFLOWS", "PROCUREMENT", "PHASES", "PLAN", "CHANGE_LOG",
+  "REGIONS", "DOMAIN_LABELS", "ENGAGEMENT_TYPE_CONFIG",
+  // App-runtime (created by ensureAppRuntimeTables; listed so drift expects them).
+  "ASSESSMENTS", "PENDING_WRITES", "CHAT_SESSIONS", "CHAT_MESSAGES",
   "PLAT_CFG_REFERENCE", "PLAT_CFG_REGION", "PLAT_CFG_NOMENCLATURE", "PLAT_CFG_SETTING",
+  // Roofing Domain Extension (cloned only from the Roofing template).
+  "RATE_CARD", "REFERENCE_DATA", "PROPERTIES", "MATERIALS_CATALOGUE", "POLYGONS",
+  "QUOTES", "MATERIALS_ORDERS",
+  // Construction Domain Extension (cloned only from the Construction template).
+  "REF_ZONES", "REF_BUDGET", "ROOM_MATRIX", "QUANTITY_TAKEOFF", "TRADE_PACKAGES",
+  "CONTRACTOR_BIDS", "BID_LINE_ITEMS",
+  // Legacy UC2/UC3 names — inert (present in no current template, so skipped at
+  // clone time); retained pending the legacy-reconciliation cleanup.
+  "VENDORS", "VARIATIONS", "QUOTE_LINES", "MEETING_MINUTES",
+  "WEEKLY_REPORTS", "PHASE_EVIDENCE", "BIM_MODELS",
 ]);
 
 // Computed fields cannot be created through the API (no inbound config).
