@@ -3,6 +3,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { OrgLogo } from "./OrgLogo";
 
 // Friendly labels for path segments — kept in sync with the nav. Anything not
 // listed falls back to a humanised slug, and numeric ids render as "#<id>".
@@ -40,7 +41,15 @@ const LABELS: Record<string, string> = {
 const labelFor = (seg: string) =>
   LABELS[seg] ?? (/^\d+$/.test(seg) ? `#${seg}` : seg.replace(/-/g, " "));
 
-export function Breadcrumbs({ orgName, orgSlug }: { orgName: string; orgSlug: string }) {
+export function Breadcrumbs({
+  orgName,
+  orgSlug,
+  orgLogo,
+}: {
+  orgName: string;
+  orgSlug: string;
+  orgLogo?: string;
+}) {
   const pathname = usePathname();
   const base = `/app/${orgSlug}`;
   if (!pathname.startsWith(base)) return null;
@@ -56,6 +65,7 @@ export function Breadcrumbs({ orgName, orgSlug }: { orgName: string; orgSlug: st
 
   return (
     <nav aria-label="Breadcrumb" className="ae-breadcrumbs">
+      {orgLogo && <OrgLogo logo={orgLogo} name={orgName} size={18} className="align-middle" />}
       <Link href={base} className="ae-crumb-link">
         {orgName}
       </Link>

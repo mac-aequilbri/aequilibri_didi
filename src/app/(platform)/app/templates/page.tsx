@@ -60,8 +60,8 @@ export default async function TemplateRegistryPage() {
                 <td className="p-3 text-right">
                   <form action={deleteTemplateMapping} className="inline">
                     <input type="hidden" name="recordId" value={r.recordId} />
-                    <button type="submit" className="text-xs text-red-600 hover:underline">
-                      Delete
+                    <button type="submit" className="btn-ae-danger-outline">
+                      <span aria-hidden>🗑</span> Delete
                     </button>
                   </form>
                 </td>

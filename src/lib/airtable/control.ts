@@ -21,6 +21,7 @@ const N = (v: unknown): number => (typeof v === "number" ? v : Number(v) || 0);
 const REGISTRY = "PLAT_ORG_REGISTRY";
 const TEAM = "PLAT_TEAM";
 const TEMPLATE_REGISTRY = "PLAT_TEMPLATE_REGISTRY";
+const JOB_CATALOG = "PLAT_JOB_CATALOG";
 
 /** The shared control base id, or null when not configured. */
 export function controlBaseId(): string | null {
@@ -313,4 +314,112 @@ export async function deleteTemplateRegistry(recordId: string): Promise<void> {
   const base = controlBaseId();
   if (!base) throw new Error("AIRTABLE_CONTROL_BASE_ID is not set");
   await deleteRecords(base, TEMPLATE_REGISTRY, [recordId]);
+}
+
+// ── Job-category catalog ────────────────────────────────────────────────────
+// The Assessment Engine's job categories (label + industry-standard phase
+// sequence), keyed by Vertical_Key so each vertical has its own set — the same
+// key the template registry maps industries onto. Construction/roofing are
+// seeded from curated data; a brand-new industry gets an AI-drafted catalog at
+// onboarding. Replaces the old hardcoded per-vertical catalog in code.
+
+export interface JobCatalogEntry {
+  recordId: string;
+  verticalKey: string;
+  key: string;
+  label: string;
+  group: string;
+  engagementType: string;
+  scopeHint: string;
+  phases: string[];
+  sortOrder: number;
+  /** "curated" (seeded) or "ai" (drafted at onboarding). */
+  source: string;
+  isActive: boolean;
+}
+
+export interface NewJobCatalogEntry {
+  verticalKey: string;
+  key: string;
+  label: string;
+  group: string;
+  engagementType: string;
+  scopeHint: string;
+  phases: string[];
+  sortOrder?: number;
+  source?: string;
+}
+
+function toCatalogEntry(r: { id: string; fields: Record<string, unknown> }): JobCatalogEntry {
+  const f = r.fields;
+  let phases: string[] = [];
+  try {
+    const p = JSON.parse(S(f["Phases"]) || "[]");
+    if (Array.isArray(p)) phases = p.map(String);
+  } catch {
+    /* leave empty on malformed JSON */
+  }
+  return {
+    recordId: r.id,
+    verticalKey: S(f["Vertical_Key"]),
+    key: S(f["Key"]),
+    label: S(f["Label"]),
+    group: S(f["Category_Group"]),
+    engagementType: S(f["Engagement_Type"]) || "short_job",
+    scopeHint: S(f["Scope_Hint"]),
+    phases,
+    sortOrder: N(f["Sort_Order"]),
+    source: S(f["Source"]) || "curated",
+    isActive: f["Is_Active"] !== false,
+  };
+}
+
+/** Active job categories for a vertical, sorted for display. */
+export async function listJobCatalog(
+  verticalKey: string,
+  opts: { includeInactive?: boolean } = {},
+): Promise<JobCatalogEntry[]> {
+  const base = controlBaseId();
+  if (!base || !verticalKey) return [];
+  const recs = await listRecords(base, JOB_CATALOG, {
+    filterByFormula: `{Vertical_Key}='${formulaSafe(verticalKey)}'`,
+    maxRecords: 1000,
+  });
+  return recs
+    .map(toCatalogEntry)
+    .filter((e) => e.key && (opts.includeInactive || e.isActive))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
+}
+
+/** Whether a vertical already has a catalog (guards AI generation at onboarding). */
+export async function hasJobCatalog(verticalKey: string): Promise<boolean> {
+  const base = controlBaseId();
+  if (!base || !verticalKey) return false;
+  const recs = await listRecords(base, JOB_CATALOG, {
+    filterByFormula: `{Vertical_Key}='${formulaSafe(verticalKey)}'`,
+    maxRecords: 1,
+  });
+  return recs.length > 0;
+}
+
+/** Insert catalog rows (batched by the client). No-op when unconfigured/empty. */
+export async function createJobCatalog(entries: NewJobCatalogEntry[]): Promise<void> {
+  const base = controlBaseId();
+  if (!base || entries.length === 0) return;
+  await createRecords(
+    base,
+    JOB_CATALOG,
+    entries.map((e) => ({
+      Key: e.key,
+      Vertical_Key: e.verticalKey,
+      Label: e.label,
+      Category_Group: e.group,
+      Engagement_Type: e.engagementType,
+      Scope_Hint: e.scopeHint,
+      Phases: JSON.stringify(e.phases),
+      Sort_Order: e.sortOrder ?? 0,
+      Source: e.source ?? "ai",
+      Is_Active: true,
+    })),
+  );
 }

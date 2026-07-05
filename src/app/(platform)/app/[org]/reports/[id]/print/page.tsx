@@ -4,6 +4,7 @@
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { OrgLogo } from "@/components/OrgLogo";
 import { formatDate } from "@/lib/format";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { reportModeFor, reportingCapabilities } from "@/lib/platform/reportingPolicy";
@@ -26,7 +27,10 @@ export default async function ReportPrintPage({
   return (
     <div className="mx-auto max-w-2xl p-10 print:p-0 bg-white">
       <header className="mb-8 border-b border-neutral-300 pb-4">
-        <p className="text-xs uppercase tracking-widest text-neutral-400">{ctx.orgName}</p>
+        <div className="flex items-center gap-2">
+          <OrgLogo logo={ctx.config.branding?.logo} name={ctx.orgName} size={22} />
+          <p className="text-xs uppercase tracking-widest text-neutral-400">{ctx.orgName}</p>
+        </div>
         <h1 className="text-2xl font-bold mt-1">
           {report.title || `Weekly report — ${formatDate(report.weekEnding)}`}
         </h1>

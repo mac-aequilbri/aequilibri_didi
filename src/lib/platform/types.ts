@@ -18,6 +18,9 @@ export interface OrgConfig {
   assistant: { name: string; persona: string };
   features: Record<string, boolean>;
   module1?: Module1Governance;
+  /** Customer branding captured at onboarding. `logo` is a data URL (stored
+   *  inline in settings so it works across the Airtable/Postgres stores). */
+  branding?: { logo?: string };
 }
 
 /** Request context every platform service takes as its first argument. */

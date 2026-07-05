@@ -10,6 +10,7 @@ import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { DEFAULT_FEATURES } from "@/lib/platform/types";
 import { PendingSubmitButton } from "@/app/(platform)/app/[org]/assess/SubmitButtons";
 import { provisionOrgAction } from "./actions";
+import { LogoField } from "./LogoField";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,7 @@ export default async function NewOrganisationPage({
               />
               <span className="block mt-1 text-xs text-neutral-500">Becomes /app/&lt;slug&gt; — lowercase, hyphens.</span>
             </label>
+            <LogoField />
             <label className="block text-sm">
               <span className="text-neutral-600">Industry · sub-industry *</span>
               <select name="templateOption" required defaultValue={verticalOptions[0]?.value} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">

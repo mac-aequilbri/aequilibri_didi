@@ -22,6 +22,7 @@ import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { defaultModule1Governance, normalizeTeamRole, type TeamRole } from "@/lib/platform/module1Governance";
 import { DEFAULT_FEATURES, EngagementType, AiAuthority } from "@/lib/platform/types";
+import { ensureJobCatalog } from "@/services/platform/jobCatalogGenerator";
 
 /** The learning-engine threshold settings seeded for every new org. */
 const SEED_SETTINGS: Array<{ key: string; value: string }> = [
@@ -149,6 +150,12 @@ export interface ProvisionInput {
   tradeReferences: string[];
   /** Domain knowledge init: expert rules of thumb, one per line. */
   initialRules: string[];
+  /** Company logo as a data URL, stored inline in settings.branding.logo. */
+  logoDataUrl?: string;
+  /** Human industry / sub-industry (from the template registry) — used to draft
+   *  a job-category catalog for a brand-new vertical at onboarding. */
+  industryLabel?: string;
+  subIndustryLabel?: string;
 }
 
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,98}$/;
@@ -187,6 +194,7 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
     },
     features: { ...DEFAULT_FEATURES, ...input.features },
     module1: defaultModule1Governance(),
+    ...(input.logoDataUrl ? { branding: { logo: input.logoDataUrl } } : {}),
   });
 
   // Slug uniqueness — checked in whichever store owns the org registry.
@@ -298,6 +306,13 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
       await mirrorConfigToBase(slug, categories, rules, clientPriorities, tradeReferences);
     } catch (err) {
       logger.warn("Airtable config mirror skipped", { slug, ...errMeta(err) });
+    }
+    // Draft a job-category catalog for a brand-new vertical (no-op for verticals
+    // that already have one, e.g. seeded construction/roofing). Best-effort.
+    try {
+      await ensureJobCatalog(vertical, input.industryLabel ?? vertical, input.subIndustryLabel ?? "");
+    } catch (err) {
+      logger.warn("Job-catalog draft skipped", { slug, vertical, ...errMeta(err) });
     }
     return { ok: true, orgId, slug };
   }

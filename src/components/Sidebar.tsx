@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { OrgLogo } from "./OrgLogo";
 
 export interface NavItem {
   href: string;
@@ -23,12 +24,15 @@ export interface NavSection {
 export function Sidebar({
   sections,
   orgName,
+  orgLogo,
   menuLabel = "Menu",
   pendingCount = 0,
 }: {
   sections: NavSection[];
   /** Shown as the org switcher (org-scoped layouts only). */
   orgName?: string;
+  /** Customer logo (data URL) shown beside the org name. */
+  orgLogo?: string;
   /** Mobile top-bar label when there's no org switcher. */
   menuLabel?: string;
   /** Pending approvals — surfaced as a badge in the mobile top bar. */
@@ -72,6 +76,7 @@ export function Sidebar({
         >
           ☰
         </button>
+        <OrgLogo logo={orgLogo} name={orgName} size={24} />
         {orgName ? (
           <Link href="/app" className="text-xs text-neutral-700 font-semibold truncate" title="Switch organisation">
             {orgName} <span className="text-neutral-400 font-normal">▾</span>
@@ -103,13 +108,16 @@ export function Sidebar({
           lg:static lg:translate-x-0 lg:transition-none`}
       >
         <div className="px-4 py-2 text-xs text-neutral-500 border-b border-[var(--ae-earth)] flex items-center justify-between gap-2">
-          {orgName ? (
-            <Link href="/app" className="hover:underline truncate font-semibold text-neutral-700" title="Switch organisation">
-              {orgName} <span className="text-neutral-400 font-normal">▾</span>
-            </Link>
-          ) : (
-            <span className="font-semibold text-neutral-700 truncate">{menuLabel}</span>
-          )}
+          <div className="flex items-center gap-2 min-w-0">
+            <OrgLogo logo={orgLogo} name={orgName} size={28} />
+            {orgName ? (
+              <Link href="/app" className="hover:underline truncate font-semibold text-neutral-700" title="Switch organisation">
+                {orgName} <span className="text-neutral-400 font-normal">▾</span>
+              </Link>
+            ) : (
+              <span className="font-semibold text-neutral-700 truncate">{menuLabel}</span>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => setOpen(false)}

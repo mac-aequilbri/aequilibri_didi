@@ -5,23 +5,26 @@
 "use client";
 
 import { useState } from "react";
-import { catalogByGroup, getCategory } from "@/lib/platform/jobCatalog";
+import { findCategory, groupCatalog, type JobCategory } from "@/lib/platform/jobCatalog";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { runAssessmentAction } from "./actions";
 import { RunAssessmentButton } from "./SubmitButtons";
 
 export function IntakeForm({
   orgSlug,
+  categories,
   allowedEngagementTypes,
   defaultEngagementType,
   mapsApiKey = "",
 }: {
   orgSlug: string;
+  /** Data-driven job categories for this org's vertical (may be empty). */
+  categories: JobCategory[];
   allowedEngagementTypes: string[];
   defaultEngagementType: string;
   mapsApiKey?: string;
 }) {
-  const groups = catalogByGroup();
+  const groups = groupCatalog(categories);
   const [category, setCategory] = useState("");
   const [engagementType, setEngagementType] = useState(defaultEngagementType);
   const [scope, setScope] = useState("");
@@ -39,7 +42,7 @@ export function IntakeForm({
 
   const onCategory = (key: string) => {
     setCategory(key);
-    const cat = getCategory(key);
+    const cat = findCategory(categories, key);
     if (!cat) return;
     if (allowedEngagementTypes.includes(cat.engagementType)) {
       setEngagementType(cat.engagementType);
@@ -47,7 +50,7 @@ export function IntakeForm({
     if (!scopeTouched) setScope(cat.scopeHint);
   };
 
-  const cat = getCategory(category);
+  const cat = findCategory(categories, category);
 
   return (
     <form action={runAssessmentAction} className="ae-card p-5 space-y-4 relative">
@@ -79,6 +82,13 @@ export function IntakeForm({
             Standard plan: {cat.phases.length} phases · runs as{" "}
             {cat.engagementType.replace("_", " ")}. Phases adapt to this job, and to your
             past {cat.label.toLowerCase()} jobs as you complete them.
+          </span>
+        )}
+        {groups.length === 0 && (
+          <span className="mt-1 block text-xs text-neutral-500">
+            No job categories are set up for this industry yet — the AI will suggest a phase plan
+            from your scope description. Categories are drafted automatically for new industries at
+            onboarding.
           </span>
         )}
       </label>

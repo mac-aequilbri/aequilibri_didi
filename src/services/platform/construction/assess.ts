@@ -20,7 +20,8 @@ import { resolveField, CascadeOutcome } from "@/lib/platform/sourceCascade";
 import { OrgCtx } from "@/lib/platform/types";
 import type { GeocodeResult } from "@/lib/platform/geocode";
 import { runAssessment } from "../assessment";
-import { getCategory } from "@/lib/platform/jobCatalog";
+import { findCategory } from "@/lib/platform/jobCatalog";
+import { loadJobCatalog } from "@/lib/platform/jobCatalogSource";
 import { reRoofBudgetSuggestion } from "@/services/uc1/pricing";
 import { getMatchingGuidance } from "../learning";
 import {
@@ -142,7 +143,7 @@ export async function runConstructionAssessment(
   //     priority; the chosen catalog category is the expert default that
   //     fills the cold-start gap; the AI only adapts durations. Guidance rules
   //     make the whole analysis learning-aware.
-  const category = getCategory(input.category);
+  const category = findCategory(await loadJobCatalog(ctx.vertical), input.category);
   const ruleContext = {
     suburb,
     engagement_type: input.engagementType,

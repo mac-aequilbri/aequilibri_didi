@@ -51,6 +51,7 @@ function parseConfig(settingsRaw: string): OrgConfig {
     },
     features: { ...DEFAULT_FEATURES, ...(settings.features ?? {}) },
     module1: settings.module1 ?? defaultModule1Governance(),
+    branding: settings.branding?.logo ? { logo: settings.branding.logo } : undefined,
   };
 }
 

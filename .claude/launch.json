@@ -4,7 +4,7 @@
     {
       "name": "aequilibri-next",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--", "-H", "::"],
       "port": 3000
     }
   ]

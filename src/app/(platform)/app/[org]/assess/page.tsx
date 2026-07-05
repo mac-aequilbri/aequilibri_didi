@@ -5,6 +5,7 @@
 
 import { PageHeader } from "@/components/PageHeader";
 import { currency } from "@/lib/format";
+import { loadJobCatalog } from "@/lib/platform/jobCatalogSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { getAssessment } from "@/services/platform/construction/assess";
 import { generateProposalAction } from "./actions";
@@ -28,6 +29,8 @@ export default async function AssessPage({
   // run is the assessment id from the redirect — a numeric string (Postgres) or
   // a "rec…" id (Airtable). Pass it through verbatim, never Number()-coerced.
   const assessment = run ? await getAssessment(ctx, run) : null;
+  // Job categories are data-driven per vertical (control base), not hardcoded.
+  const categories = assessment ? [] : await loadJobCatalog(ctx.vertical);
 
   const budgetField = assessment?.fields.budget_total;
   const durationField = assessment?.fields.duration_weeks;
@@ -46,6 +49,7 @@ export default async function AssessPage({
       {!assessment && (
         <IntakeForm
           orgSlug={ctx.orgSlug}
+          categories={categories}
           allowedEngagementTypes={ctx.allowedEngagementTypes}
           defaultEngagementType={ctx.defaultEngagementType}
           mapsApiKey={process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY || ""}

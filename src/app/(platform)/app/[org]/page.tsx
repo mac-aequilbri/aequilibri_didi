@@ -60,6 +60,7 @@ export default async function OrgDashboard({
     <div className="p-6">
       <PageHeader
         title={ctx.orgName}
+        logo={ctx.config.branding?.logo}
         subtitle={`${ctx.vertical} · ${ctx.defaultEngagementType.replace("_", " ")} · ${jobs.length} active job${jobs.length === 1 ? "" : "s"} shown · ${reportCaps.audienceLabel}`}
         actions={[{ href: p("/assistant"), label: `Ask ${ctx.config.assistant.name}` }]}
       />

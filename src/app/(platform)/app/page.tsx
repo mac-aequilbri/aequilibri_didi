@@ -4,6 +4,7 @@
 // listed; demo mode shows everything.
 
 import Link from "next/link";
+import { OrgLogo } from "@/components/OrgLogo";
 import { controlEnabled, listControlTeam, listOrgRegistry } from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { getAuthEmail, isPlatformAdmin } from "@/lib/platform/org-context";
@@ -11,6 +12,15 @@ import { deleteOrgAction } from "./actions";
 import { DeleteClientButton } from "./DeleteClientButton";
 
 export const dynamic = "force-dynamic";
+
+/** Pull the branding logo (data URL) out of an org's settings JSON, if any. */
+function logoFromSettings(settingsRaw: string): string | undefined {
+  try {
+    return (JSON.parse(settingsRaw) as { branding?: { logo?: string } })?.branding?.logo || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 interface OrgCard {
   slug: string;
@@ -20,6 +30,7 @@ interface OrgCard {
   /** Null when the count isn't cheaply available (control/Airtable mode). */
   jobs: number | null;
   emails: string[];
+  logo?: string;
 }
 
 export default async function OrgPickerPage({
@@ -42,6 +53,7 @@ export default async function OrgPickerPage({
         defaultEngagementType: e.defaultEngagementType,
         jobs: null,
         emails: (await listControlTeam(e.slug)).map((m) => m.email.toLowerCase()),
+        logo: logoFromSettings(e.settings),
       })),
     );
     orgs.sort((a, b) => a.name.localeCompare(b.name));
@@ -61,26 +73,27 @@ export default async function OrgPickerPage({
       defaultEngagementType: o.defaultEngagementType,
       jobs: o._count.jobs,
       emails: o.cfgTeam.map((m) => m.email.toLowerCase()),
+      logo: logoFromSettings(o.settings),
     }));
   }
   const visible = email === null ? orgs : orgs.filter((o) => o.emails.includes(email));
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-16">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+      <div className="flex items-start justify-between gap-6 mb-10">
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold mb-2">Choose an organisation</h1>
-          <p className="text-neutral-600 mb-10">
+          <p className="text-neutral-600">
             Each organisation is an isolated customer instance on the shared platform core.
           </p>
         </div>
         {canProvision && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Link href="/app/templates" className="btn-ae-outline">
               Templates
             </Link>
-            <Link href="/app/new" className="btn-ae">
-              + Onboard new customer
+            <Link href="/app/new" className="btn-ae whitespace-nowrap">
+              + Onboard customer
             </Link>
           </div>
         )}
@@ -127,16 +140,28 @@ export default async function OrgPickerPage({
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
           {visible.map((org) => (
-            <div key={org.slug} className="ae-card p-6 flex flex-col">
-              <Link href={`/app/${org.slug}`} className="block hover:opacity-80 transition-opacity">
-                <h2 className="text-lg font-semibold mb-1">{org.name}</h2>
-                <p className="text-sm text-neutral-600 capitalize">
-                  {org.vertical} · {org.defaultEngagementType.replace("_", " ")}
-                  {org.jobs !== null ? ` · ${org.jobs} job${org.jobs === 1 ? "" : "s"}` : ""}
-                </p>
+            <div key={org.slug} className="ae-card ae-card-link flex flex-col">
+              <Link href={`/app/${org.slug}`} className="flex items-start gap-4 p-6 group">
+                <OrgLogo logo={org.logo} name={org.name} size={44} fallback />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-lg font-semibold truncate">{org.name}</h2>
+                    <span className="text-ae-space opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      →
+                    </span>
+                  </div>
+                  <p className="text-sm text-neutral-600 capitalize mt-0.5">
+                    {org.vertical} · {org.defaultEngagementType.replace("_", " ")}
+                  </p>
+                  <p className="text-xs text-neutral-500 mt-2">
+                    {org.jobs !== null
+                      ? `${org.jobs} job${org.jobs === 1 ? "" : "s"}`
+                      : "Open workspace"}
+                  </p>
+                </div>
               </Link>
               {canProvision && (
-                <div className="mt-4 pt-3 border-t border-neutral-100">
+                <div className="flex justify-end px-6 py-3 border-t border-neutral-100">
                   <DeleteClientButton action={deleteOrgAction} slug={org.slug} name={org.name} />
                 </div>
               )}

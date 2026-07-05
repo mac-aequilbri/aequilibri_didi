@@ -3,6 +3,7 @@
 // renders from Postgres or Airtable behind the migration flag.
 
 import { notFound } from "next/navigation";
+import { OrgLogo } from "@/components/OrgLogo";
 import { currency, formatDate } from "@/lib/format";
 import { loadQuoteDetail } from "@/lib/platform/quoteDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -26,11 +27,14 @@ export default async function QuotePrintPage({
     <div className="bg-white min-h-screen text-neutral-900">
       <div className="max-w-3xl mx-auto p-8">
         <div className="flex justify-between items-start border-b-2 border-[var(--ae-space,#dc9f82)] pb-4 mb-6">
-          <div>
-            <div className="text-2xl font-bold" style={{ color: "var(--ae-space, #dc9f82)" }}>
-              {ctx.orgName}
+          <div className="flex items-center gap-3">
+            <OrgLogo logo={ctx.config.branding?.logo} name={ctx.orgName} size={48} />
+            <div>
+              <div className="text-2xl font-bold" style={{ color: "var(--ae-space, #dc9f82)" }}>
+                {ctx.orgName}
+              </div>
+              <div className="text-sm text-neutral-500">Quotation</div>
             </div>
-            <div className="text-sm text-neutral-500">Quotation</div>
           </div>
           <div className="text-right text-sm">
             <div className="font-mono font-semibold">{quote.refNumber}</div>

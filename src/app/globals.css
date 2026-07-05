@@ -70,6 +70,12 @@ h1, h2, h3, h4, h5 {
 .btn-ae:hover { background: var(--ae-space-hover); color: #fff; }
 .btn-ae-outline { border: 2px solid var(--ae-space); color: var(--ae-space); background: transparent; font-weight: 600; padding: 6px 14px; border-radius: 6px; display: inline-block; cursor: pointer; }
 .btn-ae-outline:hover { background: var(--ae-space); color: #fff; }
+.btn-ae-danger-outline { border: 1.5px solid var(--ae-danger); color: var(--ae-danger); background: transparent; font-weight: 600; font-size: 0.8125rem; padding: 5px 12px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.btn-ae-danger-outline:hover { background: var(--ae-danger); color: #fff; }
+
+/* Interactive org/entity card: lifts on hover to read as clickable. */
+.ae-card-link { transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.ae-card-link:hover { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); transform: translateY(-2px); }
 
 .ae-table { width: 100%; border-collapse: collapse; }
 .ae-table thead { background: var(--ae-ink); color: #fff; }

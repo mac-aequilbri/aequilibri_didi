@@ -20,8 +20,15 @@ export default async function ProjectsPage({ params }: { params: Promise<{ org: 
         subtitle="Every engagement — long projects and short jobs — on the shared core."
         actions={[{ href: orgPath(ctx.orgSlug, "/projects/new"), label: "+ New project" }]}
       />
-      <div className="grid gap-4 lg:grid-cols-2">
-        {jobs.map((job) => (
+      {jobs.length === 0 ? (
+        <EmptyState
+          title="No projects yet"
+          hint="Each project is a job on the platform — create one to start tracking phases, budget and risk."
+          action={{ href: orgPath(ctx.orgSlug, "/projects/new"), label: "+ New project" }}
+        />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {jobs.map((job) => (
           <Link
             key={job.id}
             href={orgPath(ctx.orgSlug, `/projects/${job.id}`)}
@@ -54,15 +61,9 @@ export default async function ProjectsPage({ params }: { params: Promise<{ org: 
               {job.counts.actions} actions · {job.counts.risks} risks
             </p>
           </Link>
-        ))}
-        {jobs.length === 0 && (
-          <EmptyState
-            title="No projects yet"
-            hint="Each project is a job on the platform — create one to start tracking phases, budget and risk."
-            action={{ href: orgPath(ctx.orgSlug, "/projects/new"), label: "+ New project" }}
-          />
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

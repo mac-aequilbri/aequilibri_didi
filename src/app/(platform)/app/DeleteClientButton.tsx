@@ -25,8 +25,8 @@ export function DeleteClientButton({ action, slug, name }: Props) {
       }}
     >
       <input type="hidden" name="slug" value={slug} />
-      <button type="submit" className="text-xs text-rose-600 hover:underline">
-        Delete client…
+      <button type="submit" className="btn-ae-danger-outline">
+        <span aria-hidden>🗑</span> Delete client
       </button>
     </form>
   );

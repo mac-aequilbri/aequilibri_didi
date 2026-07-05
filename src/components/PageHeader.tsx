@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OrgLogo } from "./OrgLogo";
 
 export interface HeaderAction {
   href: string;
@@ -10,16 +11,23 @@ export function PageHeader({
   title,
   subtitle,
   actions = [],
+  logo,
 }: {
   title: string;
   subtitle?: string;
   actions?: HeaderAction[];
+  /** Client logo (data URL) shown beside the title — used where the title is
+   *  the organisation's name (e.g. the org dashboard). */
+  logo?: string;
 }) {
   return (
     <div className="page-header flex items-start justify-between flex-wrap gap-3">
-      <div>
-        <h1 className="text-2xl font-bold">{title}</h1>
-        {subtitle && <p className="text-sm text-neutral-500 mt-1">{subtitle}</p>}
+      <div className="flex items-center gap-3 min-w-0">
+        {logo && <OrgLogo logo={logo} name={title} size={40} />}
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold">{title}</h1>
+          {subtitle && <p className="text-sm text-neutral-500 mt-1">{subtitle}</p>}
+        </div>
       </div>
       <div className="flex gap-2">
         {actions.map((a) => (

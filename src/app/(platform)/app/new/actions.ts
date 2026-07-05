@@ -33,6 +33,27 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
       .map((l) => l.trim())
       .filter(Boolean);
 
+  // Optional company logo. Stored inline in settings as a data URL, so it is
+  // capped small: the registry's Settings field is bounded long-text. Reject
+  // anything non-image or too big rather than silently truncating.
+  const LOGO_MAX_BYTES = 64 * 1024;
+  let logoDataUrl: string | undefined;
+  const logo = formData.get("logo");
+  if (logo instanceof File && logo.size > 0) {
+    if (!logo.type.startsWith("image/")) {
+      redirect(`/app/new?error=${encodeURIComponent("Logo must be an image file (PNG, SVG, JPG…).")}`);
+    }
+    if (logo.size > LOGO_MAX_BYTES) {
+      redirect(
+        `/app/new?error=${encodeURIComponent(
+          `Logo is ${(logo.size / 1024).toFixed(0)} KB — please upload one under 64 KB (an SVG or optimised PNG is ideal).`,
+        )}`,
+      );
+    }
+    const base64 = Buffer.from(await logo.arrayBuffer()).toString("base64");
+    logoDataUrl = `data:${logo.type};base64,${base64}`;
+  }
+
   // With Clerk active, default the first team member to the signing-in user so the
   // creator is a member of (and can access) the org they just provisioned.
   let adminName = String(formData.get("adminName") ?? "");
@@ -50,11 +71,15 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
   const option = String(formData.get("templateOption") ?? "");
   let vertical = VERTICALS[0];
   let templateBaseId = "";
+  let industryLabel = "";
+  let subIndustryLabel = "";
   if (option.startsWith("rec")) {
     const entry = await getTemplateRegistryEntry(option);
     if (!entry) redirect(`/app/new?error=${encodeURIComponent("Selected industry mapping not found — refresh and retry.")}`);
     vertical = entry.verticalKey || VERTICALS[0];
     templateBaseId = entry.templateBaseId;
+    industryLabel = entry.industry;
+    subIndustryLabel = entry.subIndustry;
   } else if (VERTICALS.includes(option)) {
     vertical = option;
   }
@@ -82,6 +107,9 @@ export async function provisionOrgAction(formData: FormData): Promise<void> {
     clientPriorities: lines("clientPriorities"),
     tradeReferences: lines("tradeReferences"),
     initialRules: lines("initialRules"),
+    logoDataUrl,
+    industryLabel,
+    subIndustryLabel,
   });
 
   if (!result.ok) {

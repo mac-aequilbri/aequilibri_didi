@@ -2,8 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { listTemplateRegistry } from "@/lib/airtable/control";
 import { isPlatformAdmin } from "@/lib/platform/org-context";
+import { INDUSTRY_TAXONOMY, industryOptions } from "@/lib/platform/industryTaxonomy";
 import { createTemplateMapping } from "../actions";
+import { TemplateTaxonomyFields } from "./TemplateTaxonomyFields";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +18,11 @@ export default async function NewTemplateMappingPage({
   if (!(await isPlatformAdmin())) redirect("/app?denied=admin");
   const { error } = await searchParams;
 
+  // Seed the industry dropdown with the curated taxonomy plus whatever is
+  // already mapped, so the list reflects reality as new verticals are added.
+  const registry = await listTemplateRegistry({ includeInactive: true });
+  const industries = industryOptions(registry.map((r) => r.industry));
+
   return (
     <main className="max-w-xl mx-auto px-6 py-10">
       <PageHeader
@@ -25,14 +33,7 @@ export default async function NewTemplateMappingPage({
 
       <form action={createTemplateMapping} className="ae-card p-5 space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <label className="block text-sm">
-            <span className="text-neutral-600">Industry *</span>
-            <input name="industry" required placeholder="Legal" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-          </label>
-          <label className="block text-sm">
-            <span className="text-neutral-600">Sub-industry</span>
-            <input name="subIndustry" placeholder="Litigation" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-          </label>
+          <TemplateTaxonomyFields taxonomy={INDUSTRY_TAXONOMY} industries={industries} />
           <label className="block text-sm">
             <span className="text-neutral-600">Vertical key</span>
             <input name="verticalKey" placeholder="legal" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs" />
