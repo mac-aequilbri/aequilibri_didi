@@ -42,6 +42,7 @@ describe("tool policy registry consistency", () => {
   it("every write tool maps to a registered writable table", () => {
     for (const [name, policy] of Object.entries(TOOL_POLICY)) {
       if (policy.risk === "read") continue;
+      if (policy.kind === "service") continue; // service tools call a service, not recordWriter
       expect(policy.table, `${name} has no table`).toBeDefined();
       expect(WRITABLE_TABLES, `${name} → unknown table ${policy.table}`).toContain(policy.table);
       expect(["create", "update"]).toContain(policy.op);

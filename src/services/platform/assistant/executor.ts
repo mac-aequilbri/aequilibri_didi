@@ -9,7 +9,7 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import type { ToolUse } from "@/lib/claude";
 import { writeRecord, WritableTable, type RecordId } from "@/lib/platform/recordWriter";
 import { Actor, AiAuthority, OrgCtx } from "@/lib/platform/types";
-import { roleCanUseTool, TOOL_POLICY } from "./tools";
+import { roleCanUseTool, type ToolPolicy } from "./tools";
 
 export interface ToolOutcome {
   toolName: string;
@@ -160,17 +160,124 @@ async function toWriteData(
   return data;
 }
 
+/** Dispatch a "service" tool to the platform service that backs it. These
+ *  produce human-reviewable drafts/suggestions (report draft, assessment draft,
+ *  route hints) — the downstream approve/materialise step is the human gate, so
+ *  they don't route through the recordWriter proposal queue. */
+async function runServiceTool(
+  ctx: OrgCtx,
+  actor: Actor,
+  name: string,
+  input: Record<string, unknown>,
+): Promise<ToolOutcome> {
+  try {
+    switch (name) {
+      case "generate_weekly_report": {
+        const jobId = input.jobId as RecordId | undefined;
+        const weekEnding = String(input.weekEnding ?? "").trim();
+        if (jobId == null || !weekEnding) {
+          return { toolName: name, ok: false, summary: "generate_weekly_report needs jobId and weekEnding (YYYY-MM-DD)." };
+        }
+        const { generateWeeklyReport } = await import("@/services/platform/construction/reports");
+        const r = await generateWeeklyReport(ctx, actor.name, jobId, weekEnding);
+        return {
+          toolName: name,
+          ok: true,
+          status: "executed",
+          recordId: r.id,
+          summary: `Weekly report drafted (id ${r.id}) for week ending ${weekEnding}. It is a draft — a human must approve it before it is sent.`,
+        };
+      }
+      case "run_construction_intake": {
+        const intake = {
+          name: String(input.name ?? "").trim(),
+          engagementType: String(input.engagementType ?? "long_project"),
+          address: String(input.address ?? ""),
+          suburb: String(input.suburb ?? ""),
+          scope: String(input.scope ?? ""),
+          sizeSqm: input.sizeSqm != null ? Number(input.sizeSqm) : undefined,
+          category: input.category != null ? String(input.category) : undefined,
+        };
+        if (!intake.name || !intake.scope) {
+          return { toolName: name, ok: false, summary: "run_construction_intake needs at least a name and scope." };
+        }
+        const { runModule3Capability } = await import("@/services/platform/module3/engine");
+        const res = await runModule3Capability(ctx, actor.name, { capability: "construction_intake", input: intake });
+        return {
+          toolName: name,
+          ok: true,
+          status: "executed",
+          recordId: res.resultId,
+          summary: `Construction intake assessment drafted (id ${res.resultId}, confidence ${res.overallConfidence}). It is a draft for human review — no job is created until it is accepted.`,
+        };
+      }
+      case "suggest_ingestion_routes": {
+        const { inferRouteSuggestions } = await import("@/lib/platform/ingestion");
+        const text = String(input.text ?? "");
+        const classification = String(input.classification ?? "other");
+        const title = String(input.title ?? "").trim() || text.split(/\r?\n/)[0]?.slice(0, 120) || "Ingested source";
+        const suggestions = inferRouteSuggestions({
+          classification,
+          text,
+          title,
+          docDate: new Date().toISOString().slice(0, 10),
+          jobId: input.jobId as number | string | undefined,
+        });
+        return {
+          toolName: name,
+          ok: true,
+          status: "executed",
+          summary: suggestions.length
+            ? `Routing suggestions (nothing written): ${JSON.stringify(suggestions)}`
+            : "No routing suggestions inferred from this source.",
+        };
+      }
+      case "onboarding_status": {
+        // Provisioning new orgs stays in the /app/new form (cross-org, creates
+        // external Airtable resources). The chat onboarding tool is read-only
+        // and platform-admin gated: it reports the current org's readiness.
+        const { isPlatformAdmin } = await import("@/lib/platform/org-context");
+        if (!(await isPlatformAdmin())) {
+          return { toolName: name, ok: false, summary: "Onboarding tools require a platform administrator." };
+        }
+        const cfg = ctx.config;
+        const on = Object.entries(cfg.features).filter(([, v]) => v).map(([k]) => k);
+        const off = Object.entries(cfg.features).filter(([, v]) => !v).map(([k]) => k);
+        const status = {
+          org: ctx.orgName,
+          vertical: ctx.vertical,
+          engagementTypes: ctx.allowedEngagementTypes,
+          aiAuthority: ctx.aiAuthority,
+          assistant: cfg.assistant.name,
+          personaConfigured: cfg.assistant.persona.trim().length > 40,
+          brandingLogo: !!cfg.branding?.logo,
+          module1Governance: !!cfg.module1,
+          featuresEnabled: on,
+          featuresDisabled: off,
+        };
+        return { toolName: name, ok: true, status: "executed", summary: `Onboarding/config readiness: ${JSON.stringify(status)}` };
+      }
+      default:
+        return { toolName: name, ok: false, summary: `Unknown service tool "${name}".` };
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { toolName: name, ok: false, summary: `Service tool failed: ${message.slice(0, 400)}` };
+  }
+}
+
 export async function executeToolUse(
   ctx: OrgCtx,
   actor: Actor,
   tu: ToolUse,
+  toolPolicy: Record<string, ToolPolicy>,
   currentUserRole?: string,
 ): Promise<ToolOutcome> {
-  const policy = TOOL_POLICY[tu.name];
+  const policy = toolPolicy[tu.name];
   if (!policy) {
     return { toolName: tu.name, ok: false, summary: `Unknown tool "${tu.name}".` };
   }
-  if (currentUserRole && !roleCanUseTool(currentUserRole, tu.name)) {
+  if (currentUserRole && !roleCanUseTool(currentUserRole, tu.name, toolPolicy)) {
     return {
       toolName: tu.name,
       ok: false,
@@ -178,6 +285,13 @@ export async function executeToolUse(
     };
   }
   const input = (tu.input ?? {}) as Record<string, unknown>;
+
+  // Service tools call a platform service (report/assessment/ingestion) rather
+  // than recordWriter. Checked before the read branch because a service tool
+  // may be read-risk (e.g. route suggestions) yet must not hit runQuery.
+  if (policy.kind === "service") {
+    return runServiceTool(ctx, actor, tu.name, input);
+  }
 
   if (policy.risk === "read") {
     try {

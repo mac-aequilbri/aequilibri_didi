@@ -198,11 +198,13 @@ export default function AssistantClient({
                         <span
                           key={i}
                           className={`text-[0.65rem] px-1.5 py-0.5 rounded ${
-                            t.status === "proposed"
-                              ? "text-amber-700 bg-amber-50"
-                              : t.ok
-                                ? "text-emerald-700 bg-emerald-50"
-                                : "text-red-700 bg-red-50"
+                            t.status === "delegated"
+                              ? "text-indigo-700 bg-indigo-50"
+                              : t.status === "proposed"
+                                ? "text-amber-700 bg-amber-50"
+                                : t.ok
+                                  ? "text-emerald-700 bg-emerald-50"
+                                  : "text-red-700 bg-red-50"
                           }`}
                         >
                           {t.tool}

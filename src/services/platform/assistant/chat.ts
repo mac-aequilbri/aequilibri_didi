@@ -1,18 +1,17 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { airtableEnabled, core } from "@/lib/airtable";
-import { callClaudeConversation } from "@/lib/claude";
 import { prisma } from "@/lib/db";
 import { normalizeTeamRole } from "@/lib/platform/module1Governance";
-import { modelFor } from "@/lib/platform/modelRouter";
+import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { getPrompt } from "@/lib/platform/prompts";
 import { Actor, OrgCtx } from "@/lib/platform/types";
 import type { RecordId } from "@/lib/platform/recordWriter";
 import { learningPromptText } from "../learning";
-import { executeToolUse, ToolOutcome } from "./executor";
-import { ASSISTANT_TOOLS } from "./tools";
+import type { ToolOutcome } from "./executor";
+import { runOrchestrator, type Specialist } from "../agents/orchestrator";
+import { SPECIALISTS } from "../agents/registry";
 
 const HISTORY_LIMIT = 20;
-const MAX_TOOL_ROUNDS = 4;
 
 interface ChatMessageRow {
   id: RecordId;
@@ -221,70 +220,49 @@ export async function sendChatMessage(
     role: opts.userRole,
     sourceMessageId: userMsgId,
   };
-  const outcomes: ToolOutcome[] = [];
-  let reply = "";
-  let demoMode = false;
 
-  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-    const res = await callClaudeConversation(system, convo, {
-      tools: ASSISTANT_TOOLS,
-      maxTokens: 1500,
-      model: modelFor("chat"),
-    });
-    demoMode = res.demo_mode;
-    if (res.demo_mode || res.tool_uses.length === 0 || round === MAX_TOOL_ROUNDS) {
-      reply = res.content;
-      break;
-    }
-
-    // Echo the assistant turn (text + tool_use blocks), then answer each
-    // tool_use with a tool_result so the model can continue.
-    const assistantBlocks: Anthropic.ContentBlockParam[] = [];
-    if (res.content.trim()) assistantBlocks.push({ type: "text", text: res.content });
-    const resultBlocks: Anthropic.ContentBlockParam[] = [];
-    for (const tu of res.tool_uses) {
-      if (!tu.id) continue;
-      assistantBlocks.push({
-        type: "tool_use",
-        id: tu.id,
-        name: tu.name,
-        input: tu.input ?? {},
-      });
-      const outcome = await executeToolUse(ctx, actor, tu, opts.userRole);
-      outcomes.push(outcome);
-      resultBlocks.push({
-        type: "tool_result",
-        tool_use_id: tu.id,
-        content: outcome.summary,
-        is_error: !outcome.ok,
-      });
-    }
-    if (!resultBlocks.length) {
-      reply = res.content;
-      break;
-    }
-    convo.push({ role: "assistant", content: assistantBlocks });
-    convo.push({ role: "user", content: resultBlocks });
-  }
+  // Route the turn through the orchestrator across all registered specialists.
+  // Each specialist shares the same grounded base prompt (persona, rules, data
+  // snapshot) plus a scope line; its tool bundle is what actually constrains it.
+  // Every specialist write still passes the shared aiAuthority + role gate. The
+  // Onboarding agent (Module 1) is platform-admin only, so it's excluded here
+  // for everyone else (the executor re-checks on the tool itself).
+  const platformAdmin = await isPlatformAdmin();
+  const specialists: Specialist[] = SPECIALISTS.filter(
+    (agent) => agent.key !== "onboarding" || platformAdmin,
+  ).map((agent) => ({
+    agent,
+    system: `${system}\n\nYou are the ${agent.label} specialist for this workspace. Scope: ${agent.description} Use only the tools you have been given; if a request falls outside your scope, say so briefly so it can be routed elsewhere.`,
+  }));
+  const { reply, demoMode, outcomes, delegations } = await runOrchestrator(ctx, convo, actor, {
+    specialists,
+    orgName: ctx.orgName,
+    userRole: opts.userRole,
+  });
 
   const pendingApprovals = outcomes
     .filter((o) => o.status === "proposed" && o.proposalId)
     .map((o) => o.proposalId!);
+
+  // Trace: prepend a "delegated" marker per specialist the orchestrator routed
+  // to, then the executed/proposed tool calls. Empty in single-specialist mode.
+  const toolTrace = [
+    ...delegations.map((d) => ({ tool: `→ ${d.label}`, ok: true, status: "delegated" as const })),
+    ...outcomes.map((o) => ({
+      tool: o.toolName,
+      ok: o.ok,
+      status: o.status,
+      proposalId: o.proposalId,
+      recordId: o.recordId,
+    })),
+  ];
 
   if (airtableEnabled()) {
     await core.create(ctx.orgSlug, "CHAT_MESSAGES", {
       Session_Id: String(sessionId),
       Role: "assistant",
       Content: reply || "(no reply)",
-      Tool_Calls: JSON.stringify(
-        outcomes.map((o) => ({
-          tool: o.toolName,
-          ok: o.ok,
-          status: o.status,
-          proposalId: o.proposalId,
-          recordId: o.recordId,
-        })),
-      ),
+      Tool_Calls: JSON.stringify(toolTrace),
       Created_At: new Date().toISOString(),
     });
     await core
@@ -305,15 +283,7 @@ export async function sendChatMessage(
         sessionId: Number(sessionId),
         role: "assistant",
         content: reply || "(no reply)",
-        toolCalls: JSON.stringify(
-          outcomes.map((o) => ({
-            tool: o.toolName,
-            ok: o.ok,
-            status: o.status,
-            proposalId: o.proposalId,
-            recordId: o.recordId,
-          })),
-        ),
+        toolCalls: JSON.stringify(toolTrace),
       },
     });
     await prisma.platExecutionLog
