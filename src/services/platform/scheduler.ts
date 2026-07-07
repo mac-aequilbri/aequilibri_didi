@@ -14,6 +14,7 @@
 import { controlEnabled, listOrgRegistry } from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { getOrgCtx } from "@/lib/platform/org-context";
+import { redriveOutbox } from "@/lib/platform/outbox";
 import { generateWeeklyReport } from "./construction/reports";
 import { runHypothesisEngine, snapshotIntelligence } from "./learning";
 
@@ -24,6 +25,7 @@ export interface SchedulerRunResult {
   hypotheses: { created: number; updated: number };
   snapshots: number;
   reportsDrafted: number;
+  outbox: { redriven: number; deadLettered: number };
   errors: string[];
 }
 
@@ -51,6 +53,7 @@ export async function runScheduledTasks(now = new Date()): Promise<SchedulerRunR
     hypotheses: { created: 0, updated: 0 },
     snapshots: 0,
     reportsDrafted: 0,
+    outbox: { redriven: 0, deadLettered: 0 },
     errors: [],
   };
 
@@ -118,12 +121,22 @@ export async function runScheduledTasks(now = new Date()): Promise<SchedulerRunR
     }
   }
 
+  // 4. Outbound outbox retry/DLQ — a single cross-org control-base sweep (the
+  // outbox is one shared table, not per-org). Re-drives failed rows under the
+  // attempt cap; dead-letters the rest.
+  try {
+    result.outbox = await redriveOutbox();
+  } catch (err) {
+    result.errors.push(`outbox redrive: ${err}`);
+  }
+
   // Log only orgs where the run actually did something (or failed) — hourly
   // no-op heartbeats would drown the audit log.
   const didWork =
     result.snapshots > 0 ||
     result.reportsDrafted > 0 ||
-    result.hypotheses.created + result.hypotheses.updated > 0;
+    result.hypotheses.created + result.hypotheses.updated > 0 ||
+    result.outbox.redriven + result.outbox.deadLettered > 0;
   if (didWork || result.errors.length) {
     await prisma.platExecutionLog
       .createMany({

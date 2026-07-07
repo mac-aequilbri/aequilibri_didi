@@ -13,6 +13,7 @@ import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { Actor, OrgCtx } from "./types";
+import { emitOutboundEvent } from "./outbox";
 
 // ── field helpers (typecast layer) ────────────────────────────────────
 
@@ -896,6 +897,14 @@ export async function executeProposal(
         data: { status: "executed", resolvedBy: approvedBy, resolvedAt: new Date(), execLogId },
       });
     }
+    // Outbound event: an approved write is a confirmed domain change. Best-effort
+    // + gated on an active outbound connection (no-op otherwise) — never throws.
+    await emitOutboundEvent(ctx, `${pending.tableKey}.${op}`, {
+      entityType: pending.tableKey,
+      entityId: recordId,
+      jobId: pending.jobId ?? undefined,
+      data: { approvedBy },
+    });
     return { status: "executed", recordId, execLogId, proposalId: pending.id };
   } catch (err) {
     const message = String(err instanceof Error ? err.message : err).slice(0, 1000);

@@ -5,6 +5,7 @@ import { callClaude } from "@/lib/claude";
 import { loadJobContext } from "@/lib/platform/jobContextSource";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
+import { emitOutboundEvent } from "@/lib/platform/outbox";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { OrgCtx } from "@/lib/platform/types";
 import { generateManagedDocument } from "@/services/platform/documents";
@@ -138,5 +139,11 @@ export async function markReportSent(ctx: OrgCtx, userName: string, id: RecordId
     recordId: id,
     data: { status: "sent", sentAt: new Date().toISOString() },
     actor: { type: "human", name: userName },
+  });
+  await emitOutboundEvent(ctx, "report.ready", {
+    entityType: "weekly_report",
+    entityId: id,
+    summary: "Weekly report sent",
+    data: { sentBy: userName },
   });
 }

@@ -79,6 +79,11 @@ services:
       # ── Automation (scheduler endpoint token; omit to disable) ─────────────
       - key: CRON_SECRET
         sync: false
+      # Inbound integration webhook (/api/platform/hooks) fallback signing
+      # secret for single-tenant/demo. Per-org secrets live in the control-base
+      # registry Settings JSON and take precedence; omit both to disable hooks.
+      - key: PLATFORM_WEBHOOK_SECRET
+        sync: false
 
       # ── Module 2 inbox ingestion (live IMAP mailbox; omit all to use demo
       #    fixtures). The /api/platform/ingest-inbox endpoint reuses CRON_SECRET.

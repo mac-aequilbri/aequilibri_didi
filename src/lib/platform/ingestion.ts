@@ -1,4 +1,12 @@
-export type Module2SourceChannel = "upload" | "link" | "email" | "conversation";
+export type Module2SourceChannel =
+  | "upload"
+  | "link"
+  | "email"
+  | "conversation"
+  | "slack"
+  | "form"
+  | "drive"
+  | "webhook";
 
 export interface CanonicalNameInput {
   rawName: string;
@@ -131,6 +139,10 @@ export function driveFolderSegments(docType: string, channel: Module2SourceChann
   const t = docType.trim().toLowerCase();
   if (channel === "conversation") return ["10_Claude_CoWork", "Conversation_Notes"];
   if (channel === "email") return ["10_Claude_CoWork", "Email_Inbox"];
+  if (channel === "slack") return ["10_Claude_CoWork", "Slack_Inbox"];
+  if (channel === "form") return ["10_Claude_CoWork", "Form_Intake"];
+  if (channel === "webhook") return ["10_Claude_CoWork", "Webhook_Inbox"];
+  // "drive" and "upload"/"link" fall through to docType-based routing below.
   if (t === "invoice") return ["02_Budgets_and_Costs", "Invoices"];
   if (t === "quote") return ["03_Vendors_and_Quotes", "Quotes"];
   if (t === "drawing") return ["04_Drawings_and_Designs", "Drawings"];

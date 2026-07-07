@@ -84,6 +84,7 @@ export function buildNav(ctx: OrgCtx, jobCount: number, counts: NavCounts = {}):
     items: [
       ...(f.portal ? [{ href: p("/portal"), label: "Client Portal" }] : []),
       ...(f.accounting ? [{ href: p("/accounting"), label: "Accounting" }] : []),
+      { href: p("/integrations"), label: "Integrations" },
     ],
   };
   if (admin.items.length) sections.push(admin);

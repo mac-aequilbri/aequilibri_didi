@@ -22,6 +22,8 @@ const REGISTRY = "PLAT_ORG_REGISTRY";
 const TEAM = "PLAT_TEAM";
 const TEMPLATE_REGISTRY = "PLAT_TEMPLATE_REGISTRY";
 const JOB_CATALOG = "PLAT_JOB_CATALOG";
+const CONNECTIONS = "PLAT_CONNECTIONS";
+const OUTBOX = "PLAT_OUTBOX";
 
 /** The shared control base id, or null when not configured. */
 export function controlBaseId(): string | null {
@@ -148,6 +150,312 @@ export async function getOrgRegistry(slug: string): Promise<OrgRegistryEntry | n
     maxRecords: 1,
   });
   return recs.length ? toEntry(recs[0]) : null;
+}
+
+/** Per-org webhook signing secret (inbound integration HMAC), kept in the
+ *  registry row's Settings JSON alongside branding/metrics. Null when control
+ *  is off or unset — callers fall back to the global PLATFORM_WEBHOOK_SECRET. */
+export async function getOrgWebhookSecret(slug: string): Promise<string | null> {
+  const entry = await getOrgRegistry(slug);
+  if (!entry) return null;
+  try {
+    const parsed = JSON.parse(entry.settings || "{}") as { webhookSecret?: unknown };
+    return typeof parsed.webhookSecret === "string" && parsed.webhookSecret ? parsed.webhookSecret : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Set (merge) an org's webhook signing secret into its Settings JSON, leaving
+ *  the rest of the config intact. No-op when control is off or slug unknown. */
+export async function setOrgWebhookSecret(slug: string, secret: string): Promise<void> {
+  const base = controlBaseId();
+  if (!base) return;
+  const recs = await listRecords(base, REGISTRY, {
+    filterByFormula: `{Slug}='${formulaSafe(slug)}'`,
+    maxRecords: 1,
+  });
+  if (!recs.length) return;
+  let settings: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(S(recs[0].fields["Settings"]) || "{}");
+    if (parsed && typeof parsed === "object") settings = parsed as Record<string, unknown>;
+  } catch {
+    /* start from empty on malformed settings rather than clobbering */
+  }
+  settings.webhookSecret = secret;
+  await updateRecords(base, REGISTRY, [{ id: recs[0].id, fields: { Settings: JSON.stringify(settings) } }]);
+}
+
+// ── PLAT_CONNECTIONS — per-org integration registry (Module 2 push channels) ──
+
+export type ConnectionDirection = "in" | "out";
+
+export interface ConnectionEntry {
+  recordId: string;
+  orgSlug: string;
+  channel: string;
+  direction: ConnectionDirection;
+  isActive: boolean;
+  eventFilter: string;
+  credentialRef: string;
+  lastEventAt: string;
+  lastStatus: string;
+  notes: string;
+}
+
+export interface NewConnection {
+  orgSlug: string;
+  channel: string;
+  direction: ConnectionDirection;
+  eventFilter?: string;
+  credentialRef?: string;
+  notes?: string;
+}
+
+/** Stable identity for a connection row: one per (org, channel, direction). */
+export function connectionKey(orgSlug: string, channel: string, direction: string): string {
+  return `${orgSlug}:${channel}:${direction}`;
+}
+
+function toConnectionEntry(r: { id: string; fields: Record<string, unknown> }): ConnectionEntry {
+  const f = r.fields;
+  return {
+    recordId: r.id,
+    orgSlug: S(f["Org_Slug"]),
+    channel: S(f["Channel"]),
+    direction: S(f["Direction"]) === "out" ? "out" : "in",
+    isActive: f["Is_Active"] !== false,
+    eventFilter: S(f["Event_Filter"]),
+    credentialRef: S(f["Credential_Ref"]),
+    lastEventAt: S(f["Last_Event_At"]),
+    lastStatus: S(f["Last_Status"]),
+    notes: S(f["Notes"]),
+  };
+}
+
+/** All connections for an org (admin page). Empty when control is off — or when
+ *  the table doesn't exist yet on this control base (before the migration
+ *  script runs), so the page degrades gracefully instead of 500-ing. */
+export async function listConnections(orgSlug: string): Promise<ConnectionEntry[]> {
+  const base = controlBaseId();
+  if (!base || !orgSlug) return [];
+  try {
+    const recs = await listRecords(base, CONNECTIONS, {
+      filterByFormula: `{Org_Slug}='${formulaSafe(orgSlug)}'`,
+      maxRecords: 1000,
+    });
+    return recs
+      .map(toConnectionEntry)
+      .sort((a, b) => a.channel.localeCompare(b.channel) || a.direction.localeCompare(b.direction));
+  } catch {
+    return [];
+  }
+}
+
+/** The active connection for a channel+direction, or null. Fail-closed: any
+ *  error (incl. a missing table) resolves to null, so the endpoint's
+ *  default-deny gate denies rather than crashing. */
+export async function getActiveConnection(
+  orgSlug: string,
+  channel: string,
+  direction: ConnectionDirection,
+): Promise<ConnectionEntry | null> {
+  const base = controlBaseId();
+  if (!base) return null;
+  try {
+    const recs = await listRecords(base, CONNECTIONS, {
+      filterByFormula: `{Connection_Key}='${formulaSafe(connectionKey(orgSlug, channel, direction))}'`,
+      maxRecords: 1,
+    });
+    const entry = recs.length ? toConnectionEntry(recs[0]) : null;
+    return entry && entry.isActive ? entry : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function createConnection(entry: NewConnection): Promise<void> {
+  const base = controlBaseId();
+  if (!base) throw new Error("AIRTABLE_CONTROL_BASE_ID is not set");
+  await createRecords(base, CONNECTIONS, [
+    {
+      Connection_Key: connectionKey(entry.orgSlug, entry.channel, entry.direction),
+      Org_Slug: entry.orgSlug,
+      Channel: entry.channel,
+      Direction: entry.direction,
+      Is_Active: true,
+      Event_Filter: entry.eventFilter ?? "",
+      Credential_Ref: entry.credentialRef ?? "",
+      Notes: entry.notes ?? "",
+    },
+  ]);
+}
+
+export async function updateConnection(
+  recordId: string,
+  patch: Partial<{ isActive: boolean; eventFilter: string; credentialRef: string; notes: string }>,
+): Promise<void> {
+  const base = controlBaseId();
+  if (!base) throw new Error("AIRTABLE_CONTROL_BASE_ID is not set");
+  const fields: Record<string, unknown> = {};
+  if (patch.isActive !== undefined) fields["Is_Active"] = patch.isActive;
+  if (patch.eventFilter !== undefined) fields["Event_Filter"] = patch.eventFilter;
+  if (patch.credentialRef !== undefined) fields["Credential_Ref"] = patch.credentialRef;
+  if (patch.notes !== undefined) fields["Notes"] = patch.notes;
+  if (Object.keys(fields).length === 0) return;
+  await updateRecords(base, CONNECTIONS, [{ id: recordId, fields }]);
+}
+
+export async function deleteConnection(recordId: string): Promise<void> {
+  const base = controlBaseId();
+  if (!base) throw new Error("AIRTABLE_CONTROL_BASE_ID is not set");
+  await deleteRecords(base, CONNECTIONS, [recordId]);
+}
+
+/** Record delivery health on a connection row. Best-effort — never throws into
+ *  a request path (a missing row or control-off is silently ignored). */
+export async function touchConnectionHealth(
+  orgSlug: string,
+  channel: string,
+  direction: ConnectionDirection,
+  status: string,
+): Promise<void> {
+  const base = controlBaseId();
+  if (!base) return;
+  try {
+    const recs = await listRecords(base, CONNECTIONS, {
+      filterByFormula: `{Connection_Key}='${formulaSafe(connectionKey(orgSlug, channel, direction))}'`,
+      maxRecords: 1,
+    });
+    if (!recs.length) return;
+    await updateRecords(base, CONNECTIONS, [
+      { id: recs[0].id, fields: { Last_Event_At: new Date().toISOString(), Last_Status: status.slice(0, 200) } },
+    ]);
+  } catch {
+    /* health telemetry is best-effort */
+  }
+}
+
+/** Does the org have at least one active OUTBOUND connection? Gates whether the
+ *  platform bothers to enqueue outbound events. Fail-closed on error → false. */
+export async function hasActiveOutbound(orgSlug: string): Promise<boolean> {
+  const base = controlBaseId();
+  if (!base || !orgSlug) return false;
+  try {
+    const recs = await listRecords(base, CONNECTIONS, {
+      filterByFormula: `AND({Org_Slug}='${formulaSafe(orgSlug)}',{Direction}='out',{Is_Active}=1)`,
+      maxRecords: 1,
+    });
+    return recs.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// ── PLAT_OUTBOX — outbound event queue (n8n delivers; platform only enqueues) ──
+
+export interface OutboxEntry {
+  recordId: string;
+  event: string;
+  orgSlug: string;
+  entityType: string;
+  entityId: string;
+  jobId: string;
+  summary: string;
+  status: string;
+  attempts: number;
+  createdAt: string;
+  deliveredAt: string;
+}
+
+export interface OutboxInput {
+  orgSlug: string;
+  event: string;
+  entityType: string;
+  entityId: string;
+  jobId?: string;
+  summary?: string;
+  data?: Record<string, unknown>;
+}
+
+function toOutboxEntry(r: { id: string; fields: Record<string, unknown> }): OutboxEntry {
+  const f = r.fields;
+  return {
+    recordId: r.id,
+    event: S(f["Event"]),
+    orgSlug: S(f["Org_Slug"]),
+    entityType: S(f["Entity_Type"]),
+    entityId: S(f["Entity_Id"]),
+    jobId: S(f["Job_Id"]),
+    summary: S(f["Summary"]),
+    status: S(f["Status"]) || "pending",
+    attempts: N(f["Attempts"]),
+    createdAt: S(f["Created_At"]),
+    deliveredAt: S(f["Delivered_At"]),
+  };
+}
+
+/** Enqueue a `pending` outbound event. Callers should gate on hasActiveOutbound
+ *  first (see lib/platform/outbox.ts); this just writes the row. */
+export async function enqueueOutbox(input: OutboxInput): Promise<void> {
+  const base = controlBaseId();
+  if (!base) return;
+  await createRecords(base, OUTBOX, [
+    {
+      Event: input.event,
+      Org_Slug: input.orgSlug,
+      Entity_Type: input.entityType,
+      Entity_Id: input.entityId,
+      Job_Id: input.jobId ?? "",
+      Summary: input.summary ?? "",
+      Payload: input.data ? JSON.stringify(input.data) : "{}",
+      Status: "pending",
+      Created_At: new Date().toISOString(),
+      Attempts: 0,
+    },
+  ]);
+}
+
+/** Recent outbound events for an org (admin page). Empty on error / no table. */
+export async function listOutbox(orgSlug: string, limit = 25): Promise<OutboxEntry[]> {
+  const base = controlBaseId();
+  if (!base || !orgSlug) return [];
+  try {
+    const recs = await listRecords(base, OUTBOX, {
+      filterByFormula: `{Org_Slug}='${formulaSafe(orgSlug)}'`,
+      maxRecords: 200,
+    });
+    return recs
+      .map(toOutboxEntry)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/** All `failed` outbox rows across every org (the scheduler redrive sweep reads
+ *  this control-base-wide table). Empty on error / no table. */
+export async function listFailedOutbox(limit = 200): Promise<OutboxEntry[]> {
+  const base = controlBaseId();
+  if (!base) return [];
+  try {
+    const recs = await listRecords(base, OUTBOX, {
+      filterByFormula: `{Status}='failed'`,
+      maxRecords: limit,
+    });
+    return recs.map(toOutboxEntry);
+  } catch {
+    return [];
+  }
+}
+
+/** Set an outbox row's Status (redrive → `pending`, DLQ → `dead`). */
+export async function setOutboxStatus(recordId: string, status: string): Promise<void> {
+  const base = controlBaseId();
+  if (!base) return;
+  await updateRecords(base, OUTBOX, [{ id: recordId, fields: { Status: status } }]);
 }
 
 /** Active team members for an org (auth). */

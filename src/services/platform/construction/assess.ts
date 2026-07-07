@@ -14,6 +14,7 @@ import { emitCorrection } from "@/lib/platform/corrections";
 import { geocodeProviders } from "@/lib/platform/geocode";
 import { mulMoney, sumMoney } from "@/lib/platform/money";
 import { modelFor } from "@/lib/platform/modelRouter";
+import { emitOutboundEvent } from "@/lib/platform/outbox";
 import { getPrompt } from "@/lib/platform/prompts";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { resolveField, CascadeOutcome } from "@/lib/platform/sourceCascade";
@@ -618,6 +619,14 @@ export async function materializeProjectFromAssessment(
       data: { status: "accepted", jobId: pgJobId ?? null },
     });
   }
+
+  await emitOutboundEvent(ctx, "assessment.accepted", {
+    entityType: "assessment",
+    entityId: assessmentId,
+    jobId,
+    summary: `Assessment accepted → job created${assessment.input.name ? ` for ${assessment.input.name}` : ""}`,
+    data: { acceptedBy: userName },
+  });
 
   if (finalBudget !== aiBudget && aiBudget > 0) {
     await emitCorrection(

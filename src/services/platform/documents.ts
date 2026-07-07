@@ -650,6 +650,107 @@ export async function verifyStoredSnapshot(
   }
 }
 
+/** A channel-neutral inbound message (email body, Slack post, form submission,
+ *  Drive drop, …). `externalId` is the provider's own id — it drives dedup so a
+ *  webhook re-delivery (n8n retry) does not create duplicate documents. */
+export interface InboundMessage {
+  channel: Module2SourceChannel;
+  externalId: string;
+  from?: string;
+  subject?: string;
+  body?: string;
+  receivedAt?: string;
+  attachments?: { name: string; mimeType: string; buf: Buffer }[];
+  jobId?: RecordId;
+}
+
+/** Has a message with this storage ref already been ingested for the org?
+ *  The body document is stored with `storageRef = \`${channel}:${externalId}\``
+ *  (the DOCUMENTS `Drive_URL` field in Airtable), so a match means the whole
+ *  message — body + attachments — was already processed. */
+async function findByExternalId(ctx: OrgCtx, storageRef: string): Promise<boolean> {
+  if (airtableEnabled()) {
+    const recs = await core
+      .list(ctx.orgSlug, "DOCUMENTS", {
+        filterByFormula: `{Drive_URL}='${storageRef.replace(/'/g, "")}'`,
+        maxRecords: 1,
+      })
+      .catch(() => [] as unknown[]);
+    return recs.length > 0;
+  }
+  const existing = await prisma.platDocument.findFirst({
+    where: { orgId: ctx.orgId, storageRef },
+    select: { id: true },
+  });
+  return !!existing;
+}
+
+/** Ingest one inbound message through the Module 2 pipeline: register the body
+ *  as a DOCUMENTS record + route operational content into approval-gated
+ *  proposals, then register each attachment. Shared by the IMAP pull path
+ *  (`ingestUnreadEmails`) and the push webhook (`/api/platform/hooks`). Dedups
+ *  on `(channel, externalId)` so re-delivery is a no-op. */
+export async function ingestInboundMessage(
+  ctx: OrgCtx,
+  actorName: string,
+  msg: InboundMessage,
+): Promise<{ deduped: boolean; documents: number; proposals: number }> {
+  const storageRef = `${msg.channel}:${msg.externalId}`;
+  if (await findByExternalId(ctx, storageRef)) {
+    return { deduped: true, documents: 0, proposals: 0 };
+  }
+
+  const job = await resolveJobContext(ctx, msg.jobId);
+  const subject = msg.subject || `${msg.channel} message ${msg.externalId}`;
+  const body = msg.body || "";
+  const sender = msg.from || "";
+  const topicHint = sender ? sender.split("@")[0] : msg.channel;
+  let documents = 0;
+  let proposals = 0;
+
+  const bodyDoc = await createDocumentRecord(ctx, actorName, {
+    jobId: job.jobId,
+    jobCode: job.jobCode,
+    rawName: `${subject}.txt`,
+    title: subject,
+    textContent: [subject, body].filter(Boolean).join("\n\n"),
+    docType: "correspondence",
+    classification: "correspondence",
+    mimeType: "text/plain",
+    sizeBytes: Buffer.byteLength(body, "utf8"),
+    channel: msg.channel,
+    storageProvider: msg.channel,
+    storageRef,
+    sourceRef: msg.externalId,
+    topicHint,
+    dateHint: msg.receivedAt,
+    sender,
+    kind: "generated",
+  });
+  documents += bodyDoc.id ? 1 : 0;
+  proposals += bodyDoc.proposals;
+
+  for (const attachment of msg.attachments ?? []) {
+    const created = await ingestDocumentFile(ctx, actorName, {
+      jobId: job.jobId,
+      jobCode: job.jobCode,
+      title: attachment.name,
+      name: attachment.name,
+      mimeType: attachment.mimeType,
+      buf: attachment.buf,
+      channel: msg.channel,
+      topicHint,
+      dateHint: msg.receivedAt,
+      sender,
+      sourceRef: msg.externalId,
+    });
+    documents += created.id ? 1 : 0;
+    proposals += created.proposals;
+  }
+
+  return { deduped: false, documents, proposals };
+}
+
 export async function ingestUnreadEmails(
   ctx: OrgCtx,
   actorName: string,
@@ -662,49 +763,20 @@ export async function ingestUnreadEmails(
 
   try {
     const emails = await reader.fetchUnread();
-    const job = await resolveJobContext(ctx, opts.jobId);
 
     for (const email of emails) {
-      const bodyId = await createDocumentRecord(ctx, actorName, {
-        jobId: job.jobId,
-        jobCode: job.jobCode,
-        rawName: `${email.subject}.txt`,
-        title: email.subject,
-        textContent: [email.subject, email.body].filter(Boolean).join("\n\n"),
-        docType: "correspondence",
-        classification: "correspondence",
-        mimeType: "text/plain",
-        sizeBytes: Buffer.byteLength(email.body || "", "utf8"),
+      const res = await ingestInboundMessage(ctx, actorName, {
         channel: "email",
-        storageProvider: "email",
-        storageRef: `email:${email.id}`,
-        sourceRef: email.id,
-        topicHint: email.from.split("@")[0],
-        dateHint: email.receivedAt,
-        sender: email.from,
-        kind: "generated",
+        externalId: email.id,
+        from: email.from,
+        subject: email.subject,
+        body: email.body,
+        receivedAt: email.receivedAt,
+        attachments: email.attachments,
+        jobId: opts.jobId,
       });
-      documents += bodyId.id ? 1 : 0;
-      proposals += bodyId.proposals;
-
-      for (const attachment of email.attachments) {
-        const created = await ingestDocumentFile(ctx, actorName, {
-          jobId: job.jobId,
-          jobCode: job.jobCode,
-          title: attachment.name,
-          name: attachment.name,
-          mimeType: attachment.mimeType,
-          buf: attachment.buf,
-          channel: "email",
-          topicHint: email.from.split("@")[0],
-          dateHint: email.receivedAt,
-          sender: email.from,
-          sourceRef: email.id,
-        });
-        documents += created.id ? 1 : 0;
-        proposals += created.proposals;
-      }
-
+      documents += res.documents;
+      proposals += res.proposals;
       await reader.markProcessed(email.id);
       processed += 1;
     }
