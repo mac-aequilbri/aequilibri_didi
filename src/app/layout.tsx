@@ -21,7 +21,7 @@ export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const withAuth = clerkEnabled();
-  // The UC1/UC2/UC3 cross-app switcher is an internal operator aid, not a
+  // The UC1/UC3 cross-app switcher is an internal operator aid, not a
   // customer-facing control — only platform operators see it. (Demo mode with
   // no auth configured is operator-by-definition, so it stays visible there.)
   const showAppSwitcher = await isPlatformAdmin();
@@ -38,10 +38,6 @@ export default async function RootLayout({
                 <Link href="/uc1" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)] whitespace-nowrap shrink-0">
                   <span className="uc-badge uc1-badge mr-1">UC1</span>
                   <span className="hidden sm:inline">Roofing</span>
-                </Link>
-                <Link href="/app/dulong-downs" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)] whitespace-nowrap shrink-0">
-                  <span className="uc-badge uc2-badge mr-1">UC2</span>
-                  <span className="hidden sm:inline">Didi</span>
                 </Link>
                 <Link href="/app" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)] whitespace-nowrap shrink-0">
                   <span className="uc-badge uc3-badge mr-1">UC3</span>

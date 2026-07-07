@@ -5,6 +5,13 @@ Status: **alignment draft** for team review. Describes the agreed module structu
 itself change any code. Where current behaviour is inferred from code review rather than confirmed,
 it is marked ← ASSUMPTION.
 
+> **Update:** the central recommendation below — *converge UC2 and UC3 onto a shared Project
+> Intelligence core with an `engagementType` discriminator* — has since been **implemented**. The
+> standalone UC2 module and `Uc2*` tables are gone; "Dulong Downs / Didi" is now the
+> `dulong-downs` organisation (a `long_project` engagement) on the shared `(platform)/app/[org]/…`
+> core, with the data layer on Airtable as system of record. References below to UC2/UC3 as
+> *separate* implementations describe the pre-convergence state and are retained for history.
+
 ---
 
 ## 1. The model: 8 modules (5 in the value chain, 3 across it)

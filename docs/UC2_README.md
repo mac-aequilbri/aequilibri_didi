@@ -1,6 +1,15 @@
 # UC2 — Dulong Downs / Didi AI Construction Coordinator
 
-Developer reference for the UC2 module of the `aequilibri-next` application.
+> **⚠️ Historical — the standalone UC2 module no longer exists.**
+> UC2 has been folded into the shared **platform core**. "Dulong Downs / Didi" is now
+> simply the `dulong-downs` **organisation** on the platform, reached through the UC3
+> org picker at `/app` (there is no separate `/uc2` route or `Uc2*` database models
+> anymore). Its "single long-project" dashboard comes generically from
+> `engagementType: long_project`, not from any UC2-specific code.
+> For current behaviour see [`PLATFORM_ARCHITECTURE.md`](PLATFORM_ARCHITECTURE.md) and the
+> `src/app/(platform)/app/[org]/…` routes; the data layer is Airtable (system of record)
+> when `AIRTABLE_MIGRATION`/`AIRTABLE_CONTROL_BASE_ID` are set, else Postgres.
+> Everything below describes the retired standalone module and is kept for history only.
 
 ---
 
