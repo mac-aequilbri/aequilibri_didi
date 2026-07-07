@@ -5,10 +5,17 @@
 
 import Link from "next/link";
 import { OrgLogo } from "@/components/OrgLogo";
-import { controlEnabled, listControlTeam, listOrgRegistry } from "@/lib/airtable/control";
+import {
+  controlEnabled,
+  listControlTeam,
+  listOrgRegistry,
+  readMetricsSnapshot,
+  type OrgMetricsSnapshot,
+} from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { getAuthEmail, isPlatformAdmin } from "@/lib/platform/org-context";
 import { deleteOrgAction } from "./actions";
+import { ClientCardMetrics } from "./ClientCardMetrics";
 import { DeleteClientButton } from "./DeleteClientButton";
 
 export const dynamic = "force-dynamic";
@@ -27,10 +34,11 @@ interface OrgCard {
   name: string;
   vertical: string;
   defaultEngagementType: string;
-  /** Null when the count isn't cheaply available (control/Airtable mode). */
-  jobs: number | null;
   emails: string[];
   logo?: string;
+  /** Cached picker highlights (control mode only); the card renders these
+   *  instantly and refreshes in the background if stale. */
+  metrics: OrgMetricsSnapshot | null;
 }
 
 export default async function OrgPickerPage({
@@ -51,9 +59,9 @@ export default async function OrgPickerPage({
         name: e.name,
         vertical: e.vertical,
         defaultEngagementType: e.defaultEngagementType,
-        jobs: null,
         emails: (await listControlTeam(e.slug)).map((m) => m.email.toLowerCase()),
         logo: logoFromSettings(e.settings),
+        metrics: readMetricsSnapshot(e.settings),
       })),
     );
     orgs.sort((a, b) => a.name.localeCompare(b.name));
@@ -62,7 +70,6 @@ export default async function OrgPickerPage({
       where: { isActive: true },
       orderBy: { name: "asc" },
       include: {
-        _count: { select: { jobs: true } },
         cfgTeam: { where: { isActive: true }, select: { email: true } },
       },
     });
@@ -71,9 +78,9 @@ export default async function OrgPickerPage({
       name: o.name,
       vertical: o.vertical,
       defaultEngagementType: o.defaultEngagementType,
-      jobs: o._count.jobs,
       emails: o.cfgTeam.map((m) => m.email.toLowerCase()),
       logo: logoFromSettings(o.settings),
+      metrics: null, // Postgres mode has no control-base cache; card fetches live.
     }));
   }
   const visible = email === null ? orgs : orgs.filter((o) => o.emails.includes(email));
@@ -153,11 +160,7 @@ export default async function OrgPickerPage({
                   <p className="text-sm text-neutral-600 capitalize mt-0.5">
                     {org.vertical} · {org.defaultEngagementType.replace("_", " ")}
                   </p>
-                  <p className="text-xs text-neutral-500 mt-2">
-                    {org.jobs !== null
-                      ? `${org.jobs} job${org.jobs === 1 ? "" : "s"}`
-                      : "Open workspace"}
-                  </p>
+                  <ClientCardMetrics slug={org.slug} cached={org.metrics} />
                 </div>
               </Link>
               {canProvision && (

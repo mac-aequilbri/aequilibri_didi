@@ -56,6 +56,60 @@ export interface ControlTeamMember {
   isActive: boolean;
 }
 
+/** Denormalised picker highlights, cached on the org's registry row so the org
+ *  picker can render counts without touching each customer base. `at` is the
+ *  ISO time the snapshot was computed — the picker treats it as stale past a
+ *  TTL and refreshes it in the background. Lives inside the Settings JSON
+ *  (alongside branding) so no control-base schema change is needed. */
+export interface OrgMetricsSnapshot {
+  projects: number;
+  openActions: number;
+  overdueActions: number;
+  pendingApprovals: number;
+  at: string;
+}
+
+/** Pull the cached metrics snapshot out of a registry row's Settings JSON, or
+ *  null when absent/malformed. */
+export function readMetricsSnapshot(settingsRaw: string): OrgMetricsSnapshot | null {
+  try {
+    const m = (JSON.parse(settingsRaw) as { metrics?: Partial<OrgMetricsSnapshot> })?.metrics;
+    if (!m || typeof m.at !== "string") return null;
+    return {
+      projects: N(m.projects),
+      openActions: N(m.openActions),
+      overdueActions: N(m.overdueActions),
+      pendingApprovals: N(m.pendingApprovals),
+      at: m.at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Write (merge) the metrics snapshot into an org's Settings JSON, preserving
+ *  the rest of the config (branding, assistant, features). No-op when control
+ *  is off or the slug is unknown. Best-effort by design — a picker refresh must
+ *  never fail because the cache write failed. */
+export async function saveMetricsSnapshot(slug: string, metrics: OrgMetricsSnapshot): Promise<void> {
+  const base = controlBaseId();
+  if (!base) return;
+  const recs = await listRecords(base, REGISTRY, {
+    filterByFormula: `{Slug}='${formulaSafe(slug)}'`,
+    maxRecords: 1,
+  });
+  if (!recs.length) return;
+  let settings: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(S(recs[0].fields["Settings"]) || "{}");
+    if (parsed && typeof parsed === "object") settings = parsed as Record<string, unknown>;
+  } catch {
+    /* start from empty on malformed settings rather than clobbering nothing */
+  }
+  settings.metrics = metrics;
+  await updateRecords(base, REGISTRY, [{ id: recs[0].id, fields: { Settings: JSON.stringify(settings) } }]);
+}
+
 /** Single-quote is the only char that breaks an Airtable formula string; org
  *  slugs can't contain it (SLUG_RE), but strip it defensively for emails. */
 const formulaSafe = (v: string): string => v.replace(/'/g, "");
