@@ -9,24 +9,22 @@ services:
     #                    devDependencies, but the build toolchain (prisma CLI,
     #                    typescript, tailwind) lives there. Without this the
     #                    build fails with "prisma: not found" / missing types.
-    #   migrate-deploy.mjs → tracked migrations via `prisma migrate deploy`,
-    #                    self-healing for the db-push-era transition states
-    #                    (unbaselined DB, objects that already exist, recorded
-    #                    failed migrations). Unknown failures still fail the
-    #                    build. db push is no longer used in production.
-    #   seed.mjs       → DEMO data; only runs when SEED_DEMO_DATA=true (below).
-    #                    Remove that env var the moment real customer data
-    #                    lives in this database.
-    buildCommand: npm ci --include=dev && npx prisma generate && node scripts/migrate-deploy.mjs && node prisma/seed.mjs && npm run build
+    #   prisma generate → generates the Prisma client from schema.prisma. No DB
+    #                    connection needed; the client is required at build time
+    #                    because platform code still imports it (the Postgres
+    #                    branches are just never taken when AIRTABLE_MIGRATION is
+    #                    on). No `migrate deploy` / seed: Airtable is the system
+    #                    of record, so there is no Postgres to migrate or seed.
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
     startCommand: npm start
     healthCheckPath: /
 
     envVars:
-      # ── Database (auto-wired from the managed Postgres below) ──────────────
-      - key: DATABASE_URL
-        fromDatabase:
-          name: aequilibri-next-db
-          property: connectionString
+      # ── Data layer ─────────────────────────────────────────────────────────
+      # Airtable is the system of record (AIRTABLE_MIGRATION=true below). Every
+      # platform data source routes to Airtable; the Postgres/Prisma branches are
+      # never taken, so no DATABASE_URL / managed Postgres is provisioned. Legacy
+      # UC1 routes still talk to Prisma directly — they are not deployed here.
 
       # ── AI (required for live responses; omit for demo mode) ───────────────
       - key: ANTHROPIC_API_KEY
@@ -72,9 +70,6 @@ services:
       # (comma-separated emails).
       - key: PLATFORM_ADMIN_EMAILS
         sync: false
-      # Demo seed opt-in — remove once real customer data exists.
-      - key: SEED_DEMO_DATA
-        value: "true"
 
       # ── Automation (scheduler endpoint token; omit to disable) ─────────────
       - key: CRON_SECRET
@@ -131,11 +126,3 @@ services:
         value: production
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
-
-# Managed PostgreSQL — provisioned together with the web service when you
-# create the Blueprint. (Renamed from the Django blueprint's `aequilibri-db`
-# so the two don't collide if both briefly exist.)
-databases:
-  - name: aequilibri-next-db
-    plan: free              # free Postgres expires after ~30 days — upgrade for production
-    region: singapore
