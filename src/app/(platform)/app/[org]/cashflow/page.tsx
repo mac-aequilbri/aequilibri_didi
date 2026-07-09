@@ -1,9 +1,10 @@
 // Cashflow — Spec 12 per-transaction ledger per job. The period projected-vs-
 // actual chart is derived from the transactions (Paid = actual, else projected).
 
+import { CashflowLedger } from "./CashflowLedger";
 import { TrendChart } from "@/components/charts";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
-import { currency } from "@/lib/format";
+import { comparePeriods, formatPeriodLabel } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadCashflowJobs } from "@/lib/platform/cashflowSource";
 import { orgPath } from "@/lib/platform/paths";
@@ -32,15 +33,15 @@ export default async function CashflowPage({ params }: { params: Promise<{ org: 
             byPeriod.set(c.period, agg);
           }
         }
-        const periods = [...byPeriod.entries()].sort(([a], [b]) => a.localeCompare(b));
+        const periods = [...byPeriod.entries()].sort(([a], [b]) => comparePeriods(a, b));
         if (periods.length < 2) return null;
         return (
           <section className="ae-card p-5 mb-6">
             <h2 className="font-semibold mb-3">Organisation cashflow</h2>
             <TrendChart
               series={[
-                { name: "Projected", points: periods.map(([label, v]) => ({ label, value: v.projected })) },
-                { name: "Actual", points: periods.map(([label, v]) => ({ label, value: v.actual })) },
+                { name: "Projected", points: periods.map(([label, v]) => ({ label: formatPeriodLabel(label), value: v.projected })) },
+                { name: "Actual", points: periods.map(([label, v]) => ({ label: formatPeriodLabel(label), value: v.actual })) },
               ]}
               formatValue={(n) => `$${Math.round(n / 1000)}k`}
             />
@@ -55,37 +56,7 @@ export default async function CashflowPage({ params }: { params: Promise<{ org: 
             <h2 className="font-semibold mb-3">
               {job.name} <span className="text-xs font-normal text-neutral-500">{job.code}</span>
             </h2>
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-neutral-500">
-                <tr>
-                  <th className="py-1 pr-2">Period</th>
-                  <th className="py-1 pr-2">Entry</th>
-                  <th className="py-1 pr-2">Type</th>
-                  <th className="py-1 pr-2 text-right">Amount</th>
-                  <th className="py-1 pr-2 text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {job.conCashflows.map((c) => (
-                  <tr key={c.id} className="border-t border-neutral-100">
-                    <td className="py-2 pr-2 font-medium whitespace-nowrap">{c.period}</td>
-                    <td className="py-2 pr-2">
-                      <span className="font-medium">{c.name || c.sourceOrPayee || "(entry)"}</span>
-                      {(c.sourceOrPayee || c.category || c.notes) && (
-                        <span className="block text-xs text-neutral-500">
-                          {[c.sourceOrPayee, c.category, c.notes].filter(Boolean).join(" · ")}
-                        </span>
-                      )}
-                    </td>
-                    <td className={`py-2 pr-2 text-xs font-semibold ${c.type === "In" ? "text-emerald-700" : "text-neutral-600"}`}>
-                      {c.type}
-                    </td>
-                    <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(c.amount)}</td>
-                    <td className="py-2 pr-2 text-right text-xs whitespace-nowrap">{c.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <CashflowLedger txns={job.conCashflows} />
           </section>
         );
       })}

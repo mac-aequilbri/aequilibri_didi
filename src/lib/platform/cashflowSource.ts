@@ -9,7 +9,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
-import { toNum } from "@/lib/format";
+import { comparePeriods, toNum } from "@/lib/format";
 import type { OrgCtx } from "./types";
 
 export type CashflowType = "In" | "Out";
@@ -87,7 +87,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobCashflow[]> {
     };
     (byJob.get(key) ?? byJob.set(key, []).get(key)!).push(row);
   }
-  for (const rows of byJob.values()) rows.sort((a, b) => a.period.localeCompare(b.period));
+  for (const rows of byJob.values()) rows.sort((a, b) => comparePeriods(a.period, b.period));
   return jobRows.map((j) => ({
     id: j.id,
     name: str(j["Job_Name"]) || "(job)",
