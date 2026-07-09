@@ -6,6 +6,8 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { resolveActionStatus } from "./actionStatus";
+import { loadActionStatusMap } from "./configSource";
 import type { OrgCtx } from "./types";
 
 export interface OrgHighlights {
@@ -20,15 +22,18 @@ function str(v: unknown): string {
 }
 
 async function fromAirtable(ctx: OrgCtx): Promise<OrgHighlights> {
-  const [jobRows, actionRows, pendingRows] = await Promise.all([
+  const [jobRows, actionRows, pendingRows, statusMap] = await Promise.all([
     core.list(ctx.orgSlug, "JOBS", { maxRecords: 200 }),
     core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
+    loadActionStatusMap(ctx),
   ]);
 
-  const openSet = new Set(["Open", "In Progress"]);
   const now = Date.now();
-  const openActionRows = actionRows.filter((a) => openSet.has(str(a["Status"])));
+  const openActionRows = actionRows.filter((a) => {
+    const res = resolveActionStatus(str(a["Status"]), statusMap);
+    return res.clean && (res.canonical === "open" || res.canonical === "in_progress");
+  });
   const overdueActions = openActionRows.filter((a) => {
     const d = str(a["Due_Date"]);
     return d && new Date(d).getTime() < now;

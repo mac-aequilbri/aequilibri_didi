@@ -8,6 +8,8 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { getActiveRules } from "@/services/platform/learning";
 import { toNum } from "@/lib/format";
+import { resolveActionStatus } from "./actionStatus";
+import { loadActionStatusMap } from "./configSource";
 import { loadJobsList } from "./jobsListSource";
 import { budgetActuals, loadProcurement } from "./procurementSource";
 import type { OrgCtx } from "./types";
@@ -53,7 +55,7 @@ function num(v: unknown): number {
 }
 
 async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
-  const [jobList, rules, actionRows, budgetRows, cashflowRows, logRows, pendingRows, procRows] = await Promise.all([
+  const [jobList, rules, actionRows, budgetRows, cashflowRows, logRows, pendingRows, procRows, statusMap] = await Promise.all([
     loadJobsList(ctx),
     getActiveRules(ctx),
     core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
@@ -62,12 +64,17 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     core.list(ctx.orgSlug, "EXECUTION_LOG", { maxRecords: 200 }),
     core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
     loadProcurement(ctx),
+    loadActionStatusMap(ctx),
   ]);
   const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual
 
-  const openSet = new Set(["Open", "In Progress"]);
+  // Same status definition as the Action Hub (actionsSource): only cleanly-
+  // resolved Open/In Progress rows count; unrecognised values aren't guessed in.
   const now = Date.now();
-  const openActionRows = actionRows.filter((a) => openSet.has(str(a["Status"])));
+  const openActionRows = actionRows.filter((a) => {
+    const res = resolveActionStatus(str(a["Status"]), statusMap);
+    return res.clean && (res.canonical === "open" || res.canonical === "in_progress");
+  });
   const overdueActions = openActionRows.filter((a) => {
     const d = str(a["Due_Date"]);
     return d && new Date(d).getTime() < now;

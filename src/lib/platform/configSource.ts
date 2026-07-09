@@ -12,6 +12,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { STATUS_MAP_REF_TYPE, isAppStatus, normStatusKey, type AppStatus } from "./actionStatus";
 import type { OrgCtx } from "./types";
 
 export interface RefOption {
@@ -67,6 +68,34 @@ export async function loadVendorOptions(ctx: OrgCtx): Promise<RefOption[]> {
     .filter((o) => o.name)
     .sort((a, b) => a.name.localeCompare(b.name));
   return out.length ? out : vendorsFromPostgres(ctx);
+}
+
+/** Per-org raw→canonical action-status mappings (the cleanup translation layer
+ *  for migrated bases with a messy Status vocabulary). Keyed by normalised raw
+ *  value. An empty map is valid — it just means nothing's been mapped yet, so
+ *  unknown statuses stay flagged rather than silently miscounted. */
+async function statusMapFromPostgres(ctx: OrgCtx): Promise<Map<string, AppStatus>> {
+  const rows = await prisma.platCfgReference.findMany({
+    where: { orgId: ctx.orgId, type: STATUS_MAP_REF_TYPE, isActive: true },
+  });
+  const map = new Map<string, AppStatus>();
+  for (const r of rows) {
+    const value = str(r.value);
+    if (isAppStatus(value)) map.set(r.code || normStatusKey(r.name), value);
+  }
+  return map;
+}
+
+export async function loadActionStatusMap(ctx: OrgCtx): Promise<Map<string, AppStatus>> {
+  if (!airtableEnabled()) return statusMapFromPostgres(ctx);
+  const rows = await core.list(ctx.orgSlug, "PLAT_CFG_REFERENCE", { maxRecords: 500 });
+  const map = new Map<string, AppStatus>();
+  for (const r of rows) {
+    if (str(r["Ref_Type"]) !== STATUS_MAP_REF_TYPE || r["Is_Active"] === false) continue;
+    const value = str(r["Value"]);
+    if (isAppStatus(value)) map.set(str(r["Code"]) || normStatusKey(str(r["Name"])), value);
+  }
+  return map;
 }
 
 export function loadTradeOptions(ctx: OrgCtx): Promise<RefOption[]> {

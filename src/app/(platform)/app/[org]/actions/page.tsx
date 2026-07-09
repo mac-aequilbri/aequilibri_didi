@@ -2,14 +2,13 @@
 
 import { EmptyState, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
+import { ACTION_STATUSES } from "@/lib/platform/actionStatus";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadActions } from "@/lib/platform/actionsSource";
 import { orgPath } from "@/lib/platform/paths";
-import { updateActionStatus } from "./actions";
+import { saveStatusMapping, updateActionStatus } from "./actions";
 
 export const dynamic = "force-dynamic";
-
-const STATUSES = ["open", "in_progress", "done", "deferred"] as const;
 
 export default async function ActionsPage({
   params,
@@ -21,10 +20,10 @@ export default async function ActionsPage({
   const ctx = await requireOrgCtx((await params).org);
   const { status } = await searchParams;
 
-  const { items, metrics } = await loadActions(ctx, status);
+  const { items, metrics, unmapped } = await loadActions(ctx, status);
   const openCount = metrics.open;
   const overdueCount = metrics.overdue;
-  const fromChat = metrics.fromChat;
+  const needsMapping = metrics.needsMapping;
 
   const isOverdue = (a: (typeof items)[number]) =>
     a.dueDate && a.dueDate < new Date() && (a.status === "open" || a.status === "in_progress");
@@ -36,17 +35,64 @@ export default async function ActionsPage({
         subtitle="One queue for actions from every source — manual, assistant, meeting minutes."
         actions={[{ href: orgPath(ctx.orgSlug, "/actions/new"), label: "+ New action" }]}
       />
-      <div className="grid gap-4 sm:grid-cols-3 mb-6">
+      <div className="grid gap-4 sm:grid-cols-4 mb-6">
         <MetricCard value={openCount} label="Open / in progress" />
         <MetricCard value={overdueCount} label="Overdue" />
-        <MetricCard value={fromChat} label="Created from chat" />
+        <MetricCard value={needsMapping} label="Needs mapping" />
+        <MetricCard value={items.length} label={status ? `Showing ${status.replace("_", " ")}` : "Total shown"} />
       </div>
 
-      <div className="mb-4 flex gap-2 text-xs">
+      {unmapped.length > 0 && (
+        <details className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4" open>
+          <summary className="cursor-pointer text-sm font-semibold text-amber-800">
+            {needsMapping} action{needsMapping === 1 ? "" : "s"} have an unrecognised status ·{" "}
+            {unmapped.length} value{unmapped.length === 1 ? "" : "s"} to map
+          </summary>
+          <p className="mt-2 text-xs text-amber-700">
+            These come from a migrated base whose status vocabulary doesn&apos;t match the platform&apos;s.
+            Map each value to a canonical status — the original data is left untouched, and once mapped
+            it counts correctly everywhere.
+          </p>
+          <div className="mt-3 space-y-2">
+            {unmapped.map((u) => (
+              <form
+                key={u.raw}
+                action={saveStatusMapping}
+                className="flex flex-wrap items-center gap-2 text-xs"
+              >
+                <input type="hidden" name="org" value={ctx.orgSlug} />
+                <input type="hidden" name="raw" value={u.raw} />
+                <span className="min-w-[10rem] flex-1 truncate">
+                  <span className="font-medium">{u.raw}</span>
+                  <span className="ml-1 text-amber-600">×{u.count}</span>
+                </span>
+                <span className="text-amber-700">map to</span>
+                <select
+                  name="status"
+                  defaultValue={u.suggestion ?? "open"}
+                  className="rounded border border-amber-300 bg-white px-1.5 py-1"
+                >
+                  {ACTION_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s.replace("_", " ")}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" className="btn-ae text-xs">
+                  Map
+                </button>
+                {u.suggestion && <span className="text-amber-500">suggested: {u.suggestion.replace("_", " ")}</span>}
+              </form>
+            ))}
+          </div>
+        </details>
+      )}
+
+      <div className="mb-4 flex flex-wrap gap-2 text-xs">
         <a href={orgPath(ctx.orgSlug, "/actions")} className={!status ? "btn-ae" : "btn-ae-outline"}>
           All
         </a>
-        {STATUSES.map((s) => (
+        {ACTION_STATUSES.map((s) => (
           <a
             key={s}
             href={orgPath(ctx.orgSlug, `/actions?status=${s}`)}
@@ -55,6 +101,14 @@ export default async function ActionsPage({
             {s.replace("_", " ")}
           </a>
         ))}
+        {needsMapping > 0 && (
+          <a
+            href={orgPath(ctx.orgSlug, "/actions?status=unmapped")}
+            className={status === "unmapped" ? "btn-ae" : "btn-ae-outline"}
+          >
+            unmapped
+          </a>
+        )}
       </div>
 
       <div className="ae-card p-5">
@@ -100,13 +154,22 @@ export default async function ActionsPage({
                   <form action={updateActionStatus} className="flex items-center gap-1">
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={a.id} />
-                    <StatusBadge status={isOverdue(a) ? "overdue" : a.status} />
+                    {a.needsMapping ? (
+                      <span
+                        className="status-badge status-draft"
+                        title="Unrecognised status — map it in the panel above"
+                      >
+                        {a.rawStatus || "(blank)"} · unmapped
+                      </span>
+                    ) : (
+                      <StatusBadge status={isOverdue(a) ? "overdue" : a.status} />
+                    )}
                     <select
                       name="status"
-                      defaultValue={a.status}
+                      defaultValue={a.needsMapping ? "open" : a.status}
                       className="text-xs border border-neutral-200 rounded px-1 py-0.5"
                     >
-                      {STATUSES.map((s) => (
+                      {ACTION_STATUSES.map((s) => (
                         <option key={s} value={s}>
                           {s.replace("_", " ")}
                         </option>

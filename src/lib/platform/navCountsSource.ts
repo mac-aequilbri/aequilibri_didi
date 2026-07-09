@@ -8,6 +8,8 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
+import { resolveActionStatus } from "./actionStatus";
+import { loadActionStatusMap } from "./configSource";
 import type { OrgCtx } from "./types";
 
 const ZERO_COUNTS: NavCounts = {
@@ -31,18 +33,22 @@ function str(v: unknown): string {
 }
 
 async function fromAirtable(ctx: OrgCtx, f: Record<string, boolean>): Promise<NavCounts> {
-  const [jobRows, actionRows, riskRows, variationRows, pendingRows] = await Promise.all([
+  const [jobRows, actionRows, riskRows, variationRows, pendingRows, statusMap] = await Promise.all([
     core.list(ctx.orgSlug, "JOBS", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
     f.risks ? core.list(ctx.orgSlug, "RISKS", { maxRecords: 1000 }) : Promise.resolve([]),
     f.variations ? core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 1000 }) : Promise.resolve([]),
     core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
+    loadActionStatusMap(ctx),
   ]);
-  const openAction = new Set(["Open", "In Progress"]);
+  const isOpenAction = (a: (typeof actionRows)[number]) => {
+    const res = resolveActionStatus(str(a["Status"]), statusMap);
+    return res.clean && (res.canonical === "open" || res.canonical === "in_progress");
+  };
   return {
     jobs: jobRows.length,
     pending: pendingRows.filter((p) => (str(p["Status"]) || "").toLowerCase() === "proposed").length,
-    openActions: actionRows.filter((a) => openAction.has(str(a["Status"]))).length,
+    openActions: actionRows.filter(isOpenAction).length,
     openRisks: riskRows.filter((r) => (str(r["Status"]) || "open") === "open").length,
     openVariations: variationRows.filter((v) => (str(v["Status"]) || "submitted") === "submitted").length,
   };
