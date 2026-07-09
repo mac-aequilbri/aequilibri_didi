@@ -4,7 +4,8 @@
 // Weekly Reports) behind uniform view models. Detail pages and AI-generate
 // actions are not source-switched yet — only the list reads.
 
-import { airtableEnabled, core } from "@/lib/airtable";
+import { AirtableError, airtableEnabled, core } from "@/lib/airtable";
+import type { CoreRow, CoreTableName, ListOptions } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import type { OrgCtx } from "./types";
@@ -14,6 +15,32 @@ function str(v: unknown): string {
 }
 function num(v: unknown): number {
   return typeof v === "number" ? v : 0;
+}
+
+/** List a Domain-tier table, tolerating bases that simply don't have it.
+ *  Domain extension tables (Variations, Quotes, Meeting Minutes, Weekly
+ *  Reports, Room Matrix) are optional: a base supplied via the existing-base-id
+ *  onboarding path can predate them. Airtable answers a request for a
+ *  non-existent table with 403 INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND, so a
+ *  missing table must render an empty list rather than crash the page. Genuine
+ *  auth failures (bad/expired PAT → 401) still propagate. */
+async function listOptional(
+  orgSlug: string,
+  table: CoreTableName,
+  opts: ListOptions = {},
+): Promise<CoreRow[]> {
+  try {
+    return await core.list(orgSlug, table, opts);
+  } catch (err) {
+    if (
+      err instanceof AirtableError &&
+      (err.status === 403 || err.status === 404) &&
+      /MODEL_NOT_FOUND|NOT_FOUND/.test(err.body)
+    ) {
+      return [];
+    }
+    throw err;
+  }
 }
 
 // ── Variation Orders ───────────────────────────────────────────────────
@@ -46,7 +73,7 @@ export async function loadVariations(ctx: OrgCtx): Promise<VariationView[]> {
       status: v.status,
     }));
   }
-  const rows = await core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 200 });
+  const rows = await listOptional(ctx.orgSlug, "VARIATIONS", { maxRecords: 200 });
   return rows.map((r) => ({
     id: r.id,
     refNumber: str(r["Ref_Number"]),
@@ -88,7 +115,7 @@ export async function loadRoomMatrix(ctx: OrgCtx): Promise<RoomView[]> {
       finishes: r.finishes,
     }));
   }
-  const rows = await core.list(ctx.orgSlug, "ROOM_MATRIX", { maxRecords: 200 });
+  const rows = await listOptional(ctx.orgSlug, "ROOM_MATRIX", { maxRecords: 200 });
   return rows.map((r) => ({
     id: r.id,
     name: str(r["Room_Name"]) || "(unnamed room)",
@@ -126,7 +153,7 @@ export async function loadMeetingMinutes(ctx: OrgCtx): Promise<MinutesView[]> {
       status: m.status,
     }));
   }
-  const rows = await core.list(ctx.orgSlug, "MEETING_MINUTES", { maxRecords: 200 });
+  const rows = await listOptional(ctx.orgSlug, "MEETING_MINUTES", { maxRecords: 200 });
   return rows.map((r) => ({
     id: r.id,
     title: str(r["Title"]),
@@ -167,7 +194,7 @@ export async function loadQuotes(ctx: OrgCtx): Promise<QuoteView[]> {
       status: q.status,
     }));
   }
-  const rows = await core.list(ctx.orgSlug, "QUOTES", { maxRecords: 200 });
+  const rows = await listOptional(ctx.orgSlug, "QUOTES", { maxRecords: 200 });
   return rows.map((r) => ({
     id: r.id,
     refNumber: str(r["Ref_Number"]),
@@ -208,7 +235,7 @@ export async function loadWeeklyReports(ctx: OrgCtx): Promise<ReportView[]> {
       status: r.status,
     }));
   }
-  const rows = await core.list(ctx.orgSlug, "WEEKLY_REPORTS", { maxRecords: 200 });
+  const rows = await listOptional(ctx.orgSlug, "WEEKLY_REPORTS", { maxRecords: 200 });
   return rows.map((r) => ({
     id: r.id,
     title: str(r["Title"]),
