@@ -40,6 +40,18 @@ function SendButton() {
   );
 }
 
+/** Close-session submit — shows in-flight state while the multi-step review
+ *  (save note → capture correction → run hypothesis engine → end session)
+ *  runs, so the click clearly registers instead of appearing to do nothing. */
+function CloseSessionButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={pending} className="btn-ae disabled:opacity-60">
+      {pending ? "Saving review & closing…" : "Close session & start fresh"}
+    </button>
+  );
+}
+
 /** Circular avatar so each turn is clearly attributed — a strong "this is a chat" cue. */
 function Avatar({ label, kind }: { label: string; kind: "assistant" | "user" }) {
   return (
@@ -106,7 +118,10 @@ export default function AssistantClient({
   const scrollRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const reviewDetailsRef = useRef<HTMLDetailsElement>(null);
+  const reviewFormRef = useRef<HTMLFormElement>(null);
   const [inFlight, setInFlight] = useState<string | null>(null);
+  const [closedNotice, setClosedNotice] = useState(false);
 
   // Clear the optimistic in-flight bubble once the server round-trip brings
   // new messages. Done during render (not an effect) per React's "adjust state
@@ -117,10 +132,33 @@ export default function AssistantClient({
     setInFlight(null);
   }
 
+  // A new sessionId means the close-session review just completed: getOrCreateSession
+  // handed us a fresh session (the old one is stamped ended). Confirm it explicitly
+  // — otherwise the thread just silently empties. Adjust-state-during-render per
+  // React guidance; the initial mount doesn't trip it (prev seeded to sessionId).
+  const [prevSession, setPrevSession] = useState(sessionId);
+  if (sessionId !== prevSession) {
+    setPrevSession(sessionId);
+    setClosedNotice(true);
+    setInFlight(null);
+  }
+
   // Scrolling to the newest message is a real DOM side-effect, so it stays here.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages.length]);
+
+  // On a fresh session, collapse and clear the review panel so it's ready for
+  // next time, and auto-dismiss the confirmation after a few seconds.
+  useEffect(() => {
+    reviewDetailsRef.current?.removeAttribute("open");
+    reviewFormRef.current?.reset();
+  }, [sessionId]);
+  useEffect(() => {
+    if (!closedNotice) return;
+    const t = setTimeout(() => setClosedNotice(false), 6000);
+    return () => clearTimeout(t);
+  }, [closedNotice]);
 
   // Drop a starter prompt into the composer and send it straight away.
   const sendSuggestion = (text: string) => {
@@ -135,6 +173,23 @@ export default function AssistantClient({
 
   return (
     <div className="flex flex-col h-[calc(100vh-9rem)]">
+      {closedNotice && (
+        <div
+          role="status"
+          className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+        >
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+          Session saved and reviewed — started a fresh conversation.
+          <button
+            type="button"
+            onClick={() => setClosedNotice(false)}
+            aria-label="Dismiss"
+            className="ml-auto text-emerald-600 hover:text-emerald-800"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {/* Chat window: a bordered surface with a titled header + tinted thread so
           it reads unmistakably as a conversation, not a content panel. */}
       <div className="flex-1 min-h-0 flex flex-col ae-card overflow-hidden">
@@ -288,9 +343,9 @@ export default function AssistantClient({
         />
         <SendButton />
       </form>
-      <details className="mt-2 ae-card p-4">
+      <details ref={reviewDetailsRef} className="mt-2 ae-card p-4">
         <summary className="cursor-pointer text-sm font-medium">End session with review</summary>
-        <form action={closeSessionReviewAction} className="mt-3 space-y-3">
+        <form ref={reviewFormRef} action={closeSessionReviewAction} className="mt-3 space-y-3">
           <input type="hidden" name="org" value={orgSlug} />
           <input type="hidden" name="sessionId" value={sessionId} />
           {defaultJobId != null && <input type="hidden" name="jobId" value={defaultJobId} />}
@@ -342,9 +397,7 @@ export default function AssistantClient({
               className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
-          <button type="submit" className="btn-ae">
-            Close session &amp; start fresh
-          </button>
+          <CloseSessionButton />
         </form>
       </details>
       <details className="mt-3 ae-card p-4">
