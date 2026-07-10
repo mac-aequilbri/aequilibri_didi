@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate, toNum } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -36,7 +37,12 @@ export default async function ProcurementPage({ params }: { params: Promise<{ or
             {orders.map((o) => (
               <tr key={o.id} className="border-t border-neutral-100">
                 <td className="py-2 pr-2">
-                  <span className="font-medium">{o.item}</span>
+                  <Link
+                    href={orgPath(ctx.orgSlug, `/procurement/${o.id}`)}
+                    className="font-medium hover:text-[var(--ae-space)] hover:underline"
+                  >
+                    {o.item}
+                  </Link>
                   <span className="ml-1 text-xs text-neutral-400">{o.jobCode}</span>
                 </td>
                 <td className="py-2 pr-2 text-xs">{o.vendorName || "—"}</td>

@@ -10,6 +10,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { comparePeriods, toNum } from "@/lib/format";
+import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
 export type CashflowType = "In" | "Out";
@@ -99,4 +100,29 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobCashflow[]> {
 /** Load cashflow grouped by job from whichever backend is active. */
 export function loadCashflowJobs(ctx: OrgCtx): Promise<JobCashflow[]> {
   return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+}
+
+/** Form-ready values for a single cashflow entry's edit page. The per-transaction
+ *  ledger is the Airtable (Spec 12) shape; the legacy Postgres branch splits each
+ *  period row into synthetic non-editable txns, so editing is Airtable-only here
+ *  (null otherwise). */
+export async function loadCashflowDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
+  if (!airtableEnabled()) return null;
+  let c: Record<string, unknown> | null = null;
+  try {
+    c = await core.get(ctx.orgSlug, "CASHFLOWS", id);
+  } catch {
+    return null;
+  }
+  if (!c) return null;
+  return {
+    name: str(c["Cashflow_Name"]),
+    period: str(c["Period"]),
+    type: asType(c["Type"]),
+    amount: num(c["Amount"]),
+    sourceOrPayee: str(c["Source_Or_Payee"]),
+    category: str(c["Category"]),
+    status: str(c["Status"]) || "Forecast",
+    notes: str(c["Notes"]),
+  };
 }

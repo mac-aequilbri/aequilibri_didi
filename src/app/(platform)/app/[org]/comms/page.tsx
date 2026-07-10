@@ -2,6 +2,7 @@
 // required communications: who gets told what, by when. Pending items sort to
 // the top by due date; overdue items are flagged.
 
+import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { loadComms } from "@/lib/platform/commsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -38,7 +39,12 @@ export default async function CommsPage({ params }: { params: Promise<{ org: str
             {comms.map((c) => (
               <tr key={c.id} className="border-t border-neutral-100 align-top">
                 <td className="py-2 pr-2">
-                  <span className="font-medium">{c.topic}</span>
+                  <Link
+                    href={orgPath(ctx.orgSlug, `/comms/${c.id}`)}
+                    className="font-medium hover:text-[var(--ae-space)] hover:underline"
+                  >
+                    {c.topic}
+                  </Link>
                   {c.notes && <span className="block text-xs text-neutral-500">{c.notes}</span>}
                 </td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{c.messageType}</td>

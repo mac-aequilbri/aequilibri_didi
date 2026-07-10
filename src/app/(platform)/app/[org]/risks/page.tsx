@@ -1,5 +1,6 @@
 // Risk register with likelihood × impact scoring and batch escalation.
 
+import Link from "next/link";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { priorityBandForRiskScore } from "@/lib/platform/projectIntelligence";
@@ -46,7 +47,12 @@ export default async function RisksPage({ params }: { params: Promise<{ org: str
               return (
                 <tr key={r.id} className="border-t border-neutral-100 align-top">
                   <td className="py-2 pr-2">
-                    <span className="font-medium">{r.description}</span>
+                    <Link
+                      href={orgPath(ctx.orgSlug, `/risks/${r.id}`)}
+                      className="font-medium hover:text-[var(--ae-space)] hover:underline"
+                    >
+                      {r.description}
+                    </Link>
                     {r.jobCode && <span className="ml-1 text-xs text-neutral-400">{r.jobCode}</span>}
                     {r.createdByAi && (
                       <span className="ml-1 text-[0.65rem] px-1 rounded bg-violet-100 text-violet-700">AI</span>

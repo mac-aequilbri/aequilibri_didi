@@ -6,6 +6,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { dateInput, type EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
 export interface DecisionView {
@@ -72,4 +73,33 @@ async function fromAirtable(ctx: OrgCtx): Promise<DecisionView[]> {
 /** Load decisions for the page from whichever backend is active. */
 export function loadDecisions(ctx: OrgCtx): Promise<DecisionView[]> {
   return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+}
+
+/** Form-ready values for a single decision's edit page. Fields are limited to
+ *  those the Airtable field map persists (description, rationale, status,
+ *  decidedAt). Null if the record isn't in this org. */
+export async function loadDecisionDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
+  if (airtableEnabled()) {
+    let r: Record<string, unknown> | null = null;
+    try {
+      r = await core.get(ctx.orgSlug, "DECISIONS", id);
+    } catch {
+      return null;
+    }
+    if (!r) return null;
+    return {
+      description: str(r["Decision_Description"]) || str(r["Decision_Name"]),
+      rationale: str(r["Rationale"]),
+      status: AIR_TO_APP_DECISION_STATUS[str(r["Status"])] ?? "proposed",
+      decidedAt: dateInput(str(r["Decision_Date"]) || null),
+    };
+  }
+  const d = await prisma.platDecision.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
+  if (!d) return null;
+  return {
+    description: d.description,
+    rationale: d.rationale,
+    status: d.status,
+    decidedAt: dateInput(d.decidedAt),
+  };
 }

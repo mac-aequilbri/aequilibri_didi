@@ -1,6 +1,7 @@
 // Decisions (core tier) — confirmed knowledge; assistant drafts arrive as
 // "proposed" with sourceType=chat and are confirmed or superseded here.
 
+import Link from "next/link";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -36,7 +37,12 @@ export default async function DecisionsPage({ params }: { params: Promise<{ org:
             {decisions.map((d) => (
               <tr key={d.id} className="border-t border-neutral-100 align-top">
                 <td className="py-2 pr-2">
-                  <span className="font-medium">{d.description}</span>
+                  <Link
+                    href={orgPath(ctx.orgSlug, `/decisions/${d.id}`)}
+                    className="font-medium hover:text-[var(--ae-space)] hover:underline"
+                  >
+                    {d.description}
+                  </Link>
                   {d.jobCode && <span className="ml-1 text-xs text-neutral-400">{d.jobCode}</span>}
                   {d.rationale && (
                     <span className="block text-xs text-neutral-500">{d.rationale}</span>

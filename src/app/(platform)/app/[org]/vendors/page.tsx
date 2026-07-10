@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadVendors } from "@/lib/platform/vendorsSource";
@@ -30,7 +31,14 @@ export default async function VendorsPage({ params }: { params: Promise<{ org: s
           <tbody>
             {vendors.map((v) => (
               <tr key={v.id} className="border-t border-neutral-100">
-                <td className="py-2 pr-2 font-medium">{v.name}</td>
+                <td className="py-2 pr-2 font-medium">
+                  <Link
+                    href={orgPath(ctx.orgSlug, `/vendors/${v.id}`)}
+                    className="hover:text-[var(--ae-space)] hover:underline"
+                  >
+                    {v.name}
+                  </Link>
+                </td>
                 <td className="py-2 pr-2 text-xs">{v.category || "—"}</td>
                 <td className="py-2 pr-2 text-xs">
                   {v.contactName || "—"}

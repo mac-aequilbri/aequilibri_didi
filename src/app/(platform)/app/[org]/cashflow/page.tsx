@@ -56,7 +56,7 @@ export default async function CashflowPage({ params }: { params: Promise<{ org: 
             <h2 className="font-semibold mb-3">
               {job.name} <span className="text-xs font-normal text-neutral-500">{job.code}</span>
             </h2>
-            <CashflowLedger txns={job.conCashflows} />
+            <CashflowLedger txns={job.conCashflows} orgSlug={ctx.orgSlug} />
           </section>
         );
       })}

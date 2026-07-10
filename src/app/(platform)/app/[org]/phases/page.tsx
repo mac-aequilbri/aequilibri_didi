@@ -2,9 +2,11 @@
 // evidence (photos/documents) attaches per phase; the AI review suggests a
 // completion % from it, and a human approves/adjusts/dismisses the suggestion.
 
+import Link from "next/link";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadPhaseJobs } from "@/lib/platform/phasesSource";
+import { orgPath } from "@/lib/platform/paths";
 import { parseSuggestion } from "@/services/platform/construction/phaseEvidence";
 import {
   applyEvidenceSuggestionAction,
@@ -84,7 +86,14 @@ export default async function PhasesPage({
                   const suggestion = parseSuggestion(p.evidenceSuggestion);
                   return [
                     <tr key={p.id} className="border-t border-neutral-100">
-                      <td className="py-2 pr-2 font-medium">{p.name}</td>
+                      <td className="py-2 pr-2 font-medium">
+                        <Link
+                          href={orgPath(ctx.orgSlug, `/phases/${p.id}`)}
+                          className="hover:text-[var(--ae-space)] hover:underline"
+                        >
+                          {p.name}
+                        </Link>
+                      </td>
                       <td className="py-2 pr-2 w-1/3">
                         <div className="h-2 rounded bg-neutral-100 overflow-hidden">
                           <div

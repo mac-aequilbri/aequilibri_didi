@@ -8,6 +8,7 @@ import { AirtableError, airtableEnabled, core } from "@/lib/airtable";
 import type { CoreRow, CoreTableName, ListOptions } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
 function str(v: unknown): string {
@@ -125,6 +126,34 @@ export async function loadRoomMatrix(ctx: OrgCtx): Promise<RoomView[]> {
     ceilingHeight: str(r["Ceiling_Height"]),
     finishes: "{}", // no finishes field in the Airtable table yet
   }));
+}
+
+/** Form-ready values for a single room's edit page. Limited to the fields the
+ *  Airtable ROOM_MATRIX table is known to carry (Finishes has no field yet). */
+export async function loadRoomDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
+  if (airtableEnabled()) {
+    let r: CoreRow | null = null;
+    try {
+      r = await core.get(ctx.orgSlug, "ROOM_MATRIX", id);
+    } catch {
+      return null;
+    }
+    if (!r) return null;
+    return {
+      name: str(r["Room_Name"]),
+      zone: str(r["Zone"]),
+      areaSqm: typeof r["Area_Sqm"] === "number" ? (r["Area_Sqm"] as number) : "",
+      ceilingHeight: str(r["Ceiling_Height"]),
+    };
+  }
+  const r = await prisma.platConRoomMatrix.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
+  if (!r) return null;
+  return {
+    name: r.name,
+    zone: r.zone,
+    areaSqm: r.areaSqm ?? "",
+    ceilingHeight: r.ceilingHeight,
+  };
 }
 
 // ── Meeting Minutes ────────────────────────────────────────────────────

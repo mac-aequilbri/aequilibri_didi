@@ -5,6 +5,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
 export interface RiskView {
@@ -72,4 +73,35 @@ async function fromAirtable(ctx: OrgCtx): Promise<RiskView[]> {
 /** Load the risk register from whichever backend is active. */
 export function loadRisks(ctx: OrgCtx): Promise<RiskView[]> {
   return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+}
+
+/** Form-ready values for a single risk's edit page. Null if not in this org. */
+export async function loadRiskDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
+  if (airtableEnabled()) {
+    let r: Record<string, unknown> | null = null;
+    try {
+      r = await core.get(ctx.orgSlug, "RISKS", id);
+    } catch {
+      return null;
+    }
+    if (!r) return null;
+    return {
+      description: str(r["Risk"]),
+      likelihood: num(r["Likelihood"]) || 3,
+      impact: num(r["Impact"]) || 3,
+      mitigation: str(r["Mitigation"]),
+      owner: str(r["Owner"]),
+      status: str(r["Status"]) || "open",
+    };
+  }
+  const r = await prisma.platConRisk.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
+  if (!r) return null;
+  return {
+    description: r.description,
+    likelihood: r.likelihood,
+    impact: r.impact,
+    mitigation: r.mitigation,
+    owner: r.owner,
+    status: r.status,
+  };
 }

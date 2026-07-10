@@ -4,6 +4,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
 export interface VendorView {
@@ -52,4 +53,39 @@ async function fromAirtable(ctx: OrgCtx): Promise<VendorView[]> {
 /** Load the vendor registry from whichever backend is active. */
 export function loadVendors(ctx: OrgCtx): Promise<VendorView[]> {
   return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+}
+
+/** Form-ready values for a single vendor's edit page. Null if not in this org. */
+export async function loadVendorDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
+  if (airtableEnabled()) {
+    let r: Record<string, unknown> | null = null;
+    try {
+      r = await core.get(ctx.orgSlug, "VENDORS", id);
+    } catch {
+      return null;
+    }
+    if (!r) return null;
+    return {
+      name: str(r["Vendor_Name"]),
+      category: str(r["Category"]),
+      contactName: str(r["Contact_Name"]),
+      contactEmail: str(r["Contact_Email"]),
+      contactPhone: str(r["Contact_Phone"]),
+      rating: typeof r["Rating"] === "number" ? (r["Rating"] as number) : 5,
+      notes: str(r["Notes"]),
+      isActive: r["Is_Active"] === true,
+    };
+  }
+  const v = await prisma.platConVendor.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
+  if (!v) return null;
+  return {
+    name: v.name,
+    category: v.category,
+    contactName: v.contactName,
+    contactEmail: v.contactEmail,
+    contactPhone: v.contactPhone,
+    rating: v.rating,
+    notes: v.notes,
+    isActive: v.isActive,
+  };
 }

@@ -11,6 +11,7 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { mulMoney, sumMoney } from "./money";
+import { dateInput, type EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
 export interface ProcurementView {
@@ -98,4 +99,36 @@ async function fromAirtable(ctx: OrgCtx): Promise<ProcurementView[]> {
 /** Load procurement orders from whichever backend is active. */
 export function loadProcurement(ctx: OrgCtx): Promise<ProcurementView[]> {
   return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+}
+
+/** Form-ready values for a single order's edit page. Status is lower-cased to
+ *  match the app's select vocabulary (a migrated base may store "Ordered").
+ *  Fields are limited to what the Airtable field map persists (Supplier /
+ *  Budget_Category links and the Total_Cost formula are not editable here). */
+export async function loadProcurementDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
+  if (airtableEnabled()) {
+    let r: Record<string, unknown> | null = null;
+    try {
+      r = await core.get(ctx.orgSlug, "PROCUREMENT", id);
+    } catch {
+      return null;
+    }
+    if (!r) return null;
+    return {
+      item: str(r["Procurement_Name"]),
+      qty: num(r["Quantity"]) || 1,
+      unitPrice: num(r["Unit_Cost"]),
+      status: (str(r["Status"]) || "pending").toLowerCase(),
+      dueDate: dateInput(str(r["Expected_Date"]) || null),
+    };
+  }
+  const o = await prisma.platConProcurement.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
+  if (!o) return null;
+  return {
+    item: o.item,
+    qty: o.qty,
+    unitPrice: toNum(o.unitPrice),
+    status: (o.status || "pending").toLowerCase(),
+    dueDate: dateInput(o.dueDate),
+  };
 }

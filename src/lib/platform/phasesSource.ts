@@ -6,6 +6,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
 export interface PhaseView {
@@ -93,4 +94,32 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobPhases[]> {
 /** Load phases grouped by job from whichever backend is active. */
 export function loadPhaseJobs(ctx: OrgCtx): Promise<JobPhases[]> {
   return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+}
+
+/** Form-ready values for a single phase's edit page. Null if not in this org.
+ *  (Evidence / AI-suggestion workflow stays on the list page.) */
+export async function loadPhaseDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
+  if (airtableEnabled()) {
+    let p: Record<string, unknown> | null = null;
+    try {
+      p = await core.get(ctx.orgSlug, "PHASES", id);
+    } catch {
+      return null;
+    }
+    if (!p) return null;
+    return {
+      name: str(p["Phase_Name"]),
+      status: str(p["Status"]) || "pending",
+      completionPct: num(p["Completion_Pct"]),
+      sortOrder: num(p["Sort_Order"]),
+    };
+  }
+  const p = await prisma.platConPhase.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
+  if (!p) return null;
+  return {
+    name: p.name,
+    status: p.status,
+    completionPct: p.completionPct,
+    sortOrder: p.sortOrder,
+  };
 }

@@ -4,12 +4,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { comparePeriods, currency } from "@/lib/format";
 import type { CashflowTxn } from "@/lib/platform/cashflowSource";
+import { orgPath } from "@/lib/platform/paths";
 
 const PAGE_SIZE = 12;
 
-export function CashflowLedger({ txns }: { txns: CashflowTxn[] }) {
+// Legacy Postgres rows carry synthetic split ids ("<id>-f"/"-a") that map to no
+// editable record — only real ids (Airtable rec…, plain Postgres numerics) link.
+const isEditable = (id: string) => !id.includes("-");
+
+export function CashflowLedger({ txns, orgSlug }: { txns: CashflowTxn[]; orgSlug: string }) {
   const rows = [...txns].sort((a, b) => comparePeriods(a.period, b.period));
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const [page, setPage] = useState(0);
@@ -34,7 +40,16 @@ export function CashflowLedger({ txns }: { txns: CashflowTxn[] }) {
             <tr key={c.id} className="border-t border-neutral-100">
               <td className="py-2 pr-2 font-medium whitespace-nowrap">{c.period || "—"}</td>
               <td className="py-2 pr-2">
-                <span className="font-medium">{c.name || c.sourceOrPayee || "(entry)"}</span>
+                {isEditable(c.id) ? (
+                  <Link
+                    href={orgPath(orgSlug, `/cashflow/${c.id}`)}
+                    className="font-medium hover:text-[var(--ae-space)] hover:underline"
+                  >
+                    {c.name || c.sourceOrPayee || "(entry)"}
+                  </Link>
+                ) : (
+                  <span className="font-medium">{c.name || c.sourceOrPayee || "(entry)"}</span>
+                )}
                 {(c.sourceOrPayee || c.category || c.notes) && (
                   <span className="block text-xs text-neutral-500">
                     {[c.sourceOrPayee, c.category, c.notes].filter(Boolean).join(" · ")}

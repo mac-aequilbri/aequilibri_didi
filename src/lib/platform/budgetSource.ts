@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { sumMoney } from "./money";
 import { budgetActuals, loadProcurement } from "./procurementSource";
+import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
 export interface BudgetLineView {
@@ -106,4 +107,38 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobBudget[]> {
 /** Load budget grouped by job from whichever backend is active. */
 export function loadBudgetJobs(ctx: OrgCtx): Promise<JobBudget[]> {
   return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+}
+
+/** Form-ready values for a single budget line's edit page. `actualAmount` is a
+ *  derived rollup (from confirmed procurement) — shown read-only. Null if the
+ *  line isn't in this org. */
+export async function loadBudgetLineDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
+  if (airtableEnabled()) {
+    let b: Record<string, unknown> | null = null;
+    try {
+      b = await core.get(ctx.orgSlug, "BUDGET", id);
+    } catch {
+      return null;
+    }
+    if (!b) return null;
+    const actuals = budgetActuals(await loadProcurement(ctx));
+    return {
+      category: str(b["Budget_Category"]),
+      description: str(b["Notes"]),
+      budgetAmount: num(b["Estimated"]),
+      forecast: num(b["Forecast"]),
+      rag: str(b["RAG"]),
+      actualAmount: actuals.get(id) ?? 0,
+    };
+  }
+  const b = await prisma.platConBudgetLine.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
+  if (!b) return null;
+  return {
+    category: b.category,
+    description: b.description,
+    budgetAmount: toNum(b.budgetAmount),
+    forecast: toNum(b.budgetAmount),
+    rag: "",
+    actualAmount: toNum(b.actualAmount),
+  };
 }

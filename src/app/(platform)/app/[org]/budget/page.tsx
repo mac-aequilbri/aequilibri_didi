@@ -1,6 +1,7 @@
 // Budget per job: Estimated / Forecast / Actual / Variance. Actual is derived
 // from confirmed PROCUREMENT (Invoiced/Paid), not hand-entered.
 
+import Link from "next/link";
 import { BarsCompare } from "@/components/charts";
 import { EmptyState, MetricCard, PageHeader } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
@@ -87,7 +88,12 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
                   return (
                     <tr key={b.id} className="border-t border-neutral-100">
                       <td className="py-2 pr-2">
-                        <span className="font-medium">{b.category || b.description}</span>
+                        <Link
+                          href={orgPath(ctx.orgSlug, `/budget/${b.id}`)}
+                          className="font-medium hover:text-[var(--ae-space)] hover:underline"
+                        >
+                          {b.category || b.description}
+                        </Link>
                         {(b.description || b.phaseName) && (
                           <span className="block text-xs text-neutral-500">
                             {b.description}
