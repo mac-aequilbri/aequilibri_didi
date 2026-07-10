@@ -14,6 +14,24 @@
 
 import { createRecords, deleteRecords, getRecord, listRecords, updateRecords } from "./client";
 import { airtableEnabled } from "./config";
+import { TtlCache } from "./ttlCache";
+
+// Registry rows and team lists are read on every page, action, and data-layer
+// call (resolveBaseId goes through getOrgRegistry), but change rarely. A short
+// TTL plus explicit invalidation on the write paths below removes an Airtable
+// round-trip from nearly every request. Staleness bound: edits made directly
+// in the Airtable UI (or by another server instance) take up to TTL_MS to be
+// seen — including member deactivation, which is why the TTL stays short.
+const CONTROL_TTL_MS = 60_000;
+const orgRegistryCache = new TtlCache<OrgRegistryEntry | null>(CONTROL_TTL_MS);
+const teamCache = new TtlCache<ControlTeamMember[]>(CONTROL_TTL_MS);
+
+/** Drop cached control-plane rows for a slug. Exported for out-of-band writes
+ *  (e.g. provisioning scripts) — control.ts's own write paths call it already. */
+export function invalidateControlCache(slug: string): void {
+  orgRegistryCache.delete(slug);
+  teamCache.delete(slug);
+}
 
 const S = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
 const N = (v: unknown): number => (typeof v === "number" ? v : Number(v) || 0);
@@ -110,6 +128,7 @@ export async function saveMetricsSnapshot(slug: string, metrics: OrgMetricsSnaps
   }
   settings.metrics = metrics;
   await updateRecords(base, REGISTRY, [{ id: recs[0].id, fields: { Settings: JSON.stringify(settings) } }]);
+  orgRegistryCache.delete(slug);
 }
 
 /** Single-quote is the only char that breaks an Airtable formula string; org
@@ -141,15 +160,18 @@ export async function listOrgRegistry(): Promise<OrgRegistryEntry[]> {
   return recs.map(toEntry).filter((e) => e.slug && e.isActive);
 }
 
-/** Resolve one org by slug, or null. */
+/** Resolve one org by slug, or null. Cached (TTL + write invalidation) — this
+ *  sits under resolveBaseId and requireOrgCtx, i.e. under everything. */
 export async function getOrgRegistry(slug: string): Promise<OrgRegistryEntry | null> {
   const base = controlBaseId();
   if (!base) return null;
-  const recs = await listRecords(base, REGISTRY, {
-    filterByFormula: `{Slug}='${formulaSafe(slug)}'`,
-    maxRecords: 1,
+  return orgRegistryCache.get(slug, async () => {
+    const recs = await listRecords(base, REGISTRY, {
+      filterByFormula: `{Slug}='${formulaSafe(slug)}'`,
+      maxRecords: 1,
+    });
+    return recs.length ? toEntry(recs[0]) : null;
   });
-  return recs.length ? toEntry(recs[0]) : null;
 }
 
 /** Per-org webhook signing secret (inbound integration HMAC), kept in the
@@ -185,6 +207,7 @@ export async function setOrgWebhookSecret(slug: string, secret: string): Promise
   }
   settings.webhookSecret = secret;
   await updateRecords(base, REGISTRY, [{ id: recs[0].id, fields: { Settings: JSON.stringify(settings) } }]);
+  orgRegistryCache.delete(slug);
 }
 
 // ── PLAT_CONNECTIONS — per-org integration registry (Module 2 push channels) ──
@@ -458,10 +481,15 @@ export async function setOutboxStatus(recordId: string, status: string): Promise
   await updateRecords(base, OUTBOX, [{ id: recordId, fields: { Status: status } }]);
 }
 
-/** Active team members for an org (auth). */
+/** Active team members for an org (auth). Cached — member changes made outside
+ *  the app (Airtable UI) take up to CONTROL_TTL_MS to apply. */
 export async function listControlTeam(slug: string): Promise<ControlTeamMember[]> {
   const base = controlBaseId();
   if (!base) return [];
+  return teamCache.get(slug, () => fetchControlTeam(base, slug));
+}
+
+async function fetchControlTeam(base: string, slug: string): Promise<ControlTeamMember[]> {
   const recs = await listRecords(base, TEAM, {
     filterByFormula: `{Org_Slug}='${formulaSafe(slug)}'`,
     maxRecords: 500,
@@ -519,6 +547,7 @@ export async function createOrgRegistry(entry: NewOrgRegistry): Promise<number> 
       Is_Active: true,
     },
   ]);
+  invalidateControlCache(entry.slug);
   return orgId;
 }
 
@@ -553,6 +582,7 @@ export async function deleteOrgFromRegistry(slug: string): Promise<OrgDeletionRe
   });
   if (regRecs.length) await deleteRecords(base, REGISTRY, regRecs.map((r) => r.id));
   if (teamRecs.length) await deleteRecords(base, TEAM, teamRecs.map((r) => r.id));
+  invalidateControlCache(slug);
   return { slug, baseId, removedRegistry: regRecs.length, removedTeam: teamRecs.length };
 }
 
@@ -572,6 +602,7 @@ export async function createControlTeamMember(
       Is_Active: true,
     },
   ]);
+  teamCache.delete(slug);
 }
 
 // ── Template registry ───────────────────────────────────────────────────────
