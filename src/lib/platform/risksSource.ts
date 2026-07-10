@@ -51,7 +51,8 @@ async function fromPostgres(ctx: OrgCtx): Promise<RiskView[]> {
 }
 
 async function fromAirtable(ctx: OrgCtx): Promise<RiskView[]> {
-  const rows = await core.list(ctx.orgSlug, "RISKS", { maxRecords: 200 });
+  // Opts shared with loadJobsList + loadOrgHighlights — one cached read/render.
+  const rows = await core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 });
   return rows.map((r) => {
     const esc = str(r["Escalated_At"]);
     return {

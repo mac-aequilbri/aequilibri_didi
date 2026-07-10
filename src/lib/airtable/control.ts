@@ -76,21 +76,26 @@ export interface ControlTeamMember {
   isActive: boolean;
 }
 
-/** Denormalised picker highlights, cached on the org's registry row so the org
- *  picker can render counts without touching each customer base. `at` is the
- *  ISO time the snapshot was computed — the picker treats it as stale past a
- *  TTL and refreshes it in the background. Lives inside the Settings JSON
- *  (alongside branding) so no control-base schema change is needed. */
+/** Denormalised org counts, cached on the org's registry row so the org picker
+ *  cards AND the sidebar nav badges can render without touching each customer
+ *  base. `at` is the ISO time the snapshot was computed — readers treat it as
+ *  stale past their own TTL and refresh it (write-through). Lives inside the
+ *  Settings JSON (alongside branding) so no control-base schema change is
+ *  needed. */
 export interface OrgMetricsSnapshot {
   projects: number;
   openActions: number;
   overdueActions: number;
   pendingApprovals: number;
+  openRisks: number;
+  openVariations: number;
   at: string;
 }
 
 /** Pull the cached metrics snapshot out of a registry row's Settings JSON, or
- *  null when absent/malformed. */
+ *  null when absent/malformed. Fields a pre-upgrade writer didn't know about
+ *  read as 0 — bounded by the reader's TTL, since every current writer stores
+ *  the full shape. */
 export function readMetricsSnapshot(settingsRaw: string): OrgMetricsSnapshot | null {
   try {
     const m = (JSON.parse(settingsRaw) as { metrics?: Partial<OrgMetricsSnapshot> })?.metrics;
@@ -100,6 +105,8 @@ export function readMetricsSnapshot(settingsRaw: string): OrgMetricsSnapshot | n
       openActions: N(m.openActions),
       overdueActions: N(m.overdueActions),
       pendingApprovals: N(m.pendingApprovals),
+      openRisks: N(m.openRisks),
+      openVariations: N(m.openVariations),
       at: m.at,
     };
   } catch {

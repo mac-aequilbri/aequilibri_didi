@@ -75,3 +75,21 @@ async function fromAirtable(ctx: OrgCtx): Promise<PendingWriteView[]> {
 export function loadPendingWrites(ctx: OrgCtx): Promise<PendingWriteView[]> {
   return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
 }
+
+/** Server-side filter for the approval queue's "awaiting decision" rows. Every
+ *  proposed-count reader (nav badges, dashboard, coordination) must use these
+ *  exact list opts so one render shares a single cached request. */
+export const PROPOSED_PENDING_FORMULA = `LOWER({Status})='proposed'`;
+
+/** Count of proposed (awaiting-approval) pending writes only — cheaper than
+ *  loadPendingWrites when the resolved history isn't needed. */
+export async function loadProposedPendingCount(ctx: OrgCtx): Promise<number> {
+  if (!airtableEnabled()) {
+    return prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed" } });
+  }
+  const rows = await core.list(ctx.orgSlug, "PENDING_WRITES", {
+    maxRecords: 1000,
+    filterByFormula: PROPOSED_PENDING_FORMULA,
+  });
+  return rows.length;
+}

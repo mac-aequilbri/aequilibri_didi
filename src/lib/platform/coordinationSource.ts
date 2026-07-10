@@ -1,7 +1,7 @@
 import { orgPath } from "@/lib/platform/paths";
 import { loadActions } from "./actionsSource";
 import { loadComms } from "./commsSource";
-import { loadPendingWrites } from "./pendingWritesSource";
+import { loadProposedPendingCount } from "./pendingWritesSource";
 import {
   comparePriority,
   priorityBandForActionDueDate,
@@ -21,10 +21,12 @@ export interface CoordinationItemView {
 }
 
 export async function loadCoordinationQueue(ctx: OrgCtx): Promise<CoordinationItemView[]> {
-  const [actionsData, risks, pendingWrites, comms] = await Promise.all([
+  const [actionsData, risks, proposalCount, comms] = await Promise.all([
     loadActions(ctx),
     loadRisks(ctx),
-    loadPendingWrites(ctx),
+    // Proposed count only — shares one cached filtered read with the nav
+    // badges and dashboard instead of pulling the full approval history.
+    loadProposedPendingCount(ctx),
     loadComms(ctx),
   ]);
 
@@ -77,7 +79,6 @@ export async function loadCoordinationQueue(ctx: OrgCtx): Promise<CoordinationIt
     });
   }
 
-  const proposalCount = pendingWrites.filter((w) => w.status === "proposed").length;
   if (proposalCount > 0) {
     items.push({
       id: "approvals:pending",

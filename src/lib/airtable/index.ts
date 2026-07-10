@@ -10,7 +10,7 @@ export {
   airtableEnabled,
   resolveBaseId,
 } from "./config";
-export { AirtableError } from "./client";
+export { AirtableError, lastWriteAt } from "./client";
 export type { AirtableRecord, ListOptions, Codec, FieldDef } from "./types";
 export { CORE_SCHEMA, type CoreTableName } from "./schema.generated";
 export * as core from "./generic";

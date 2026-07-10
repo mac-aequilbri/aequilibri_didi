@@ -1,15 +1,26 @@
 // Sidebar badge counts — Postgres (default) or Airtable when the flag is on.
-// These run in the org layout on EVERY platform page, so they must not touch
-// Postgres in a Postgres-free deployment. Counts are derived by listing the
-// org's base tables and filtering in app (fine at these volumes).
+// These run in the org layout on EVERY platform page, so in Airtable mode they
+// must not fan out list-reads per render. The counts are served from the
+// OrgMetricsSnapshot cached on the org's registry row: that row is already
+// fetched (and TTL-cached in-process) by getOrgRegistry under resolveBaseId,
+// so a fresh snapshot costs ZERO extra Airtable requests. When the snapshot is
+// stale — or this process has written to the org's base since it was taken —
+// the counts are recomputed from filtered reads (loadOrgHighlights) and
+// written through, so the next minute of page renders is free again.
 //
 // pending (approval queue) is counted from PENDING_WRITES in Airtable mode.
 
-import { airtableEnabled, core } from "@/lib/airtable";
+import { airtableEnabled, lastWriteAt } from "@/lib/airtable";
+import {
+  controlEnabled,
+  getOrgRegistry,
+  readMetricsSnapshot,
+  saveMetricsSnapshot,
+  type OrgMetricsSnapshot,
+} from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
-import { resolveActionStatus } from "./actionStatus";
-import { loadActionStatusMap } from "./configSource";
+import { loadOrgHighlights } from "./orgHighlightsSource";
 import type { OrgCtx } from "./types";
 
 const ZERO_COUNTS: NavCounts = {
@@ -20,6 +31,11 @@ const ZERO_COUNTS: NavCounts = {
   openVariations: 0,
 };
 
+/** How long a registry-row snapshot may serve nav badges before the layout
+ *  recomputes it. Matches the 60s control-plane staleness contract; in-app
+ *  writes bypass it immediately via lastWriteAt. */
+const NAV_SNAPSHOT_TTL_MS = 60_000;
+
 export interface NavCounts {
   jobs: number;
   pending: number;
@@ -28,30 +44,41 @@ export interface NavCounts {
   openVariations: number;
 }
 
-function str(v: unknown): string {
-  return typeof v === "string" ? v : "";
+function toCounts(m: OrgMetricsSnapshot): NavCounts {
+  return {
+    jobs: m.projects,
+    pending: m.pendingApprovals,
+    openActions: m.openActions,
+    openRisks: m.openRisks,
+    openVariations: m.openVariations,
+  };
 }
 
-async function fromAirtable(ctx: OrgCtx, f: Record<string, boolean>): Promise<NavCounts> {
-  const [jobRows, actionRows, riskRows, variationRows, pendingRows, statusMap] = await Promise.all([
-    core.list(ctx.orgSlug, "JOBS", { maxRecords: 1000 }),
-    core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
-    f.risks ? core.list(ctx.orgSlug, "RISKS", { maxRecords: 1000 }) : Promise.resolve([]),
-    f.variations ? core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 1000 }) : Promise.resolve([]),
-    core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
-    loadActionStatusMap(ctx),
-  ]);
-  const isOpenAction = (a: (typeof actionRows)[number]) => {
-    const res = resolveActionStatus(str(a["Status"]), statusMap);
-    return res.clean && (res.canonical === "open" || res.canonical === "in_progress");
-  };
-  return {
-    jobs: jobRows.length,
-    pending: pendingRows.filter((p) => (str(p["Status"]) || "").toLowerCase() === "proposed").length,
-    openActions: actionRows.filter(isOpenAction).length,
-    openRisks: riskRows.filter((r) => (str(r["Status"]) || "open") === "open").length,
-    openVariations: variationRows.filter((v) => (str(v["Status"]) || "submitted") === "submitted").length,
-  };
+async function fromAirtable(ctx: OrgCtx): Promise<NavCounts> {
+  // 1) The cached-registry-row fast path: no Airtable reads at all.
+  if (controlEnabled()) {
+    const entry = await getOrgRegistry(ctx.orgSlug);
+    const snap = entry ? readMetricsSnapshot(entry.settings) : null;
+    if (snap) {
+      const takenAt = new Date(snap.at).getTime();
+      const age = Date.now() - takenAt;
+      const writtenSince = !!entry?.airtableBaseId && lastWriteAt(entry.airtableBaseId) > takenAt;
+      if (age >= 0 && age < NAV_SNAPSHOT_TTL_MS && !writtenSince) return toCounts(snap);
+    }
+  }
+
+  // 2) Stale/absent: recompute from the org's base (status filters pushed into
+  // filterByFormula; missing optional tables count 0) and write through so the
+  // picker and every subsequent page render share it.
+  const highlights = await loadOrgHighlights(ctx);
+  if (controlEnabled()) {
+    try {
+      await saveMetricsSnapshot(ctx.orgSlug, { ...highlights, at: new Date().toISOString() });
+    } catch {
+      /* the snapshot is an optimisation; never fail the render on a cache write */
+    }
+  }
+  return toCounts({ ...highlights, at: "" });
 }
 
 async function fromPostgres(ctx: OrgCtx, f: Record<string, boolean>): Promise<NavCounts> {
@@ -76,9 +103,10 @@ async function fromPostgres(ctx: OrgCtx, f: Record<string, boolean>): Promise<Na
  *  must NOT crash the whole shell — degrade to zeros so admin/diagnostic pages
  *  stay reachable to fix the underlying problem. */
 export async function loadNavCounts(ctx: OrgCtx): Promise<NavCounts> {
-  const f = ctx.config.features;
   try {
-    return await (airtableEnabled() ? fromAirtable(ctx, f) : fromPostgres(ctx, f));
+    return await (airtableEnabled()
+      ? fromAirtable(ctx)
+      : fromPostgres(ctx, ctx.config.features));
   } catch (err) {
     logger.warn("Nav counts unavailable — degrading to zeros", {
       org: ctx.orgSlug,

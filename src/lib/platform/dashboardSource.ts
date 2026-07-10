@@ -11,6 +11,7 @@ import { toNum } from "@/lib/format";
 import { resolveActionStatus } from "./actionStatus";
 import { loadActionStatusMap } from "./configSource";
 import { loadJobsList } from "./jobsListSource";
+import { PROPOSED_PENDING_FORMULA } from "./pendingWritesSource";
 import { budgetActuals, loadProcurement } from "./procurementSource";
 import type { OrgCtx } from "./types";
 
@@ -61,8 +62,11 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "BUDGET", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 1000 }),
-    core.list(ctx.orgSlug, "EXECUTION_LOG", { maxRecords: 200 }),
-    core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
+    // Only 8 log rows render; one page is plenty and avoids a pagination call.
+    core.list(ctx.orgSlug, "EXECUTION_LOG", { maxRecords: 100 }),
+    // Proposed-only, filtered server-side — the same opts as loadOrgHighlights'
+    // read, so a dashboard render shares one cached request with the nav badges.
+    core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000, filterByFormula: PROPOSED_PENDING_FORMULA }),
     loadProcurement(ctx),
     loadActionStatusMap(ctx),
   ]);
@@ -104,7 +108,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     })),
     openActions: openActionRows.length,
     overdueActions,
-    pendingProposals: pendingRows.filter((r) => str(r["Status"]).toLowerCase() === "proposed").length,
+    pendingProposals: pendingRows.length,
     budget: budgetRows.reduce((s, b) => s + num(b["Estimated"]), 0),
     actual: budgetRows.reduce((s, b) => s + (actualsByBudget.get(b.id) ?? 0), 0),
     recentLogs: logRows.slice(0, 8).map((l) => ({
