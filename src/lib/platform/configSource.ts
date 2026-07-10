@@ -13,6 +13,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { STATUS_MAP_REF_TYPE, isAppStatus, normStatusKey, type AppStatus } from "./actionStatus";
+import { listOptional } from "./optionalList";
 import type { OrgCtx } from "./types";
 
 export interface RefOption {
@@ -58,10 +59,14 @@ async function vendorsFromPostgres(ctx: OrgCtx): Promise<RefOption[]> {
   return rows.map((v) => ({ id: String(v.id), name: v.name }));
 }
 
-/** Active vendors for the procurement vendor picker. */
+/** Active vendors for the procurement vendor picker. VENDORS comes from the
+ *  vertical template clone — not the app-runtime top-up — so a base supplied
+ *  via the existing-base-id path can lack it entirely; read it as optional.
+ *  (PLAT_CFG_* don't need this: ensureAppRuntimeTables creates them on every
+ *  onboarding path, supplied bases included.) */
 export async function loadVendorOptions(ctx: OrgCtx): Promise<RefOption[]> {
   if (!airtableEnabled()) return vendorsFromPostgres(ctx);
-  const rows = await core.list(ctx.orgSlug, "VENDORS", { maxRecords: 500 });
+  const rows = await listOptional(ctx.orgSlug, "VENDORS", { maxRecords: 500 });
   const out = rows
     .filter((v) => v["Is_Active"] !== false)
     .map((v) => ({ id: v.id, name: str(v["Vendor_Name"]) }))
