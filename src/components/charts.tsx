@@ -85,11 +85,13 @@ export function TrendChart({
   const usable = series.filter((s) => s.points.length > 0);
   if (!usable.length) return null;
   const palette = [INK, ACCENT, "#0e7490"];
-  const width = 520;
+  const maxPoints = Math.max(...usable.map((s) => s.points.length));
+  // Grow the viewBox with the number of points so a busy series gets breathing
+  // room instead of cramming labels; the SVG still scales to fill its card.
+  const width = Math.max(520, maxPoints * 46);
   const pad = { top: 12, right: 12, bottom: 26, left: 38 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
-  const maxPoints = Math.max(...usable.map((s) => s.points.length));
   const values = usable.flatMap((s) => s.points.map((p) => p.value));
   const maxV = Math.max(...values, 1);
   const minV = Math.min(...values, 0);
@@ -99,7 +101,7 @@ export function TrendChart({
   const labels = usable.reduce((best, s) => (s.points.length > best.length ? s.points : best), usable[0].points);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full max-w-2xl" role="img" aria-label="Trend chart">
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label="Trend chart">
       {[minV, (minV + maxV) / 2, maxV].map((v, i) => (
         <g key={i}>
           <line x1={pad.left} x2={width - pad.right} y1={y(v)} y2={y(v)} stroke={MUTED} strokeWidth={1} />
