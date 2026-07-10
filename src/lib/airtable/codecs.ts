@@ -10,10 +10,13 @@
 
 import type { AirtableRecord, Codec, FieldDef } from "./types";
 
-/** Plain text / long text / number / boolean — passthrough with null-safety. */
+/** Plain text / long text / number / boolean — passthrough with null-safety.
+ *  `undefined` is omitted so a partial PATCH leaves the field untouched, but an
+ *  explicit `null` is preserved and sent to Airtable to CLEAR the cell (the only
+ *  way to erase a value; an empty string is dropped upstream by present()). */
 export function passthrough<T>(): Codec<T | null> {
   return {
-    toCell: (v) => v ?? undefined,
+    toCell: (v) => (v === undefined ? undefined : v),
     fromCell: (c) => (c === undefined ? null : (c as T)),
   };
 }

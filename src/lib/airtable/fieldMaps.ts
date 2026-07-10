@@ -123,8 +123,10 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       // Real ISSUES has no Phase field, and its risk link is named RISKS (not Linked_Risk).
       { air: "Issue_Type", from: "issueType", createDefault: "Open Action", to: S },
       { air: "RISKS", from: "riskId", to: LINK },
-      { air: "Due_Date", from: "dueDate", to: DATE },
-      { air: "Notes", from: "owner", to: (v) => (v ? `Owner: ${S(v)}` : undefined) },
+      // Editable from the action detail page: an explicit null (sent when the
+      // user clears the field) erases the cell; absent/"" leaves it untouched.
+      { air: "Due_Date", from: "dueDate", to: (v) => (v == null || S(v) === "" ? null : S(v)) },
+      { air: "Notes", from: "owner", to: (v) => (v == null || S(v).trim() === "" ? null : `Owner: ${S(v).trim()}`) },
     ],
   },
   comms: {

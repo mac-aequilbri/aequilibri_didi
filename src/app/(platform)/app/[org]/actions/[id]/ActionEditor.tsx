@@ -1,11 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { useFormStatus } from "react-dom";
-import Link from "next/link";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { ACTION_STATUSES } from "@/lib/platform/actionStatus";
 import type { ActionDetail } from "@/lib/platform/actionsSource";
-import { suggestActionEdits, updateActionDetail } from "../actions";
+import { updateActionDetail } from "../actions";
 
 const PRIORITIES = [
   { value: "P1", label: "P1 — urgent" },
@@ -15,12 +14,30 @@ const PRIORITIES = [
 
 const inputCls = "mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm";
 
-function SaveButton() {
-  const { pending } = useFormStatus();
+/** Shape returned by the AI-assist route handler. */
+interface AiResponse {
+  ok: boolean;
+  demo?: boolean;
+  error?: string;
+  note?: string;
+  suggestion?: {
+    title?: string;
+    detail?: string;
+    owner?: string;
+    dueDate?: string;
+    priority?: string;
+    status?: string;
+  };
+}
+
+function Spinner({ light }: { light?: boolean }) {
   return (
-    <button type="submit" className="btn-ae disabled:opacity-60" disabled={pending}>
-      {pending ? "Saving…" : "Save changes"}
-    </button>
+    <span
+      aria-hidden
+      className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 animate-spin ${
+        light ? "border-white/40 border-t-white" : "border-neutral-300 border-t-neutral-600"
+      }`}
+    />
   );
 }
 
@@ -40,6 +57,8 @@ export default function ActionEditor({
   action: ActionDetail;
   backHref: string;
 }) {
+  const router = useRouter();
+
   const [title, setTitle] = useState(action.title);
   const [detail, setDetail] = useState(action.detail);
   const [owner, setOwner] = useState(action.owner);
@@ -47,74 +66,92 @@ export default function ActionEditor({
   const [priority, setPriority] = useState(action.priority || "P2");
   const [status, setStatus] = useState(action.status || "open");
 
-  const [aiState, runAi, aiPending] = useActionState(suggestActionEdits, null);
-
-  // When a suggestion comes back, fill the fields the model actually proposed —
-  // leaving the rest as the user has them. The user reviews, then Saves.
+  // Save runs the server action; on success we navigate client-side (a redirect
+  // inside the action would route through the [org] loading fallback and blank
+  // the page). A failed write surfaces its error inline instead of vanishing.
+  const [saveState, saveAction, saving] = useActionState(updateActionDetail, null);
+  const [navigating, startNav] = useTransition();
   useEffect(() => {
-    const s = aiState?.suggestion;
-    if (!s) return;
-    if (s.title) setTitle(s.title);
-    if (s.detail) setDetail(s.detail);
-    if (s.owner) setOwner(s.owner);
-    if (s.dueDate) setDueDate(s.dueDate);
-    if (s.priority) setPriority(s.priority);
-    if (s.status) setStatus(s.status);
-  }, [aiState]);
+    if (saveState?.ok) startNav(() => router.push(backHref));
+  }, [saveState, router, backHref]);
 
-  // The AI-assist runs the same server action shape as useActionState expects —
-  // hand it the current (possibly unsaved) field values as context.
-  const askAi = () => {
-    const fd = new FormData();
-    fd.set("org", orgSlug);
-    fd.set("title", title);
-    fd.set("detail", detail);
-    fd.set("owner", owner);
-    fd.set("dueDate", dueDate);
-    fd.set("priority", priority);
-    fd.set("status", status);
-    fd.set("issueType", action.issueType);
-    runAi(fd);
+  // AI assist over fetch (not a server action) so the editor stays mounted while
+  // it runs — a server action would refresh this force-dynamic route.
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const askAi = async () => {
+    setAiLoading(true);
+    setAiNote(null);
+    setAiError(null);
+    try {
+      const res = await fetch(`/app/${orgSlug}/actions/${action.id}/suggest`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, detail, owner, dueDate, priority, status, issueType: action.issueType }),
+      });
+      const data = (await res.json()) as AiResponse;
+      if (!data.ok) {
+        setAiError(data.error ?? "Couldn't get a suggestion. Try again.");
+      } else {
+        const s = data.suggestion;
+        if (s) {
+          if (s.title) setTitle(s.title);
+          if (s.detail) setDetail(s.detail);
+          if (s.owner) setOwner(s.owner);
+          if (s.dueDate) setDueDate(s.dueDate);
+          if (s.priority) setPriority(s.priority);
+          if (s.status) setStatus(s.status);
+        }
+        setAiNote(data.note ?? "Suggested edits ready — review and save.");
+      }
+    } catch {
+      setAiError("Network error — try again.");
+    } finally {
+      setAiLoading(false);
+    }
   };
 
+  const busy = saving || navigating;
+
   return (
-    <form action={updateActionDetail} className="ae-card p-5 space-y-4">
+    <form action={saveAction} className="ae-card p-5 space-y-4">
       <input type="hidden" name="org" value={orgSlug} />
       <input type="hidden" name="recordId" value={action.id} />
 
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-neutral-500">
-          {action.jobCode ? `${action.jobCode} · ` : ""}
-          {action.issueType || "Action"}
-        </span>
+        <button
+          type="button"
+          onClick={() => startNav(() => router.push(backHref))}
+          disabled={navigating}
+          className="btn-ae-outline text-xs inline-flex items-center gap-1.5 disabled:opacity-60"
+        >
+          {navigating ? <Spinner /> : "←"} {navigating ? "Loading…" : "Back to actions"}
+        </button>
         <button
           type="button"
           onClick={askAi}
-          disabled={aiPending}
+          disabled={aiLoading}
           className="btn-ae-outline text-xs inline-flex items-center gap-1.5 disabled:opacity-60"
         >
-          {aiPending && (
-            <span
-              aria-hidden
-              className="h-3 w-3 rounded-full border-2 border-neutral-300 border-t-neutral-600 animate-spin"
-            />
-          )}
-          {aiPending ? "Thinking…" : "✨ AI suggest / auto-fill"}
+          {aiLoading ? <Spinner /> : "✨"} {aiLoading ? "Thinking…" : "AI suggest / auto-fill"}
         </button>
       </div>
 
-      {aiState?.note && !aiState.error && (
-        <p
-          role="status"
-          className="rounded border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-800"
-        >
-          {aiState.demo ? "🛈 " : "✨ "}
-          {aiState.note}
+      {aiNote && (
+        <p role="status" className="rounded border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-800">
+          ✨ {aiNote}
         </p>
       )}
-      {aiState?.error && (
+      {aiError && (
         <p role="alert" className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-700">
-          {aiState.error}
+          {aiError}
+        </p>
+      )}
+      {saveState?.error && (
+        <p role="alert" className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-700">
+          Couldn&apos;t save — {saveState.error}
         </p>
       )}
 
@@ -172,10 +209,19 @@ export default function ActionEditor({
       </div>
 
       <div className="flex items-center gap-3 pt-1">
-        <SaveButton />
-        <Link href={backHref} className="btn-ae-outline">
+        <button type="submit" disabled={busy} className="btn-ae inline-flex items-center gap-1.5 disabled:opacity-60">
+          {saving && <Spinner light />}
+          {saving ? "Saving…" : navigating ? "Saved — returning…" : "Save changes"}
+        </button>
+        <button
+          type="button"
+          onClick={() => startNav(() => router.push(backHref))}
+          disabled={busy}
+          className="btn-ae-outline inline-flex items-center gap-1.5 disabled:opacity-60"
+        >
+          {navigating && <Spinner />}
           Cancel
-        </Link>
+        </button>
       </div>
     </form>
   );

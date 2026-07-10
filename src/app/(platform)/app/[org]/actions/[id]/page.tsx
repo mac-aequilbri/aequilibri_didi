@@ -36,11 +36,7 @@ export default async function ActionDetailPage({
 
   return (
     <div className="p-6 max-w-2xl">
-      <PageHeader
-        title="Edit action"
-        subtitle={action.title}
-        actions={[{ href: backHref, label: "← Back to actions", variant: "outline" }]}
-      />
+      <PageHeader title="Edit action" subtitle={action.title} />
       <ActionEditor orgSlug={ctx.orgSlug} action={action} backHref={backHref} />
     </div>
   );
