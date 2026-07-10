@@ -1,5 +1,6 @@
 // Action Hub (core tier) — actions from any source: manual, chat, minutes.
 
+import Link from "next/link";
 import { EmptyState, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { ACTION_STATUSES } from "@/lib/platform/actionStatus";
@@ -127,7 +128,14 @@ export default async function ActionsPage({
             {items.map((a) => (
               <tr key={a.id} className="border-t border-neutral-100">
                 <td className="py-2 pr-2">
-                  <span className="font-medium">{a.title}</span>
+                  <Link
+                    href={orgPath(ctx.orgSlug, `/actions/${a.id}`)}
+                    className="group inline-flex items-baseline gap-1"
+                  >
+                    <span className="font-medium group-hover:text-[var(--ae-space)] group-hover:underline">
+                      {a.title}
+                    </span>
+                  </Link>
                   {a.issueType && a.issueType !== "Open Action" && (
                     <span className="ml-1 text-[0.65rem] px-1 rounded bg-amber-100 text-amber-800">
                       {a.issueType}

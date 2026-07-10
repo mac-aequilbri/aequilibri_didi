@@ -60,6 +60,41 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
+/** Airtable stores the owner text in Notes as "Owner: <name>" (the Assigned_To
+ *  field is a linked record we can't set from a free-text name). Pull it back
+ *  out so the edited owner is what the UI shows. */
+function ownerFromNotes(notes: string): string {
+  const m = notes.match(/Owner:\s*(.+)/i);
+  return m ? m[1].split(/\r?\n/)[0].trim() : "";
+}
+
+/** Map a raw Airtable Priority option back to the app's P1/P2/P3 vocabulary so
+ *  the edit form's select can default correctly. Postgres already stores P#. */
+function appPriority(raw: string): string {
+  const s = raw.trim();
+  if (/^P[123]$/i.test(s)) return s.toUpperCase();
+  const low = s.toLowerCase();
+  if (low.startsWith("high") || low === "urgent") return "P1";
+  if (low.startsWith("med") || low === "normal") return "P2";
+  if (low.startsWith("low")) return "P3";
+  return "P2";
+}
+
+/** A single action's editable fields, backend-agnostic. */
+export interface ActionDetail {
+  id: string;
+  title: string;
+  detail: string;
+  owner: string;
+  dueDate: Date | null;
+  /** App priority (P1/P2/P3). */
+  priority: string;
+  /** Canonical app status (open/in_progress/done/deferred). */
+  status: string;
+  issueType: string;
+  jobCode: string | null;
+}
+
 async function fromPostgres(ctx: OrgCtx, status?: string): Promise<ActionsData> {
   const where = { orgId: ctx.orgId, ...(status && isAppStatus(status) ? { status } : {}) };
   const [items, open, overdue, fromChat] = await Promise.all([
@@ -112,12 +147,13 @@ async function fromAirtable(ctx: OrgCtx, status?: string): Promise<ActionsData> 
     const res = resolveActionStatus(raw, orgMap);
     const due = str(r["Due_Date"]);
     const owner = r["Assigned_To"];
+    const notesOwner = ownerFromNotes(str(r["Notes"]));
     return {
       id: r.id,
       title: str(r["Action_Name"]) || "(untitled action)",
       detail: str(r["Description"]),
       jobCode: null,
-      owner: Array.isArray(owner) && owner.length > 0 ? "(linked)" : "—",
+      owner: notesOwner || (Array.isArray(owner) && owner.length > 0 ? "(linked)" : "—"),
       dueDate: due ? new Date(due) : null,
       priority: str(r["Priority"]) || "—",
       sourceType: "airtable",
@@ -153,4 +189,47 @@ async function fromAirtable(ctx: OrgCtx, status?: string): Promise<ActionsData> 
 /** Load actions + headline metrics from whichever backend is active. */
 export function loadActions(ctx: OrgCtx, status?: string): Promise<ActionsData> {
   return airtableEnabled() ? fromAirtable(ctx, status) : fromPostgres(ctx, status);
+}
+
+/** Load a single action for the edit page. Null if it doesn't exist in this org. */
+export async function loadAction(ctx: OrgCtx, id: string): Promise<ActionDetail | null> {
+  if (airtableEnabled()) {
+    let r: Record<string, unknown> | null = null;
+    try {
+      r = await core.get(ctx.orgSlug, "ISSUES", id);
+    } catch {
+      return null;
+    }
+    if (!r) return null;
+    const orgMap = await loadActionStatusMap(ctx);
+    const res = resolveActionStatus(str(r["Status"]), orgMap);
+    const due = str(r["Due_Date"]);
+    return {
+      id: str(r.id) || id,
+      title: str(r["Action_Name"]) || "(untitled action)",
+      detail: str(r["Description"]),
+      owner: ownerFromNotes(str(r["Notes"])),
+      dueDate: due ? new Date(due) : null,
+      priority: appPriority(str(r["Priority"])),
+      status: res.canonical ?? "open",
+      issueType: str(r["Issue_Type"]),
+      jobCode: null,
+    };
+  }
+  const a = await prisma.platActionHub.findFirst({
+    where: { id: Number(id), orgId: ctx.orgId },
+    include: { job: { select: { code: true } } },
+  });
+  if (!a) return null;
+  return {
+    id: String(a.id),
+    title: a.title,
+    detail: a.detail,
+    owner: a.owner,
+    dueDate: a.dueDate,
+    priority: a.priority,
+    status: a.status,
+    issueType: "",
+    jobCode: a.job?.code ?? null,
+  };
 }
