@@ -139,6 +139,8 @@ async function fromPostgres(ctx: OrgCtx): Promise<DashboardView> {
       prisma.platLearningRule.count({ where: { orgId: ctx.orgId, isActive: true } }),
     ]);
 
+  // Legacy shape: cashflow writes are Airtable-only (Spec 12 ledger), so this
+  // only ever renders pre-migration/seeded projected-vs-actual rows.
   const cashflows = await prisma.platConCashflow.findMany({
     where: { orgId: ctx.orgId },
     select: { period: true, projected: true, actual: true },

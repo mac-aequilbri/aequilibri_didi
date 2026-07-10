@@ -39,6 +39,8 @@ const QUERYABLE = {
     ({ model: prisma.platConPhase, select: { id: true, jobId: true, name: true, status: true, completionPct: true, sortOrder: true, isAiDraft: true } }),
   budget_lines: () =>
     ({ model: prisma.platConBudgetLine, select: { id: true, jobId: true, phaseId: true, category: true, description: true, budgetAmount: true, committedAmount: true, actualAmount: true } }),
+  // Legacy shape — cashflow writes are Airtable-only (Spec 12 ledger); this
+  // Postgres read only surfaces pre-migration/seeded rows.
   cashflows: () =>
     ({ model: prisma.platConCashflow, select: { id: true, jobId: true, period: true, projected: true, actual: true } }),
   risks: () =>

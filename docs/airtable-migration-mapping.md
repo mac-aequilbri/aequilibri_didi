@@ -63,7 +63,7 @@ connection concern (which base you open). This is a simplification, not a loss.
 |---|---|---|---|---|
 | `PlatConPhase` | plat_con_phase | PROJECT_PHASES | ✅ | |
 | `PlatConBudgetLine` | plat_con_budgetline | BUDGET | ✅ | Structure = Domain; figures = Customer Config (per spec). |
-| `PlatConCashflow` | plat_con_cashflow | CASHFLOWS | ✅ | Forecast vs actual structure universal. |
+| `PlatConCashflow` | plat_con_cashflow | CASHFLOWS | ⚠️ | Spec 12 reshaped CASHFLOWS into a per-transaction ledger (name/type/amount/status); the Prisma model keeps the legacy projected/actual shape. Writes are Airtable-only; Postgres reads render legacy rows only. |
 | `PlatConProcurement` | plat_con_procurement | PROCUREMENT | ✅ | |
 | `PlatConVendor` | plat_con_vendor | VENDORS | ✅ | Structure = Domain; actual vendor records = Customer Config. |
 | `PlatConRoomMatrix` | plat_con_roommatrix | ROOM_MATRIX | ✅ | Commercial may relabel as Zone Matrix (`zone` field already present). |

@@ -190,12 +190,16 @@ export function inferRouteSuggestions(args: {
   if (args.jobId != null && classification === "invoice" && amount != null) {
     out.push({
       table: "cashflow",
-      summary: `Route invoice amount ${amount.toFixed(2)} into cashflow actuals for ${period}.`,
+      summary: `Route invoice amount ${amount.toFixed(2)} into the cashflow ledger for ${period}.`,
       payload: {
         jobId: args.jobId,
+        name: `Invoice — ${args.title}`.slice(0, 200),
         period,
-        actual: amount,
-        projected: 0,
+        type: "Out",
+        amount,
+        sourceOrPayee: sender,
+        category: "invoice",
+        status: "Confirmed",
         notes: `Suggested from document "${args.title}". ${summary}`.slice(0, 800),
       },
     });

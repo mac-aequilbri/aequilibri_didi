@@ -251,6 +251,10 @@ const budgetLineSchema = z.object({
   actualAmount: num.default(0),
 });
 
+// CASHFLOWS (Spec 12) — per-transaction ledger. Airtable-only: the Prisma
+// PlatConCashflow model still carries the legacy projected/actual-per-period
+// columns and is kept read-only for legacy dev data, so there is no Postgres
+// write delegate (a Postgres-mode write fails fast, like COMMS).
 const cashflowSchema = z.object({
   jobId: id,
   name: str(200).default(""),
@@ -414,7 +418,7 @@ const REGISTRY = {
   phase: { physical: "plat_con_phase", delegate: d(prisma.platConPhase), create: phaseSchema, update: upd(phaseSchema) },
   phase_evidence: { physical: "plat_con_phaseevidence", delegate: d(prisma.platConPhaseEvidence), create: phaseEvidenceSchema, update: upd(phaseEvidenceSchema) },
   budget_line: { physical: "plat_con_budgetline", delegate: d(prisma.platConBudgetLine), create: budgetLineSchema, update: upd(budgetLineSchema) },
-  cashflow: { physical: "plat_con_cashflow", delegate: d(prisma.platConCashflow), create: cashflowSchema, update: upd(cashflowSchema) },
+  cashflow: { physical: "CASHFLOWS", create: cashflowSchema, update: upd(cashflowSchema) },
   risk: { physical: "plat_con_risk", delegate: d(prisma.platConRisk), create: riskSchema, update: upd(riskSchema) },
   variation_order: { physical: "plat_con_variationorder", delegate: d(prisma.platConVariationOrder), create: variationSchema, update: upd(variationSchema) },
   vendor: { physical: "plat_con_vendor", delegate: d(prisma.platConVendor), create: vendorSchema, update: upd(vendorSchema) },
