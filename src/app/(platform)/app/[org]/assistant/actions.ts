@@ -80,33 +80,53 @@ export async function closeSessionReviewAction(formData: FormData): Promise<void
   revalidatePath(orgPath(ctx.orgSlug, "/documents"));
 }
 
-export async function approveFromChatAction(formData: FormData): Promise<void> {
-  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const user = await getCurrentUser(ctx);
-  const proposalId = recordIdParam(formData.get("proposalId"));
-  if (proposalId) {
-    try {
-      await executeProposal(ctx, proposalId, user.name);
-    } catch {
-      /* recorded as failed/expired on the pending row */
-    }
-  }
-  revalidatePath(orgPath(ctx.orgSlug, "/assistant"));
+/** Result of an approve/reject click, surfaced back to the chat panel via
+ *  useActionState so a failed write is visible instead of silently vanishing. */
+export interface ProposalActionResult {
+  ok: boolean;
+  error?: string;
 }
 
-export async function rejectFromChatAction(formData: FormData): Promise<void> {
+export async function approveFromChatAction(
+  _prev: ProposalActionResult | null,
+  formData: FormData,
+): Promise<ProposalActionResult> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
   const proposalId = recordIdParam(formData.get("proposalId"));
-  if (proposalId) {
-    try {
-      await rejectProposal(ctx, proposalId, user.name);
-    } catch {
-      /* already resolved */
-    }
+  if (!proposalId) return { ok: false, error: "Missing proposal reference." };
+  try {
+    await executeProposal(ctx, proposalId, user.name);
+  } catch (err) {
+    // Leave the row in place (no revalidate) so the inline error stays visible —
+    // otherwise a silently-failed write looks identical to a successful one.
+    return { ok: false, error: err instanceof Error ? err.message : "The change could not be applied." };
+  }
+  // Refresh the whole org subtree, not just /assistant: an approved write lands
+  // in a domain table (actions register, dashboard, detail pages), so those are
+  // the views where the user actually looks to confirm the change took effect.
+  revalidatePath(orgPath(ctx.orgSlug), "layout");
+  return { ok: true };
+}
+
+export async function rejectFromChatAction(
+  _prev: ProposalActionResult | null,
+  formData: FormData,
+): Promise<ProposalActionResult> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  const user = await getCurrentUser(ctx);
+  const proposalId = recordIdParam(formData.get("proposalId"));
+  if (!proposalId) return { ok: false, error: "Missing proposal reference." };
+  try {
+    await rejectProposal(ctx, proposalId, user.name);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "The change could not be rejected." };
   }
   revalidatePath(orgPath(ctx.orgSlug, "/assistant"));
+  return { ok: true };
 }
+
+// (rejection changes nothing in a domain table, so /assistant is enough.)
 
 export async function saveConversationNoteFromChatAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));

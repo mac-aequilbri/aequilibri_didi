@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -49,6 +49,78 @@ function CloseSessionButton() {
     <button type="submit" disabled={pending} className="btn-ae disabled:opacity-60">
       {pending ? "Saving review & closing…" : "Close session & start fresh"}
     </button>
+  );
+}
+
+/** A single pending AI write with Approve/Reject controls. Clicking either
+ *  kicks off a backend round-trip (write → revalidate) that used to give no
+ *  feedback at all. Now the whole row locks and the pressed button shows a
+ *  spinner while it runs, and — critically — a failed write surfaces its error
+ *  inline instead of silently vanishing as if it had succeeded. */
+function ProposalRow({
+  orgSlug,
+  proposal,
+  tableLabel,
+}: {
+  orgSlug: string;
+  proposal: PendingProposalView;
+  tableLabel: (t: string) => string;
+}) {
+  const [approveState, approveAction, approving] = useActionState(approveFromChatAction, null);
+  const [rejectState, rejectAction, rejecting] = useActionState(rejectFromChatAction, null);
+  const busy = approving || rejecting;
+  const error = approveState?.error ?? rejectState?.error;
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-xs">
+        <span className="flex-1 truncate">
+          <span className="font-medium">
+            {proposal.operation} {tableLabel(proposal.targetTable)}
+          </span>{" "}
+          <code className="text-neutral-500">{proposal.payload.slice(0, 90)}</code>
+        </span>
+        <form action={approveAction}>
+          <input type="hidden" name="org" value={orgSlug} />
+          <input type="hidden" name="proposalId" value={proposal.id} />
+          <button
+            className="btn-ae text-xs inline-flex items-center gap-1.5 disabled:opacity-60"
+            type="submit"
+            disabled={busy}
+          >
+            {approving && (
+              <span
+                aria-hidden
+                className="h-3 w-3 rounded-full border-2 border-white/40 border-t-white animate-spin"
+              />
+            )}
+            {approving ? "Applying…" : "Approve"}
+          </button>
+        </form>
+        <form action={rejectAction}>
+          <input type="hidden" name="org" value={orgSlug} />
+          <input type="hidden" name="proposalId" value={proposal.id} />
+          <button
+            className="btn-ae-outline text-xs inline-flex items-center gap-1.5 disabled:opacity-60"
+            type="submit"
+            disabled={busy}
+          >
+            {rejecting && (
+              <span
+                aria-hidden
+                className="h-3 w-3 rounded-full border-2 border-neutral-300 border-t-neutral-600 animate-spin"
+              />
+            )}
+            {rejecting ? "Rejecting…" : "Reject"}
+          </button>
+        </form>
+      </div>
+      {error && (
+        <p role="alert" className="mt-1.5 rounded border border-red-200 bg-red-50 px-2 py-1 text-[0.7rem] text-red-700">
+          Couldn&apos;t apply this change — {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -294,28 +366,7 @@ export default function AssistantClient({
           </p>
           <div className="space-y-2">
             {pendingProposals.map((prop) => (
-              <div key={prop.id} className="flex items-center gap-2 text-xs">
-                <span className="flex-1 truncate">
-                  <span className="font-medium">
-                    {prop.operation} {tableLabel(prop.targetTable)}
-                  </span>{" "}
-                  <code className="text-neutral-500">{prop.payload.slice(0, 90)}</code>
-                </span>
-                <form action={approveFromChatAction}>
-                  <input type="hidden" name="org" value={orgSlug} />
-                  <input type="hidden" name="proposalId" value={prop.id} />
-                  <button className="btn-ae text-xs" type="submit">
-                    Approve
-                  </button>
-                </form>
-                <form action={rejectFromChatAction}>
-                  <input type="hidden" name="org" value={orgSlug} />
-                  <input type="hidden" name="proposalId" value={prop.id} />
-                  <button className="btn-ae-outline text-xs" type="submit">
-                    Reject
-                  </button>
-                </form>
-              </div>
+              <ProposalRow key={prop.id} orgSlug={orgSlug} proposal={prop} tableLabel={tableLabel} />
             ))}
           </div>
         </div>
