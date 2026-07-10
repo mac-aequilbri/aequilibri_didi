@@ -59,6 +59,9 @@ interface TableDef {
   };
   create: z.ZodTypeAny;
   update: z.ZodTypeAny;
+  /** Schema fields that exist only in Airtable (no Postgres column) — stripped
+   *  before a Prisma write so the legacy path doesn't reject them. */
+  pgOmit?: readonly string[];
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -403,7 +406,7 @@ const REGISTRY = {
   job: { physical: "plat_core_job", delegate: d(prisma.platJob), create: jobSchema, update: upd(jobSchema) },
   contact: { physical: "plat_core_contact", delegate: d(prisma.platContact), create: contactSchema, update: upd(contactSchema) },
   workstream: { physical: "plat_core_workstream", delegate: d(prisma.platWorkstream), create: workstreamSchema, update: upd(workstreamSchema) },
-  action: { physical: "plat_core_actionhub", delegate: d(prisma.platActionHub), create: actionSchema, update: upd(actionSchema) },
+  action: { physical: "plat_core_actionhub", delegate: d(prisma.platActionHub), pgOmit: ["issueType", "phaseId", "riskId"], create: actionSchema, update: upd(actionSchema) },
   decision: { physical: "plat_core_decision", delegate: d(prisma.platDecision), create: decisionSchema, update: upd(decisionSchema) },
   comms: { physical: "COMMS", create: commsSchema, update: upd(commsSchema) },
   learning_rule: { physical: "plat_core_learningrule", delegate: d(prisma.platLearningRule), create: learningRuleSchema, update: upd(learningRuleSchema) },
@@ -564,6 +567,9 @@ async function performWrite(
     );
   }
   const delegate = def.delegate();
+  if (def.pgOmit) {
+    data = Object.fromEntries(Object.entries(data).filter(([k]) => !def.pgOmit!.includes(k)));
+  }
   if (op === "create") {
     // Learning-rule codes are allocated at WRITE time (deferred proposals
     // would otherwise collide on codes pre-allocated at propose time).
