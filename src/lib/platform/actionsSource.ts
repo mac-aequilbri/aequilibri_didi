@@ -7,12 +7,19 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import {
   ACTION_STATUSES,
-  isAppStatus,
   resolveActionStatus,
   suggestStatus,
   type AppStatus,
 } from "./actionStatus";
 import { loadActionStatusMap } from "./configSource";
+import {
+  countEnumOptions,
+  toPredicate,
+  toPrismaWhere,
+  type FacetCounts,
+  type ListQuery,
+  type ListViewConfig,
+} from "./listQuery";
 import type { OrgCtx } from "./types";
 
 export interface ActionView {
@@ -46,15 +53,52 @@ export interface ActionsData {
   items: ActionView[];
   metrics: { open: number; overdue: number; fromChat: number; needsMapping: number };
   unmapped: UnmappedStatus[];
+  /** Unfiltered row count, so the FilterBar can show "12 of 214". */
+  total: number;
+  /** Per-option counts over the unfiltered list (Airtable path only). */
+  facets?: FacetCounts;
 }
 
-/** A status the list can be filtered to: a canonical status or "unmapped". */
-function filterItems(all: ActionView[], status?: string): ActionView[] {
-  if (!status) return all;
-  if (status === "unmapped") return all.filter((a) => a.needsMapping);
-  if (isAppStatus(status)) return all.filter((a) => !a.needsMapping && a.status === status);
-  return all;
-}
+/** Declarative filter config for the Action Hub — drives the FilterBar UI (via
+ *  toClientConfig) and filtering on both backends. "unmapped" is a virtual
+ *  status option matching by flag, and clean statuses exclude unmapped rows
+ *  (getValue returns null for them), so the two never overlap. */
+export const actionsListConfig: ListViewConfig<ActionView> = {
+  search: [(a) => a.title, (a) => a.detail, (a) => a.owner],
+  prismaSearch: ["title", "detail", "owner"],
+  fields: [
+    {
+      kind: "enum",
+      name: "status",
+      label: "Status",
+      getValue: (a) => (a.needsMapping ? null : a.status),
+      options: [
+        ...ACTION_STATUSES.map((s) => ({ value: s as string, label: s.replace("_", " ") })),
+        { value: "unmapped", match: (a: ActionView) => a.needsMapping },
+      ],
+    },
+    {
+      kind: "enum",
+      name: "priority",
+      label: "Priority",
+      // Airtable stores raw option names ("High"); normalise before matching.
+      // Postgres already stores P1/P2/P3, so the column filters directly.
+      getValue: (a) => (a.priority && a.priority !== "—" ? appPriority(a.priority) : null),
+      options: [
+        { value: "P1", label: "P1 · high" },
+        { value: "P2", label: "P2 · medium" },
+        { value: "P3", label: "P3 · low" },
+      ],
+    },
+    {
+      kind: "daterange",
+      name: "due",
+      label: "Due",
+      prismaField: "dueDate",
+      getValue: (a) => a.dueDate,
+    },
+  ],
+};
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -95,15 +139,19 @@ export interface ActionDetail {
   jobCode: string | null;
 }
 
-async function fromPostgres(ctx: OrgCtx, status?: string): Promise<ActionsData> {
-  const where = { orgId: ctx.orgId, ...(status && isAppStatus(status) ? { status } : {}) };
-  const [items, open, overdue, fromChat] = await Promise.all([
+async function fromPostgres(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData> {
+  const where = {
+    orgId: ctx.orgId,
+    ...(query ? toPrismaWhere(query, actionsListConfig) : {}),
+  };
+  const [items, total, open, overdue, fromChat] = await Promise.all([
     prisma.platActionHub.findMany({
       where,
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
       take: 200,
       include: { job: { select: { code: true } } },
     }),
+    prisma.platActionHub.count({ where: { orgId: ctx.orgId } }),
     prisma.platActionHub.count({
       where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] } },
     }),
@@ -133,10 +181,13 @@ async function fromPostgres(ctx: OrgCtx, status?: string): Promise<ActionsData> 
     })),
     metrics: { open, overdue, fromChat, needsMapping: 0 },
     unmapped: [],
+    total,
+    // No facet counts on Postgres — computing them would cost extra count
+    // queries per option; the FilterBar simply omits counts when absent.
   };
 }
 
-async function fromAirtable(ctx: OrgCtx, status?: string): Promise<ActionsData> {
+async function fromAirtable(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData> {
   const [rows, orgMap] = await Promise.all([
     core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
     loadActionStatusMap(ctx),
@@ -183,12 +234,20 @@ async function fromAirtable(ctx: OrgCtx, status?: string): Promise<ActionsData> 
     .map(([raw, count]) => ({ raw, count, suggestion: suggestStatus(raw) }))
     .sort((a, b) => b.count - a.count);
 
-  return { items: filterItems(all, status), metrics, unmapped };
+  return {
+    // Filtering happens here, AFTER the TTL-cached core.list read — toggling
+    // filters re-slices the cached snapshot instead of adding Airtable calls.
+    items: query ? all.filter(toPredicate(query, actionsListConfig)) : all,
+    metrics,
+    unmapped,
+    total: all.length,
+    facets: countEnumOptions(all, actionsListConfig),
+  };
 }
 
 /** Load actions + headline metrics from whichever backend is active. */
-export function loadActions(ctx: OrgCtx, status?: string): Promise<ActionsData> {
-  return airtableEnabled() ? fromAirtable(ctx, status) : fromPostgres(ctx, status);
+export function loadActions(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData> {
+  return airtableEnabled() ? fromAirtable(ctx, query) : fromPostgres(ctx, query);
 }
 
 /** Load a single action for the edit page. Null if it doesn't exist in this org. */

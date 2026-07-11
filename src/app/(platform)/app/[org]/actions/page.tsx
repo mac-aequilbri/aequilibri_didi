@@ -1,11 +1,13 @@
 // Action Hub (core tier) — actions from any source: manual, chat, minutes.
 
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { ACTION_STATUSES } from "@/lib/platform/actionStatus";
 import { requireOrgCtx } from "@/lib/platform/org-context";
-import { loadActions } from "@/lib/platform/actionsSource";
+import { actionsListConfig, loadActions } from "@/lib/platform/actionsSource";
+import { hasActiveFilters, parseListQuery, toClientConfig } from "@/lib/platform/listQuery";
 import { orgPath } from "@/lib/platform/paths";
 import { saveStatusMapping, updateActionStatus } from "./actions";
 
@@ -16,12 +18,13 @@ export default async function ActionsPage({
   searchParams,
 }: {
   params: Promise<{ org: string }>;
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const { status } = await searchParams;
+  const query = parseListQuery(await searchParams, actionsListConfig);
+  const filtered = hasActiveFilters(query);
 
-  const { items, metrics, unmapped } = await loadActions(ctx, status);
+  const { items, metrics, unmapped, total, facets } = await loadActions(ctx, query);
   const openCount = metrics.open;
   const overdueCount = metrics.overdue;
   const needsMapping = metrics.needsMapping;
@@ -40,7 +43,7 @@ export default async function ActionsPage({
         <MetricCard value={openCount} label="Open / in progress" />
         <MetricCard value={overdueCount} label="Overdue" />
         <MetricCard value={needsMapping} label="Needs mapping" />
-        <MetricCard value={items.length} label={status ? `Showing ${status.replace("_", " ")}` : "Total shown"} />
+        <MetricCard value={items.length} label={filtered ? "Matching filters" : "Total shown"} />
       </div>
 
       {unmapped.length > 0 && (
@@ -89,29 +92,15 @@ export default async function ActionsPage({
         </details>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-2 text-xs">
-        <a href={orgPath(ctx.orgSlug, "/actions")} className={!status ? "btn-ae" : "btn-ae-outline"}>
-          All
-        </a>
-        {ACTION_STATUSES.map((s) => (
-          <a
-            key={s}
-            href={orgPath(ctx.orgSlug, `/actions?status=${s}`)}
-            className={status === s ? "btn-ae" : "btn-ae-outline"}
-          >
-            {s.replace("_", " ")}
-          </a>
-        ))}
-        {needsMapping > 0 && (
-          <a
-            href={orgPath(ctx.orgSlug, "/actions?status=unmapped")}
-            className={status === "unmapped" ? "btn-ae" : "btn-ae-outline"}
-          >
-            unmapped
-          </a>
-        )}
-      </div>
-
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/actions")}
+        config={toClientConfig(actionsListConfig)}
+        query={query}
+        shown={items.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search actions…"
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -194,8 +183,12 @@ export default async function ActionsPage({
               <tr>
                 <td colSpan={6} className="py-6">
                   <EmptyState
-                    title={status ? `No ${status.replace("_", " ")} actions` : "No actions yet"}
-                    hint="Actions from the assistant, meeting minutes, or added by hand all land in this one queue."
+                    title={filtered ? "No actions match these filters" : "No actions yet"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Actions from the assistant, meeting minutes, or added by hand all land in this one queue."
+                    }
                     action={{ href: orgPath(ctx.orgSlug, "/actions/new"), label: "+ New action" }}
                   />
                 </td>
@@ -204,6 +197,7 @@ export default async function ActionsPage({
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }
