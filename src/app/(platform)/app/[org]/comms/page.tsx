@@ -3,19 +3,35 @@
 // the top by due date; overdue items are flagged.
 
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { loadComms } from "@/lib/platform/commsSource";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { setCommStatus } from "./actions";
+import { commsListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
 const STATUSES = ["pending", "sent", "acknowledged", "overdue"];
 
-export default async function CommsPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function CommsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
-  const comms = await loadComms(ctx);
+  const query = parseListQuery(await searchParams, commsListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: comms, total, facets } = applyListQuery(await loadComms(ctx), query, commsListConfig);
 
   return (
     <div className="p-6">
@@ -24,6 +40,15 @@ export default async function CommsPage({ params }: { params: Promise<{ org: str
         subtitle="COMMS — who needs to be told what, by when."
         actions={[{ href: orgPath(ctx.orgSlug, "/comms/new"), label: "+ New communication" }]}
       />
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/comms")}
+        config={toClientConfig(commsListConfig)}
+        query={query}
+        shown={comms.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search communications…"
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -81,8 +106,12 @@ export default async function CommsPage({ params }: { params: Promise<{ org: str
               <tr>
                 <td colSpan={5} className="py-6">
                   <EmptyState
-                    title="No communications scheduled"
-                    hint="Track who needs to be told what, by when — notifications, approvals, escalations."
+                    title={filtered ? "No communications match these filters" : "No communications scheduled"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Track who needs to be told what, by when — notifications, approvals, escalations."
+                    }
                     action={{ href: orgPath(ctx.orgSlug, "/comms/new"), label: "+ New communication" }}
                   />
                 </td>
@@ -91,6 +120,7 @@ export default async function CommsPage({ params }: { params: Promise<{ org: str
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }

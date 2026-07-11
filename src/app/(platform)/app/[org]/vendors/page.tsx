@@ -1,14 +1,34 @@
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadVendors } from "@/lib/platform/vendorsSource";
 import { orgPath } from "@/lib/platform/paths";
+import { vendorsListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
-export default async function VendorsPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function VendorsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
-  const vendors = await loadVendors(ctx);
+  const query = parseListQuery(await searchParams, vendorsListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: vendors, total, facets } = applyListQuery(
+    await loadVendors(ctx),
+    query,
+    vendorsListConfig,
+  );
 
   return (
     <div className="p-6">
@@ -17,6 +37,15 @@ export default async function VendorsPage({ params }: { params: Promise<{ org: s
         subtitle="Contractor and supplier registry."
         actions={[{ href: orgPath(ctx.orgSlug, "/vendors/new"), label: "+ New vendor" }]}
       />
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/vendors")}
+        config={toClientConfig(vendorsListConfig)}
+        query={query}
+        shown={vendors.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search vendors…"
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -57,8 +86,12 @@ export default async function VendorsPage({ params }: { params: Promise<{ org: s
               <tr>
                 <td colSpan={5} className="py-6">
                   <EmptyState
-                    title="No vendors yet"
-                    hint="Keep subcontractors and suppliers — with ratings and contacts — here."
+                    title={filtered ? "No vendors match these filters" : "No vendors yet"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Keep subcontractors and suppliers — with ratings and contacts — here."
+                    }
                     action={{ href: orgPath(ctx.orgSlug, "/vendors/new"), label: "+ New vendor" }}
                   />
                 </td>
@@ -67,6 +100,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ org: s
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }

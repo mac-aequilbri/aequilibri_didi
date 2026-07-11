@@ -2,18 +2,38 @@
 // "proposed" with sourceType=chat and are confirmed or superseded here.
 
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadDecisions } from "@/lib/platform/decisionsSource";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { orgPath } from "@/lib/platform/paths";
 import { setDecisionStatus } from "./actions";
+import { decisionsListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
-export default async function DecisionsPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function DecisionsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
-  const decisions = await loadDecisions(ctx);
+  const query = parseListQuery(await searchParams, decisionsListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: decisions, total, facets } = applyListQuery(
+    await loadDecisions(ctx),
+    query,
+    decisionsListConfig,
+  );
 
   return (
     <div className="p-6">
@@ -22,6 +42,15 @@ export default async function DecisionsPage({ params }: { params: Promise<{ org:
         subtitle="Project decisions with rationale — proposed by people or the assistant, confirmed by you."
         actions={[{ href: orgPath(ctx.orgSlug, "/decisions/new"), label: "+ New decision" }]}
       />
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/decisions")}
+        config={toClientConfig(decisionsListConfig)}
+        query={query}
+        shown={decisions.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search decisions…"
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -85,8 +114,12 @@ export default async function DecisionsPage({ params }: { params: Promise<{ org:
               <tr>
                 <td colSpan={5} className="py-6">
                   <EmptyState
-                    title="No decisions yet"
-                    hint="Record key decisions and their rationale so the project's reasoning stays traceable."
+                    title={filtered ? "No decisions match these filters" : "No decisions yet"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Record key decisions and their rationale so the project's reasoning stays traceable."
+                    }
                     action={{ href: orgPath(ctx.orgSlug, "/decisions/new"), label: "+ New decision" }}
                   />
                 </td>
@@ -95,6 +128,7 @@ export default async function DecisionsPage({ params }: { params: Promise<{ org:
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }

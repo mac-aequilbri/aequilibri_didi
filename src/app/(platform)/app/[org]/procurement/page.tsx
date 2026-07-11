@@ -1,18 +1,38 @@
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate, toNum } from "@/lib/format";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadProcurement } from "@/lib/platform/procurementSource";
 import { orgPath } from "@/lib/platform/paths";
 import { setProcurementStatus } from "./actions";
+import { procurementListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
 const STATUSES = ["pending", "ordered", "delivered", "invoiced", "paid"];
 
-export default async function ProcurementPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function ProcurementPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
-  const orders = await loadProcurement(ctx);
+  const query = parseListQuery(await searchParams, procurementListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: orders, total, facets } = applyListQuery(
+    await loadProcurement(ctx),
+    query,
+    procurementListConfig,
+  );
 
   return (
     <div className="p-6">
@@ -21,6 +41,15 @@ export default async function ProcurementPage({ params }: { params: Promise<{ or
         subtitle="Orders tracked from pending through to paid."
         actions={[{ href: orgPath(ctx.orgSlug, "/procurement/new"), label: "+ New order" }]}
       />
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/procurement")}
+        config={toClientConfig(procurementListConfig)}
+        query={query}
+        shown={orders.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search orders…"
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -73,13 +102,14 @@ export default async function ProcurementPage({ params }: { params: Promise<{ or
             {orders.length === 0 && (
               <tr>
                 <td className="py-4 text-neutral-500" colSpan={6}>
-                  No orders yet.
+                  {filtered ? "No orders match these filters." : "No orders yet."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }

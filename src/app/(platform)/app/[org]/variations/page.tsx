@@ -1,15 +1,35 @@
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadVariations } from "@/lib/platform/domainListSources";
 import { orgPath } from "@/lib/platform/paths";
+import { variationsListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
-export default async function VariationsPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function VariationsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
-  const variations = await loadVariations(ctx);
+  const query = parseListQuery(await searchParams, variationsListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: variations, total, facets } = applyListQuery(
+    await loadVariations(ctx),
+    query,
+    variationsListConfig,
+  );
 
   return (
     <div className="p-6">
@@ -18,6 +38,15 @@ export default async function VariationsPage({ params }: { params: Promise<{ org
         subtitle="Scope changes with cost and time impact — AI drafts go through human approval."
         actions={[{ href: orgPath(ctx.orgSlug, "/variations/new"), label: "+ New / AI draft" }]}
       />
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/variations")}
+        config={toClientConfig(variationsListConfig)}
+        query={query}
+        shown={variations.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search variations…"
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -59,8 +88,12 @@ export default async function VariationsPage({ params }: { params: Promise<{ org
               <tr>
                 <td colSpan={5} className="py-6">
                   <EmptyState
-                    title="No variation orders yet"
-                    hint="Capture scope changes with their cost and time impact for client sign-off."
+                    title={filtered ? "No variations match these filters" : "No variation orders yet"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Capture scope changes with their cost and time impact for client sign-off."
+                    }
                     action={{ href: orgPath(ctx.orgSlug, "/variations/new"), label: "+ New variation" }}
                   />
                 </td>
@@ -69,6 +102,7 @@ export default async function VariationsPage({ params }: { params: Promise<{ org
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }

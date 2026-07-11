@@ -1,17 +1,37 @@
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency } from "@/lib/format";
 import { loadJobsList } from "@/lib/platform/jobsListSource";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
+import { projectsListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectsPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function ProjectsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  const query = parseListQuery(await searchParams, projectsListConfig);
+  const filtered = hasActiveFilters(query);
   // Postgres (numeric ids) or Airtable (rec… ids) depending on the flag — the
   // ids here must match what the detail page (jobDetailSource) can resolve.
-  const jobs = await loadJobsList(ctx);
+  const { items: jobs, total, facets } = applyListQuery(
+    await loadJobsList(ctx),
+    query,
+    projectsListConfig,
+  );
 
   return (
     <div className="p-6">
@@ -20,10 +40,23 @@ export default async function ProjectsPage({ params }: { params: Promise<{ org: 
         subtitle="Every engagement — long projects and short jobs — on the shared core."
         actions={[{ href: orgPath(ctx.orgSlug, "/projects/new"), label: "+ New project" }]}
       />
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/projects")}
+        config={toClientConfig(projectsListConfig)}
+        query={query}
+        shown={jobs.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search projects…"
+      >
       {jobs.length === 0 ? (
         <EmptyState
-          title="No projects yet"
-          hint="Each project is a job on the platform — create one to start tracking phases, budget and risk."
+          title={filtered ? "No projects match these filters" : "No projects yet"}
+          hint={
+            filtered
+              ? "Try widening or clearing the filters above."
+              : "Each project is a job on the platform — create one to start tracking phases, budget and risk."
+          }
           action={{ href: orgPath(ctx.orgSlug, "/projects/new"), label: "+ New project" }}
         />
       ) : (
@@ -64,6 +97,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ org: 
           ))}
         </div>
       )}
+      </FilterBar>
     </div>
   );
 }

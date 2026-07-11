@@ -1,11 +1,19 @@
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { loadDocuments } from "@/lib/platform/documentsSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { ingestInboxAction } from "./actions";
+import { documentsListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +22,13 @@ export default async function DocumentsPage({
   searchParams,
 }: {
   params: Promise<{ org: string }>;
-  searchParams: Promise<{ processed?: string; documents?: string; proposals?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const [docs, jobs, sync] = await Promise.all([loadDocuments(ctx), loadJobOptions(ctx), searchParams]);
+  const [allDocs, jobs, sync] = await Promise.all([loadDocuments(ctx), loadJobOptions(ctx), searchParams]);
+  const query = parseListQuery(sync, documentsListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: docs, total, facets } = applyListQuery(allDocs, query, documentsListConfig);
 
   return (
     <div className="p-6">
@@ -45,6 +56,15 @@ export default async function DocumentsPage({
         </label>
         <button type="submit" className="btn-ae">Run inbox ingestion</button>
       </form>
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/documents")}
+        config={toClientConfig(documentsListConfig)}
+        query={query}
+        shown={docs.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search documents…"
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -89,8 +109,12 @@ export default async function DocumentsPage({
               <tr>
                 <td colSpan={5} className="py-6">
                   <EmptyState
-                    title="No documents yet"
-                    hint="Upload or link project files; the assistant can summarise and classify them."
+                    title={filtered ? "No documents match these filters" : "No documents yet"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Upload or link project files; the assistant can summarise and classify them."
+                    }
                     action={{ href: orgPath(ctx.orgSlug, "/documents/new"), label: "+ New document" }}
                   />
                 </td>
@@ -99,6 +123,7 @@ export default async function DocumentsPage({
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }

@@ -1,12 +1,20 @@
 // Risk register with likelihood × impact scoring and batch escalation.
 
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { priorityBandForRiskScore } from "@/lib/platform/projectIntelligence";
 import { loadRisks } from "@/lib/platform/risksSource";
 import { orgPath } from "@/lib/platform/paths";
 import { setRiskStatus } from "./actions";
+import { risksListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +24,17 @@ function scoreClass(score: number): string {
   return "bg-emerald-100 text-emerald-800";
 }
 
-export default async function RisksPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function RisksPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
-  const risks = await loadRisks(ctx);
+  const query = parseListQuery(await searchParams, risksListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: risks, total, facets } = applyListQuery(await loadRisks(ctx), query, risksListConfig);
 
   return (
     <div className="p-6">
@@ -30,6 +46,15 @@ export default async function RisksPage({ params }: { params: Promise<{ org: str
           { href: orgPath(ctx.orgSlug, "/risks/escalation"), label: "Escalation", variant: "outline" },
         ]}
       />
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/risks")}
+        config={toClientConfig(risksListConfig)}
+        query={query}
+        shown={risks.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search risks…"
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -106,8 +131,12 @@ export default async function RisksPage({ params }: { params: Promise<{ org: str
               <tr>
                 <td colSpan={5} className="py-6">
                   <EmptyState
-                    title="No risks recorded"
-                    hint="Log risks with likelihood × impact; the high scorers can be batch-escalated."
+                    title={filtered ? "No risks match these filters" : "No risks recorded"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Log risks with likelihood × impact; the high scorers can be batch-escalated."
+                    }
                     action={{ href: orgPath(ctx.orgSlug, "/risks/new"), label: "+ New risk" }}
                   />
                 </td>
@@ -116,6 +145,7 @@ export default async function RisksPage({ params }: { params: Promise<{ org: str
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }

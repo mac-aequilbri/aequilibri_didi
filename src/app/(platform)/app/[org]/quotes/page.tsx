@@ -2,17 +2,37 @@
 // be started blank or generated from a job's assessment budget breakdown.
 
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate } from "@/lib/format";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadQuotes } from "@/lib/platform/domainListSources";
 import { orgPath } from "@/lib/platform/paths";
+import { quotesListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
-export default async function QuotesPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function QuotesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
-  const quotes = await loadQuotes(ctx);
+  const query = parseListQuery(await searchParams, quotesListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: quotes, total, facets } = applyListQuery(
+    await loadQuotes(ctx),
+    query,
+    quotesListConfig,
+  );
 
   return (
     <div className="p-4 sm:p-6">
@@ -22,9 +42,24 @@ export default async function QuotesPage({ params }: { params: Promise<{ org: st
         actions={[{ href: orgPath(ctx.orgSlug, "/quotes/new"), label: "+ New quote" }]}
       />
 
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/quotes")}
+        config={toClientConfig(quotesListConfig)}
+        query={query}
+        shown={quotes.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search quotes…"
+      >
       {quotes.length === 0 ? (
         <p className="text-sm text-neutral-500">
-          No quotes yet. <Link className="underline" href={orgPath(ctx.orgSlug, "/quotes/new")}>Create one</Link>.
+          {filtered ? (
+            "No quotes match these filters."
+          ) : (
+            <>
+              No quotes yet. <Link className="underline" href={orgPath(ctx.orgSlug, "/quotes/new")}>Create one</Link>.
+            </>
+          )}
         </p>
       ) : (
         <section className="ae-card p-5">
@@ -67,6 +102,7 @@ export default async function QuotesPage({ params }: { params: Promise<{ org: st
           </div>
         </section>
       )}
+      </FilterBar>
     </div>
   );
 }

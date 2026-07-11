@@ -1,15 +1,35 @@
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
+import {
+  applyListQuery,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadMeetingMinutes } from "@/lib/platform/domainListSources";
 import { orgPath } from "@/lib/platform/paths";
+import { minutesListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
-export default async function MeetingMinutesPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function MeetingMinutesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
-  const minutes = await loadMeetingMinutes(ctx);
+  const query = parseListQuery(await searchParams, minutesListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: minutes, total, facets } = applyListQuery(
+    await loadMeetingMinutes(ctx),
+    query,
+    minutesListConfig,
+  );
 
   return (
     <div className="p-6">
@@ -18,6 +38,15 @@ export default async function MeetingMinutesPage({ params }: { params: Promise<{
         subtitle="Paste raw minutes; the AI extracts action items, you confirm to create them."
         actions={[{ href: orgPath(ctx.orgSlug, "/meeting-minutes/new"), label: "+ New minutes" }]}
       />
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/meeting-minutes")}
+        config={toClientConfig(minutesListConfig)}
+        query={query}
+        shown={minutes.length}
+        total={total}
+        counts={facets}
+        searchPlaceholder="Search minutes…"
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -47,13 +76,14 @@ export default async function MeetingMinutesPage({ params }: { params: Promise<{
             {minutes.length === 0 && (
               <tr>
                 <td className="py-4 text-neutral-500" colSpan={4}>
-                  No minutes yet.
+                  {filtered ? "No minutes match these filters." : "No minutes yet."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }

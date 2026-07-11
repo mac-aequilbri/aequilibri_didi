@@ -249,6 +249,22 @@ export function toClientConfig<Row>(config: ListViewConfig<Row>): ClientListConf
   };
 }
 
+/** One-call page helper for windows whose source already returns the full
+ *  view-model list: filter + total + facets, ready to spread into FilterBar
+ *  props. (Windows needing backend-side filtering, like Actions on Postgres,
+ *  use toPredicate/toPrismaWhere in their source instead.) */
+export function applyListQuery<Row>(
+  rows: Row[],
+  query: ListQuery,
+  config: ListViewConfig<Row>,
+): { items: Row[]; total: number; facets: FacetCounts } {
+  return {
+    items: hasActiveFilters(query) ? rows.filter(toPredicate(query, config)) : rows,
+    total: rows.length,
+    facets: countEnumOptions(rows, config),
+  };
+}
+
 /** Count rows per enum option over the UNFILTERED list, so the FilterBar can
  *  show facet counts. Cheap: one pass over rows already in memory. */
 export function countEnumOptions<Row>(rows: Row[], config: ListViewConfig<Row>): FacetCounts {
