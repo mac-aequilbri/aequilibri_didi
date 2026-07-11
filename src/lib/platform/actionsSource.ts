@@ -98,6 +98,16 @@ export const actionsListConfig: ListViewConfig<ActionView> = {
       getValue: (a) => a.dueDate,
     },
   ],
+  sort: [
+    { name: "due", label: "Due date", getValue: (a) => a.dueDate },
+    { name: "title", label: "Title", getValue: (a) => a.title.toLowerCase() },
+    {
+      name: "priority",
+      label: "Priority",
+      getValue: (a) => (a.priority && a.priority !== "—" ? appPriority(a.priority) : null),
+    },
+  ],
+  pageSize: 50,
 };
 
 function str(v: unknown): string {

@@ -50,12 +50,23 @@ export interface DateRangeField<Row> extends FieldBase {
 
 export type FilterField<Row> = EnumField<Row> | DateRangeField<Row>;
 
+export interface SortFieldDef<Row> {
+  /** URL token; also the default row property. */
+  name: string;
+  label: string;
+  getValue?: (row: Row) => string | number | Date | null | undefined;
+}
+
 export interface ListViewConfig<Row> {
   fields: FilterField<Row>[];
   /** Row accessors the free-text q param searches on the predicate path. */
   search?: Array<(row: Row) => string | null | undefined>;
   /** Postgres columns q searches with `contains` on the Prisma path. */
   prismaSearch?: string[];
+  /** Sortable fields (?sort=name:asc). Omit for source-order lists. */
+  sort?: SortFieldDef<Row>[];
+  /** Rows per page (?page=N). Omit to render everything. */
+  pageSize?: number;
 }
 
 /** A validated, backend-agnostic filter state parsed from the URL. */
@@ -65,6 +76,10 @@ export interface ListQuery {
   enums: Record<string, string[]>;
   /** range field name → ISO date bounds (inclusive). */
   ranges: Record<string, { from?: string; to?: string }>;
+  /** Active sort, validated against config.sort. */
+  sort: { field: string; dir: "asc" | "desc" } | null;
+  /** 1-based page; meaningful only when config.pageSize is set. */
+  page: number;
 }
 
 /** Per enum field, per option value → row count. Feeds the FilterBar facets. */
@@ -104,9 +119,23 @@ export function parseListQuery<Row>(sp: SearchParams, config: ListViewConfig<Row
       if (r.from || r.to) ranges[f.name] = r;
     }
   }
-  return { q: first(sp.q).trim(), enums, ranges };
+
+  let sort: ListQuery["sort"] = null;
+  const sortRaw = first(sp.sort);
+  if (sortRaw && config.sort?.length) {
+    const [field, dir] = sortRaw.split(":");
+    if (config.sort.some((s) => s.name === field) && (dir === "asc" || dir === "desc")) {
+      sort = { field, dir };
+    }
+  }
+
+  const pageRaw = Number(first(sp.page));
+  const page = Number.isInteger(pageRaw) && pageRaw > 1 ? pageRaw : 1;
+
+  return { q: first(sp.q).trim(), enums, ranges, sort, page };
 }
 
+/** Whether any row-narrowing filter is active (sort/page don't count). */
 export function hasActiveFilters(query: ListQuery): boolean {
   return (
     query.q !== "" || Object.keys(query.enums).length > 0 || Object.keys(query.ranges).length > 0
@@ -124,6 +153,8 @@ export function buildQueryString(query: ListQuery): string {
     if (r.from) p.set(`${name}_from`, r.from);
     if (r.to) p.set(`${name}_to`, r.to);
   }
+  if (query.sort) p.set("sort", `${query.sort.field}:${query.sort.dir}`);
+  if (query.page > 1) p.set("page", String(query.page));
   const s = p.toString();
   return s ? `?${s}` : "";
 }
@@ -231,11 +262,14 @@ export interface ClientFilterField {
 export interface ClientListConfig {
   hasSearch: boolean;
   fields: ClientFilterField[];
+  /** Sortable fields for the Sort pill (name + label only). */
+  sort?: Array<{ name: string; label: string }>;
 }
 
 export function toClientConfig<Row>(config: ListViewConfig<Row>): ClientListConfig {
   return {
     hasSearch: Boolean(config.search?.length || config.prismaSearch?.length),
+    sort: config.sort?.map((s) => ({ name: s.name, label: s.label })),
     fields: config.fields.map((f) =>
       f.kind === "enum"
         ? {
@@ -249,18 +283,68 @@ export function toClientConfig<Row>(config: ListViewConfig<Row>): ClientListConf
   };
 }
 
+/** Sort + paginate an already-filtered list per the query. Windows that filter
+ *  in their source (Actions) call this in the page; applyListQuery calls it
+ *  for everyone else. Page is clamped so a stale ?page= never strands the user
+ *  on an empty slice. */
+export function sortAndPaginate<Row>(
+  rows: Row[],
+  query: ListQuery,
+  config: ListViewConfig<Row>,
+): { items: Row[]; page: number; pageCount: number } {
+  let items = rows;
+
+  const sortDef = query.sort ? config.sort?.find((s) => s.name === query.sort?.field) : undefined;
+  if (query.sort && sortDef) {
+    const get =
+      sortDef.getValue ??
+      ((row: Row) => (row as Record<string, unknown>)[sortDef.name] as string | number | Date | null);
+    const flip = query.sort.dir === "desc" ? -1 : 1;
+    items = [...items].sort((a, b) => {
+      const va = get(a);
+      const vb = get(b);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1; // empty values always last, either direction
+      if (vb == null) return -1;
+      const na = va instanceof Date ? va.getTime() : va;
+      const nb = vb instanceof Date ? vb.getTime() : vb;
+      if (typeof na === "number" && typeof nb === "number") return (na - nb) * flip;
+      return String(na).localeCompare(String(nb)) * flip;
+    });
+  }
+
+  if (!config.pageSize) return { items, page: 1, pageCount: 1 };
+  const pageCount = Math.max(1, Math.ceil(items.length / config.pageSize));
+  const page = Math.min(Math.max(1, query.page), pageCount);
+  const start = (page - 1) * config.pageSize;
+  return { items: items.slice(start, start + config.pageSize), page, pageCount };
+}
+
 /** One-call page helper for windows whose source already returns the full
- *  view-model list: filter + total + facets, ready to spread into FilterBar
- *  props. (Windows needing backend-side filtering, like Actions on Postgres,
- *  use toPredicate/toPrismaWhere in their source instead.) */
+ *  view-model list: filter + sort + paginate + total + facets, ready to spread
+ *  into FilterBar props. `matching` is the filtered count before pagination —
+ *  feed that to FilterBar's `shown`. (Windows needing backend-side filtering,
+ *  like Actions on Postgres, use toPredicate/toPrismaWhere in their source.) */
 export function applyListQuery<Row>(
   rows: Row[],
   query: ListQuery,
   config: ListViewConfig<Row>,
-): { items: Row[]; total: number; facets: FacetCounts } {
+): {
+  items: Row[];
+  total: number;
+  matching: number;
+  page: number;
+  pageCount: number;
+  facets: FacetCounts;
+} {
+  const filteredRows = hasActiveFilters(query) ? rows.filter(toPredicate(query, config)) : rows;
+  const { items, page, pageCount } = sortAndPaginate(filteredRows, query, config);
   return {
-    items: hasActiveFilters(query) ? rows.filter(toPredicate(query, config)) : rows,
+    items,
     total: rows.length,
+    matching: filteredRows.length,
+    page,
+    pageCount,
     facets: countEnumOptions(rows, config),
   };
 }

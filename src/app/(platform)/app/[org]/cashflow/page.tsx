@@ -2,18 +2,45 @@
 // actual chart is derived from the transactions (Paid = actual, else projected).
 
 import { CashflowLedger } from "./CashflowLedger";
+import { FilterBar } from "@/components/FilterBar";
 import { TrendChart } from "@/components/charts";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { comparePeriods, formatPeriodLabel } from "@/lib/format";
+import {
+  countEnumOptions,
+  hasActiveFilters,
+  parseListQuery,
+  toClientConfig,
+  toPredicate,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadCashflowJobs } from "@/lib/platform/cashflowSource";
 import { orgPath } from "@/lib/platform/paths";
+import { cashflowListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
 
-export default async function CashflowPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function CashflowPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
-  const jobs = await loadCashflowJobs(ctx);
+  const query = parseListQuery(await searchParams, cashflowListConfig);
+  const filtered = hasActiveFilters(query);
+  const allJobs = await loadCashflowJobs(ctx);
+  const allTxns = allJobs.flatMap((j) => j.conCashflows);
+
+  // The filter applies per job so the grouping survives; the trend chart is
+  // built from the filtered rows, so it follows the filters too.
+  const pred = toPredicate(query, cashflowListConfig);
+  const jobs = allJobs.map((j) => ({
+    ...j,
+    conCashflows: filtered ? j.conCashflows.filter(pred) : j.conCashflows,
+  }));
+  const shownCount = jobs.reduce((s, j) => s + j.conCashflows.length, 0);
 
   return (
     <div className="p-6">
@@ -23,6 +50,15 @@ export default async function CashflowPage({ params }: { params: Promise<{ org: 
         actions={[{ href: orgPath(ctx.orgSlug, "/cashflow/new"), label: "+ New entry" }]}
       />
 
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/cashflow")}
+        config={toClientConfig(cashflowListConfig)}
+        query={query}
+        shown={shownCount}
+        total={allTxns.length}
+        counts={countEnumOptions(allTxns, cashflowListConfig)}
+        searchPlaceholder="Search entries…"
+      >
       {(() => {
         const byPeriod = new Map<string, { projected: number; actual: number }>();
         for (const job of jobs) {
@@ -62,11 +98,16 @@ export default async function CashflowPage({ params }: { params: Promise<{ org: 
       })}
       {jobs.every((j) => !j.conCashflows.length) && (
         <EmptyState
-          title="No cashflow entries yet"
-          hint="Log money in and out per period to spot squeezes early."
+          title={filtered ? "No entries match these filters" : "No cashflow entries yet"}
+          hint={
+            filtered
+              ? "Try widening or clearing the filters above."
+              : "Log money in and out per period to spot squeezes early."
+          }
           action={{ href: orgPath(ctx.orgSlug, "/cashflow/new"), label: "+ New entry" }}
         />
       )}
+      </FilterBar>
     </div>
   );
 }

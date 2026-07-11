@@ -7,7 +7,12 @@ import { formatDate } from "@/lib/format";
 import { ACTION_STATUSES } from "@/lib/platform/actionStatus";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { actionsListConfig, loadActions } from "@/lib/platform/actionsSource";
-import { hasActiveFilters, parseListQuery, toClientConfig } from "@/lib/platform/listQuery";
+import {
+  hasActiveFilters,
+  parseListQuery,
+  sortAndPaginate,
+  toClientConfig,
+} from "@/lib/platform/listQuery";
 import { orgPath } from "@/lib/platform/paths";
 import { saveStatusMapping, updateActionStatus } from "./actions";
 
@@ -24,7 +29,8 @@ export default async function ActionsPage({
   const query = parseListQuery(await searchParams, actionsListConfig);
   const filtered = hasActiveFilters(query);
 
-  const { items, metrics, unmapped, total, facets } = await loadActions(ctx, query);
+  const { items: matching, metrics, unmapped, total, facets } = await loadActions(ctx, query);
+  const { items, page, pageCount } = sortAndPaginate(matching, query, actionsListConfig);
   const openCount = metrics.open;
   const overdueCount = metrics.overdue;
   const needsMapping = metrics.needsMapping;
@@ -43,7 +49,7 @@ export default async function ActionsPage({
         <MetricCard value={openCount} label="Open / in progress" />
         <MetricCard value={overdueCount} label="Overdue" />
         <MetricCard value={needsMapping} label="Needs mapping" />
-        <MetricCard value={items.length} label={filtered ? "Matching filters" : "Total shown"} />
+        <MetricCard value={matching.length} label={filtered ? "Matching filters" : "Total shown"} />
       </div>
 
       {unmapped.length > 0 && (
@@ -96,9 +102,11 @@ export default async function ActionsPage({
         basePath={orgPath(ctx.orgSlug, "/actions")}
         config={toClientConfig(actionsListConfig)}
         query={query}
-        shown={items.length}
+        shown={matching.length}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search actions…"
       >
       <div className="ae-card p-5">

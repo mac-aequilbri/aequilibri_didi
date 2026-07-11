@@ -25,6 +25,8 @@ export function FilterBar({
   shown,
   total,
   counts,
+  page = 1,
+  pageCount = 1,
   searchPlaceholder = "Search…",
   children,
 }: {
@@ -32,11 +34,15 @@ export function FilterBar({
   basePath: string;
   config: ClientListConfig;
   query: ListQuery;
-  /** Rows currently displayed / rows before filtering. */
+  /** Rows matching the filters / rows before filtering. */
   shown: number;
   total: number;
   /** Optional per-option facet counts (from countEnumOptions). */
   counts?: FacetCounts;
+  /** Current page + page count (from applyListQuery/sortAndPaginate); a pager
+   *  renders below children when pageCount > 1. */
+  page?: number;
+  pageCount?: number;
   searchPlaceholder?: string;
   /** The list itself — dimmed while a filter navigation is pending. */
   children?: React.ReactNode;
@@ -68,11 +74,11 @@ export function FilterBar({
     if (externalQ) setSearch(query.q);
   }, [query]);
 
-  // Debounced free-text search → URL.
+  // Debounced free-text search → URL (any filter change restarts at page 1).
   useEffect(() => {
     const term = search.trim();
     if (term === latest.current.q) return;
-    const t = setTimeout(() => navigate({ ...latest.current, q: term }), 350);
+    const t = setTimeout(() => navigate({ ...latest.current, q: term, page: 1 }), 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
@@ -100,7 +106,7 @@ export function FilterBar({
     const next = current.includes(value)
       ? current.filter((v) => v !== value)
       : [...current, value];
-    navigate({ ...base, enums: { ...base.enums, [field]: next } });
+    navigate({ ...base, enums: { ...base.enums, [field]: next }, page: 1 });
   };
 
   const setRange = (field: string, part: "from" | "to", value: string) => {
@@ -111,12 +117,26 @@ export function FilterBar({
     const ranges = { ...base.ranges };
     if (current.from || current.to) ranges[field] = current;
     else delete ranges[field];
-    navigate({ ...base, ranges });
+    navigate({ ...base, ranges, page: 1 });
   };
+
+  // Same field again toggles direction; "Default order" clears the sort.
+  const setSort = (field: string | null) => {
+    const base = latest.current;
+    const sort =
+      field === null
+        ? null
+        : base.sort?.field === field
+          ? { field, dir: base.sort.dir === "asc" ? ("desc" as const) : ("asc" as const) }
+          : { field, dir: "asc" as const };
+    navigate({ ...base, sort, page: 1 });
+  };
+
+  const goToPage = (p: number) => navigate({ ...latest.current, page: p });
 
   const clearAll = () => {
     setSearch("");
-    navigate({ q: "", enums: {}, ranges: {} });
+    navigate({ q: "", enums: {}, ranges: {}, sort: latest.current.sort, page: 1 });
     setOpenField(null);
   };
 
@@ -197,6 +217,11 @@ export function FilterBar({
     );
   };
 
+  const sortOpen = openField === "__sort";
+  const activeSort = query.sort
+    ? config.sort?.find((s) => s.name === query.sort?.field)
+    : undefined;
+
   return (
     <>
       <div ref={barRef} className="filter-bar">
@@ -211,6 +236,52 @@ export function FilterBar({
           />
         )}
         {config.fields.map(renderPill)}
+        {(config.sort?.length ?? 0) > 0 && (
+          <div className="filter-pill-wrap">
+            <button
+              type="button"
+              className={`filter-pill${activeSort ? " active" : ""}`}
+              aria-expanded={sortOpen}
+              onClick={() => setOpenField(sortOpen ? null : "__sort")}
+            >
+              Sort
+              {activeSort && (
+                <span className="filter-pill-count">
+                  {activeSort.label} {query.sort?.dir === "desc" ? "↓" : "↑"}
+                </span>
+              )}
+              <span aria-hidden="true">▾</span>
+            </button>
+            {sortOpen && (
+              <div className="filter-pop">
+                {config.sort?.map((s) => (
+                  <button
+                    key={s.name}
+                    type="button"
+                    className="filter-opt filter-opt-btn"
+                    onClick={() => setSort(s.name)}
+                  >
+                    <span className="filter-opt-label">{s.label}</span>
+                    {query.sort?.field === s.name && (
+                      <span className="filter-opt-count">
+                        {query.sort.dir === "desc" ? "↓ desc" : "↑ asc"}
+                      </span>
+                    )}
+                  </button>
+                ))}
+                {query.sort && (
+                  <button
+                    type="button"
+                    className="filter-opt filter-opt-btn"
+                    onClick={() => setSort(null)}
+                  >
+                    <span className="filter-opt-label">Default order</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {hasActiveFilters(query) && (
           <button type="button" className="filter-clear" onClick={clearAll}>
             Clear all
@@ -221,6 +292,29 @@ export function FilterBar({
         </span>
       </div>
       <div className={isPending ? "filter-pending" : undefined}>{children}</div>
+      {pageCount > 1 && (
+        <div className="filter-pager">
+          <button
+            type="button"
+            className="btn-ae-outline text-xs disabled:opacity-40"
+            onClick={() => goToPage(page - 1)}
+            disabled={page <= 1}
+          >
+            ← Prev
+          </button>
+          <span className="tabular-nums">
+            Page {page} of {pageCount}
+          </span>
+          <button
+            type="button"
+            className="btn-ae-outline text-xs disabled:opacity-40"
+            onClick={() => goToPage(page + 1)}
+            disabled={page >= pageCount}
+          >
+            Next →
+          </button>
+        </div>
+      )}
     </>
   );
 }
