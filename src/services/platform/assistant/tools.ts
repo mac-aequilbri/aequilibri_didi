@@ -18,6 +18,30 @@ export interface ToolPolicy {
   kind?: "record" | "service";
 }
 
+// Spec 12 role-scoped write access (Module 7): Owner confirms anything;
+// Builder writes to PLAN and ISSUES only (no budget, no risks, no decisions);
+// Architect additionally drafts scope changes (variation orders = CHANGE_LOG)
+// but has no financial write; Broker is read-only except creating ISSUES
+// (Decision Required flagging). All writes remain approval-gated downstream.
+const ROLE_WRITE_ALLOW: Record<string, ReadonlySet<string>> = {
+  builder: new Set([
+    "create_action",
+    "update_action",
+    "log_workstream_update",
+    "capture_source_note",
+    "generate_weekly_report",
+  ]),
+  architect: new Set([
+    "create_action",
+    "update_action",
+    "log_workstream_update",
+    "capture_source_note",
+    "create_variation_draft",
+    "generate_weekly_report",
+  ]),
+  broker: new Set(["create_action"]),
+};
+
 export function roleCanUseTool(
   role: string,
   toolName: string,
@@ -27,8 +51,23 @@ export function roleCanUseTool(
   const policy = policyMap[toolName];
   if (!policy) return false;
   if (policy.risk === "read") return true;
-  if (normalized === "owner" || normalized === "builder" || normalized === "architect") return true;
-  return false;
+  if (normalized === "owner") return true;
+  return ROLE_WRITE_ALLOW[normalized]?.has(toolName) ?? false;
+}
+
+// Spec 12 role-scoped read access: financial tables (BUDGET/CASHFLOWS) are
+// Owner-only; RISKS is hidden from Builder/Architect; LEARNING_RULES from all
+// non-owner roles; PROCUREMENT is financial detail the Architect doesn't get.
+const ROLE_QUERY_DENY: Record<string, ReadonlySet<string>> = {
+  builder: new Set(["budget_lines", "cashflows", "risks", "learning_rules"]),
+  architect: new Set(["budget_lines", "cashflows", "procurement", "risks", "learning_rules"]),
+  broker: new Set(["budget_lines", "cashflows", "learning_rules"]),
+};
+
+export function roleCanQueryTable(role: string, table: string): boolean {
+  const normalized = normalizeTeamRole(role);
+  if (normalized === "owner") return true;
+  return !(ROLE_QUERY_DENY[normalized]?.has(table) ?? false);
 }
 
 export const TOOL_POLICY: Record<string, ToolPolicy> = {

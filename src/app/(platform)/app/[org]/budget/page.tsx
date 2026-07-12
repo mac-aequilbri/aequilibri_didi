@@ -5,7 +5,7 @@ import Link from "next/link";
 import { BarsCompare } from "@/components/charts";
 import { EmptyState, MetricCard, PageHeader } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
 import { loadBudgetJobs } from "@/lib/platform/budgetSource";
 import { orgPath } from "@/lib/platform/paths";
 
@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function BudgetPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
+  await requireFinancialAccess(ctx);
   const jobs = await loadBudgetJobs(ctx);
 
   const all = jobs.flatMap((j) => j.conBudgets);

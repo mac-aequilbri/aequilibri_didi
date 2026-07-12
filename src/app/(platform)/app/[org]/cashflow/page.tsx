@@ -14,7 +14,7 @@ import {
   toClientConfig,
   toPredicate,
 } from "@/lib/platform/listQuery";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
 import { loadCashflowJobs } from "@/lib/platform/cashflowSource";
 import { orgPath } from "@/lib/platform/paths";
 import { cashflowListConfig } from "./listConfig";
@@ -29,6 +29,7 @@ export default async function CashflowPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
+  await requireFinancialAccess(ctx);
   const query = parseListQuery(await searchParams, cashflowListConfig);
   const filtered = hasActiveFilters(query);
   const allJobs = await loadCashflowJobs(ctx);

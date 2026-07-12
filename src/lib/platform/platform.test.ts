@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calcConfidence, combine, confidenceBand } from "./confidence";
 import { diffForCorrections } from "./corrections";
+import { diffStoredVsSubmitted, valuesEquivalent } from "./reconciliation";
 import { getPrompt } from "./prompts";
 import { modelFor } from "./modelRouter";
 import { validateRecord } from "./recordWriter";
@@ -101,6 +102,33 @@ describe("diffForCorrections", () => {
   it("ignores non-numeric and unchanged fields", () => {
     const out = diffForCorrections({ a: "x" }, { a: "y" }, [{ field: "a", dimension: "d" }], base);
     expect(out).toHaveLength(0);
+  });
+});
+
+describe("post-write reconciliation (Spec 12 Module 2)", () => {
+  it("tolerates Airtable storage conventions (typecast, absent falsy fields)", () => {
+    expect(valuesEquivalent("5", 5)).toBe(true);
+    expect(valuesEquivalent(5, "5.0")).toBe(true);
+    expect(valuesEquivalent(false, undefined)).toBe(true); // unchecked checkbox omitted on read
+    expect(valuesEquivalent("", undefined)).toBe(true);
+    expect(valuesEquivalent([], undefined)).toBe(true);
+    expect(valuesEquivalent(" trimmed ", "trimmed")).toBe(true);
+    expect(valuesEquivalent(["recA", "recB"], ["recB", "recA"])).toBe(true);
+  });
+
+  it("flags genuine divergence between submitted and stored values", () => {
+    expect(valuesEquivalent(5, 6)).toBe(false);
+    expect(valuesEquivalent("Ordered", "Paid")).toBe(false);
+    expect(valuesEquivalent("x", undefined)).toBe(false);
+    expect(valuesEquivalent(["recA"], ["recA", "recB"])).toBe(false);
+  });
+
+  it("diffs only submitted fields, naming submitted and stored values", () => {
+    const out = diffStoredVsSubmitted(
+      { Status: "Ordered", Quantity: "5", Notes: undefined },
+      { Status: "Paid", Quantity: 5, Total_Cost: 999 }, // Total_Cost = formula, never sent
+    );
+    expect(out).toEqual([{ field: "Status", submitted: "Ordered", stored: "Paid" }]);
   });
 });
 

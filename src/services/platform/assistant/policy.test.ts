@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { WRITABLE_TABLES } from "@/lib/platform/recordWriter";
 import { requiresApproval } from "./executor";
-import { ASSISTANT_TOOLS, roleCanUseTool, TOOL_POLICY } from "./tools";
+import { ASSISTANT_TOOLS, roleCanQueryTable, roleCanUseTool, TOOL_POLICY } from "./tools";
 
 describe("aiAuthority policy matrix", () => {
   it("reads never require approval", () => {
@@ -54,17 +54,48 @@ describe("tool policy registry consistency", () => {
   });
 });
 
-describe("assistant role-scoped access", () => {
-  it("broker role can read but cannot write", () => {
+describe("assistant role-scoped access (Spec 12 Module 7)", () => {
+  it("broker is read-only except creating issues (Decision Required flagging)", () => {
     expect(roleCanUseTool("broker", "query_records")).toBe(true);
-    expect(roleCanUseTool("broker", "create_action")).toBe(false);
+    expect(roleCanUseTool("broker", "create_action")).toBe(true);
+    expect(roleCanUseTool("broker", "update_action")).toBe(false);
     expect(roleCanUseTool("broker", "update_budget_line")).toBe(false);
+    expect(roleCanUseTool("broker", "save_decision")).toBe(false);
   });
 
-  it("owner/builder/architect roles can use write tools", () => {
-    for (const role of ["owner", "builder", "architect"]) {
-      expect(roleCanUseTool(role, "create_action")).toBe(true);
-      expect(roleCanUseTool(role, "save_decision")).toBe(true);
+  it("builder writes PLAN/ISSUES only — no budget, risks, decisions, or rules", () => {
+    expect(roleCanUseTool("builder", "create_action")).toBe(true);
+    expect(roleCanUseTool("builder", "update_action")).toBe(true);
+    expect(roleCanUseTool("builder", "log_workstream_update")).toBe(true);
+    expect(roleCanUseTool("builder", "update_budget_line")).toBe(false);
+    expect(roleCanUseTool("builder", "create_risk")).toBe(false);
+    expect(roleCanUseTool("builder", "save_decision")).toBe(false);
+    expect(roleCanUseTool("builder", "propose_rule")).toBe(false);
+    expect(roleCanUseTool("builder", "create_variation_draft")).toBe(false);
+  });
+
+  it("architect drafts scope changes but has no financial write", () => {
+    expect(roleCanUseTool("architect", "create_variation_draft")).toBe(true);
+    expect(roleCanUseTool("architect", "update_budget_line")).toBe(false);
+    expect(roleCanUseTool("architect", "save_decision")).toBe(false);
+  });
+
+  it("owner can use every tool", () => {
+    for (const name of Object.keys(TOOL_POLICY)) {
+      expect(roleCanUseTool("owner", name), name).toBe(true);
     }
+  });
+
+  it("financial and restricted tables are unreadable below owner", () => {
+    for (const role of ["builder", "architect", "broker"]) {
+      expect(roleCanQueryTable(role, "budget_lines"), role).toBe(false);
+      expect(roleCanQueryTable(role, "cashflows"), role).toBe(false);
+      expect(roleCanQueryTable(role, "learning_rules"), role).toBe(false);
+      expect(roleCanQueryTable(role, "actions"), role).toBe(true);
+    }
+    expect(roleCanQueryTable("builder", "risks")).toBe(false);
+    expect(roleCanQueryTable("architect", "procurement")).toBe(false);
+    expect(roleCanQueryTable("builder", "procurement")).toBe(true); // their trade's items
+    expect(roleCanQueryTable("owner", "budget_lines")).toBe(true);
   });
 });

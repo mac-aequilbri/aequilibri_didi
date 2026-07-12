@@ -17,6 +17,7 @@ import {
 } from "@/lib/airtable/control";
 import { prisma } from "@/lib/db";
 import { clerkEnabled, platformAdminEmails } from "./authConfig";
+import { reportingCapabilities } from "./reportingPolicy";
 import {
   defaultModule1Governance,
   isAdminRole,
@@ -164,6 +165,18 @@ export async function getCurrentUser(ctx: OrgCtx): Promise<CurrentUser> {
   const user = await getCurrentViewer(ctx);
   if (!isWriteRole(user.role)) {
     throw new Error("Your role in this organisation is read-only — writes are not permitted.");
+  }
+  return user;
+}
+
+/** Financial-surface gate (Spec 12 Module 8: the Budget Dashboard is Owner
+ *  role only — no financial view for Builder, Architect, or Broker). Used by
+ *  the budget/cashflow/accounting pages and their server actions; non-owner
+ *  roles are bounced to the org dashboard. */
+export async function requireFinancialAccess(ctx: OrgCtx): Promise<CurrentUser> {
+  const user = await getCurrentViewer(ctx);
+  if (!reportingCapabilities(user.role).showFinancialDetail) {
+    redirect(`/app/${ctx.orgSlug}?denied=financial`);
   }
   return user;
 }

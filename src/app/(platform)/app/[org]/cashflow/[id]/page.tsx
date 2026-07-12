@@ -2,7 +2,7 @@
 
 import RecordEditPage from "../../_record-edit/RecordEditPage";
 import { loadCashflowDetail } from "@/lib/platform/cashflowSource";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
 import type { RecordEditorConfig } from "@/lib/platform/recordEditor";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +50,7 @@ export default async function CashflowDetailPage({
 }) {
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
+  await requireFinancialAccess(ctx);
   const values = await loadCashflowDetail(ctx, id);
   return (
     <RecordEditPage

@@ -15,8 +15,16 @@ export interface NavCounts {
   openVariations?: number;
 }
 
-export function buildNav(ctx: OrgCtx, jobCount: number, counts: NavCounts = {}): NavSection[] {
+export function buildNav(
+  ctx: OrgCtx,
+  jobCount: number,
+  counts: NavCounts = {},
+  /** Viewer's normalized team role. Financial entries render for owner only
+   *  (Spec 12 Module 8) — the routes themselves are also server-gated. */
+  role: string = "owner",
+): NavSection[] {
   const f = ctx.config.features;
+  const financial = role === "owner";
   const p = (path: string) => orgPath(ctx.orgSlug, path);
   // Single-engagement long_project orgs (e.g. Dulong Downs) pin their one job;
   // everyone else navigates a projects list.
@@ -53,14 +61,18 @@ export function buildNav(ctx: OrgCtx, jobCount: number, counts: NavCounts = {}):
         ...(f.delay_cascade ? [{ href: p("/delay-cascade"), label: "Schedule impact" }] : []),
       ],
     },
-    {
-      heading: "Finance",
-      items: [
-        ...(f.quotes ? [{ href: p("/quotes"), label: "Quotes" }] : []),
-        { href: p("/budget"), label: "Budget" },
-        { href: p("/cashflow"), label: "Cashflow" },
-      ],
-    },
+    ...(financial
+      ? [
+          {
+            heading: "Finance",
+            items: [
+              ...(f.quotes ? [{ href: p("/quotes"), label: "Quotes" }] : []),
+              { href: p("/budget"), label: "Budget" },
+              { href: p("/cashflow"), label: "Cashflow" },
+            ],
+          },
+        ]
+      : []),
     {
       heading: "Records",
       items: [

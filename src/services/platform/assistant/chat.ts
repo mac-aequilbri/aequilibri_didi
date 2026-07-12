@@ -199,7 +199,7 @@ export async function sendChatMessage(
     rulesBlock: [
       rulesBlock,
       `Current user role: ${normalizeTeamRole(opts.userRole ?? "broker")}.`,
-      `If role is broker, do not attempt write tools (read/query only).`,
+      `Role access is enforced server-side: owner has full access; builder writes actions/workstreams only (no budget, risks, decisions, or rules); architect additionally drafts variations but has no financial access; broker is read-only except raising an action to flag a decision needed. Financial tables (budget, cashflow) and learning rules are readable by the owner only — for other roles, answer without that data and note it is owner-restricted.`,
       `Current data snapshot:\n${context}`,
     ]
       .filter(Boolean)

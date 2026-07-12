@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { formToObject } from "@/lib/platform/forms";
-import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
+import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { writeRecord } from "@/lib/platform/recordWriter";
 
 export async function createCashflowEntry(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const user = await getCurrentUser(ctx);
+  const user = await requireFinancialAccess(ctx);
   await writeRecord(ctx, {
     table: "cashflow",
     op: "create",

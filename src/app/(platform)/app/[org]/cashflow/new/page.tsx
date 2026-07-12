@@ -1,13 +1,14 @@
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
 import { createCashflowEntry } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewCashflowPage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
+  await requireFinancialAccess(ctx);
   const jobs = await loadJobOptions(ctx);
 
   return (

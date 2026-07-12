@@ -14,6 +14,7 @@ import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { Actor, OrgCtx } from "./types";
 import { emitOutboundEvent } from "./outbox";
+import { reconcileAirtableWrite } from "./reconciliation";
 
 // ── field helpers (typecast layer) ────────────────────────────────────
 
@@ -758,6 +759,12 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
       payload: JSON.stringify({ table: req.table, op: req.op, data }),
       bestEffort: onAirtable,
     });
+    // Spec 12 Module 2 post-write reconciliation: every AI-initiated write is
+    // re-read and diffed against the submitted payload (best-effort; never
+    // fails the write). Human form writes are their own confirmation.
+    if (req.actor.type !== "human" && (req.op === "create" || req.op === "update")) {
+      await reconcileAirtableWrite(ctx, req.table, req.op, data, recordId, req.actor);
+    }
     return { status: "executed", recordId, execLogId };
   } catch (err) {
     logger.error("Record write failed", {
@@ -837,6 +844,10 @@ export async function executeProposal(
   ctx: OrgCtx,
   proposalId: RecordId,
   approvedBy: string,
+  /** Approve-with-edits (Spec 12 Module 2): field values the reviewer changed
+   *  before approving, merged over the stored payload. The caller is
+   *  responsible for emitting the matching CORRECTIONS records. */
+  edits?: Record<string, unknown>,
 ): Promise<WriteResult> {
   const pending = await resolvePending(ctx, proposalId);
 
@@ -864,7 +875,10 @@ export async function executeProposal(
 
   const onAirtable = airtableEnabled() && airtableMapFor(pending.tableKey) !== undefined;
   try {
-    const payloadObj = JSON.parse(pending.payload) as Record<string, unknown>;
+    const payloadObj = {
+      ...(JSON.parse(pending.payload) as Record<string, unknown>),
+      ...(edits ?? {}),
+    };
     // Airtable update/delete proposals stash their "rec…" target in the payload
     // (the Postgres recordId column is integer-only). Strip it before writing.
     let target: number | string | undefined = pending.recordId ?? undefined;
@@ -880,6 +894,14 @@ export async function executeProposal(
       data = validated(def, op, payloadObj);
     }
     const recordId = await performWrite(ctx, pending.tableKey as WritableTable, def, op, target, data);
+    // Post-write reconciliation on approved proposals too — the reviewed value
+    // was submitted; this catches drift between submission and storage.
+    if (op !== "delete") {
+      await reconcileAirtableWrite(ctx, pending.tableKey, op, data, recordId, {
+        type: (pending.actorType as Actor["type"]) ?? "system",
+        name: pending.actorName,
+      });
+    }
     const execLogId = await writeExecutedLog(ctx, {
       jobId: pending.jobId ?? undefined,
       actor: {

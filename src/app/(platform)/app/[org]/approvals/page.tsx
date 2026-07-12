@@ -53,7 +53,13 @@ interface Change {
   /** null = this field is a new addition (create / newly-set). */
   before: string | null;
   after: string;
+  /** Raw string form of the proposed value when the field is a scalar the
+   *  reviewer may correct before approving (Spec 12 Module 2). */
+  raw: string | null;
 }
+
+const rawIfEditable = (v: unknown): string | null =>
+  typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? String(v) : null;
 
 /** Diff the proposed payload against the record's current state. */
 function buildChanges(op: string, payload: string, current: Record<string, unknown> | null): Change[] {
@@ -61,7 +67,7 @@ function buildChanges(op: string, payload: string, current: Record<string, unkno
   try {
     proposed = JSON.parse(payload);
   } catch {
-    return [{ key: "payload", before: null, after: fmt(payload) }];
+    return [{ key: "payload", before: null, after: fmt(payload), raw: null }];
   }
   const entries = Object.entries(proposed).filter(([k]) => !SKIP_FIELDS.has(k));
 
@@ -69,14 +75,14 @@ function buildChanges(op: string, payload: string, current: Record<string, unkno
     return entries
       .filter(([, v]) => !isEmpty(v))
       .slice(0, 10)
-      .map(([key, v]) => ({ key, before: null, after: fmt(v) }));
+      .map(([key, v]) => ({ key, before: null, after: fmt(v), raw: rawIfEditable(v) }));
   }
   // update: surface only fields that actually change.
   const changes: Change[] = [];
   for (const [key, v] of entries) {
     const after = fmt(v);
     const before = current ? fmt(current[key]) : "—";
-    if (after !== before) changes.push({ key, before, after });
+    if (after !== before) changes.push({ key, before, after, raw: rawIfEditable(v) });
   }
   return changes;
 }
@@ -127,8 +133,15 @@ export default async function ApprovalsPage({
           {proposals.map(({ prop, changes }) => {
             const exp = expiryNote(prop.expiresAt);
             const isAi = prop.actorType === "ai";
+            const editable = prop.op !== "delete" && changes.some((c) => c.raw !== null);
             return (
-              <div key={prop.id} className="ae-card p-4">
+              // One form per card: Approve submits it (with any corrected
+              // field values); Reject overrides via formAction. Correcting a
+              // value before approving emits a CORRECTIONS record (Spec 12
+              // Module 2 — propose, review/correct, confirm).
+              <form key={prop.id} action={approveProposalAction} className="ae-card p-4">
+                <input type="hidden" name="org" value={ctx.orgSlug} />
+                <input type="hidden" name="proposalId" value={prop.id} />
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -151,20 +164,12 @@ export default async function ApprovalsPage({
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    <form action={approveProposalAction}>
-                      <input type="hidden" name="org" value={ctx.orgSlug} />
-                      <input type="hidden" name="proposalId" value={prop.id} />
-                      <button type="submit" className="btn-ae text-sm">
-                        Approve
-                      </button>
-                    </form>
-                    <form action={rejectProposalAction}>
-                      <input type="hidden" name="org" value={ctx.orgSlug} />
-                      <input type="hidden" name="proposalId" value={prop.id} />
-                      <button type="submit" className="btn-ae-outline text-sm">
-                        Reject
-                      </button>
-                    </form>
+                    <button type="submit" className="btn-ae text-sm">
+                      Approve
+                    </button>
+                    <button type="submit" formAction={rejectProposalAction} className="btn-ae-outline text-sm">
+                      Reject
+                    </button>
                   </div>
                 </div>
 
@@ -182,8 +187,22 @@ export default async function ApprovalsPage({
                         <dt className="text-[0.7rem] uppercase tracking-wide text-neutral-400 w-32 shrink-0">
                           {c.key}
                         </dt>
-                        <dd className="min-w-0 text-neutral-700">
-                          {c.before === null ? (
+                        <dd className="min-w-0 text-neutral-700 flex-1">
+                          {c.raw !== null ? (
+                            <span className="flex flex-wrap items-baseline gap-x-1.5">
+                              {c.before !== null && (
+                                <>
+                                  <span className="line-through text-neutral-400">{c.before}</span>
+                                  <span className="text-neutral-300">→</span>
+                                </>
+                              )}
+                              <input
+                                name={`field:${c.key}`}
+                                defaultValue={c.raw}
+                                className="flex-1 min-w-40 rounded border border-neutral-200 px-1.5 py-0.5 text-sm font-medium text-[var(--ae-space-deep)] focus:border-neutral-400 focus:outline-none"
+                              />
+                            </span>
+                          ) : c.before === null ? (
                             <span className="text-[var(--ae-success)]">{c.after}</span>
                           ) : (
                             <>
@@ -197,7 +216,29 @@ export default async function ApprovalsPage({
                     ))}
                   </dl>
                 )}
-              </div>
+
+                {editable && (
+                  <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                    <span>If you corrected a value, why was the proposal wrong?</span>
+                    <select
+                      name="rootCauseCategory"
+                      defaultValue="Estimation Error"
+                      className="rounded border border-neutral-200 px-1.5 py-0.5 text-xs"
+                    >
+                      <option>Estimation Error</option>
+                      <option>Data Quality</option>
+                      <option>Scope Change</option>
+                      <option>External Factor</option>
+                      <option>Model Error</option>
+                    </select>
+                    <input
+                      name="rootCauseNote"
+                      placeholder="Optional note (e.g. supplier quote superseded)"
+                      className="flex-1 min-w-48 rounded border border-neutral-200 px-1.5 py-0.5 text-xs"
+                    />
+                  </div>
+                )}
+              </form>
             );
           })}
         </div>

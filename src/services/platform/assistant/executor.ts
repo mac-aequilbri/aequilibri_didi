@@ -9,7 +9,7 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import type { ToolUse } from "@/lib/claude";
 import { writeRecord, WritableTable, type RecordId } from "@/lib/platform/recordWriter";
 import { Actor, AiAuthority, OrgCtx } from "@/lib/platform/types";
-import { roleCanUseTool, type ToolPolicy } from "./tools";
+import { roleCanQueryTable, roleCanUseTool, type ToolPolicy } from "./tools";
 
 export interface ToolOutcome {
   toolName: string;
@@ -296,6 +296,19 @@ export async function executeToolUse(
   }
 
   if (policy.risk === "read") {
+    // Spec 12 role-scoped context: financial and restricted tables are not
+    // readable below the Owner role, even via the generic query tool.
+    if (
+      tu.name === "query_records" &&
+      currentUserRole &&
+      !roleCanQueryTable(currentUserRole, String(input.table ?? ""))
+    ) {
+      return {
+        toolName: tu.name,
+        ok: false,
+        summary: `Role "${currentUserRole}" does not have access to the "${String(input.table ?? "")}" table. Answer without that data and say the detail is restricted to the owner role.`,
+      };
+    }
     try {
       return { toolName: tu.name, ok: true, summary: await runQuery(ctx, input) };
     } catch (err) {

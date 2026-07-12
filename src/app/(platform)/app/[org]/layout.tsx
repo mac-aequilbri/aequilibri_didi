@@ -3,7 +3,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { CommandSearch } from "@/components/CommandSearch";
 import { buildNav } from "@/lib/platform/nav";
 import { loadNavCounts } from "@/lib/platform/navCountsSource";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 
 export default async function OrgLayout({
   children,
@@ -14,17 +14,22 @@ export default async function OrgLayout({
 }) {
   const { org } = await params;
   const ctx = await requireOrgCtx(org);
-  const counts = await loadNavCounts(ctx);
+  const [counts, viewer] = await Promise.all([loadNavCounts(ctx), getCurrentViewer(ctx)]);
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <Sidebar
-        sections={buildNav(ctx, counts.jobs, {
-          pending: counts.pending,
-          openActions: counts.openActions,
-          openRisks: counts.openRisks,
-          openVariations: counts.openVariations,
-        })}
+        sections={buildNav(
+          ctx,
+          counts.jobs,
+          {
+            pending: counts.pending,
+            openActions: counts.openActions,
+            openRisks: counts.openRisks,
+            openVariations: counts.openVariations,
+          },
+          viewer.role,
+        )}
         orgName={ctx.orgName}
         orgLogo={ctx.config.branding?.logo}
         pendingCount={counts.pending}

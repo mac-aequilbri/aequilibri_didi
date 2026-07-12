@@ -141,6 +141,26 @@ describe("recordWriter lifecycle", () => {
     expect(audit?.approvedBy).toBe("Approver");
   });
 
+  it("approve-with-edits applies the reviewer's corrected values (Spec 12 Module 2)", async () => {
+    const proposed = await writeRecord(ctx, {
+      table: "action",
+      op: "create",
+      data: { title: "AI-proposed title" },
+      actor: { type: "ai", name: "TestBot" },
+      requireApproval: true,
+    });
+    expect(proposed.status).toBe("proposed");
+
+    const executed = await executeProposal(ctx, proposed.proposalId!, "Approver", {
+      title: "Reviewer-corrected title",
+    });
+    expect(executed.status).toBe("executed");
+    const created = await prisma.platActionHub.findFirst({
+      where: { id: executed.recordId as number, orgId: ctx.orgId },
+    });
+    expect(created?.title).toBe("Reviewer-corrected title");
+  });
+
   it("rejection never performs the write", async () => {
     const proposed = await writeRecord(ctx, {
       table: "action",

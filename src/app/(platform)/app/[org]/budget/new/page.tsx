@@ -2,13 +2,14 @@ import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadReferenceOptions } from "@/lib/platform/configSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
 import { createBudgetLine } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewBudgetLinePage({ params }: { params: Promise<{ org: string }> }) {
   const ctx = await requireOrgCtx((await params).org);
+  await requireFinancialAccess(ctx);
   const [jobs, categories] = await Promise.all([
     loadJobOptions(ctx),
     loadReferenceOptions(ctx, "budget_category"),

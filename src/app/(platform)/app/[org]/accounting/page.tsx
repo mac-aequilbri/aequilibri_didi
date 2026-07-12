@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate } from "@/lib/format";
 import { xeroEnabled, type AccountingSummary } from "@/lib/platform/accounting";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
 import {
   connectAccountingAction,
   disconnectAccountingAction,
@@ -23,6 +23,7 @@ export default async function AccountingPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
+  await requireFinancialAccess(ctx);
   if (!ctx.config.features.accounting) {
     return (
       <div className="p-6 max-w-3xl">
