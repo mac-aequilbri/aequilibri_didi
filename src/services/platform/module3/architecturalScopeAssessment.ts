@@ -228,6 +228,8 @@ export async function runArchitecturalScopeAssessment(
         dimension: "scope.room_area",
         aiValueText: "missing",
         humanValueText: missingArea.map((r) => r.room).join(", "),
+        sourceModule: "module3",
+        rootCauseCategory: "Data Quality",
         rootCause: "architectural document omitted dimensions for one or more rooms",
         context: { capability: "architectural_scope_assessment", jobId: String(input.jobId) },
       },

@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
-import { emitCorrection } from "@/lib/platform/corrections";
+import {
+  CORRECTION_ROOT_CAUSES,
+  emitCorrection,
+  type CorrectionRootCause,
+} from "@/lib/platform/corrections";
 import { orgPath } from "@/lib/platform/paths";
 import { executeProposal, recordIdParam, rejectProposal } from "@/lib/platform/recordWriter";
 import { captureConversationNote } from "@/services/platform/documents";
@@ -42,6 +46,13 @@ export async function closeSessionReviewAction(formData: FormData): Promise<void
   const humanCorrection = String(formData.get("humanCorrection") ?? "").trim();
   const rootCause = String(formData.get("rootCause") ?? "").trim();
   const dimension = String(formData.get("dimension") ?? "").trim() || "assistant.session";
+  // Spec 12 five-category Root_Cause: honour an explicit category from the
+  // close form; a manually captured "should have applied / applied wrongly"
+  // correction defaults to Model Error.
+  const rawCategory = String(formData.get("rootCauseCategory") ?? "").trim();
+  const rootCauseCategory = (CORRECTION_ROOT_CAUSES as readonly string[]).includes(rawCategory)
+    ? (rawCategory as CorrectionRootCause)
+    : "Model Error";
 
   if (reviewSummary) {
     await captureConversationNote(ctx, user.name, {
@@ -61,6 +72,8 @@ export async function closeSessionReviewAction(formData: FormData): Promise<void
       dimension,
       aiValueText: aiOutput,
       humanValueText: humanCorrection,
+      sourceModule: "manual",
+      rootCauseCategory,
       rootCause,
       context: {
         phase: "session_close",

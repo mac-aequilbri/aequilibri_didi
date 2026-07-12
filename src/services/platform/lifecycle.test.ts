@@ -14,6 +14,7 @@ import { OrgCtx } from "@/lib/platform/types";
 import {
   applyRules,
   promoteHypothesisToRule,
+  recordRuleOverride,
   runHypothesisEngine,
 } from "./learning";
 
@@ -206,8 +207,9 @@ describe("recordWriter lifecycle", () => {
   });
 });
 
-describe("learning loop", () => {
-  it("clusters corrections, promotes a rule, applies it context-scoped", async () => {
+describe("learning loop (Spec 12 Module 6)", () => {
+  it("clusters on Root_Cause + Source_Module + Supplier, validates at the type threshold, promotes a DRAFT, applies only after owner activation", async () => {
+    // Three supplier-anchored corrections: Supplier Pattern validates at 3.
     for (const [ai, human] of [
       [1000, 1150],
       [2000, 2260],
@@ -220,26 +222,127 @@ describe("learning loop", () => {
           aiValue: ai,
           humanValue: human,
           variancePct: Math.round(((human - ai) / ai) * 1000) / 10,
-          rootCause: "test cause",
-          context: JSON.stringify({ suburb: "Testville" }),
+          rootCause: "External Factor",
+          context: JSON.stringify({
+            suburb: "Testville",
+            supplier: "Acme Supplies",
+            _sourceModule: "module5",
+          }),
         },
       });
     }
     const engine = await runHypothesisEngine(ctx);
     expect(engine.created).toBe(1);
 
+    // Stage 3: platform proposes validation (threshold 3 met, direction consistent).
     const hypothesis = await prisma.platHypothesis.findFirst({
-      where: { orgId: ctx.orgId, dimension: "budget.test", status: "pending" },
+      where: { orgId: ctx.orgId, dimension: "budget.test" },
     });
     expect(hypothesis).toBeTruthy();
     expect(hypothesis!.sampleCount).toBe(3);
+    expect(hypothesis!.status).toBe("validated");
+    // Supplier anchor survives into the trigger condition (all 3 share it).
+    expect(JSON.parse(hypothesis!.triggerCondition).supplier).toBe("acme supplies");
+    // Reserved loop metadata never becomes a trigger key.
+    expect(JSON.parse(hypothesis!.triggerCondition)._sourceModule).toBeUndefined();
 
+    // Stage 4: promotion creates a DRAFT — not an active rule.
     const ruleId = await promoteHypothesisToRule(ctx, hypothesis!.id, "adjustment");
     expect(ruleId).toBeTruthy();
+    const draft = await prisma.platLearningRule.findFirst({
+      where: { orgId: ctx.orgId, id: Number(ruleId) },
+    });
+    expect(draft!.isActive).toBe(false);
+    // Spec formula: min(85, 3/3 × 70) = 70 — capped, never full confidence.
+    expect(draft!.confidence).toBe(70);
 
-    const matched = await applyRules(ctx, { suburb: "Testville" });
+    // A draft does not apply.
+    const beforeActivation = await applyRules(ctx, { supplier: "Acme Supplies" });
+    expect(beforeActivation.some((r) => r.adjustment?.dimension === "budget.test")).toBe(false);
+
+    // Owner sign-off: activate, then the rule applies context-scoped.
+    await prisma.platLearningRule.update({ where: { id: draft!.id }, data: { isActive: true } });
+    const matched = await applyRules(ctx, { supplier: "Acme Supplies", suburb: "Testville" });
     expect(matched.some((r) => r.adjustment?.dimension === "budget.test")).toBe(true);
-    const unmatched = await applyRules(ctx, { suburb: "Elsewhere" });
+    const unmatched = await applyRules(ctx, { supplier: "Other Supplier", suburb: "Elsewhere" });
     expect(unmatched.some((r) => r.adjustment?.dimension === "budget.test")).toBe(false);
+
+    // +1 per clean application (one matched firing above): 70 → 71.
+    const afterFiring = await prisma.platLearningRule.findFirst({ where: { orgId: ctx.orgId, id: draft!.id } });
+    expect(afterFiring!.confidence).toBe(71);
+  });
+
+  it("refuses to promote below the type's validation threshold", async () => {
+    // Two corrections, no supplier anchor, category Estimation Error →
+    // Estimation Bias (threshold 8, detect gate 5): no hypothesis forms.
+    for (const [ai, human] of [
+      [100, 90],
+      [200, 180],
+    ]) {
+      await prisma.platCorrection.create({
+        data: {
+          orgId: ctx.orgId,
+          dimension: "schedule.test",
+          aiValue: ai,
+          humanValue: human,
+          variancePct: Math.round(((human - ai) / ai) * 1000) / 10,
+          rootCause: "Estimation Error",
+          context: JSON.stringify({ _sourceModule: "module3" }),
+        },
+      });
+    }
+    const engine = await runHypothesisEngine(ctx);
+    expect(engine.created).toBe(0);
+
+    // A hand-made under-evidenced hypothesis cannot be promoted.
+    const thin = await prisma.platHypothesis.create({
+      data: {
+        orgId: ctx.orgId,
+        description: "thin evidence",
+        dimension: "schedule.test",
+        rootCausePattern: "estimation error",
+        triggerCondition: "{}",
+        sampleCount: 2,
+        avgVariancePct: -10,
+        confidence: 24,
+        status: "pending",
+      },
+    });
+    expect(await promoteHypothesisToRule(ctx, thin.id, "adjustment")).toBeNull();
+  });
+
+  it("caps confidence at 95 and decays −5 per override, auto Under Review at ≤50", async () => {
+    const rule = await prisma.platLearningRule.create({
+      data: {
+        orgId: ctx.orgId,
+        ruleCode: "LRN-9001",
+        kind: "guidance",
+        description: "confidence lifecycle rule",
+        triggerCondition: JSON.stringify({ suburb: "capville" }),
+        adjustment: "{}",
+        priority: 3,
+        confidence: 95,
+        isActive: true,
+      },
+    });
+
+    // At the 95 ceiling a firing must not push confidence higher.
+    await applyRules(ctx, { suburb: "Capville" });
+    let r = await prisma.platLearningRule.findFirst({ where: { orgId: ctx.orgId, id: rule.id } });
+    expect(r!.confidence).toBe(95);
+
+    // Overrides decay by 5 per event.
+    const afterOne = await recordRuleOverride(ctx, "LRN-9001");
+    expect(afterOne!.confidence).toBe(90);
+    expect(afterOne!.underReview).toBe(false);
+
+    // Decay to ≤50 automatically takes the rule out of application.
+    await prisma.platLearningRule.update({ where: { id: rule.id }, data: { confidence: 55 } });
+    const tipped = await recordRuleOverride(ctx, "LRN-9001");
+    expect(tipped!.confidence).toBe(50);
+    expect(tipped!.underReview).toBe(true);
+    r = await prisma.platLearningRule.findFirst({ where: { orgId: ctx.orgId, id: rule.id } });
+    expect(r!.isActive).toBe(false);
+    expect(r!.notes).toMatch(/Under Review/);
   });
 });

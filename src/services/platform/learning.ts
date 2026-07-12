@@ -1,9 +1,18 @@
-// Platform learning loop — org-scoped generalisation of the UC1 mechanism
-// (src/services/uc1/learning.ts): CORRECTIONS → HYPOTHESES → LEARNING_RULES.
-// Differences from UC1: every query is org-scoped; the trigger context is an
-// open key/value JSON (UC1 hardcoded suburb/address); rules come in two kinds
-// ("adjustment" = numeric, applied by the assessment engine; "guidance" =
-// text, injected into the assistant prompt); thresholds live in PlatCfgSetting.
+// Platform learning loop — Spec 12 Module 6 pipeline (Capture → Detect →
+// Validate → Promote) over CORRECTIONS → HYPOTHESES → LEARNING_RULES.
+//   Detect: corrections cluster on Root_Cause category + Source_Module +
+//     (Supplier | Phase) anchor, at per-Hypothesis_Type thresholds.
+//   Validate: a hypothesis is proposed as "validated" by the platform when its
+//     type's evidence threshold is met with a consistent delta direction; the
+//     owner confirms by promoting (or rejects).
+//   Promote: promotion creates a DRAFT rule (Rule_Status "Draft") with
+//     confidence capped at 85 — no rule becomes Active without owner sign-off
+//     (the activate toggle on the learning-rules page).
+//   Application: +1 confidence per clean firing (max 95); overrides decay −5
+//     (recordRuleOverride); ≤60 flags for review, ≤50 auto Under Review.
+// Rules come in two kinds ("adjustment" = numeric, applied by the assessment
+// engine; "guidance" = text, injected into the assistant prompt); thresholds
+// live in PlatCfgSetting.
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
@@ -28,11 +37,48 @@ export interface LearningSettings {
 }
 
 const DEFAULTS: LearningSettings = {
-  hypothesisMinSamples: 3,
+  hypothesisMinSamples: 5, // Spec 12 Stage 2 default; per-type thresholds below can lower it
   ruleMinSamples: 5,
   autoApplyConfidence: 85,
   autoApplyTriggers: 50,
 };
+
+// ── Spec 12 Module 6 constants ──────────────────────────────────────
+
+export const HYPOTHESIS_TYPES = [
+  "Domain Pattern",
+  "Supplier Pattern",
+  "Estimation Bias",
+  "Seasonal Pattern",
+  "Scope Creep Pattern",
+] as const;
+export type HypothesisType = (typeof HYPOTHESIS_TYPES)[number];
+
+/** Validation thresholds per Hypothesis_Type (Spec 12 Stage 3 defaults).
+ *  Supplier behaviour repeats, so fewer samples validate it; estimation bias
+ *  is noisy, so more are needed. Seasonal Pattern is specified as 2 *seasons*
+ *  of calendar recurrence — there is no Season_Year signal in the data yet, so
+ *  it is defined here for completeness but never assigned by classification. */
+export const VALIDATION_THRESHOLDS: Record<HypothesisType, number> = {
+  "Supplier Pattern": 3,
+  "Domain Pattern": 5,
+  "Estimation Bias": 8,
+  "Seasonal Pattern": 2,
+  "Scope Creep Pattern": 5,
+};
+
+/** Starting confidence at promotion (Spec 12): capped at 85 regardless of
+ *  evidence — no rule starts at full confidence. The applications term is 0 at
+ *  promotion (Times_Applied_Without_Override starts at 0). */
+export function promotionConfidence(evidenceCount: number, type: HypothesisType): number {
+  const threshold = VALIDATION_THRESHOLDS[type];
+  return Math.min(85, Math.round((evidenceCount / threshold) * 70));
+}
+
+export const RULE_CONFIDENCE_MAX = 95; // never 100 — no rule is absolute
+export const RULE_OVERRIDE_DECAY = 5;
+export const RULE_REVIEW_FLAG_AT = 60; // flagged for review
+export const RULE_UNDER_REVIEW_AT = 50; // auto Status = Under Review
 
 const SETTING_KEYS: Record<keyof LearningSettings, string> = {
   hypothesisMinSamples: "learning.hypothesis_min_samples",
@@ -89,34 +135,176 @@ function parseContext(raw: string): Record<string, string> {
   }
 }
 
+// ── Clustering engine (backend-neutral helpers) ─────────────────────
+
+/** Neutral correction shape both backends map into before clustering. Context
+ *  is the trigger-key map with the reserved "_"-prefixed loop metadata already
+ *  extracted (sourceModule/direction) and stripped. */
+interface LoopCorrection {
+  id: string;
+  dimension: string;
+  /** Root_Cause category (Spec 12 five categories; legacy rows: free text). */
+  rootCause: string;
+  sourceModule: string;
+  direction: string;
+  variancePct: number | null;
+  context: Record<string, string>;
+}
+
+/** Split raw context into trigger keys vs reserved loop metadata. */
+function splitContext(raw: Record<string, string>): {
+  triggers: Record<string, string>;
+  sourceModule: string;
+  direction: string;
+} {
+  const triggers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!k.startsWith("_")) triggers[k] = v;
+  }
+  return { triggers, sourceModule: S(raw["_sourceModule"]), direction: S(raw["_direction"]) };
+}
+
+/** Spec 12 Stage 2 detection key: Root_Cause + Source_Module + (same Supplier
+ *  or same Phase). Corrections with neither anchor fall back to the dimension
+ *  so legacy rows still cluster meaningfully. */
+function clusterKey(c: LoopCorrection): string {
+  const anchor = c.context["supplier"]
+    ? `supplier:${norm(c.context["supplier"])}`
+    : c.context["phase"]
+      ? `phase:${norm(c.context["phase"])}`
+      : `dim:${c.dimension}`;
+  return `${norm(c.rootCause)}::${c.sourceModule || "manual"}::${anchor}`;
+}
+
+/** Hypothesis_Type from the cluster's anchor and Root_Cause category.
+ *  Seasonal Pattern needs a calendar-recurrence signal (Season_Year) that the
+ *  data does not carry yet, so it is never assigned here. */
+function classifyGroup(group: LoopCorrection[]): HypothesisType {
+  const first = group[0];
+  if (first.context["supplier"]) return "Supplier Pattern";
+  if (first.rootCause === "Scope Change") return "Scope Creep Pattern";
+  if (first.rootCause === "Estimation Error") return "Estimation Bias";
+  return "Domain Pattern";
+}
+
+/** Share of the dominant delta direction across the group (0–1). Uses variance
+ *  signs when numeric, stored Correction_Direction otherwise; with fewer than
+ *  two signals there is nothing to contradict, so the group counts consistent. */
+function directionConsistency(group: LoopCorrection[]): number {
+  const signs = group
+    .map((c) => c.variancePct)
+    .filter((v): v is number => v != null && v !== 0)
+    .map((v) => (v > 0 ? "+" : "-"));
+  const signals = signs.length >= 2 ? signs : group.map((c) => c.direction).filter(Boolean);
+  if (signals.length < 2) return 1;
+  const counts = new Map<string, number>();
+  for (const s of signals) counts.set(s, (counts.get(s) ?? 0) + 1);
+  return Math.max(...counts.values()) / signals.length;
+}
+
+const DIRECTION_CONSISTENT_AT = 0.8;
+
+interface GroupStats {
+  dimension: string; // dominant dimension — adjustments need one
+  avgVar: number;
+  signedAvg: number;
+  trigger: Record<string, string>;
+  consistency: number;
+}
+
+function groupStats(group: LoopCorrection[]): GroupStats {
+  const variances = group.map((c) => c.variancePct).filter((v): v is number => v != null);
+  const avgVar = variances.length
+    ? Math.round((variances.reduce((s, v) => s + Math.abs(v), 0) / variances.length) * 10) / 10
+    : 0;
+  const signedAvg = variances.length ? variances.reduce((s, v) => s + v, 0) / variances.length : 0;
+
+  // Trigger condition: context keys whose dominant value covers ≥60% of samples.
+  const trigger: Record<string, string> = {};
+  const keyCounts = new Map<string, Map<string, number>>();
+  for (const c of group) {
+    for (const [k, v] of Object.entries(c.context)) {
+      if (!v) continue;
+      if (!keyCounts.has(k)) keyCounts.set(k, new Map());
+      const m = keyCounts.get(k)!;
+      m.set(norm(String(v)), (m.get(norm(String(v))) ?? 0) + 1);
+    }
+  }
+  for (const [k, values] of keyCounts) {
+    let best = "";
+    let n = 0;
+    for (const [v, count] of values) if (count > n) { best = v; n = count; }
+    if (n / group.length >= 0.6) trigger[k] = best;
+  }
+
+  const dimCounts = new Map<string, number>();
+  for (const c of group) dimCounts.set(c.dimension, (dimCounts.get(c.dimension) ?? 0) + 1);
+  let dimension = group[0].dimension;
+  let dimBest = 0;
+  for (const [d, n] of dimCounts) if (n > dimBest) { dimension = d; dimBest = n; }
+
+  return { dimension, avgVar, signedAvg, trigger, consistency: directionConsistency(group) };
+}
+
+function groupDescription(stats: GroupStats, cause: string): string {
+  const direction = stats.signedAvg >= 0 ? "under" : "over";
+  return stats.avgVar > 0
+    ? `${stats.dimension.replace(/[._]/g, " ")} ${direction}estimated by ~${stats.avgVar}% on average — ${cause || "no root cause"}.`
+    : `${stats.dimension.replace(/[._]/g, " ")} repeatedly corrected — ${cause || "no root cause"}.`;
+}
+
+/** Stage 3 (Validate): the platform proposes "validated" once the type's
+ *  evidence threshold is met with a consistent direction; owner statuses
+ *  (active/rejected/promoted) are never downgraded. */
+function proposedStatus(
+  sampleCount: number,
+  type: HypothesisType,
+  consistency: number,
+  prior?: string,
+): string {
+  if (prior && prior !== "pending" && prior !== "validated") return prior;
+  const validated =
+    sampleCount >= VALIDATION_THRESHOLDS[type] && consistency >= DIRECTION_CONSISTENT_AT;
+  return validated ? "validated" : "pending";
+}
+
+/** Detection gate: Spec 12's Stage 2 default (settings) lowered by the
+ *  per-type validation threshold, so e.g. a Supplier Pattern forms at 3. */
+function detectThreshold(settings: LearningSettings, type: HypothesisType): number {
+  return Math.min(settings.hypothesisMinSamples, VALIDATION_THRESHOLDS[type]);
+}
+
 // ── Airtable corrections/hypotheses (the loop machinery, mirrored into the
 // base once scripts/airtable-add-hypothesis-link.mjs has added the link) ──────
 
-const HYP_OPEN_STATUSES = new Set(["pending", "active"]);
+const HYP_OPEN_STATUSES = new Set(["pending", "validated", "active"]);
 
-interface AirCorrection {
-  id: string;
-  dimension: string;
-  rootCause: string;
-  variancePct: number | null;
-  context: Record<string, string>;
-  clustered: boolean;
-}
-function airCorrection(r: Record<string, unknown> & { id: string }): AirCorrection {
+function airCorrection(r: Record<string, unknown> & { id: string }): LoopCorrection & { clustered: boolean } {
   let context: Record<string, string> = {};
+  let notesModule = "";
+  let notesDirection = "";
   try {
-    const n = JSON.parse(S(r["Notes"]) || "{}") as { context?: unknown };
+    const n = JSON.parse(S(r["Notes"]) || "{}") as {
+      context?: unknown;
+      sourceModule?: unknown;
+      direction?: unknown;
+    };
     if (n && typeof n.context === "object" && n.context) context = n.context as Record<string, string>;
+    notesModule = S(n?.sourceModule);
+    notesDirection = S(n?.direction);
   } catch {
     /* malformed Notes */
   }
+  const { triggers, sourceModule, direction } = splitContext(context);
   const v = r["Variance_Percent"];
   return {
     id: r.id,
     dimension: S(r["Field_Corrected"]),
     rootCause: S(r["Root_Cause"]),
+    sourceModule: notesModule || sourceModule,
+    direction: notesDirection || direction,
     variancePct: typeof v === "number" ? v : null,
-    context,
+    context: triggers,
     clustered: Array.isArray(r["Hypothesis"]) && (r["Hypothesis"] as unknown[]).length > 0,
   };
 }
@@ -131,6 +319,9 @@ interface AirHypothesis {
   avgVariancePct: number;
   confidence: number;
   status: string;
+  hypothesisType: HypothesisType;
+  clusterKey: string;
+  consistency: number;
 }
 function airHypothesis(r: Record<string, unknown> & { id: string }): AirHypothesis {
   let meta: Record<string, unknown> = {};
@@ -139,6 +330,12 @@ function airHypothesis(r: Record<string, unknown> & { id: string }): AirHypothes
   } catch {
     /* malformed Evidence */
   }
+  const typedField = S(r["Hypothesis_Type"]);
+  const hypothesisType = (HYPOTHESIS_TYPES as readonly string[]).includes(typedField)
+    ? (typedField as HypothesisType)
+    : (HYPOTHESIS_TYPES as readonly string[]).includes(S(meta.hypothesisType))
+      ? (S(meta.hypothesisType) as HypothesisType)
+      : "Domain Pattern";
   return {
     id: r.id,
     description: S(r["Summary_of_Findings"]) || S(r["Hypothesis_Name"]),
@@ -149,6 +346,9 @@ function airHypothesis(r: Record<string, unknown> & { id: string }): AirHypothes
     avgVariancePct: N(meta.avgVariancePct),
     confidence: N(r["Confidence"]),
     status: S(r["Status"]) || "pending",
+    hypothesisType,
+    clusterKey: S(meta.clusterKey),
+    consistency: typeof meta.consistency === "number" ? meta.consistency : 1,
   };
 }
 function hypFields(h: Omit<AirHypothesis, "id">): Record<string, unknown> {
@@ -158,11 +358,15 @@ function hypFields(h: Omit<AirHypothesis, "id">): Record<string, unknown> {
     Status: h.status,
     Evidence_Count: h.sampleCount,
     Confidence: h.confidence,
+    Hypothesis_Type: h.hypothesisType,
     Evidence: JSON.stringify({
       dimension: h.dimension,
       rootCausePattern: h.rootCausePattern,
       avgVariancePct: h.avgVariancePct,
       triggerCondition: h.triggerCondition,
+      hypothesisType: h.hypothesisType,
+      clusterKey: h.clusterKey,
+      consistency: h.consistency,
     }),
   };
 }
@@ -180,9 +384,9 @@ async function runHypothesisEngineAirtable(
   const corrections = corrRows.map(airCorrection).filter((c) => !c.clustered && c.rootCause);
   const existing = hypRows.map(airHypothesis);
 
-  const groups = new Map<string, AirCorrection[]>();
+  const groups = new Map<string, LoopCorrection[]>();
   for (const c of corrections) {
-    const key = `${c.dimension}::${norm(c.rootCause)}`;
+    const key = clusterKey(c);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(c);
   }
@@ -190,40 +394,19 @@ async function runHypothesisEngineAirtable(
   let created = 0;
   let updated = 0;
   for (const [key, group] of groups) {
-    if (group.length < settings.hypothesisMinSamples) continue;
-    const [dimension, cause] = key.split("::");
+    const type = classifyGroup(group);
+    if (group.length < detectThreshold(settings, type)) continue;
+    const cause = group[0].rootCause;
 
-    const variances = group.map((c) => c.variancePct).filter((v): v is number => v != null);
-    const avgVar = variances.length
-      ? Math.round((variances.reduce((s, v) => s + Math.abs(v), 0) / variances.length) * 10) / 10
-      : 0;
-    const signedAvg = variances.length ? variances.reduce((s, v) => s + v, 0) / variances.length : 0;
-
-    const trigger: Record<string, string> = {};
-    const keyCounts = new Map<string, Map<string, number>>();
-    for (const c of group) {
-      for (const [k, v] of Object.entries(c.context)) {
-        if (!v) continue;
-        if (!keyCounts.has(k)) keyCounts.set(k, new Map());
-        const m = keyCounts.get(k)!;
-        m.set(norm(String(v)), (m.get(norm(String(v))) ?? 0) + 1);
-      }
-    }
-    for (const [k, values] of keyCounts) {
-      let best = "";
-      let n = 0;
-      for (const [v, count] of values) if (count > n) { best = v; n = count; }
-      if (n / group.length >= 0.6) trigger[k] = best;
-    }
-
-    const direction = signedAvg >= 0 ? "under" : "over";
-    const description =
-      avgVar > 0
-        ? `${dimension.replace(/[._]/g, " ")} ${direction}estimated by ~${avgVar}% on average — ${cause || "no root cause"}.`
-        : `${dimension.replace(/[._]/g, " ")} repeatedly corrected — ${cause || "no root cause"}.`;
+    const stats = groupStats(group);
+    const description = groupDescription(stats, cause);
 
     const prior = existing.find(
-      (h) => h.dimension === dimension && h.rootCausePattern === cause && HYP_OPEN_STATUSES.has(h.status),
+      (h) =>
+        HYP_OPEN_STATUSES.has(h.status) &&
+        (h.clusterKey
+          ? h.clusterKey === key
+          : h.dimension === stats.dimension && h.rootCausePattern === norm(cause)),
     );
 
     let hypId: string;
@@ -235,13 +418,16 @@ async function runHypothesisEngineAirtable(
         prior.id,
         hypFields({
           description,
-          dimension,
+          dimension: stats.dimension,
           rootCausePattern: cause,
-          triggerCondition: JSON.stringify(trigger),
+          triggerCondition: JSON.stringify(stats.trigger),
           sampleCount,
-          avgVariancePct: avgVar,
+          avgVariancePct: stats.avgVar,
           confidence: Math.min(95, sampleCount * 12),
-          status: prior.status,
+          status: proposedStatus(sampleCount, type, stats.consistency, prior.status),
+          hypothesisType: type,
+          clusterKey: key,
+          consistency: stats.consistency,
         }),
       );
       hypId = prior.id;
@@ -252,13 +438,16 @@ async function runHypothesisEngineAirtable(
         "HYPOTHESES",
         hypFields({
           description,
-          dimension,
+          dimension: stats.dimension,
           rootCausePattern: cause,
-          triggerCondition: JSON.stringify(trigger),
+          triggerCondition: JSON.stringify(stats.trigger),
           sampleCount: group.length,
-          avgVariancePct: avgVar,
+          avgVariancePct: stats.avgVar,
           confidence: Math.min(95, group.length * 12),
-          status: "pending",
+          status: proposedStatus(group.length, type, stats.consistency),
+          hypothesisType: type,
+          clusterKey: key,
+          consistency: stats.consistency,
         }),
       );
       hypId = rec.id;
@@ -272,83 +461,73 @@ async function runHypothesisEngineAirtable(
 }
 
 // ── Hypothesis engine ───────────────────────────────────────────────
-// Cluster the org's un-linked corrections by (dimension + normalised root
-// cause); form or update a hypothesis once enough similar corrections exist.
+// Cluster the org's un-linked corrections by the Spec 12 detection key
+// (Root_Cause + Source_Module + Supplier/Phase anchor); form or update a
+// hypothesis once the type's detection threshold is met.
 
 export async function runHypothesisEngine(
   ctx: OrgCtx,
 ): Promise<{ created: number; updated: number }> {
   const settings = await getLearningSettings(ctx);
   if (airtableEnabled()) return runHypothesisEngineAirtable(ctx, settings);
-  const corrections = await prisma.platCorrection.findMany({
+  const rows = await prisma.platCorrection.findMany({
     where: { orgId: ctx.orgId, hypothesisId: null, rootCause: { not: "" } },
   });
+  const corrections: (LoopCorrection & { pgId: number })[] = rows.map((c) => {
+    const { triggers, sourceModule, direction } = splitContext(parseContext(c.context));
+    return {
+      id: String(c.id),
+      pgId: c.id,
+      dimension: c.dimension,
+      rootCause: c.rootCause,
+      sourceModule,
+      direction,
+      variancePct: c.variancePct,
+      context: triggers,
+    };
+  });
 
-  const groups = new Map<string, typeof corrections>();
+  const groups = new Map<string, (LoopCorrection & { pgId: number })[]>();
   for (const c of corrections) {
-    const key = `${c.dimension}::${norm(c.rootCause)}`;
+    const key = clusterKey(c);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(c);
   }
 
   let created = 0;
   let updated = 0;
-  for (const [key, group] of groups) {
-    if (group.length < settings.hypothesisMinSamples) continue;
-    const [dimension, cause] = key.split("::");
+  for (const [, group] of groups) {
+    const type = classifyGroup(group);
+    if (group.length < detectThreshold(settings, type)) continue;
+    const cause = group[0].rootCause;
 
-    const variances = group.map((c) => c.variancePct).filter((v): v is number => v != null);
-    const avgVar = variances.length
-      ? Math.round((variances.reduce((s, v) => s + Math.abs(v), 0) / variances.length) * 10) / 10
-      : 0;
-    const signedAvg = variances.length
-      ? variances.reduce((s, v) => s + v, 0) / variances.length
-      : 0;
+    const stats = groupStats(group);
+    const description = groupDescription(stats, cause);
 
-    // Trigger condition: context keys whose dominant value covers ≥60% of samples.
-    const trigger: Record<string, string> = {};
-    const keyCounts = new Map<string, Map<string, number>>();
-    for (const c of group) {
-      for (const [k, v] of Object.entries(parseContext(c.context))) {
-        if (!v) continue;
-        if (!keyCounts.has(k)) keyCounts.set(k, new Map());
-        const m = keyCounts.get(k)!;
-        m.set(norm(String(v)), (m.get(norm(String(v))) ?? 0) + 1);
-      }
-    }
-    for (const [k, values] of keyCounts) {
-      let best = "";
-      let n = 0;
-      for (const [v, count] of values) if (count > n) { best = v; n = count; }
-      if (n / group.length >= 0.6) trigger[k] = best;
-    }
-
-    const confidence = Math.min(95, group.length * 12);
-    const direction = signedAvg >= 0 ? "under" : "over";
-    const description =
-      avgVar > 0
-        ? `${dimension.replace(/[._]/g, " ")} ${direction}estimated by ~${avgVar}% on average — ${cause || "no root cause"}.`
-        : `${dimension.replace(/[._]/g, " ")} repeatedly corrected — ${cause || "no root cause"}.`;
-
+    // Postgres has no meta column for the cluster key; prior matching stays on
+    // (dominant dimension + root cause), which the key subsumes for rows
+    // without a supplier/phase anchor.
     const existing = await prisma.platHypothesis.findFirst({
       where: {
         orgId: ctx.orgId,
-        dimension,
-        rootCausePattern: cause,
-        status: { in: ["pending", "active"] },
+        dimension: stats.dimension,
+        rootCausePattern: norm(cause),
+        status: { in: [...HYP_OPEN_STATUSES] },
       },
     });
 
     let hypothesisId: number;
     if (existing) {
+      const sampleCount = group.length + existing.sampleCount;
       const h = await prisma.platHypothesis.update({
         where: { id: existing.id },
         data: {
           description,
-          sampleCount: group.length + existing.sampleCount,
-          avgVariancePct: avgVar,
-          confidence: Math.min(95, (group.length + existing.sampleCount) * 12),
-          triggerCondition: JSON.stringify(trigger),
+          sampleCount,
+          avgVariancePct: stats.avgVar,
+          confidence: Math.min(95, sampleCount * 12),
+          triggerCondition: JSON.stringify(stats.trigger),
+          status: proposedStatus(sampleCount, type, stats.consistency, existing.status),
         },
       });
       hypothesisId = h.id;
@@ -358,20 +537,20 @@ export async function runHypothesisEngine(
         data: {
           orgId: ctx.orgId,
           description,
-          dimension,
-          rootCausePattern: cause,
-          triggerCondition: JSON.stringify(trigger),
+          dimension: stats.dimension,
+          rootCausePattern: norm(cause),
+          triggerCondition: JSON.stringify(stats.trigger),
           sampleCount: group.length,
-          avgVariancePct: avgVar,
-          confidence,
-          status: "pending",
+          avgVariancePct: stats.avgVar,
+          confidence: Math.min(95, group.length * 12),
+          status: proposedStatus(group.length, type, stats.consistency),
         },
       });
       hypothesisId = h.id;
       created++;
     }
     await prisma.platCorrection.updateMany({
-      where: { orgId: ctx.orgId, id: { in: group.map((c) => c.id) } },
+      where: { orgId: ctx.orgId, id: { in: group.map((c) => c.pgId) } },
       data: { hypothesisId },
     });
   }
@@ -419,11 +598,12 @@ export async function nextRuleCode(ctx: OrgCtx, bump = 0): Promise<string> {
 }
 
 /** App-shaped rule create payload (a subset of the Prisma create data, shared
- *  with the Airtable field map). */
+ *  with the Airtable field map, plus Airtable-only keys the Postgres path
+ *  strips: the source-hypothesis record link and the issue date). */
 type RuleCreateData = Omit<
   Parameters<typeof prisma.platLearningRule.create>[0]["data"],
   "ruleCode" | "orgId"
->;
+> & { sourceHypothesisAirId?: string; dateIssued?: Date };
 
 /** Create a rule with a freshly allocated code. Routes to the org's Airtable
  *  base (via the learning_rule field map) or Postgres (retrying on a unique-code
@@ -442,11 +622,14 @@ export async function createRuleWithCode(
     );
     return { id: rec.id, ruleCode };
   }
+  const { sourceHypothesisAirId: _airHyp, dateIssued: _issued, ...pgData } = data;
+  void _airHyp;
+  void _issued;
   for (let attempt = 0; attempt < 3; attempt++) {
     const ruleCode = await nextRuleCode(ctx, attempt);
     try {
       /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-      const rule = await prisma.platLearningRule.create({ data: { ...(data as any), orgId: ctx.orgId, ruleCode } });
+      const rule = await prisma.platLearningRule.create({ data: { ...(pgData as any), orgId: ctx.orgId, ruleCode } });
       return { id: String(rule.id), ruleCode };
     } catch (err) {
       const code = (err as { code?: string }).code;
@@ -456,6 +639,28 @@ export async function createRuleWithCode(
   throw new Error("unreachable");
 }
 
+/** Hypothesis_Type for a Postgres hypothesis row (no meta column): derived
+ *  from the stored root-cause pattern and whether the trigger carries a
+ *  supplier anchor. Mirrors classifyGroup. */
+export function deriveHypothesisType(
+  rootCausePattern: string,
+  triggerCondition: string,
+): HypothesisType {
+  const trigger = parseContext(triggerCondition);
+  if (trigger["supplier"]) return "Supplier Pattern";
+  const cause = norm(rootCausePattern);
+  if (cause === norm("Scope Change")) return "Scope Creep Pattern";
+  if (cause === norm("Estimation Error")) return "Estimation Bias";
+  return "Domain Pattern";
+}
+
+/** Stage 4 (Promote) — owner-confirmed. Creates a DRAFT rule (never Active;
+ *  the owner activates it on the learning-rules page — Spec 12: "No rule
+ *  becomes Active without owner sign-off"). Refuses hypotheses that have not
+ *  reached their type's validation threshold with a consistent direction.
+ *  Starting confidence: min(85, Evidence_Count / Validation_Threshold × 70).
+ *  Scope Creep patterns never become adjustments — a scope change does not
+ *  update the estimation model. */
 export async function promoteHypothesisToRule(
   ctx: OrgCtx,
   id: RecordId,
@@ -465,7 +670,16 @@ export async function promoteHypothesisToRule(
     const rec = await core.get(ctx.orgSlug, "HYPOTHESES", String(id)).catch(() => null);
     if (!rec) return null;
     const h = airHypothesis(rec);
-    const effectiveKind = h.avgVariancePct !== 0 && kind === "adjustment" ? "adjustment" : "guidance";
+    if (
+      h.sampleCount < VALIDATION_THRESHOLDS[h.hypothesisType] ||
+      h.consistency < DIRECTION_CONSISTENT_AT
+    ) {
+      return null; // not validated — Stage 3 gate
+    }
+    const effectiveKind =
+      h.hypothesisType !== "Scope Creep Pattern" && h.avgVariancePct !== 0 && kind === "adjustment"
+        ? "adjustment"
+        : "guidance";
     let adjustment = "{}";
     if (effectiveKind === "adjustment") {
       const variances = (await core.list(ctx.orgSlug, "CORRECTIONS", { maxRecords: 1000 }))
@@ -493,19 +707,29 @@ export async function promoteHypothesisToRule(
       triggerCondition: h.triggerCondition,
       adjustment,
       priority: 3,
-      confidence: Math.max(72, h.confidence),
-      isActive: true,
+      confidence: promotionConfidence(h.sampleCount, h.hypothesisType),
+      isActive: false, // Draft — owner activates
       autoApply: false,
-      dateActivated: new Date(),
+      dateIssued: new Date(),
+      sourceHypothesisAirId: String(id),
     });
-    await core.update(ctx.orgSlug, "HYPOTHESES", String(id), { Status: "promoted" });
+    await core.update(ctx.orgSlug, "HYPOTHESES", String(id), {
+      Status: "promoted",
+      Promote_to_Rule: true,
+    });
     return rule.id;
   }
 
   const h = await prisma.platHypothesis.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!h) return null;
 
-  const effectiveKind = h.avgVariancePct !== 0 && kind === "adjustment" ? "adjustment" : "guidance";
+  const type = deriveHypothesisType(h.rootCausePattern, h.triggerCondition);
+  if (h.sampleCount < VALIDATION_THRESHOLDS[type]) return null; // not validated
+
+  const effectiveKind =
+    type !== "Scope Creep Pattern" && h.avgVariancePct !== 0 && kind === "adjustment"
+      ? "adjustment"
+      : "guidance";
 
   let adjustment = "{}";
   if (effectiveKind === "adjustment") {
@@ -531,11 +755,10 @@ export async function promoteHypothesisToRule(
     triggerCondition: h.triggerCondition,
     adjustment,
     priority: 3,
-    confidence: Math.max(72, h.confidence),
-    isActive: true,
+    confidence: promotionConfidence(h.sampleCount, type),
+    isActive: false, // Draft — owner activates
     autoApply: false,
     sourceHypothesisId: h.id,
-    dateActivated: new Date(),
   });
   await prisma.platHypothesis.update({ where: { id: h.id }, data: { status: "promoted" } });
   return rule.id;
@@ -601,16 +824,17 @@ function ruleFromAirtable(r: Record<string, unknown> & { id: string }): RuleRow 
 }
 
 export async function getActiveRules(ctx: OrgCtx): Promise<RuleRow[]> {
+  // Spec 12 session protocol: Active rules sorted by Priority descending.
   if (airtableEnabled()) {
     const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
     return rows
       .map(ruleFromAirtable)
       .filter((r) => r.isActive)
-      .sort((a, b) => a.priority - b.priority || b.confidence - a.confidence);
+      .sort((a, b) => b.priority - a.priority || b.confidence - a.confidence);
   }
   const rows = await prisma.platLearningRule.findMany({
     where: { orgId: ctx.orgId, isActive: true },
-    orderBy: [{ priority: "asc" }, { confidence: "desc" }],
+    orderBy: [{ priority: "desc" }, { confidence: "desc" }],
   });
   return rows.map((r) => ({
     id: String(r.id),
@@ -678,13 +902,16 @@ export async function applyRules(
       confidence: r.confidence,
       autoApply: r.autoApply,
     });
-    const newConfidence = Math.min(99, r.confidence + 1);
+    // Spec 12: confidence grows by 1 per application without override,
+    // capped at RULE_CONFIDENCE_MAX (95) — never 100, no rule is absolute.
+    const newConfidence = Math.min(RULE_CONFIDENCE_MAX, r.confidence + 1);
     const newAutoApply =
       newConfidence >= settings.autoApplyConfidence &&
       r.timesTriggered + 1 >= settings.autoApplyTriggers;
     if (airtableEnabled()) {
       await core.update(ctx.orgSlug, "LEARNING_RULES", r.id, {
         Times_Triggered: r.timesTriggered + 1,
+        Last_Triggered: new Date().toISOString().slice(0, 10),
         Confidence_Level: newConfidence,
         Applies_To: newAutoApply ? "AI Layer Only" : "Owner Review",
       });
@@ -702,14 +929,61 @@ export async function applyRules(
   return applied;
 }
 
-/** Working-memory hydration: the org's rules as a prompt block for the assistant. */
+/** Spec 12 confidence decay: an override costs the rule 5 confidence. At 60
+ *  or below the rule is flagged for review (surfaced on the learning-rules
+ *  page); at 50 or below it is automatically taken out of application —
+ *  Rule_Status "Under Review" in Airtable (excluded from RULE_ACTIVE_STATUSES),
+ *  isActive=false in Postgres — pending owner reassessment. Looked up by rule
+ *  code (Instance) so callers can name the rule the human overrode. */
+export async function recordRuleOverride(
+  ctx: OrgCtx,
+  ruleCode: string,
+): Promise<{ confidence: number; underReview: boolean } | null> {
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
+    const row = rows.find((r) => S(r["Instance"]) === ruleCode);
+    if (!row) return null;
+    const rule = ruleFromAirtable(row);
+    const confidence = Math.max(0, rule.confidence - RULE_OVERRIDE_DECAY);
+    const underReview = confidence <= RULE_UNDER_REVIEW_AT;
+    await core.update(ctx.orgSlug, "LEARNING_RULES", rule.id, {
+      Confidence_Level: confidence,
+      ...(underReview ? { Rule_Status: "Under Review" } : {}),
+    });
+    return { confidence, underReview };
+  }
+  const rule = await prisma.platLearningRule.findFirst({
+    where: { orgId: ctx.orgId, ruleCode },
+  });
+  if (!rule) return null;
+  const confidence = Math.max(0, rule.confidence - RULE_OVERRIDE_DECAY);
+  const underReview = confidence <= RULE_UNDER_REVIEW_AT;
+  await prisma.platLearningRule.update({
+    where: { id: rule.id },
+    data: {
+      confidence,
+      ...(underReview ? { isActive: false, notes: "Under Review — confidence decayed to 50 or below" } : {}),
+    },
+  });
+  return { confidence, underReview };
+}
+
+/** Working-memory hydration: the org's rules as a prompt block for the
+ *  assistant. Spec 12 session protocol: Active rules by Priority descending
+ *  (getActiveRules), each with its trigger context and override posture, up to
+ *  the 80-rule review flag. */
 export async function learningPromptText(ctx: OrgCtx): Promise<string> {
   const rules = await getActiveRules(ctx);
   if (!rules.length) return "";
   const locked = rules.filter((r) => r.cannotOverride);
-  const rest = rules.filter((r) => !r.cannotOverride).slice(0, 12);
-  const fmt = (r: (typeof rules)[number]) =>
-    `- [${r.ruleCode} · conf ${r.confidence}] ${r.description}`;
+  const rest = rules.filter((r) => !r.cannotOverride).slice(0, 80);
+  const fmt = (r: (typeof rules)[number]) => {
+    const trigger = Object.entries(parseContext(r.triggerCondition))
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+    return `- [${r.ruleCode} · conf ${r.confidence} · priority ${r.priority}] ${r.description}${trigger ? ` (applies when ${trigger})` : ""}`;
+  };
   const parts: string[] = [];
   if (locked.length) {
     parts.push(`CRITICAL RULES (must never be overridden):\n${locked.map(fmt).join("\n")}`);
@@ -718,6 +992,9 @@ export async function learningPromptText(ctx: OrgCtx): Promise<string> {
     parts.push(
       `Validated learning rules for this customer (apply where relevant):\n${rest.map(fmt).join("\n")}`,
     );
+  }
+  if (rules.length > 80) {
+    parts.push(`(NOTE: ${rules.length} active rules exceeds the 80-rule review threshold — flag for owner review.)`);
   }
   return parts.join("\n\n");
 }

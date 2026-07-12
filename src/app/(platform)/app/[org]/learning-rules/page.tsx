@@ -62,28 +62,47 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
           <h2 className="font-semibold mb-3">Hypotheses awaiting review</h2>
           {hypotheses.map((h) => (
             <div key={h.id} className="border-t border-neutral-100 py-3 text-sm">
-              <p className="font-medium">{h.description}</p>
+              <p className="font-medium">
+                {h.description}
+                <span className="ml-1 text-[0.65rem] px-1 rounded bg-neutral-100 text-neutral-600">
+                  {h.hypothesisType}
+                </span>
+                {h.validated && (
+                  <span className="ml-1 text-[0.65rem] px-1 rounded bg-emerald-100 text-emerald-700">
+                    validated
+                  </span>
+                )}
+              </p>
               <p className="text-xs text-neutral-500 mt-0.5">
-                {h.dimension} · {h.sampleCount} samples · avg variance {h.avgVariancePct}% ·
-                confidence {h.confidence}
+                {h.dimension} · {h.sampleCount}/{h.validationThreshold} evidence · avg variance{" "}
+                {h.avgVariancePct}% · confidence {h.confidence}
               </p>
               <div className="mt-2 flex gap-2">
-                <form action={promoteHypothesisAction}>
-                  <input type="hidden" name="org" value={ctx.orgSlug} />
-                  <input type="hidden" name="hypothesisId" value={h.id} />
-                  <input type="hidden" name="kind" value="adjustment" />
-                  <button className="btn-ae text-xs" title="Numeric adjustment applied by the assessment engine">
-                    Promote as adjustment
-                  </button>
-                </form>
-                <form action={promoteHypothesisAction}>
-                  <input type="hidden" name="org" value={ctx.orgSlug} />
-                  <input type="hidden" name="hypothesisId" value={h.id} />
-                  <input type="hidden" name="kind" value="guidance" />
-                  <button className="btn-ae-outline text-xs" title="Injected into the assistant's prompt">
-                    Promote as guidance
-                  </button>
-                </form>
+                {h.validated ? (
+                  <>
+                    <form action={promoteHypothesisAction}>
+                      <input type="hidden" name="org" value={ctx.orgSlug} />
+                      <input type="hidden" name="hypothesisId" value={h.id} />
+                      <input type="hidden" name="kind" value="adjustment" />
+                      <button className="btn-ae text-xs" title="Drafts a numeric adjustment rule for you to activate">
+                        Draft adjustment rule
+                      </button>
+                    </form>
+                    <form action={promoteHypothesisAction}>
+                      <input type="hidden" name="org" value={ctx.orgSlug} />
+                      <input type="hidden" name="hypothesisId" value={h.id} />
+                      <input type="hidden" name="kind" value="guidance" />
+                      <button className="btn-ae-outline text-xs" title="Drafts a guidance rule for you to activate">
+                        Draft guidance rule
+                      </button>
+                    </form>
+                  </>
+                ) : (
+                  <span className="text-xs text-neutral-400 self-center">
+                    Needs {Math.max(0, h.validationThreshold - h.sampleCount)} more consistent
+                    correction{h.validationThreshold - h.sampleCount === 1 ? "" : "s"} to validate
+                  </span>
+                )}
                 <form action={rejectHypothesisAction}>
                   <input type="hidden" name="org" value={ctx.orgSlug} />
                   <input type="hidden" name="hypothesisId" value={h.id} />
@@ -118,6 +137,15 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                   )}
                   {r.autoApply && (
                     <span className="ml-1 text-[0.65rem] px-1 rounded bg-emerald-100 text-emerald-700">auto-apply</span>
+                  )}
+                  {r.status === "draft" && (
+                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-sky-100 text-sky-700">draft — activate to apply</span>
+                  )}
+                  {r.status === "under_review" && (
+                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-amber-100 text-amber-700">under review — confidence ≤ 50</span>
+                  )}
+                  {r.needsReview && (
+                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-amber-100 text-amber-700">review — confidence ≤ 60</span>
                   )}
                 </td>
                 <td className="py-2 pr-2 text-xs">{r.kind}</td>
@@ -217,7 +245,9 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
       </section>
       <p className="mt-4 text-xs text-neutral-400">
         Status legend: hypotheses come from clustered corrections; <StatusBadge status="pending" />{" "}
-        means awaiting your review.
+        means awaiting your review. Promotion creates a <em>draft</em> rule — no rule applies until
+        you activate it. Overrides decay confidence by 5; a rule at 50 or below is automatically
+        moved under review.
       </p>
     </div>
   );

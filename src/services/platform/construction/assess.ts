@@ -639,6 +639,8 @@ export async function materializeProjectFromAssessment(
         dimension: "budget.total",
         aiValue: aiBudget,
         humanValue: finalBudget,
+        sourceModule: "module3",
+        rootCauseCategory: "Estimation Error",
         rootCause: "client-accepted proposal differed from intake estimate",
         context: {
           suburb: assessment.input.suburb,
@@ -666,6 +668,9 @@ export async function materializeProjectFromAssessment(
         dimension: "schedule.phases",
         aiValueText: generatedNames,
         humanValueText: finalNames,
+        sourceModule: "module3",
+        rootCauseCategory: "Model Error",
+        direction: "Wrong_Sequence",
         rootCause: `estimator refined the ${assessment.phaseSource === "learnings" ? "learned" : "AI-suggested"} phase plan`,
         context: {
           suburb: assessment.input.suburb,

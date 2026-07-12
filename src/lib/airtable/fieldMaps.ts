@@ -252,6 +252,8 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Confidence_Level", from: "confidence", to: (v) => NUM(v, 50) },
       { air: "Times_Triggered", from: "timesTriggered", to: (v) => NUM(v) },
       { air: "Override_Permission", from: "cannotOverride", to: (v) => !BOOL(v) },
+      { air: "Date_Issued", from: "dateIssued", to: DATE },
+      { air: "Related_Hypothesis", from: "sourceHypothesisAirId", to: LINK },
     ],
   },
   // ---- Domain Extension (app-shaped tables; statuses already match) ----

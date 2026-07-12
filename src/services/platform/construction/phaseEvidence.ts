@@ -286,8 +286,10 @@ export async function applyEvidenceSuggestion(
         dimension: "phase.completion_pct",
         aiValue: suggestion.suggestedPct,
         humanValue: pct,
+        sourceModule: "module5",
+        rootCauseCategory: "Estimation Error",
         rootCause: "Human adjusted the evidence-suggested completion before applying",
-        context: { phase: phase.name },
+        phase: phase.name,
       },
     );
   }
@@ -322,8 +324,10 @@ export async function dismissEvidenceSuggestion(
       dimension: "phase.completion_pct",
       aiValue: suggestion.suggestedPct,
       humanValue: phase.completionPct,
+      sourceModule: "module5",
+      rootCauseCategory: "Model Error",
       rootCause: "Evidence-based completion suggestion dismissed — completion left unchanged",
-      context: { phase: phase.name },
+      phase: phase.name,
     },
   );
   return { ok: true };

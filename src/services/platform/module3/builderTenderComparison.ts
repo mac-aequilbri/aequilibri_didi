@@ -190,6 +190,8 @@ export async function runBuilderTenderComparison(
           dimension: "tender.recommendation",
           aiValueText: `preferred=${preferred.builder};total=${preferred.total}`,
           humanValueText: `median=${median}`,
+          sourceModule: "module3",
+          rootCauseCategory: "Data Quality",
           rootCause: "tender spread exceeds 20%; comparison flagged for manual review",
           context: { capability: "builder_tender_comparison", jobId: String(input.jobId) },
         },

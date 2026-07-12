@@ -12,6 +12,13 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import {
+  deriveHypothesisType,
+  HYPOTHESIS_TYPES,
+  RULE_REVIEW_FLAG_AT,
+  VALIDATION_THRESHOLDS,
+  type HypothesisType,
+} from "@/services/platform/learning";
 import type { OrgCtx } from "./types";
 
 export interface RuleView {
@@ -24,6 +31,10 @@ export interface RuleView {
   isActive: boolean;
   autoApply: boolean;
   cannotOverride: boolean;
+  /** Draft rules await owner activation; Under Review rules decayed to ≤50. */
+  status: "draft" | "active" | "under_review";
+  /** Spec 12: confidence at 60 or below flags the rule for owner review. */
+  needsReview: boolean;
 }
 
 export interface HypothesisView {
@@ -33,6 +44,11 @@ export interface HypothesisView {
   sampleCount: number;
   avgVariancePct: number;
   confidence: number;
+  hypothesisType: HypothesisType;
+  /** Evidence needed before this hypothesis type validates (Spec 12 Stage 3). */
+  validationThreshold: number;
+  /** Platform-proposed validation — owner confirms by promoting. */
+  validated: boolean;
 }
 
 export interface SnapshotView {
@@ -76,33 +92,49 @@ async function rulesFromPostgres(ctx: OrgCtx): Promise<RuleView[]> {
     where: { orgId: ctx.orgId },
     orderBy: [{ isActive: "desc" }, { confidence: "desc" }],
   });
-  return rules.map((r) => ({
-    id: String(r.id),
-    ruleCode: r.ruleCode,
-    description: r.description,
-    kind: r.kind,
-    confidence: r.confidence,
-    timesTriggered: r.timesTriggered,
-    isActive: r.isActive,
-    autoApply: r.autoApply,
-    cannotOverride: r.cannotOverride,
-  }));
+  return rules.map((r) => {
+    const underReview = !r.isActive && r.notes.startsWith("Under Review");
+    return {
+      id: String(r.id),
+      ruleCode: r.ruleCode,
+      description: r.description,
+      kind: r.kind,
+      confidence: r.confidence,
+      timesTriggered: r.timesTriggered,
+      isActive: r.isActive,
+      autoApply: r.autoApply,
+      cannotOverride: r.cannotOverride,
+      status: (r.isActive ? "active" : underReview ? "under_review" : "draft") as RuleView["status"],
+      needsReview: r.isActive && r.confidence <= RULE_REVIEW_FLAG_AT,
+    };
+  });
 }
 
 async function rulesFromAirtable(ctx: OrgCtx): Promise<RuleView[]> {
   const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
   return rows
-    .map((r) => ({
-      id: r.id,
-      ruleCode: str(r["Instance"]),
-      description: str(r["Rule_Description"]) || str(r["Rule_Name"]),
-      kind: str(r["Rule_Type"]).toLowerCase() === "adjustment" ? "adjustment" : "guidance",
-      confidence: num(r["Confidence_Level"]),
-      timesTriggered: num(r["Times_Triggered"]),
-      isActive: RULE_ACTIVE_STATUSES.has(str(r["Rule_Status"])),
-      autoApply: str(r["Applies_To"]) === "AI Layer Only",
-      cannotOverride: r["Override_Permission"] === false,
-    }))
+    .map((r) => {
+      const ruleStatus = str(r["Rule_Status"]);
+      const isActive = RULE_ACTIVE_STATUSES.has(ruleStatus);
+      const confidence = num(r["Confidence_Level"]);
+      return {
+        id: r.id,
+        ruleCode: str(r["Instance"]),
+        description: str(r["Rule_Description"]) || str(r["Rule_Name"]),
+        kind: str(r["Rule_Type"]).toLowerCase() === "adjustment" ? "adjustment" : "guidance",
+        confidence,
+        timesTriggered: num(r["Times_Triggered"]),
+        isActive,
+        autoApply: str(r["Applies_To"]) === "AI Layer Only",
+        cannotOverride: r["Override_Permission"] === false,
+        status: (isActive
+          ? "active"
+          : ruleStatus === "Under Review"
+            ? "under_review"
+            : "draft") as RuleView["status"],
+        needsReview: isActive && confidence <= RULE_REVIEW_FLAG_AT,
+      };
+    })
     .sort((a, b) => Number(b.isActive) - Number(a.isActive) || b.confidence - a.confidence);
 }
 
@@ -115,21 +147,27 @@ interface EngineCounts {
 async function engineFromPostgres(ctx: OrgCtx): Promise<EngineCounts> {
   const [hypotheses, correctionsCount, unclustered] = await Promise.all([
     prisma.platHypothesis.findMany({
-      where: { orgId: ctx.orgId, status: "pending" },
+      where: { orgId: ctx.orgId, status: { in: ["pending", "validated"] } },
       orderBy: { confidence: "desc" },
     }),
     prisma.platCorrection.count({ where: { orgId: ctx.orgId } }),
     prisma.platCorrection.count({ where: { orgId: ctx.orgId, hypothesisId: null } }),
   ]);
   return {
-    hypotheses: hypotheses.map((h) => ({
-      id: String(h.id),
-      description: h.description,
-      dimension: h.dimension,
-      sampleCount: h.sampleCount,
-      avgVariancePct: h.avgVariancePct,
-      confidence: h.confidence,
-    })),
+    hypotheses: hypotheses.map((h) => {
+      const hypothesisType = deriveHypothesisType(h.rootCausePattern, h.triggerCondition);
+      return {
+        id: String(h.id),
+        description: h.description,
+        dimension: h.dimension,
+        sampleCount: h.sampleCount,
+        avgVariancePct: h.avgVariancePct,
+        confidence: h.confidence,
+        hypothesisType,
+        validationThreshold: VALIDATION_THRESHOLDS[hypothesisType],
+        validated: h.status === "validated",
+      };
+    }),
     correctionsCount,
     unclustered,
   };
@@ -141,7 +179,7 @@ async function engineFromAirtable(ctx: OrgCtx): Promise<EngineCounts> {
     core.list(ctx.orgSlug, "CORRECTIONS", { maxRecords: 1000 }),
   ]);
   const hypotheses: HypothesisView[] = hypRows
-    .filter((h) => (str(h["Status"]) || "pending") === "pending")
+    .filter((h) => ["pending", "validated"].includes(str(h["Status"]) || "pending"))
     .map((h) => {
       let meta: Record<string, unknown> = {};
       try {
@@ -149,6 +187,10 @@ async function engineFromAirtable(ctx: OrgCtx): Promise<EngineCounts> {
       } catch {
         /* malformed Evidence */
       }
+      const typeField = str(h["Hypothesis_Type"]) || str(meta.hypothesisType);
+      const hypothesisType = (HYPOTHESIS_TYPES as readonly string[]).includes(typeField)
+        ? (typeField as HypothesisType)
+        : "Domain Pattern";
       return {
         id: h.id,
         description: str(h["Summary_of_Findings"]) || str(h["Hypothesis_Name"]),
@@ -156,6 +198,9 @@ async function engineFromAirtable(ctx: OrgCtx): Promise<EngineCounts> {
         sampleCount: num(h["Evidence_Count"]),
         avgVariancePct: typeof meta.avgVariancePct === "number" ? meta.avgVariancePct : 0,
         confidence: num(h["Confidence"]),
+        hypothesisType,
+        validationThreshold: VALIDATION_THRESHOLDS[hypothesisType],
+        validated: str(h["Status"]) === "validated",
       };
     })
     .sort((a, b) => b.confidence - a.confidence);

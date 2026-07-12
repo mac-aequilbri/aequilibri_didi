@@ -182,6 +182,8 @@ export async function approveVariation(
         dimension: "variation.cost_impact",
         aiValue: toNum(vo.costImpact),
         humanValue: finalCost,
+        sourceModule: "module3",
+        rootCauseCategory: "Estimation Error",
         rootCause: "approver adjusted AI cost estimate",
       });
     }
@@ -193,6 +195,8 @@ export async function approveVariation(
         dimension: "variation.time_impact_days",
         aiValue: vo.timeImpactDays,
         humanValue: finalDays,
+        sourceModule: "module3",
+        rootCauseCategory: "Estimation Error",
         rootCause: "approver adjusted AI time estimate",
       });
     }

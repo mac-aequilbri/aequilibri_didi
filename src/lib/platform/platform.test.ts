@@ -74,7 +74,13 @@ describe("confidence calculator", () => {
 });
 
 describe("diffForCorrections", () => {
-  const base = { entityType: "variation_order", jobId: 1, rootCause: "edited on approval" };
+  const base = {
+    entityType: "variation_order",
+    jobId: 1,
+    rootCause: "edited on approval",
+    rootCauseCategory: "Estimation Error" as const,
+    sourceModule: "module3" as const,
+  };
   it("emits one correction per changed numeric dimension", () => {
     const out = diffForCorrections(
       { costImpact: 18400, timeImpactDays: 6 },
