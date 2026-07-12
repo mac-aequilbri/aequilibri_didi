@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -51,9 +52,7 @@ export default async function NewMinutesPage({ params }: { params: Promise<{ org
             className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs"
           />
         </label>
-        <button type="submit" className="btn-ae">
-          Extract actions with AI
-        </button>
+        <SubmitButton label="Extract actions with AI" pendingLabel="Extracting…" />
       </form>
     </div>
   );

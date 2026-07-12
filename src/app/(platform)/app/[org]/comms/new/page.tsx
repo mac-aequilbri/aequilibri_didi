@@ -1,3 +1,5 @@
+import { DateField } from "@/components/form/DateField";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -59,10 +61,7 @@ export default async function NewCommPage({ params }: { params: Promise<{ org: s
               ))}
             </select>
           </label>
-          <label className="block text-sm">
-            <span className="text-neutral-600">Due date</span>
-            <input type="date" name="dueDate" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-          </label>
+          <DateField name="dueDate" label="Due date" noPast />
         </div>
         <label className="block text-sm">
           <span className="text-neutral-600">Sent by</span>
@@ -72,9 +71,7 @@ export default async function NewCommPage({ params }: { params: Promise<{ org: s
           <span className="text-neutral-600">Notes</span>
           <textarea name="notes" rows={2} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </label>
-        <button type="submit" className="btn-ae">
-          Add communication
-        </button>
+        <SubmitButton label="Add communication" pendingLabel="Adding…" />
       </form>
     </div>
   );

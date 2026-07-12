@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobDetail } from "@/lib/platform/jobDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -73,9 +74,7 @@ export default async function NewBimModelPage({
           <input type="checkbox" name="clientVisible" />
           <span>Visible in the client portal</span>
         </label>
-        <button type="submit" className="btn-ae">
-          Add model
-        </button>
+        <SubmitButton label="Add model" pendingLabel="Adding…" />
       </form>
     </div>
   );

@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { createJob } from "../actions";
@@ -55,7 +56,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ org
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Budget total $</span>
-            <input type="number" step="0.01" name="budgetTotal" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="number" step="0.01" min={0} inputMode="decimal" name="budgetTotal" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Status</span>
@@ -72,9 +73,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ org
           <span className="text-neutral-600">Summary</span>
           <textarea name="summary" rows={2} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </label>
-        <button type="submit" className="btn-ae">
-          Create project
-        </button>
+        <SubmitButton label="Create project" pendingLabel="Creating…" />
       </form>
     </div>
   );

@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -68,9 +69,7 @@ export default async function NewDocumentPage({
           <span className="text-neutral-600">External link (Drive, Dropbox…)</span>
           <input name="url" type="url" placeholder="https://…" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </label>
-        <button type="submit" className="btn-ae">
-          Save document
-        </button>
+        <SubmitButton label="Save document" pendingLabel="Uploading…" />
       </form>
     </div>
   );

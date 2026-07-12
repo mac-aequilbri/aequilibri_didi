@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadReferenceOptions } from "@/lib/platform/configSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
@@ -57,9 +58,7 @@ export default async function NewDecisionPage({ params }: { params: Promise<{ or
             </select>
           </label>
         </div>
-        <button type="submit" className="btn-ae">
-          Save decision
-        </button>
+        <SubmitButton label="Save decision" />
       </form>
     </div>
   );

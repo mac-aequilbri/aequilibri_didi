@@ -1,9 +1,9 @@
+import { DateField } from "@/components/form/DateField";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { createActionItem } from "../actions";
-import { DueDateField } from "./DueDateField";
-import { SubmitButton } from "./SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +58,9 @@ export default async function NewActionPage({ params }: { params: Promise<{ org:
             <span className="text-neutral-600">Owner</span>
             <input name="owner" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
-          <DueDateField />
+          <DateField name="dueDate" label="Due date" noPast />
         </div>
-        <SubmitButton />
+        <SubmitButton label="Create action" pendingLabel="Creating…" />
       </form>
     </div>
   );

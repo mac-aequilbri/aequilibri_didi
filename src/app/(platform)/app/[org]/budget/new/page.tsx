@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadReferenceOptions } from "@/lib/platform/configSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
@@ -48,20 +49,18 @@ export default async function NewBudgetLinePage({ params }: { params: Promise<{ 
         <div className="grid grid-cols-3 gap-4">
           <label className="block text-sm">
             <span className="text-neutral-600">Budget $</span>
-            <input type="number" step="0.01" name="budgetAmount" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="number" step="0.01" min={0} inputMode="decimal" name="budgetAmount" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Committed $</span>
-            <input type="number" step="0.01" name="committedAmount" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="number" step="0.01" min={0} inputMode="decimal" name="committedAmount" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Actual $</span>
-            <input type="number" step="0.01" name="actualAmount" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="number" step="0.01" min={0} inputMode="decimal" name="actualAmount" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
         </div>
-        <button type="submit" className="btn-ae">
-          Add budget line
-        </button>
+        <SubmitButton label="Add budget line" pendingLabel="Adding…" />
       </form>
     </div>
   );

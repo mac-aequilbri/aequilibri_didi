@@ -1,12 +1,18 @@
-// Submit button for the New Action form. Creating an action runs a server
-// action (Airtable write → revalidate → redirect → re-fetch of the whole
-// Action Hub) that can take several seconds; without a pending state the plain
+// Shared submit button for the New-record forms. Creating a record runs a
+// server action (Airtable write → revalidate → redirect → re-fetch of the list
+// window) that can take several seconds; without a pending state the plain
 // button looked dead and the click read as "nothing happened".
 "use client";
 
 import { useFormStatus } from "react-dom";
 
-export function SubmitButton() {
+export function SubmitButton({
+  label,
+  pendingLabel = "Saving…",
+}: {
+  label: string;
+  pendingLabel?: string;
+}) {
   const { pending } = useFormStatus();
   return (
     <button
@@ -21,7 +27,7 @@ export function SubmitButton() {
           className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-white/40 border-t-white animate-spin"
         />
       )}
-      {pending ? "Creating…" : "Create action"}
+      {pending ? pendingLabel : label}
     </button>
   );
 }

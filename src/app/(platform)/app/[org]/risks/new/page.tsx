@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -46,9 +47,7 @@ export default async function NewRiskPage({ params }: { params: Promise<{ org: s
           <span className="text-neutral-600">Mitigation</span>
           <textarea name="mitigation" rows={2} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </label>
-        <button type="submit" className="btn-ae">
-          Add risk
-        </button>
+        <SubmitButton label="Add risk" pendingLabel="Adding…" />
       </form>
     </div>
   );

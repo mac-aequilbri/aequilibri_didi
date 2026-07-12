@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -31,7 +32,7 @@ export default async function NewCashflowPage({ params }: { params: Promise<{ or
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Period (YYYY-MM) *</span>
-            <input name="period" required pattern="\d{4}-\d{2}" placeholder="2026-07" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input name="period" required pattern="\d{4}-(0[1-9]|1[0-2])" title="Use the format YYYY-MM, e.g. 2026-07" placeholder="2026-07" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Type</span>
@@ -42,7 +43,7 @@ export default async function NewCashflowPage({ params }: { params: Promise<{ or
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Amount $</span>
-            <input type="number" step="0.01" name="amount" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="number" step="0.01" min={0} inputMode="decimal" name="amount" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Source / Payee</span>
@@ -66,9 +67,7 @@ export default async function NewCashflowPage({ params }: { params: Promise<{ or
           <span className="text-neutral-600">Notes</span>
           <input name="notes" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </label>
-        <button type="submit" className="btn-ae">
-          Add entry
-        </button>
+        <SubmitButton label="Add entry" pendingLabel="Adding…" />
       </form>
     </div>
   );

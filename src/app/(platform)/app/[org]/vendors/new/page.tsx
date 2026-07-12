@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { createVendor } from "../actions";
@@ -31,16 +32,14 @@ export default async function NewVendorPage({ params }: { params: Promise<{ org:
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Contact phone</span>
-            <input name="contactPhone" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input name="contactPhone" type="tel" inputMode="tel" pattern="[0-9+()\-\s]{6,}" title="Digits, spaces and + ( ) - only" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Rating (1–10)</span>
             <input type="number" name="rating" min={1} max={10} defaultValue={5} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
         </div>
-        <button type="submit" className="btn-ae">
-          Add vendor
-        </button>
+        <SubmitButton label="Add vendor" pendingLabel="Adding…" />
       </form>
     </div>
   );

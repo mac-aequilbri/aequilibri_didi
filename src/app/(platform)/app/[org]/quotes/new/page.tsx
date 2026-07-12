@@ -1,6 +1,8 @@
 // New quote — pick the job, then either start blank or pre-fill the lines
 // from that job's assessment budget breakdown.
 
+import { DateField } from "@/components/form/DateField";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -50,10 +52,7 @@ export default async function NewQuotePage({ params }: { params: Promise<{ org: 
               <span className="text-neutral-600">Client name</span>
               <input name="clientName" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
             </label>
-            <label className="block text-sm">
-              <span className="text-neutral-600">Valid until</span>
-              <input type="date" name="validUntil" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-            </label>
+            <DateField name="validUntil" label="Valid until" noPast />
           </div>
           <label className="block text-sm">
             <span className="text-neutral-600">Notes / terms</span>
@@ -68,9 +67,7 @@ export default async function NewQuotePage({ params }: { params: Promise<{ org: 
             <input type="checkbox" name="fromBudget" defaultChecked />
             <span>Pre-fill lines from the job&apos;s budget breakdown</span>
           </label>
-          <button type="submit" className="btn-ae">
-            Create quote
-          </button>
+          <SubmitButton label="Create quote" pendingLabel="Creating…" />
         </form>
       )}
     </div>

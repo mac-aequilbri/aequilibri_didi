@@ -1,3 +1,5 @@
+import { DateField } from "@/components/form/DateField";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadVendorOptions } from "@/lib/platform/configSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
@@ -45,22 +47,17 @@ export default async function NewProcurementPage({ params }: { params: Promise<{
             <span className="text-neutral-600">Vendor name (free text)</span>
             <input name="vendorName" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
-          <label className="block text-sm">
-            <span className="text-neutral-600">Due date</span>
-            <input type="date" name="dueDate" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-          </label>
+          <DateField name="dueDate" label="Due date" noPast />
           <label className="block text-sm">
             <span className="text-neutral-600">Qty</span>
-            <input type="number" step="0.01" name="qty" defaultValue={1} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="number" step="0.01" min={0} inputMode="decimal" name="qty" defaultValue={1} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Unit price $</span>
-            <input type="number" step="0.01" name="unitPrice" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="number" step="0.01" min={0} inputMode="decimal" name="unitPrice" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
         </div>
-        <button type="submit" className="btn-ae">
-          Create order
-        </button>
+        <SubmitButton label="Create order" pendingLabel="Creating…" />
       </form>
     </div>
   );

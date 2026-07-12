@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -42,9 +43,7 @@ export default async function NewVariationPage({ params }: { params: Promise<{ o
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
             />
           </label>
-          <button type="submit" className="btn-ae">
-            Draft with AI
-          </button>
+          <SubmitButton label="Draft with AI" pendingLabel="Drafting…" />
         </form>
       </div>
 
@@ -74,9 +73,7 @@ export default async function NewVariationPage({ params }: { params: Promise<{ o
               <input type="number" name="timeImpactDays" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
             </label>
           </div>
-          <button type="submit" className="btn-ae">
-            Submit variation
-          </button>
+          <SubmitButton label="Submit variation" pendingLabel="Submitting…" />
         </form>
       </div>
     </div>
