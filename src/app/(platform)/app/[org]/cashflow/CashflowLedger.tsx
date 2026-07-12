@@ -67,31 +67,29 @@ export function CashflowLedger({ txns, orgSlug }: { txns: CashflowTxn[]; orgSlug
       </table>
 
       {pageCount > 1 && (
-        <div className="mt-3 flex items-center justify-between text-xs text-neutral-500">
+        <div className="filter-pager">
           <span>
             {start + 1}–{Math.min(start + PAGE_SIZE, rows.length)} of {rows.length}
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="btn-ae-outline text-xs disabled:opacity-40"
-              onClick={() => setPage(current - 1)}
-              disabled={current === 0}
-            >
-              ← Prev
-            </button>
-            <span className="tabular-nums">
-              Page {current + 1} of {pageCount}
-            </span>
-            <button
-              type="button"
-              className="btn-ae-outline text-xs disabled:opacity-40"
-              onClick={() => setPage(current + 1)}
-              disabled={current >= pageCount - 1}
-            >
-              Next →
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn-ae-outline text-xs disabled:opacity-40"
+            onClick={() => setPage(current - 1)}
+            disabled={current === 0}
+          >
+            ← Prev
+          </button>
+          <span className="tabular-nums">
+            Page {current + 1} of {pageCount}
+          </span>
+          <button
+            type="button"
+            className="btn-ae-outline text-xs disabled:opacity-40"
+            onClick={() => setPage(current + 1)}
+            disabled={current >= pageCount - 1}
+          >
+            Next →
+          </button>
         </div>
       )}
     </>

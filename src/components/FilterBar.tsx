@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import {
   buildQueryString,
   hasActiveFilters,
+  PAGE_SIZE_OPTIONS,
   type ClientFilterField,
   type ClientListConfig,
   type FacetCounts,
@@ -134,9 +135,24 @@ export function FilterBar({
 
   const goToPage = (p: number) => navigate({ ...latest.current, page: p });
 
+  // Chosen size only goes to the URL when it differs from the config default.
+  const setPageSize = (size: number) =>
+    navigate({
+      ...latest.current,
+      pageSize: size === config.pageSize ? null : size,
+      page: 1,
+    });
+
   const clearAll = () => {
     setSearch("");
-    navigate({ q: "", enums: {}, ranges: {}, sort: latest.current.sort, page: 1 });
+    navigate({
+      q: "",
+      enums: {},
+      ranges: {},
+      sort: latest.current.sort,
+      pageSize: latest.current.pageSize,
+      page: 1,
+    });
     setOpenField(null);
   };
 
@@ -290,6 +306,24 @@ export function FilterBar({
         <span className="filter-count" role="status">
           {isPending ? "Updating…" : `${shown} of ${total}`}
         </span>
+        {config.pageSize !== undefined && (
+          <label className="filter-psize">
+            Rows
+            <select
+              value={query.pageSize ?? config.pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              aria-label="Rows per page"
+            >
+              {[...new Set([...PAGE_SIZE_OPTIONS, config.pageSize])]
+                .sort((a, b) => a - b)
+                .map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
       </div>
       <div className={isPending ? "filter-pending" : undefined}>{children}</div>
       {pageCount > 1 && (

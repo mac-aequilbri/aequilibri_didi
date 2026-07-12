@@ -69,6 +69,9 @@ export interface ListViewConfig<Row> {
   pageSize?: number;
 }
 
+/** Rows-per-page choices offered by the FilterBar's selector (?ps=N). */
+export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 /** A validated, backend-agnostic filter state parsed from the URL. */
 export interface ListQuery {
   q: string;
@@ -80,6 +83,8 @@ export interface ListQuery {
   sort: { field: string; dir: "asc" | "desc" } | null;
   /** 1-based page; meaningful only when config.pageSize is set. */
   page: number;
+  /** User-chosen rows per page (?ps=N); null = config.pageSize default. */
+  pageSize: number | null;
 }
 
 /** Per enum field, per option value → row count. Feeds the FilterBar facets. */
@@ -132,7 +137,10 @@ export function parseListQuery<Row>(sp: SearchParams, config: ListViewConfig<Row
   const pageRaw = Number(first(sp.page));
   const page = Number.isInteger(pageRaw) && pageRaw > 1 ? pageRaw : 1;
 
-  return { q: first(sp.q).trim(), enums, ranges, sort, page };
+  const psRaw = Number(first(sp.ps));
+  const pageSize = config.pageSize && PAGE_SIZE_OPTIONS.includes(psRaw) ? psRaw : null;
+
+  return { q: first(sp.q).trim(), enums, ranges, sort, page, pageSize };
 }
 
 /** Whether any row-narrowing filter is active (sort/page don't count). */
@@ -155,6 +163,7 @@ export function buildQueryString(query: ListQuery): string {
   }
   if (query.sort) p.set("sort", `${query.sort.field}:${query.sort.dir}`);
   if (query.page > 1) p.set("page", String(query.page));
+  if (query.pageSize) p.set("ps", String(query.pageSize));
   const s = p.toString();
   return s ? `?${s}` : "";
 }
@@ -264,12 +273,15 @@ export interface ClientListConfig {
   fields: ClientFilterField[];
   /** Sortable fields for the Sort pill (name + label only). */
   sort?: Array<{ name: string; label: string }>;
+  /** Default rows per page; presence enables the FilterBar's Rows selector. */
+  pageSize?: number;
 }
 
 export function toClientConfig<Row>(config: ListViewConfig<Row>): ClientListConfig {
   return {
     hasSearch: Boolean(config.search?.length || config.prismaSearch?.length),
     sort: config.sort?.map((s) => ({ name: s.name, label: s.label })),
+    pageSize: config.pageSize,
     fields: config.fields.map((f) =>
       f.kind === "enum"
         ? {
@@ -313,11 +325,12 @@ export function sortAndPaginate<Row>(
     });
   }
 
-  if (!config.pageSize) return { items, page: 1, pageCount: 1 };
-  const pageCount = Math.max(1, Math.ceil(items.length / config.pageSize));
+  const size = query.pageSize ?? config.pageSize;
+  if (!size) return { items, page: 1, pageCount: 1 };
+  const pageCount = Math.max(1, Math.ceil(items.length / size));
   const page = Math.min(Math.max(1, query.page), pageCount);
-  const start = (page - 1) * config.pageSize;
-  return { items: items.slice(start, start + config.pageSize), page, pageCount };
+  const start = (page - 1) * size;
+  return { items: items.slice(start, start + size), page, pageCount };
 }
 
 /** One-call page helper for windows whose source already returns the full
