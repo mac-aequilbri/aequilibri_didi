@@ -13,12 +13,20 @@ export async function createRisk(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx); // also enforces the write gate
 
-  await writeRecord(ctx, {
-    table: "risk",
-    op: "create",
-    data: formToObject(formData),
-    actor: { type: "human", name: user.name },
-  });
+  // A base whose RISKS schema has drifted from the field map (e.g. a supplied
+  // base predating the app shape) rejects the create — send the user back to
+  // the form with a message instead of crashing the render.
+  try {
+    await writeRecord(ctx, {
+      table: "risk",
+      op: "create",
+      data: formToObject(formData),
+      actor: { type: "human", name: user.name },
+    });
+  } catch (e) {
+    console.error("[createRisk] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/risks/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/risks"));
   redirect(orgPath(ctx.orgSlug, "/risks"));
 }

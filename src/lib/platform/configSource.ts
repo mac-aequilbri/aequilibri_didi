@@ -28,6 +28,22 @@ function num(v: unknown): number {
   return typeof v === "number" ? v : 0;
 }
 
+/** Run a transitional Postgres fallback, tolerating a retired database.
+ *  Airtable is the system of record now; an Airtable-native org has no
+ *  Postgres rows and the server may not even be running (local dev after the
+ *  cutover). An empty dropdown beats crashing the whole page render. */
+async function pgFallback(label: string, read: () => Promise<RefOption[]>): Promise<RefOption[]> {
+  try {
+    return await read();
+  } catch (e) {
+    console.warn(
+      `[configSource] ${label}: Postgres fallback unavailable, returning no options —`,
+      e instanceof Error ? e.message.trim().split("\n").pop() : e,
+    );
+    return [];
+  }
+}
+
 async function referencesFromPostgres(ctx: OrgCtx, type: string): Promise<RefOption[]> {
   const rows = await prisma.platCfgReference.findMany({
     where: { orgId: ctx.orgId, type, isActive: true },
@@ -47,7 +63,7 @@ export async function loadReferenceOptions(ctx: OrgCtx, type: string): Promise<R
     .filter((o) => o.name);
   // Transitional fallback: base not yet seeded → use Postgres so the dropdown
   // isn't empty for an org provisioned before the config mirror.
-  return out.length ? out : referencesFromPostgres(ctx, type);
+  return out.length ? out : pgFallback(`references:${type}`, () => referencesFromPostgres(ctx, type));
 }
 
 async function vendorsFromPostgres(ctx: OrgCtx): Promise<RefOption[]> {
@@ -72,7 +88,7 @@ export async function loadVendorOptions(ctx: OrgCtx): Promise<RefOption[]> {
     .map((v) => ({ id: v.id, name: str(v["Vendor_Name"]) }))
     .filter((o) => o.name)
     .sort((a, b) => a.name.localeCompare(b.name));
-  return out.length ? out : vendorsFromPostgres(ctx);
+  return out.length ? out : pgFallback("vendors", () => vendorsFromPostgres(ctx));
 }
 
 /** Per-org raw→canonical action-status mappings (the cleanup translation layer

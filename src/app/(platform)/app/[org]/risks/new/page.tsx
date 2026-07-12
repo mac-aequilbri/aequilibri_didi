@@ -6,13 +6,26 @@ import { createRisk } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewRiskPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function NewRiskPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  const { error } = await searchParams;
   const jobs = await loadJobOptions(ctx);
 
   return (
     <div className="p-6 max-w-xl">
       <PageHeader title="New risk" />
+      {error === "save_failed" && (
+        <p className="text-red-600 text-sm mb-3">
+          The risk couldn&apos;t be saved — the org&apos;s base rejected the write. Check the server
+          log for details.
+        </p>
+      )}
       <form action={createRisk} className="ae-card p-5 space-y-4">
         <input type="hidden" name="org" value={ctx.orgSlug} />
         <label className="block text-sm">
@@ -36,11 +49,23 @@ export default async function NewRiskPage({ params }: { params: Promise<{ org: s
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Likelihood (1–5)</span>
-            <input type="number" name="likelihood" min={1} max={5} defaultValue={3} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <select name="likelihood" defaultValue="3" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Impact (1–5)</span>
-            <input type="number" name="impact" min={1} max={5} defaultValue={3} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <select name="impact" defaultValue="3" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         <label className="block text-sm">
