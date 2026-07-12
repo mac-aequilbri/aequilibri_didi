@@ -24,7 +24,7 @@ export default async function VendorsPage({
   const ctx = await requireOrgCtx((await params).org);
   const query = parseListQuery(await searchParams, vendorsListConfig);
   const filtered = hasActiveFilters(query);
-  const { items: vendors, total, facets } = applyListQuery(
+  const { items: vendors, total, matching, facets, page, pageCount } = applyListQuery(
     await loadVendors(ctx),
     query,
     vendorsListConfig,
@@ -41,9 +41,11 @@ export default async function VendorsPage({
         basePath={orgPath(ctx.orgSlug, "/vendors")}
         config={toClientConfig(vendorsListConfig)}
         query={query}
-        shown={vendors.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search vendors…"
       >
       <div className="ae-card p-5">

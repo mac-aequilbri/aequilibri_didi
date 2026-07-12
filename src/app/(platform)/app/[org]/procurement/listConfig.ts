@@ -23,4 +23,5 @@ export const procurementListConfig: ListViewConfig<ProcurementView> = {
         o.dueDate ? (o.dueDate instanceof Date ? o.dueDate : new Date(o.dueDate)) : null,
     },
   ],
+  pageSize: 50,
 };

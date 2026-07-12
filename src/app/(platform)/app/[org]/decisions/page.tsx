@@ -29,7 +29,7 @@ export default async function DecisionsPage({
   const ctx = await requireOrgCtx((await params).org);
   const query = parseListQuery(await searchParams, decisionsListConfig);
   const filtered = hasActiveFilters(query);
-  const { items: decisions, total, facets } = applyListQuery(
+  const { items: decisions, total, matching, facets, page, pageCount } = applyListQuery(
     await loadDecisions(ctx),
     query,
     decisionsListConfig,
@@ -46,9 +46,11 @@ export default async function DecisionsPage({
         basePath={orgPath(ctx.orgSlug, "/decisions")}
         config={toClientConfig(decisionsListConfig)}
         query={query}
-        shown={decisions.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search decisions…"
       >
       <div className="ae-card p-5">

@@ -20,4 +20,5 @@ export const decisionsListConfig: ListViewConfig<DecisionView> = {
       getValue: (d) => (d.date ? new Date(d.date) : null),
     },
   ],
+  pageSize: 50,
 };

@@ -34,7 +34,7 @@ export default async function RisksPage({
   const ctx = await requireOrgCtx((await params).org);
   const query = parseListQuery(await searchParams, risksListConfig);
   const filtered = hasActiveFilters(query);
-  const { items: risks, total, facets } = applyListQuery(await loadRisks(ctx), query, risksListConfig);
+  const { items: risks, total, matching, facets, page, pageCount } = applyListQuery(await loadRisks(ctx), query, risksListConfig);
 
   return (
     <div className="p-6">
@@ -50,9 +50,11 @@ export default async function RisksPage({
         basePath={orgPath(ctx.orgSlug, "/risks")}
         config={toClientConfig(risksListConfig)}
         query={query}
-        shown={risks.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search risks…"
       >
       <div className="ae-card p-5">

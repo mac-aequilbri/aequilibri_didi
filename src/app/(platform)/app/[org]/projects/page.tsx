@@ -27,7 +27,7 @@ export default async function ProjectsPage({
   const filtered = hasActiveFilters(query);
   // Postgres (numeric ids) or Airtable (rec… ids) depending on the flag — the
   // ids here must match what the detail page (jobDetailSource) can resolve.
-  const { items: jobs, total, facets } = applyListQuery(
+  const { items: jobs, total, matching, facets, page, pageCount } = applyListQuery(
     await loadJobsList(ctx),
     query,
     projectsListConfig,
@@ -44,9 +44,11 @@ export default async function ProjectsPage({
         basePath={orgPath(ctx.orgSlug, "/projects")}
         config={toClientConfig(projectsListConfig)}
         query={query}
-        shown={jobs.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search projects…"
       >
       {jobs.length === 0 ? (

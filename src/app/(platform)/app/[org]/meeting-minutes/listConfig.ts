@@ -26,4 +26,5 @@ export const minutesListConfig: ListViewConfig<MinutesView> = {
           : null,
     },
   ],
+  pageSize: 50,
 };

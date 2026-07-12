@@ -28,4 +28,5 @@ export const vendorsListConfig: ListViewConfig<VendorView> = {
       ],
     },
   ],
+  pageSize: 50,
 };

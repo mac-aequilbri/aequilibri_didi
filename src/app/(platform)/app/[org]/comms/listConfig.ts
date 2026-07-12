@@ -21,4 +21,5 @@ export const commsListConfig: ListViewConfig<CommView> = {
     },
     { kind: "daterange", name: "due", label: "Due", getValue: (c) => c.dueDate },
   ],
+  pageSize: 50,
 };

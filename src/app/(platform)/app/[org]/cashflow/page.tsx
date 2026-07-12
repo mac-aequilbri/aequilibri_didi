@@ -10,6 +10,7 @@ import {
   countEnumOptions,
   hasActiveFilters,
   parseListQuery,
+  sortAndPaginate,
   toClientConfig,
   toPredicate,
 } from "@/lib/platform/listQuery";
@@ -42,6 +43,14 @@ export default async function CashflowPage({
   }));
   const shownCount = jobs.reduce((s, j) => s + j.conCashflows.length, 0);
 
+  // Pagination is per job section (a row pager would split the groupings);
+  // the org-wide chart still aggregates every filtered row across pages.
+  const visibleJobs = jobs.filter((j) => j.conCashflows.length > 0);
+  const { items: pageJobs, page, pageCount } = sortAndPaginate(visibleJobs, query, {
+    fields: [],
+    pageSize: 8,
+  });
+
   return (
     <div className="p-6">
       <PageHeader
@@ -57,6 +66,8 @@ export default async function CashflowPage({
         shown={shownCount}
         total={allTxns.length}
         counts={countEnumOptions(allTxns, cashflowListConfig)}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search entries…"
       >
       {(() => {
@@ -85,8 +96,7 @@ export default async function CashflowPage({
         );
       })()}
 
-      {jobs.map((job) => {
-        if (!job.conCashflows.length) return null;
+      {pageJobs.map((job) => {
         return (
           <section key={job.id} className="ae-card p-5 mb-6">
             <h2 className="font-semibold mb-3">
@@ -96,7 +106,7 @@ export default async function CashflowPage({
           </section>
         );
       })}
-      {jobs.every((j) => !j.conCashflows.length) && (
+      {visibleJobs.length === 0 && (
         <EmptyState
           title={filtered ? "No entries match these filters" : "No cashflow entries yet"}
           hint={

@@ -18,4 +18,5 @@ export const projectsListConfig: ListViewConfig<JobListView> = {
       })),
     },
   ],
+  pageSize: 50,
 };

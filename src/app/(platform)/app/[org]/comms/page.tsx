@@ -31,7 +31,7 @@ export default async function CommsPage({
   const ctx = await requireOrgCtx((await params).org);
   const query = parseListQuery(await searchParams, commsListConfig);
   const filtered = hasActiveFilters(query);
-  const { items: comms, total, facets } = applyListQuery(await loadComms(ctx), query, commsListConfig);
+  const { items: comms, total, matching, facets, page, pageCount } = applyListQuery(await loadComms(ctx), query, commsListConfig);
 
   return (
     <div className="p-6">
@@ -44,9 +44,11 @@ export default async function CommsPage({
         basePath={orgPath(ctx.orgSlug, "/comms")}
         config={toClientConfig(commsListConfig)}
         query={query}
-        shown={comms.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search communications…"
       >
       <div className="ae-card p-5">

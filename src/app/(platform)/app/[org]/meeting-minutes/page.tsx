@@ -25,7 +25,7 @@ export default async function MeetingMinutesPage({
   const ctx = await requireOrgCtx((await params).org);
   const query = parseListQuery(await searchParams, minutesListConfig);
   const filtered = hasActiveFilters(query);
-  const { items: minutes, total, facets } = applyListQuery(
+  const { items: minutes, total, matching, facets, page, pageCount } = applyListQuery(
     await loadMeetingMinutes(ctx),
     query,
     minutesListConfig,
@@ -42,9 +42,11 @@ export default async function MeetingMinutesPage({
         basePath={orgPath(ctx.orgSlug, "/meeting-minutes")}
         config={toClientConfig(minutesListConfig)}
         query={query}
-        shown={minutes.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search minutes…"
       >
       <div className="ae-card p-5">

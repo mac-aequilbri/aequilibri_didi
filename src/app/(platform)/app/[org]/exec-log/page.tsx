@@ -1,13 +1,25 @@
 // Execution log — the audit trail AND the AI-write approval queue.
 // Pending proposals can be approved (the deferred write executes) or rejected.
 
+import { FilterBar } from "@/components/FilterBar";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import {
+  parseListQuery,
+  sortAndPaginate,
+  toClientConfig,
+  type ListViewConfig,
+} from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
-import { loadExecLogHistory } from "@/lib/platform/execLogSource";
+import { loadExecLogHistory, type LogView } from "@/lib/platform/execLogSource";
 import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
+import { orgPath } from "@/lib/platform/paths";
 import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+// Pager-only config for the history table (the pending queue stays unpaged —
+// approvals must always all be visible). Filters can be added here later.
+const execLogListConfig: ListViewConfig<LogView> = { fields: [], pageSize: 50 };
 
 function Payload({ raw }: { raw: string }) {
   let pretty = raw;
@@ -21,11 +33,19 @@ function Payload({ raw }: { raw: string }) {
   );
 }
 
-export default async function ExecLogPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function ExecLogPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  const query = parseListQuery(await searchParams, execLogListConfig);
 
-  const [pending, logs] = await Promise.all([loadPendingWrites(ctx), loadExecLogHistory(ctx)]);
+  const [pending, allLogs] = await Promise.all([loadPendingWrites(ctx), loadExecLogHistory(ctx)]);
   const proposals = pending.filter((p) => p.status === "proposed");
+  const { items: logs, page, pageCount } = sortAndPaginate(allLogs, query, execLogListConfig);
 
   const tableLabel = (t: string) => t.replace(/^plat_(core|con|cfg)_/, "");
 
@@ -85,6 +105,15 @@ export default async function ExecLogPage({ params }: { params: Promise<{ org: s
         </section>
       )}
 
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/exec-log")}
+        config={toClientConfig(execLogListConfig)}
+        query={query}
+        shown={allLogs.length}
+        total={allLogs.length}
+        page={page}
+        pageCount={pageCount}
+      >
       <section className="ae-card p-5">
         <h2 className="font-semibold mb-3">History</h2>
         <table className="w-full text-sm">
@@ -130,6 +159,7 @@ export default async function ExecLogPage({ params }: { params: Promise<{ org: s
           </tbody>
         </table>
       </section>
+      </FilterBar>
     </div>
   );
 }

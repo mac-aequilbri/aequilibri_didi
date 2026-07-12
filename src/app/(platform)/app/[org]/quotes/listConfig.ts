@@ -22,4 +22,5 @@ export const quotesListConfig: ListViewConfig<QuoteView> = {
         q.validUntil ? (q.validUntil instanceof Date ? q.validUntil : new Date(q.validUntil)) : null,
     },
   ],
+  pageSize: 50,
 };

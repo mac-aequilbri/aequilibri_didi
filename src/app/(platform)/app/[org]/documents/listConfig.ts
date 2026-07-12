@@ -30,4 +30,5 @@ export const documentsListConfig: ListViewConfig<DocumentView> = {
     },
     { kind: "daterange", name: "added", label: "Added", getValue: (d) => d.createdAt },
   ],
+  pageSize: 50,
 };

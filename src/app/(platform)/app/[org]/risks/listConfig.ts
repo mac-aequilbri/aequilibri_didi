@@ -42,4 +42,5 @@ export const risksListConfig: ListViewConfig<RiskView> = {
       ],
     },
   ],
+  pageSize: 50,
 };

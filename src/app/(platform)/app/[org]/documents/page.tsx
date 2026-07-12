@@ -28,7 +28,7 @@ export default async function DocumentsPage({
   const [allDocs, jobs, sync] = await Promise.all([loadDocuments(ctx), loadJobOptions(ctx), searchParams]);
   const query = parseListQuery(sync, documentsListConfig);
   const filtered = hasActiveFilters(query);
-  const { items: docs, total, facets } = applyListQuery(allDocs, query, documentsListConfig);
+  const { items: docs, total, matching, facets, page, pageCount } = applyListQuery(allDocs, query, documentsListConfig);
 
   return (
     <div className="p-6">
@@ -60,9 +60,11 @@ export default async function DocumentsPage({
         basePath={orgPath(ctx.orgSlug, "/documents")}
         config={toClientConfig(documentsListConfig)}
         query={query}
-        shown={docs.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search documents…"
       >
       <div className="ae-card p-5">

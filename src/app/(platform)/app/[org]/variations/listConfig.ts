@@ -24,4 +24,5 @@ export const variationsListConfig: ListViewConfig<VariationView> = {
       ],
     },
   ],
+  pageSize: 50,
 };

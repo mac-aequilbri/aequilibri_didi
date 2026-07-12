@@ -1,8 +1,15 @@
 import Link from "next/link";
+import { FilterBar } from "@/components/FilterBar";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
+import {
+  parseListQuery,
+  sortAndPaginate,
+  toClientConfig,
+  type ListViewConfig,
+} from "@/lib/platform/listQuery";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
-import { loadWeeklyReports } from "@/lib/platform/domainListSources";
+import { loadWeeklyReports, type ReportView } from "@/lib/platform/domainListSources";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { orgPath } from "@/lib/platform/paths";
 import { reportModeFor, reportingCapabilities } from "@/lib/platform/reportingPolicy";
@@ -10,14 +17,26 @@ import { generateReportAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportsPage({ params }: { params: Promise<{ org: string }> }) {
+// Pager-only config — reports accumulate weekly per job, so the table grows
+// without bound. Filters can be added here later.
+const reportsListConfig: ListViewConfig<ReportView> = { fields: [], pageSize: 50 };
+
+export default async function ReportsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  const query = parseListQuery(await searchParams, reportsListConfig);
   const viewer = await getCurrentViewer(ctx);
   const reportCaps = reportingCapabilities(viewer.role);
-  const [reports, jobs] = await Promise.all([
+  const [allReports, jobs] = await Promise.all([
     loadWeeklyReports(ctx),
     loadJobOptions(ctx), // jobs feed the AI-generate dropdown
   ]);
+  const { items: reports, page, pageCount } = sortAndPaginate(allReports, query, reportsListConfig);
 
   return (
     <div className="p-6">
@@ -53,6 +72,15 @@ export default async function ReportsPage({ params }: { params: Promise<{ org: s
         </div>
       )}
 
+      <FilterBar
+        basePath={orgPath(ctx.orgSlug, "/reports")}
+        config={toClientConfig(reportsListConfig)}
+        query={query}
+        shown={allReports.length}
+        total={allReports.length}
+        page={page}
+        pageCount={pageCount}
+      >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
@@ -92,6 +120,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ org: s
           </tbody>
         </table>
       </div>
+      </FilterBar>
     </div>
   );
 }

@@ -28,7 +28,7 @@ export default async function QuotesPage({
   const ctx = await requireOrgCtx((await params).org);
   const query = parseListQuery(await searchParams, quotesListConfig);
   const filtered = hasActiveFilters(query);
-  const { items: quotes, total, facets } = applyListQuery(
+  const { items: quotes, total, matching, facets, page, pageCount } = applyListQuery(
     await loadQuotes(ctx),
     query,
     quotesListConfig,
@@ -46,9 +46,11 @@ export default async function QuotesPage({
         basePath={orgPath(ctx.orgSlug, "/quotes")}
         config={toClientConfig(quotesListConfig)}
         query={query}
-        shown={quotes.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search quotes…"
       >
       {quotes.length === 0 ? (

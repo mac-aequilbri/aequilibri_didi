@@ -25,7 +25,7 @@ export default async function VariationsPage({
   const ctx = await requireOrgCtx((await params).org);
   const query = parseListQuery(await searchParams, variationsListConfig);
   const filtered = hasActiveFilters(query);
-  const { items: variations, total, facets } = applyListQuery(
+  const { items: variations, total, matching, facets, page, pageCount } = applyListQuery(
     await loadVariations(ctx),
     query,
     variationsListConfig,
@@ -42,9 +42,11 @@ export default async function VariationsPage({
         basePath={orgPath(ctx.orgSlug, "/variations")}
         config={toClientConfig(variationsListConfig)}
         query={query}
-        shown={variations.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search variations…"
       >
       <div className="ae-card p-5">

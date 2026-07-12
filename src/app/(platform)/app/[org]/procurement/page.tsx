@@ -28,7 +28,7 @@ export default async function ProcurementPage({
   const ctx = await requireOrgCtx((await params).org);
   const query = parseListQuery(await searchParams, procurementListConfig);
   const filtered = hasActiveFilters(query);
-  const { items: orders, total, facets } = applyListQuery(
+  const { items: orders, total, matching, facets, page, pageCount } = applyListQuery(
     await loadProcurement(ctx),
     query,
     procurementListConfig,
@@ -45,9 +45,11 @@ export default async function ProcurementPage({
         basePath={orgPath(ctx.orgSlug, "/procurement")}
         config={toClientConfig(procurementListConfig)}
         query={query}
-        shown={orders.length}
+        shown={matching}
         total={total}
         counts={facets}
+        page={page}
+        pageCount={pageCount}
         searchPlaceholder="Search orders…"
       >
       <div className="ae-card p-5">
