@@ -34,9 +34,10 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
-// Blank status defaults to the "open-ish" state in app code (see
-// dashboardSource/navCounts history), so the formula must match blanks too.
-const SUBMITTED_VARIATIONS_FORMULA = `OR({Status}='submitted',{Status}=BLANK())`;
+// Spec 12: variations are CHANGE_LOG rows (Change_Type="Variation"). "submitted"
+// maps to CHANGE_LOG's "Pending"; a blank status still counts as open-ish (see
+// dashboardSource/navCounts history).
+const SUBMITTED_VARIATIONS_FORMULA = `AND({Change_Type}='Variation',OR({Status}='Pending',{Status}=BLANK()))`;
 
 async function fromAirtable(ctx: OrgCtx): Promise<OrgHighlights> {
   const f = ctx.config.features;
@@ -47,7 +48,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<OrgHighlights> {
     // Same opts as loadRisks/loadJobsList so a dashboard render reuses their read.
     f.risks ? listOptional(ctx.orgSlug, "RISKS", { maxRecords: 500 }) : Promise.resolve([]),
     f.variations
-      ? listOptional(ctx.orgSlug, "VARIATIONS", { maxRecords: 1000, filterByFormula: SUBMITTED_VARIATIONS_FORMULA })
+      ? listOptional(ctx.orgSlug, "CHANGE_LOG", { maxRecords: 1000, filterByFormula: SUBMITTED_VARIATIONS_FORMULA })
       : Promise.resolve([]),
     loadActionStatusMap(ctx),
   ]);

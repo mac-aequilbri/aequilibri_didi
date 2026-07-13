@@ -1,5 +1,6 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { parseReportModule8 } from "./reportDoc";
 import type { OrgCtx } from "./types";
 
 export interface ReportDetailView {
@@ -56,20 +57,25 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<ReportDetailView |
 
 async function fromAirtable(ctx: OrgCtx, id: string): Promise<ReportDetailView | null> {
   if (!id.startsWith("rec")) return null;
-  const report = await core.get(ctx.orgSlug, "WEEKLY_REPORTS", id).catch(() => null);
-  if (!report) return null;
-  const jobId = firstLink(report["Job"]);
+  // Spec 12: a weekly report is a DOCUMENTS row — body in Text_Content, lifecycle
+  // in AI_Analysis.module8 (see reportDoc.ts). A rec id that isn't a report doc
+  // (no module8 tag) is treated as not-found.
+  const doc = await core.get(ctx.orgSlug, "DOCUMENTS", id).catch(() => null);
+  if (!doc) return null;
+  const m8 = parseReportModule8(doc["AI_Analysis"]);
+  if (!m8) return null;
+  const jobId = firstLink(doc["Job"]);
   const job = jobId ? await core.get(ctx.orgSlug, "JOBS", jobId).catch(() => null) : null;
   return {
-    id: report.id,
-    title: str(report["Title"]),
-    weekEnding: dateOrNull(report["Week_Ending"]),
-    generatedAt: dateOrNull(report["Generated_At"]),
-    content: str(report["Content"]),
-    status: str(report["Status"]) || "draft",
-    approvedBy: str(report["Approved_By"]),
-    approvedAt: dateOrNull(report["Approved_At"]),
-    sentAt: dateOrNull(report["Sent_At"]),
+    id: doc.id,
+    title: str(doc["Document_Name"]),
+    weekEnding: dateOrNull(m8.weekEnding),
+    generatedAt: dateOrNull(m8.generatedAt) ?? dateOrNull(doc["Upload_Date"]),
+    content: str(doc["Text_Content"]),
+    status: m8.status,
+    approvedBy: m8.approvedBy ?? "",
+    approvedAt: dateOrNull(m8.approvedAt),
+    sentAt: dateOrNull(m8.sentAt),
     jobCode: "",
     jobName: job ? str(job["Job_Name"]) : "",
   };

@@ -7,7 +7,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
-import type { ExtractedAction } from "@/services/platform/construction/minutes";
+import { type ExtractedAction, parseMinutesModule } from "./minutesDoc";
 import type { OrgCtx } from "./types";
 
 export interface MinutesDetailView {
@@ -65,21 +65,26 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<MinutesDetailView 
 
 async function fromAirtable(ctx: OrgCtx, id: string): Promise<MinutesDetailView | null> {
   if (!id.startsWith("rec")) return null;
-  let minutes;
+  // Spec 12: minutes are a DOCUMENTS row — raw minutes in Text_Content, metadata
+  // in AI_Analysis.minutes (see minutesDoc.ts). A doc without that block is not a
+  // minutes record → treated as not-found.
+  let doc;
   try {
-    minutes = await core.get(ctx.orgSlug, "MEETING_MINUTES", id);
+    doc = await core.get(ctx.orgSlug, "DOCUMENTS", id);
   } catch {
     return null; // 404 / deleted / wrong-base → not found
   }
+  const m = parseMinutesModule(doc["AI_Analysis"]);
+  if (!m) return null;
   return {
-    id: minutes.id,
-    title: str(minutes["Title"]),
-    meetingDate: dateOrNull(minutes["Meeting_Date"]),
-    attendees: str(minutes["Attendees"]),
-    status: str(minutes["Status"]) || "raw",
-    rawMinutes: str(minutes["Raw_Minutes"]),
-    extractedActions: parseActions(minutes["Extracted_Actions"]),
-    confirmedAt: dateOrNull(minutes["Confirmed_At"]),
+    id: doc.id,
+    title: str(doc["Document_Name"]),
+    meetingDate: dateOrNull(m.meetingDate),
+    attendees: m.attendees,
+    status: m.status,
+    rawMinutes: str(doc["Text_Content"]),
+    extractedActions: m.extractedActions,
+    confirmedAt: dateOrNull(m.confirmedAt),
     jobCode: "", // Airtable JOBS has no code field (see plan P4)
   };
 }

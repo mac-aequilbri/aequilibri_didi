@@ -66,6 +66,14 @@ const COMMS_STATUS: Record<string, string> = {
   acknowledged: "Acknowledged",
   overdue: "Overdue",
 };
+// App variation status → CHANGE_LOG.Status option (Spec 12). Reverse map lives in
+// lib/platform/changeLog.ts (variationStatusFromAir) — keep the two in sync.
+const VARIATION_STATUS: Record<string, string> = {
+  draft: "Proposed",
+  submitted: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+};
 
 // ── spec model ──────────────────────────────────────────────────────────────
 type Op = "create" | "update";
@@ -342,20 +350,27 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
     ],
   },
   variation_order: {
-    table: "VARIATIONS",
+    // Spec 12: variation orders live in CHANGE_LOG (Change_Type="Variation").
+    // CHANGE_LOG covers cost/schedule impact, status, job + dates; the extra
+    // variation fields (Ref_Number/Scope_Change/Is_AI_Drafted/AI_Draft/
+    // Approved_By) were backfilled by airtable-extend-changelog.mjs. Status maps
+    // app→CHANGE_LOG option names (reverse in changeLog.ts, keep in sync).
+    table: "CHANGE_LOG",
     specs: [
-      { air: "Title", from: "title", to: (v) => S(v) || "Untitled variation" },
+      { air: "Change_Name", from: "title", to: (v) => S(v) || "Untitled variation" },
+      { air: "Change_Type", createOnly: true, createDefault: "Variation", to: S },
       { air: "Ref_Number", from: "refNumber", to: S },
       { air: "Description", from: "description", to: S },
       { air: "Scope_Change", from: "scopeChange", to: S },
-      { air: "Cost_Impact", from: "costImpact", to: (v) => NUM(v) },
-      { air: "Time_Impact_Days", from: "timeImpactDays", to: (v) => NUM(v) },
-      { air: "Status", from: "status", createDefault: "draft", to: S },
+      { air: "Impact_Cost", from: "costImpact", to: (v) => NUM(v) },
+      { air: "Impact_Schedule_Days", from: "timeImpactDays", to: (v) => NUM(v) },
+      { air: "Status", from: "status", createDefault: "draft", to: (v) => VARIATION_STATUS[S(v)] ?? "Proposed" },
       { air: "Is_AI_Drafted", from: "isAiDrafted", to: BOOL },
       { air: "AI_Draft", from: "aiDraft", to: S },
-      { air: "Submitted_By", from: "submittedBy", to: S },
+      { air: "Raised_By", from: "submittedBy", to: S },
       { air: "Approved_By", from: "approvedBy", to: S },
-      { air: "Approved_At", from: "approvedAt", to: DATE },
+      { air: "Date_Resolved", from: "approvedAt", to: DATE },
+      { air: "Date_Raised", createOnly: true, to: () => new Date().toISOString().slice(0, 10) },
       { air: "Job", from: "jobId", to: LINK },
     ],
   },

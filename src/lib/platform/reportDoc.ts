@@ -1,0 +1,66 @@
+// Weekly report ↔ DOCUMENTS mapping (Spec 12 reconciliation).
+//
+// Spec 12 dropped the legacy WEEKLY_REPORTS table; a weekly report is now stored
+// as a DOCUMENTS row (Module 8 client-facing output): the markdown body lives in
+// Text_Content, and the report's own lifecycle (week ending, draft→approved→sent,
+// approver/sent stamps) rides in AI_Analysis under a `module8` block — kept out
+// of Doc_Status so the generic DOCUMENTS status vocabulary stays clean. The
+// Postgres backend still uses the rich plat_con_weeklyreport model; this module
+// is the shared shape for the Airtable path (service + read sources).
+
+/** Airtable Document_Type for a weekly report row. */
+export const REPORT_DOC_TYPE = "report";
+
+export interface ReportModule8 {
+  kind: "weekly_report";
+  weekEnding: string;
+  status: "draft" | "approved" | "sent";
+  isAiGenerated: boolean;
+  generatedAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  sentAt?: string;
+}
+
+/** Serialize a report's lifecycle into the DOCUMENTS AI_Analysis cell. */
+export function buildReportAnalysis(m8: ReportModule8): string {
+  return JSON.stringify({ module8: m8 });
+}
+
+/** Recover the report lifecycle from a DOCUMENTS AI_Analysis cell, or null if the
+ *  row is not a weekly report. Tolerant of malformed/legacy JSON. */
+export function parseReportModule8(aiAnalysis: unknown): ReportModule8 | null {
+  if (typeof aiAnalysis !== "string" || !aiAnalysis.trim()) return null;
+  try {
+    const parsed = JSON.parse(aiAnalysis) as { module8?: Partial<ReportModule8> };
+    const m8 = parsed.module8;
+    if (!m8 || m8.kind !== "weekly_report") return null;
+    return {
+      kind: "weekly_report",
+      weekEnding: typeof m8.weekEnding === "string" ? m8.weekEnding : "",
+      status: m8.status === "approved" || m8.status === "sent" ? m8.status : "draft",
+      isAiGenerated: m8.isAiGenerated === true,
+      generatedAt: typeof m8.generatedAt === "string" ? m8.generatedAt : "",
+      approvedBy: typeof m8.approvedBy === "string" ? m8.approvedBy : undefined,
+      approvedAt: typeof m8.approvedAt === "string" ? m8.approvedAt : undefined,
+      sentAt: typeof m8.sentAt === "string" ? m8.sentAt : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Merge lifecycle changes into an existing report's module8 and re-serialize. */
+export function patchReportAnalysis(
+  existing: unknown,
+  patch: Partial<ReportModule8>,
+): string {
+  const base = parseReportModule8(existing) ?? {
+    kind: "weekly_report" as const,
+    weekEnding: "",
+    status: "draft" as const,
+    isAiGenerated: false,
+    generatedAt: "",
+  };
+  return buildReportAnalysis({ ...base, ...patch });
+}

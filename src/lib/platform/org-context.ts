@@ -9,6 +9,7 @@
 // the current user).
 
 import { redirect } from "next/navigation";
+import { airtableEnabled } from "@/lib/airtable";
 import {
   controlEnabled,
   getOrgRegistry,
@@ -50,7 +51,15 @@ function parseConfig(settingsRaw: string): OrgConfig {
         settings.assistant?.persona ??
         "You are the AI project coordinator for this organisation. Be precise, data-driven, and flag risks proactively.",
     },
-    features: { ...DEFAULT_FEATURES, ...(settings.features ?? {}) },
+    // Spec 12 has no QUOTES/QUOTE_LINES table in any vertical template (roofing
+    // estimation uses its own ROOFING_QUOTES flow), so the plat quotes feature
+    // has no Airtable home — force it off in Airtable mode regardless of stored
+    // config, so the nav + pages don't target a missing table.
+    features: {
+      ...DEFAULT_FEATURES,
+      ...(settings.features ?? {}),
+      ...(airtableEnabled() ? { quotes: false } : {}),
+    },
     module1: settings.module1 ?? defaultModule1Governance(),
     branding: settings.branding?.logo ? { logo: settings.branding.logo } : undefined,
   };

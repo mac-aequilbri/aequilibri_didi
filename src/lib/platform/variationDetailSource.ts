@@ -7,6 +7,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { variationStatusFromAir } from "./changeLog";
 import type { OrgCtx } from "./types";
 
 export interface VariationDetailView {
@@ -65,25 +66,26 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<VariationDetailVie
 
 async function fromAirtable(ctx: OrgCtx, id: string): Promise<VariationDetailView | null> {
   if (!id.startsWith("rec")) return null;
+  // Spec 12: a variation is a CHANGE_LOG row (Change_Type="Variation").
   let vo;
   try {
-    vo = await core.get(ctx.orgSlug, "VARIATIONS", id);
+    vo = await core.get(ctx.orgSlug, "CHANGE_LOG", id);
   } catch {
     return null;
   }
   return {
     id: vo.id,
     refNumber: str(vo["Ref_Number"]),
-    title: str(vo["Title"]) || "(untitled variation)",
+    title: str(vo["Change_Name"]) || "(untitled variation)",
     description: str(vo["Description"]),
     scopeChange: str(vo["Scope_Change"]),
-    costImpact: num(vo["Cost_Impact"]),
-    timeImpactDays: num(vo["Time_Impact_Days"]),
-    status: str(vo["Status"]) || "submitted",
-    submittedBy: str(vo["Submitted_By"]),
+    costImpact: num(vo["Impact_Cost"]),
+    timeImpactDays: num(vo["Impact_Schedule_Days"]),
+    status: variationStatusFromAir(vo["Status"]),
+    submittedBy: str(vo["Raised_By"]),
     isAiDrafted: vo["Is_AI_Drafted"] === true,
     approvedBy: str(vo["Approved_By"]),
-    approvedAt: dateOrNull(vo["Approved_At"]),
+    approvedAt: dateOrNull(vo["Date_Resolved"]),
     jobCode: "", // Airtable JOBS has no code field
   };
 }

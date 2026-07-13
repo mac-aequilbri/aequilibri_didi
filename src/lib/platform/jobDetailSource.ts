@@ -190,8 +190,10 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<JobDetailView | nu
     actions: [], // ACTION_HUB has no Job link in Airtable — empty in this mode
     counts: {
       bimModels: linkCount(job["BIM_MODELS"]),
-      documents: 0, // JOBS has no DOCUMENTS link in Airtable
-      variations: linkCount(job["VARIATIONS"]),
+      documents: linkCount(job["DOCUMENTS"]), // JOBS↔DOCUMENTS link added in Spec 12 reconciliation
+      // Spec 12: variations live in CHANGE_LOG. The link counts all change-log
+      // entries for the job (the app only writes Change_Type="Variation" rows).
+      variations: linkCount(job["CHANGE_LOG"]),
     },
   };
 }

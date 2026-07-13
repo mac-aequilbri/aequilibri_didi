@@ -68,7 +68,7 @@ async function runQuery(ctx: OrgCtx, input: Record<string, unknown>): Promise<st
       budget_lines: "BUDGET",
       cashflows: "CASHFLOWS",
       risks: "RISKS",
-      variations: "VARIATIONS",
+      variations: "CHANGE_LOG", // Spec 12: variations are Change_Type="Variation" rows
       procurement: "PROCUREMENT",
       vendors: "VENDORS",
       learning_rules: "LEARNING_RULES",
@@ -79,7 +79,11 @@ async function runQuery(ctx: OrgCtx, input: Record<string, unknown>): Promise<st
     const status = typeof input.status === "string" ? input.status.trim() : "";
     const limit = Math.min(Math.max(Number(input.limit) || 20, 1), 50);
     const jobId = typeof input.jobId === "string" || typeof input.jobId === "number" ? String(input.jobId) : "";
-    const rows = await core.list(ctx.orgSlug, tableName, { maxRecords: 500 });
+    const allRows = await core.list(ctx.orgSlug, tableName, { maxRecords: 500 });
+    // CHANGE_LOG holds every change type; the variations view is only the
+    // Change_Type="Variation" rows.
+    const rows =
+      table === "variations" ? allRows.filter((r) => r["Change_Type"] === "Variation") : allRows;
     const withJob = ["jobs", "vendors", "learning_rules"].includes(table)
       ? rows
       : rows.filter((r) => {

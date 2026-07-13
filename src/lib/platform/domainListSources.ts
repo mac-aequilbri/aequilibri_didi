@@ -8,7 +8,10 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import type { CoreRow } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { VARIATION_FILTER, variationStatusFromAir } from "./changeLog";
+import { MINUTES_DOC_TYPE, parseMinutesModule } from "./minutesDoc";
 import { listOptional } from "./optionalList";
+import { parseReportModule8, REPORT_DOC_TYPE } from "./reportDoc";
 import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -49,16 +52,20 @@ export async function loadVariations(ctx: OrgCtx): Promise<VariationView[]> {
       status: v.status,
     }));
   }
-  const rows = await listOptional(ctx.orgSlug, "VARIATIONS", { maxRecords: 200 });
+  // Spec 12: variations are CHANGE_LOG rows (Change_Type="Variation").
+  const rows = await core.list(ctx.orgSlug, "CHANGE_LOG", {
+    maxRecords: 500,
+    filterByFormula: VARIATION_FILTER,
+  });
   return rows.map((r) => ({
     id: r.id,
     refNumber: str(r["Ref_Number"]),
-    title: str(r["Title"]) || "(untitled variation)",
+    title: str(r["Change_Name"]) || "(untitled variation)",
     jobCode: null,
-    isAiDrafted: false,
-    costImpact: num(r["Cost_Impact"]),
-    timeImpactDays: num(r["Time_Impact_Days"]),
-    status: str(r["Status"]) || "draft",
+    isAiDrafted: r["Is_AI_Drafted"] === true,
+    costImpact: num(r["Impact_Cost"]),
+    timeImpactDays: num(r["Impact_Schedule_Days"]),
+    status: variationStatusFromAir(r["Status"]),
   }));
 }
 
@@ -157,15 +164,23 @@ export async function loadMeetingMinutes(ctx: OrgCtx): Promise<MinutesView[]> {
       status: m.status,
     }));
   }
-  const rows = await listOptional(ctx.orgSlug, "MEETING_MINUTES", { maxRecords: 200 });
-  return rows.map((r) => ({
-    id: r.id,
-    title: str(r["Title"]),
-    meetingDate: str(r["Meeting_Date"]) || null,
-    jobCode: null,
-    actionsCount: num(r["Actions_Count"]),
-    status: str(r["Status"]) || "raw",
-  }));
+  // Spec 12: minutes are DOCUMENTS rows (Document_Type="Meeting Minutes") whose
+  // metadata rides in AI_Analysis.minutes — see minutesDoc.ts.
+  const rows = await core.list(ctx.orgSlug, "DOCUMENTS", {
+    maxRecords: 500,
+    filterByFormula: `{Document_Type}='${MINUTES_DOC_TYPE}'`,
+  });
+  return rows
+    .map((r) => ({ r, m: parseMinutesModule(r["AI_Analysis"]) }))
+    .filter((x): x is { r: CoreRow; m: NonNullable<typeof x.m> } => x.m != null)
+    .map(({ r, m }) => ({
+      id: r.id,
+      title: str(r["Document_Name"]) || `Meeting ${m.meetingDate}`,
+      meetingDate: m.meetingDate || null,
+      jobCode: null,
+      actionsCount: m.actionsCount,
+      status: m.status,
+    }));
 }
 
 // ── Quotes ─────────────────────────────────────────────────────────────
@@ -239,14 +254,23 @@ export async function loadWeeklyReports(ctx: OrgCtx): Promise<ReportView[]> {
       status: r.status,
     }));
   }
-  const rows = await listOptional(ctx.orgSlug, "WEEKLY_REPORTS", { maxRecords: 200 });
-  return rows.map((r) => ({
-    id: r.id,
-    title: str(r["Title"]),
-    weekEnding: str(r["Week_Ending"]) || null,
-    generatedAt: null, // no generated-at field in the Airtable table
-    jobCode: null,
-    isAiGenerated: r["Is_AI_Generated"] === true,
-    status: str(r["Status"]) || "draft",
-  }));
+  // Spec 12: a weekly report is a DOCUMENTS row (Document_Type=report) whose
+  // lifecycle rides in AI_Analysis.module8 — see reportDoc.ts. Narrow by type in
+  // the query, then confirm the module8 tag so other "report" docs are excluded.
+  const rows = await core.list(ctx.orgSlug, "DOCUMENTS", {
+    maxRecords: 500,
+    filterByFormula: `LOWER({Document_Type})='${REPORT_DOC_TYPE}'`,
+  });
+  return rows
+    .map((r) => ({ r, m8: parseReportModule8(r["AI_Analysis"]) }))
+    .filter((x): x is { r: CoreRow; m8: NonNullable<typeof x.m8> } => x.m8 != null)
+    .map(({ r, m8 }) => ({
+      id: r.id,
+      title: str(r["Document_Name"]) || `Week ending ${m8.weekEnding}`,
+      weekEnding: m8.weekEnding || null,
+      generatedAt: m8.generatedAt || str(r["Upload_Date"]) || null,
+      jobCode: null,
+      isAiGenerated: m8.isAiGenerated,
+      status: m8.status,
+    }));
 }

@@ -1,28 +1,24 @@
 // Weekly reports — AI-generated from live job data, human approval before
 // sending (doc module 8: client-facing outputs).
+//
+// Storage model differs by backend. Postgres keeps the rich plat_con_weeklyreport
+// model (+ an immutable DOCUMENTS snapshot). Airtable (Spec 12) has no
+// WEEKLY_REPORTS table, so a report IS a DOCUMENTS row: the markdown body in
+// Text_Content, the lifecycle (week ending, draft→approved→sent) in AI_Analysis
+// under a module8 block (see reportDoc.ts). Both paths go through writeRecord, so
+// the audit log + approval discipline are unchanged.
 
-import { airtableEnabled } from "@/lib/airtable";
+import { airtableEnabled, core } from "@/lib/airtable";
 import { callClaude } from "@/lib/claude";
 import { loadJobContext } from "@/lib/platform/jobContextSource";
 import { modelFor } from "@/lib/platform/modelRouter";
-import { tableExists } from "@/lib/platform/optionalList";
 import { getPrompt } from "@/lib/platform/prompts";
 import { emitOutboundEvent } from "@/lib/platform/outbox";
+import { buildReportAnalysis, patchReportAnalysis, REPORT_DOC_TYPE } from "@/lib/platform/reportDoc";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
+import { getStorer } from "@/lib/platform/storage";
 import { OrgCtx } from "@/lib/platform/types";
 import { generateManagedDocument } from "@/services/platform/documents";
-
-/** Thrown when the base has no WEEKLY_REPORTS table to write into. Spec 12
- *  dropped the legacy per-artifact tables (WEEKLY_REPORTS/VARIATIONS/…), so a
- *  correctly-provisioned Spec 12 base can't store a weekly report yet — pending
- *  the legacy→DOCUMENTS reconciliation. The action catches this and surfaces a
- *  clear notice instead of a 500. */
-export class ReportsUnavailableError extends Error {
-  constructor() {
-    super("Weekly reports are not available on this base — no WEEKLY_REPORTS table.");
-    this.name = "ReportsUnavailableError";
-  }
-}
 
 function applyWeeklyTemplate(content: string): string {
   const text = content.trim();
@@ -62,13 +58,6 @@ export async function generateWeeklyReport(
   const job = await loadJobContext(ctx, jobId);
   if (!job) throw new Error("Job not found");
 
-  // Fail fast (before the AI call) when the Airtable base has no WEEKLY_REPORTS
-  // table — otherwise the write 403s after we've paid for generation. Postgres
-  // mode always has the table, so the probe is Airtable-only.
-  if (airtableEnabled() && !(await tableExists(ctx.orgSlug, "WEEKLY_REPORTS"))) {
-    throw new ReportsUnavailableError();
-  }
-
   const context = JSON.stringify({
     job: { name: job.name, completionPct: job.completionPct, healthScore: job.healthScore },
     phases: job.phases.map((p) => ({ name: p.name, status: p.status, pct: p.completionPct })),
@@ -102,14 +91,47 @@ export async function generateWeeklyReport(
     ? `## Progress\n_Demo mode — no API key. This report was generated from a template._\n\n- ${job.phases.map((p) => `${p.name}: ${p.completionPct}%`).join("\n- ")}\n\n## Risks\n- ${job.risks.length} open risks\n\n## Next week\n- ${job.actions.length} open actions to progress`
     : res.content;
   const content = applyWeeklyTemplate(contentRaw);
+  const title = `Week ending ${weekEnding}`;
 
+  // Airtable (Spec 12): the report is a DOCUMENTS row — body in Text_Content,
+  // lifecycle in AI_Analysis.module8. Doc_Status stays a neutral "Active".
+  if (airtableEnabled()) {
+    const stored = await getStorer()
+      .put({ orgSlug: ctx.orgSlug, docType: REPORT_DOC_TYPE, name: `${title}.md` }, Buffer.from(content, "utf8"))
+      .catch(() => null);
+    const result = await writeRecord(ctx, {
+      table: "document",
+      op: "create",
+      data: {
+        jobId,
+        title,
+        docType: REPORT_DOC_TYPE,
+        status: "Active",
+        uploadedBy: userName,
+        textContent: content,
+        storageProvider: stored?.provider ?? "",
+        storageRef: stored?.ref ?? "",
+        aiAnalysis: buildReportAnalysis({
+          kind: "weekly_report",
+          weekEnding,
+          status: "draft",
+          isAiGenerated: true,
+          generatedAt: new Date().toISOString(),
+        }),
+      },
+      actor: { type: "ai", name: "Report Writer" },
+    });
+    return { id: result.recordId, demoMode: res.demo_mode };
+  }
+
+  // Postgres: rich weekly_report row + an immutable DOCUMENTS snapshot for audit.
   const result = await writeRecord(ctx, {
     table: "weekly_report",
     op: "create",
     data: {
       jobId,
       weekEnding,
-      title: `Week ending ${weekEnding}`,
+      title,
       content,
       isAiGenerated: true,
       status: "draft",
@@ -139,11 +161,27 @@ export async function generateWeeklyReport(
       });
     }
   }
-  void userName;
   return { id: result.recordId, demoMode: res.demo_mode };
 }
 
 export async function approveReport(ctx: OrgCtx, userName: string, id: RecordId): Promise<void> {
+  if (airtableEnabled()) {
+    const doc = await core.get(ctx.orgSlug, "DOCUMENTS", String(id)).catch(() => null);
+    await writeRecord(ctx, {
+      table: "document",
+      op: "update",
+      recordId: id,
+      data: {
+        aiAnalysis: patchReportAnalysis(doc?.["AI_Analysis"], {
+          status: "approved",
+          approvedBy: userName,
+          approvedAt: new Date().toISOString(),
+        }),
+      },
+      actor: { type: "human", name: userName },
+    });
+    return;
+  }
   await writeRecord(ctx, {
     table: "weekly_report",
     op: "update",
@@ -154,13 +192,29 @@ export async function approveReport(ctx: OrgCtx, userName: string, id: RecordId)
 }
 
 export async function markReportSent(ctx: OrgCtx, userName: string, id: RecordId): Promise<void> {
-  await writeRecord(ctx, {
-    table: "weekly_report",
-    op: "update",
-    recordId: id,
-    data: { status: "sent", sentAt: new Date().toISOString() },
-    actor: { type: "human", name: userName },
-  });
+  if (airtableEnabled()) {
+    const doc = await core.get(ctx.orgSlug, "DOCUMENTS", String(id)).catch(() => null);
+    await writeRecord(ctx, {
+      table: "document",
+      op: "update",
+      recordId: id,
+      data: {
+        aiAnalysis: patchReportAnalysis(doc?.["AI_Analysis"], {
+          status: "sent",
+          sentAt: new Date().toISOString(),
+        }),
+      },
+      actor: { type: "human", name: userName },
+    });
+  } else {
+    await writeRecord(ctx, {
+      table: "weekly_report",
+      op: "update",
+      recordId: id,
+      data: { status: "sent", sentAt: new Date().toISOString() },
+      actor: { type: "human", name: userName },
+    });
+  }
   await emitOutboundEvent(ctx, "report.ready", {
     entityType: "weekly_report",
     entityId: id,

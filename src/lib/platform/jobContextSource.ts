@@ -13,6 +13,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { VARIATION_FILTER, variationStatusFromAir } from "./changeLog";
 import { listOptional } from "./optionalList";
 import { budgetActuals, loadProcurement } from "./procurementSource";
 import type { RecordId } from "./recordWriter";
@@ -143,7 +144,8 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
     listOptional(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "BUDGET", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 500 }),
-    listOptional(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 }),
+    // Spec 12: variations are CHANGE_LOG rows (Change_Type="Variation").
+    listOptional(ctx.orgSlug, "CHANGE_LOG", { maxRecords: 500, filterByFormula: VARIATION_FILTER }),
     loadProcurement(ctx),
   ]);
   const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual
@@ -197,14 +199,14 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
     .filter(
       (v) =>
         linksTo(v["Job"], id) &&
-        ["submitted", "approved"].includes(str(v["Status"]) || "submitted"),
+        ["submitted", "approved"].includes(variationStatusFromAir(v["Status"])),
     )
     .slice(0, 5)
     .map((v) => ({
       refNumber: str(v["Ref_Number"]),
-      title: str(v["Title"]) || "(variation)",
-      costImpact: num(v["Cost_Impact"]),
-      status: str(v["Status"]) || "submitted",
+      title: str(v["Change_Name"]) || "(variation)",
+      costImpact: num(v["Impact_Cost"]),
+      status: variationStatusFromAir(v["Status"]),
     }));
 
   return {

@@ -4,6 +4,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { callClaude } from "@/lib/claude";
 import { prisma } from "@/lib/db";
+import { VARIATION_FILTER } from "@/lib/platform/changeLog";
 import { emitCorrection } from "@/lib/platform/corrections";
 import { loadJobContext } from "@/lib/platform/jobContextSource";
 import { modelFor } from "@/lib/platform/modelRouter";
@@ -17,7 +18,11 @@ import { toNum } from "@/lib/format";
  *  ref is only a display label (the Job link is the real association). */
 async function nextRefNumber(ctx: OrgCtx, jobId: RecordId): Promise<string> {
   if (airtableEnabled()) {
-    const rows = await core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 });
+    // Spec 12: variations are CHANGE_LOG rows (Change_Type="Variation").
+    const rows = await core.list(ctx.orgSlug, "CHANGE_LOG", {
+      maxRecords: 500,
+      filterByFormula: VARIATION_FILTER,
+    });
     const max = rows.reduce((m, v) => {
       const match = /-(\d+)$/.exec(String(v["Ref_Number"] ?? ""));
       return match ? Math.max(m, Number(match[1])) : m;
@@ -133,9 +138,9 @@ export async function approveVariation(
   // correction-capture learning loop stays Postgres-only (it threads numeric
   // entity ids and writes to the corrections pipeline).
   if (airtableEnabled()) {
-    const vo = await core.get(ctx.orgSlug, "VARIATIONS", String(id)).catch(() => null);
-    const finalCost = edits.costImpact ?? (vo ? toNum(vo["Cost_Impact"] as number) : 0);
-    const finalDays = edits.timeImpactDays ?? (vo ? Number(vo["Time_Impact_Days"]) || 0 : 0);
+    const vo = await core.get(ctx.orgSlug, "CHANGE_LOG", String(id)).catch(() => null);
+    const finalCost = edits.costImpact ?? (vo ? toNum(vo["Impact_Cost"] as number) : 0);
+    const finalDays = edits.timeImpactDays ?? (vo ? Number(vo["Impact_Schedule_Days"]) || 0 : 0);
     await writeRecord(ctx, {
       table: "variation_order",
       op: "update",

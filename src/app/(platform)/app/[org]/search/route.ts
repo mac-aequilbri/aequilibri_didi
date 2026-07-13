@@ -5,7 +5,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { VARIATION_FILTER } from "@/lib/platform/changeLog";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { listOptional } from "@/lib/platform/optionalList";
 import { orgPath } from "@/lib/platform/paths";
 
 export const dynamic = "force-dynamic";
@@ -39,16 +41,19 @@ export async function GET(
   const p = (path: string) => orgPath(ctx.orgSlug, path);
   const take = PER_TYPE;
   if (airtableEnabled()) {
+    // VARIATIONS live in CHANGE_LOG now; VENDORS/QUOTES are optional Domain-tier
+    // tables absent from Spec 12 construction bases — read tolerantly so a
+    // missing table yields no hits rather than 403-ing the whole search.
     const [jobs, actions, risks, decisions, variations, documents, vendors, quotes] =
       await Promise.all([
         core.list(ctx.orgSlug, "JOBS", { maxRecords: 500 }),
         core.list(ctx.orgSlug, "ISSUES", { maxRecords: 500 }),
         core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
         core.list(ctx.orgSlug, "DECISIONS", { maxRecords: 500 }),
-        core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "CHANGE_LOG", { maxRecords: 500, filterByFormula: VARIATION_FILTER }),
         core.list(ctx.orgSlug, "DOCUMENTS", { maxRecords: 500 }),
-        core.list(ctx.orgSlug, "VENDORS", { maxRecords: 500 }),
-        core.list(ctx.orgSlug, "QUOTES", { maxRecords: 500 }),
+        listOptional(ctx.orgSlug, "VENDORS", { maxRecords: 500 }),
+        listOptional(ctx.orgSlug, "QUOTES", { maxRecords: 500 }),
       ]);
     const results: Hit[] = [
       ...jobs
@@ -68,9 +73,9 @@ export async function GET(
         .slice(0, take)
         .map((d) => ({ type: "Decision", label: str(d["Decision_Name"]), sublabel: str(d["Status"]), href: p("/decisions") })),
       ...variations
-        .filter((v) => contains(v["Title"], q) || contains(v["Ref_Number"], q))
+        .filter((v) => contains(v["Change_Name"], q) || contains(v["Ref_Number"], q))
         .slice(0, take)
-        .map((v) => ({ type: "Variation", label: str(v["Title"]), sublabel: str(v["Ref_Number"]) || str(v["Status"]), href: p(`/variations/${v.id}`) })),
+        .map((v) => ({ type: "Variation", label: str(v["Change_Name"]), sublabel: str(v["Ref_Number"]) || str(v["Status"]), href: p(`/variations/${v.id}`) })),
       ...documents
         .filter((d) => contains(d["Document_Name"], q))
         .slice(0, take)

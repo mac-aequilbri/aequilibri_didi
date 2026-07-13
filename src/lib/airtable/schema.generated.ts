@@ -238,6 +238,20 @@ export const CORE_SCHEMA = {
       { name: "Upload_Date", id: "fldAA6CYAU7cmvll8", type: "dateTime" },
       { name: "Drive_URL", id: "fld52mzQZH7ZeUxtA", type: "url" },
       { name: "Doc_Status", id: "fldaE2rxr03NbntTJ", type: "singleSelect" },
+      // Spec 12 reconciliation (2026-07-13): the lean template DOCUMENTS held
+      // only Drive-URL-level metadata, so the generic codec silently dropped the
+      // body + analysis the app writes (fieldMaps.document / documents.ts). These
+      // were backfilled additively across the vertical templates + client bases
+      // by scripts/airtable-extend-documents.mjs so generated artifacts (weekly
+      // reports, quote snapshots) persist their content. IDs are the Didi base's.
+      { name: "Uploaded_By", id: "fldfv4TWdO9I0C4HP", type: "singleLineText" },
+      { name: "Storage_Provider", id: "fld8P5j0A8RQGKbdF", type: "singleLineText" },
+      { name: "Text_Content", id: "fldjjVdKFPAYsMBBK", type: "multilineText" },
+      { name: "AI_Summary", id: "fldZlNopvqOUHt2Pn", type: "multilineText" },
+      { name: "AI_Analysis", id: "fldjQgFbj31sf1lgP", type: "multilineText" },
+      { name: "Confidence", id: "fldwCUdrkgpuugaKC", type: "number" },
+      { name: "Analyzed_At", id: "fldTyZ3RyQPIsXhrE", type: "dateTime" },
+      { name: "Job", id: "fldW7rrVAQyYzannN", type: "multipleRecordLinks" },
       { name: "_TIER", id: "fldWIEUK9V5ir3dNm", type: "singleLineText" },
       { name: "PHASE_EVIDENCE", id: "fld6yg8xEhGRBOdHv", type: "multipleRecordLinks" },
     ],
@@ -434,6 +448,15 @@ export const CORE_SCHEMA = {
       { name: "Phase", id: "flduxqzA2fufQ7js2", type: "multipleRecordLinks" },
       { name: "Linked_Issue", id: "fldhq6IVZzEH2rUv2", type: "multipleRecordLinks" },
       { name: "Notes", id: "fldNncQ7CSXr2LLUa", type: "multilineText" },
+      // Spec 12 reconciliation (2026-07-13): variation orders now live in
+      // CHANGE_LOG (Change_Type="Variation"). These carry the app's variation
+      // fields CHANGE_LOG lacked natively; backfilled additively across the
+      // vertical templates + client bases by scripts/airtable-extend-changelog.mjs.
+      { name: "Ref_Number", id: "fldgm6knDY3QbypUU", type: "singleLineText" },
+      { name: "Scope_Change", id: "fldoqWx8bgZSnRrBS", type: "multilineText" },
+      { name: "Is_AI_Drafted", id: "flddS5FDHsw7Roe9L", type: "checkbox" },
+      { name: "AI_Draft", id: "fld3bT12WwUzwsgUo", type: "multilineText" },
+      { name: "Approved_By", id: "fldYerkFL2BkG0zO2", type: "singleLineText" },
       { name: "_TIER", id: "fldh14HZztCGE68k9", type: "singleLineText" },
     ],
   },
