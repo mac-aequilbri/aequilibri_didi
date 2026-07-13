@@ -23,5 +23,17 @@ export const procurementListConfig: ListViewConfig<ProcurementView> = {
         o.dueDate ? (o.dueDate instanceof Date ? o.dueDate : new Date(o.dueDate)) : null,
     },
   ],
+  sort: [
+    {
+      name: "due",
+      label: "Due date",
+      getValue: (o) =>
+        o.dueDate ? (o.dueDate instanceof Date ? o.dueDate : new Date(o.dueDate)) : null,
+    },
+    { name: "total", label: "Amount", getValue: (o) => o.total },
+    { name: "delta", label: "Delivery delta", getValue: (o) => o.deltaDays },
+    { name: "item", label: "Item", getValue: (o) => o.item.toLowerCase() },
+    { name: "status", label: "Status", getValue: (o) => o.status.toLowerCase() },
+  ],
   pageSize: 50,
 };

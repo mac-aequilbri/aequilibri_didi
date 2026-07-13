@@ -35,4 +35,17 @@ export const cashflowListConfig: ListViewConfig<CashflowTxn> = {
       },
     },
   ],
+  sort: [
+    {
+      name: "period",
+      label: "Period",
+      getValue: (t) => {
+        const ms = parsePeriod(t.period);
+        return Number.isNaN(ms) ? null : new Date(ms);
+      },
+    },
+    { name: "amount", label: "Amount", getValue: (t) => t.amount },
+    { name: "name", label: "Name", getValue: (t) => t.name.toLowerCase() },
+    { name: "status", label: "Status", getValue: (t) => t.status.toLowerCase() },
+  ],
 };

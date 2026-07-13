@@ -28,5 +28,10 @@ export const vendorsListConfig: ListViewConfig<VendorView> = {
       ],
     },
   ],
+  sort: [
+    { name: "name", label: "Name", getValue: (v) => v.name.toLowerCase() },
+    { name: "rating", label: "Rating", getValue: (v) => v.rating },
+    { name: "category", label: "Category", getValue: (v) => v.category.toLowerCase() },
+  ],
   pageSize: 50,
 };

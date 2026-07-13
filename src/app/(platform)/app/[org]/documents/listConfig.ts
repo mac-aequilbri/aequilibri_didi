@@ -30,5 +30,10 @@ export const documentsListConfig: ListViewConfig<DocumentView> = {
     },
     { kind: "daterange", name: "added", label: "Added", getValue: (d) => d.createdAt },
   ],
+  sort: [
+    { name: "added", label: "Added", getValue: (d) => d.createdAt },
+    { name: "title", label: "Title", getValue: (d) => d.title.toLowerCase() },
+    { name: "status", label: "Status", getValue: (d) => d.status.toLowerCase() },
+  ],
   pageSize: 50,
 };

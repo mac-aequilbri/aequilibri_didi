@@ -17,9 +17,18 @@ import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-// Pager-only config for the history table (the pending queue stays unpaged —
+// Sort + pager config for the history table (the pending queue stays unpaged —
 // approvals must always all be visible). Filters can be added here later.
-const execLogListConfig: ListViewConfig<LogView> = { fields: [], pageSize: 50 };
+const execLogListConfig: ListViewConfig<LogView> = {
+  fields: [],
+  sort: [
+    { name: "created", label: "Date", getValue: (l) => l.createdAt },
+    { name: "operation", label: "Operation", getValue: (l) => l.operation.toLowerCase() },
+    { name: "table", label: "Table", getValue: (l) => l.targetTable.toLowerCase() },
+    { name: "status", label: "Status", getValue: (l) => l.status.toLowerCase() },
+  ],
+  pageSize: 50,
+};
 
 function Payload({ raw }: { raw: string }) {
   let pretty = raw;

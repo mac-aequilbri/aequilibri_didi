@@ -20,5 +20,11 @@ export const decisionsListConfig: ListViewConfig<DecisionView> = {
       getValue: (d) => (d.date ? new Date(d.date) : null),
     },
   ],
+  sort: [
+    { name: "date", label: "Date", getValue: (d) => (d.date ? new Date(d.date) : null) },
+    { name: "description", label: "Description", getValue: (d) => d.description.toLowerCase() },
+    { name: "madeBy", label: "Made by", getValue: (d) => d.madeBy.toLowerCase() },
+    { name: "status", label: "Status", getValue: (d) => d.status.toLowerCase() },
+  ],
   pageSize: 50,
 };

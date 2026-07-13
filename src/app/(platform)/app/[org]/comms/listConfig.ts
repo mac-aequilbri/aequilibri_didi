@@ -21,5 +21,10 @@ export const commsListConfig: ListViewConfig<CommView> = {
     },
     { kind: "daterange", name: "due", label: "Due", getValue: (c) => c.dueDate },
   ],
+  sort: [
+    { name: "due", label: "Due date", getValue: (c) => c.dueDate },
+    { name: "topic", label: "Topic", getValue: (c) => c.topic.toLowerCase() },
+    { name: "status", label: "Status", getValue: (c) => c.status.toLowerCase() },
+  ],
   pageSize: 50,
 };

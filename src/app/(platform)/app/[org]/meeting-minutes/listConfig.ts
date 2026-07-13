@@ -26,5 +26,20 @@ export const minutesListConfig: ListViewConfig<MinutesView> = {
           : null,
     },
   ],
+  sort: [
+    {
+      name: "meeting",
+      label: "Meeting date",
+      getValue: (m) =>
+        m.meetingDate
+          ? m.meetingDate instanceof Date
+            ? m.meetingDate
+            : new Date(m.meetingDate)
+          : null,
+    },
+    { name: "title", label: "Title", getValue: (m) => m.title.toLowerCase() },
+    { name: "actions", label: "Action items", getValue: (m) => m.actionsCount },
+    { name: "status", label: "Status", getValue: (m) => m.status.toLowerCase() },
+  ],
   pageSize: 50,
 };

@@ -42,5 +42,11 @@ export const risksListConfig: ListViewConfig<RiskView> = {
       ],
     },
   ],
+  sort: [
+    { name: "severity", label: "Severity score", getValue: (r) => score(r) },
+    { name: "status", label: "Status", getValue: (r) => r.status.toLowerCase() },
+    { name: "owner", label: "Owner", getValue: (r) => r.owner.toLowerCase() },
+    { name: "description", label: "Description", getValue: (r) => r.description.toLowerCase() },
+  ],
   pageSize: 50,
 };

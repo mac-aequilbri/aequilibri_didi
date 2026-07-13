@@ -17,9 +17,32 @@ import { generateReportAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-// Pager-only config — reports accumulate weekly per job, so the table grows
+// Sort + pager config — reports accumulate weekly per job, so the table grows
 // without bound. Filters can be added here later.
-const reportsListConfig: ListViewConfig<ReportView> = { fields: [], pageSize: 50 };
+const reportsListConfig: ListViewConfig<ReportView> = {
+  fields: [],
+  sort: [
+    {
+      name: "week",
+      label: "Week ending",
+      getValue: (r) =>
+        r.weekEnding ? (r.weekEnding instanceof Date ? r.weekEnding : new Date(r.weekEnding)) : null,
+    },
+    {
+      name: "generated",
+      label: "Generated",
+      getValue: (r) =>
+        r.generatedAt
+          ? r.generatedAt instanceof Date
+            ? r.generatedAt
+            : new Date(r.generatedAt)
+          : null,
+    },
+    { name: "title", label: "Title", getValue: (r) => r.title.toLowerCase() },
+    { name: "status", label: "Status", getValue: (r) => r.status.toLowerCase() },
+  ],
+  pageSize: 50,
+};
 
 export default async function ReportsPage({
   params,

@@ -22,5 +22,17 @@ export const quotesListConfig: ListViewConfig<QuoteView> = {
         q.validUntil ? (q.validUntil instanceof Date ? q.validUntil : new Date(q.validUntil)) : null,
     },
   ],
+  sort: [
+    {
+      name: "valid",
+      label: "Valid until",
+      getValue: (q) =>
+        q.validUntil ? (q.validUntil instanceof Date ? q.validUntil : new Date(q.validUntil)) : null,
+    },
+    { name: "total", label: "Total", getValue: (q) => q.total },
+    { name: "title", label: "Title", getValue: (q) => q.title.toLowerCase() },
+    { name: "client", label: "Client", getValue: (q) => q.clientName.toLowerCase() },
+    { name: "status", label: "Status", getValue: (q) => q.status.toLowerCase() },
+  ],
   pageSize: 50,
 };

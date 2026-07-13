@@ -18,5 +18,13 @@ export const projectsListConfig: ListViewConfig<JobListView> = {
       })),
     },
   ],
+  sort: [
+    { name: "name", label: "Name", getValue: (j) => j.name.toLowerCase() },
+    { name: "code", label: "Code", getValue: (j) => j.code.toLowerCase() },
+    { name: "status", label: "Status", getValue: (j) => j.status.toLowerCase() },
+    { name: "completion", label: "Completion", getValue: (j) => j.completionPct },
+    { name: "health", label: "Health score", getValue: (j) => j.healthScore },
+    { name: "budget", label: "Budget", getValue: (j) => j.budgetTotal },
+  ],
   pageSize: 50,
 };

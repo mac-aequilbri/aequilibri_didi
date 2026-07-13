@@ -24,5 +24,12 @@ export const variationsListConfig: ListViewConfig<VariationView> = {
       ],
     },
   ],
+  sort: [
+    { name: "ref", label: "Reference", getValue: (v) => v.refNumber.toLowerCase() },
+    { name: "title", label: "Title", getValue: (v) => v.title.toLowerCase() },
+    { name: "cost", label: "Cost impact", getValue: (v) => v.costImpact },
+    { name: "time", label: "Time impact", getValue: (v) => v.timeImpactDays },
+    { name: "status", label: "Status", getValue: (v) => v.status.toLowerCase() },
+  ],
   pageSize: 50,
 };
