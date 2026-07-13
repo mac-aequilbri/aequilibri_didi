@@ -1,14 +1,28 @@
 // Weekly reports — AI-generated from live job data, human approval before
 // sending (doc module 8: client-facing outputs).
 
+import { airtableEnabled } from "@/lib/airtable";
 import { callClaude } from "@/lib/claude";
 import { loadJobContext } from "@/lib/platform/jobContextSource";
 import { modelFor } from "@/lib/platform/modelRouter";
+import { tableExists } from "@/lib/platform/optionalList";
 import { getPrompt } from "@/lib/platform/prompts";
 import { emitOutboundEvent } from "@/lib/platform/outbox";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { OrgCtx } from "@/lib/platform/types";
 import { generateManagedDocument } from "@/services/platform/documents";
+
+/** Thrown when the base has no WEEKLY_REPORTS table to write into. Spec 12
+ *  dropped the legacy per-artifact tables (WEEKLY_REPORTS/VARIATIONS/…), so a
+ *  correctly-provisioned Spec 12 base can't store a weekly report yet — pending
+ *  the legacy→DOCUMENTS reconciliation. The action catches this and surfaces a
+ *  clear notice instead of a 500. */
+export class ReportsUnavailableError extends Error {
+  constructor() {
+    super("Weekly reports are not available on this base — no WEEKLY_REPORTS table.");
+    this.name = "ReportsUnavailableError";
+  }
+}
 
 function applyWeeklyTemplate(content: string): string {
   const text = content.trim();
@@ -47,6 +61,13 @@ export async function generateWeeklyReport(
 ): Promise<{ id?: RecordId; demoMode: boolean }> {
   const job = await loadJobContext(ctx, jobId);
   if (!job) throw new Error("Job not found");
+
+  // Fail fast (before the AI call) when the Airtable base has no WEEKLY_REPORTS
+  // table — otherwise the write 403s after we've paid for generation. Postgres
+  // mode always has the table, so the probe is Airtable-only.
+  if (airtableEnabled() && !(await tableExists(ctx.orgSlug, "WEEKLY_REPORTS"))) {
+    throw new ReportsUnavailableError();
+  }
 
   const context = JSON.stringify({
     job: { name: job.name, completionPct: job.completionPct, healthScore: job.healthScore },

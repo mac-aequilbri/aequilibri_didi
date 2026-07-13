@@ -13,6 +13,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { listOptional } from "./optionalList";
 import { budgetActuals, loadProcurement } from "./procurementSource";
 import type { RecordId } from "./recordWriter";
 import type { OrgCtx } from "./types";
@@ -133,12 +134,16 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
     return null;
   }
 
+  // RISKS and VARIATIONS are optional Domain-tier tables — a supplied/ drifted
+  // base can lack them, and Airtable answers a missing table with a 403 that
+  // would otherwise reject this whole batch and crash generation. Read them
+  // tolerantly (→ [] when absent); the core tables stay strict.
   const [phaseRows, riskRows, budgetRows, cashflowRows, variationRows, procRows] = await Promise.all([
     core.list(ctx.orgSlug, "PHASES", { maxRecords: 500 }),
-    core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
+    listOptional(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "BUDGET", { maxRecords: 500 }),
     core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 500 }),
-    core.list(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 }),
+    listOptional(ctx.orgSlug, "VARIATIONS", { maxRecords: 500 }),
     loadProcurement(ctx),
   ]);
   const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual

@@ -54,3 +54,31 @@ export async function listOptional(
     throw err;
   }
 }
+
+/** Whether the base currently has this optional table (data-API probe). false
+ *  when Airtable answers the missing-table 403/404; genuine auth failures still
+ *  propagate. Updates the missing cache so a following listOptional short-cuts.
+ *  Use before a WRITE to an optional table — a create can't fall back to []. */
+export async function tableExists(orgSlug: string, table: CoreTableName): Promise<boolean> {
+  const key = `${orgSlug}/${table}`;
+  if ((missingUntil.get(key) ?? 0) > Date.now()) return false;
+  try {
+    await core.list(orgSlug, table, { maxRecords: 1 });
+    missingUntil.delete(key);
+    return true;
+  } catch (err) {
+    if (isMissingTable(err)) {
+      missingUntil.set(key, Date.now() + MISSING_RETRY_MS);
+      return false;
+    }
+    throw err;
+  }
+}
+
+/** Sync check against the missing-table cache — no network. Meaningful only
+ *  after a listOptional/tableExists call for the same (org, table) this process
+ *  lifetime (returns false when nothing is known yet). Lets a page that already
+ *  read the table cheaply decide whether to offer a write action for it. */
+export function isKnownMissing(orgSlug: string, table: CoreTableName): boolean {
+  return (missingUntil.get(`${orgSlug}/${table}`) ?? 0) > Date.now();
+}

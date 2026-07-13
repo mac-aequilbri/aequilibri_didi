@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { airtableEnabled } from "@/lib/airtable";
 import { FilterBar } from "@/components/FilterBar";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
@@ -11,6 +12,7 @@ import {
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { loadWeeklyReports, type ReportView } from "@/lib/platform/domainListSources";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
+import { isKnownMissing } from "@/lib/platform/optionalList";
 import { orgPath } from "@/lib/platform/paths";
 import { reportModeFor, reportingCapabilities } from "@/lib/platform/reportingPolicy";
 import { generateReportAction } from "./actions";
@@ -52,7 +54,8 @@ export default async function ReportsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const query = parseListQuery(await searchParams, reportsListConfig);
+  const sp = await searchParams;
+  const query = parseListQuery(sp, reportsListConfig);
   const viewer = await getCurrentViewer(ctx);
   const reportCaps = reportingCapabilities(viewer.role);
   const [allReports, jobs] = await Promise.all([
@@ -61,6 +64,14 @@ export default async function ReportsPage({
   ]);
   const { items: reports, page, pageCount } = sortAndPaginate(allReports, query, reportsListConfig);
 
+  // Spec 12 bases carry no WEEKLY_REPORTS table (legacy UC2/UC3 name dropped
+  // from the template) — generation can't write into a table that isn't there.
+  // loadWeeklyReports (listOptional) just warmed the missing-table cache, so
+  // this is a free sync check; the redirect notice covers a cold cache.
+  const reportsUnavailable =
+    (airtableEnabled() && isKnownMissing(ctx.orgSlug, "WEEKLY_REPORTS")) ||
+    sp.notice === "unavailable";
+
   return (
     <div className="p-6">
       <PageHeader
@@ -68,7 +79,18 @@ export default async function ReportsPage({
         subtitle={`AI drafts from live project data; you approve before anything is sent. ${reportModeFor("weekly_report")} output · ${reportCaps.audienceLabel}.`}
       />
 
-      {reportCaps.canGenerateReports ? (
+      {reportsUnavailable ? (
+        <div className="ae-card p-5 mb-6 text-sm">
+          <p className="font-medium text-amber-700">
+            Report generation isn’t available on this base yet.
+          </p>
+          <p className="text-neutral-600 mt-1">
+            This organisation’s Airtable base follows the Spec 12 schema, which no longer includes a
+            dedicated Weekly Reports table. Generation will be re-enabled once weekly reports are
+            reconciled onto the shared Documents store. Existing snapshot reports still open below.
+          </p>
+        </div>
+      ) : reportCaps.canGenerateReports ? (
         <form action={generateReportAction} className="ae-card p-5 mb-6 flex flex-wrap items-end gap-4">
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <label className="block text-sm">
@@ -136,7 +158,9 @@ export default async function ReportsPage({
             {reports.length === 0 && (
               <tr>
                 <td className="py-4 text-neutral-500" colSpan={4}>
-                  No reports yet — generate one above.
+                  {reportsUnavailable
+                    ? "No reports on this base yet."
+                    : "No reports yet — generate one above."}
                 </td>
               </tr>
             )}
