@@ -8,6 +8,10 @@ export const CORE_SCHEMA = {
     fields: [
       { name: "Organisation_Name", id: "fldMbFDVU01DYPnnj", type: "singleLineText" },
       { name: "Notes", id: "fldbSvrybSPNpEggA", type: "multilineText" },
+      // Spec 12 (30 June 2026): free-text postal address, backported to all three
+      // template bases. Additive — reads tolerate its absence on drifted bases;
+      // schema-drift/migrateBaseToTemplate provisions it by name.
+      { name: "Address", id: "fldOrgAddressS12x", type: "multilineText" },
       { name: "_TIER", id: "fldBdmCnujaBssKOm", type: "singleLineText" },
       { name: "Type", id: "fld7Ro0t4WVVe1wz0", type: "singleSelect" },
       { name: "Org_Status", id: "fldJrpsQRzgVOaAG5", type: "singleSelect" },
@@ -342,6 +346,12 @@ export const CORE_SCHEMA = {
       { name: "Created_By_AI", id: "fldjjYDJ55T72iKEo", type: "checkbox" },
       { name: "Job", id: "fldLPvL4InYpnodoF", type: "multipleRecordLinks" },
       { name: "Linked_Issues", id: "fldIivhyzWlYK1r9s", type: "multipleRecordLinks" },
+      // Spec 12 Module 5 RISKS fields. Additive — reads tolerate absence on
+      // drifted bases; schema-drift/migrateBaseToTemplate provisions them by
+      // name. Not yet written by the app (bases must carry the fields first).
+      { name: "Category", id: "fldRiskCategoryS12", type: "singleSelect" },
+      { name: "RAG", id: "fldRiskRAGS12x", type: "singleSelect" },
+      { name: "Phase", id: "fldRiskPhaseS12x", type: "multipleRecordLinks" },
     ],
   },
   VENDORS: {

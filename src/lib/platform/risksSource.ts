@@ -20,6 +20,20 @@ export interface RiskView {
   escalatedAt: Date | null;
   escalationNote: string;
   createdByAi: boolean;
+  // Spec 12 Module 5 RISKS fields. Read-only this pass — populated in Airtable
+  // mode once the base carries the fields (schema-drift provisions them);
+  // empty on Postgres and on bases that have not yet been migrated.
+  category: string;
+  rag: string;
+}
+
+/** Canonical RAG label from a stored cell (tolerant of case / shorthand). */
+function normalizeRag(v: unknown): string {
+  const s = (typeof v === "string" ? v : "").trim().toLowerCase();
+  if (s.startsWith("r")) return "Red";
+  if (s.startsWith("a")) return "Amber";
+  if (s.startsWith("g")) return "Green";
+  return "";
 }
 
 function str(v: unknown): string {
@@ -47,6 +61,8 @@ async function fromPostgres(ctx: OrgCtx): Promise<RiskView[]> {
     escalatedAt: r.escalatedAt,
     escalationNote: r.escalationNote,
     createdByAi: r.createdByAi,
+    category: "", // Postgres model has no category/rag columns
+    rag: "",
   }));
 }
 
@@ -67,6 +83,8 @@ async function fromAirtable(ctx: OrgCtx): Promise<RiskView[]> {
       escalatedAt: esc ? new Date(esc) : null,
       escalationNote: str(r["Escalation_Note"]),
       createdByAi: r["Created_By_AI"] === true,
+      category: str(r["Category"]),
+      rag: normalizeRag(r["RAG"]),
     };
   });
 }

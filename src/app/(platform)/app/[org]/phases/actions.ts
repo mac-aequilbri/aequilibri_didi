@@ -97,6 +97,27 @@ export async function dismissEvidenceSuggestionAction(formData: FormData): Promi
   revalidatePath(orgPath(ctx.orgSlug, "/phases"));
 }
 
+const RAG_VALUES = ["Red", "Amber", "Green", ""] as const;
+
+export async function setPhaseRag(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  const user = await getCurrentUser(ctx);
+  const recordIdRaw = String(formData.get("recordId") ?? "");
+  const rag = String(formData.get("rag") ?? "");
+  if (!recordIdRaw || !(RAG_VALUES as readonly string[]).includes(rag)) return;
+
+  // Airtable is system of record for phase RAG; in Postgres mode `rag` is
+  // stripped by the phase pgOmit list, so the write is a harmless no-op there.
+  await writeRecord(ctx, {
+    table: "phase",
+    op: "update",
+    recordId: recordIdRaw,
+    data: { rag },
+    actor: { type: "human", name: user.name },
+  });
+  revalidatePath(orgPath(ctx.orgSlug, "/phases"));
+}
+
 export async function setPhaseProgress(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);

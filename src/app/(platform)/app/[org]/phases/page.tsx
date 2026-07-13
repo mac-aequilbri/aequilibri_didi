@@ -15,11 +15,22 @@ import {
   dismissEvidenceSuggestionAction,
   rejectPhase,
   setPhaseProgress,
+  setPhaseRag,
   uploadPhaseEvidenceAction,
 } from "./actions";
 import { PendingButton } from "./PendingButton";
 
 export const dynamic = "force-dynamic";
+
+const RAG_CLASS: Record<string, string> = {
+  Red: "bg-red-100 text-red-800 border-red-300",
+  Amber: "bg-amber-100 text-amber-800 border-amber-300",
+  Green: "bg-emerald-100 text-emerald-800 border-emerald-300",
+};
+
+function fmtDate(d: string | null): string {
+  return d ? d.slice(0, 10) : "";
+}
 
 export default async function PhasesPage({
   params,
@@ -93,6 +104,48 @@ export default async function PhasesPage({
                         >
                           {p.name}
                         </Link>
+                        <span className="block text-xs font-normal text-neutral-500">
+                          {[
+                            p.sequence ? `#${p.sequence}` : null,
+                            p.phaseType || null,
+                            p.loopPermitted ? "loops" : null,
+                            p.startDate || p.endDate
+                              ? `${fmtDate(p.startDate) || "?"} → ${fmtDate(p.endDate) || "?"}`
+                              : null,
+                            p.openIssues > 0 ? `${p.openIssues} open issue(s)` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-2 whitespace-nowrap">
+                        <form action={setPhaseRag} className="flex items-center gap-1">
+                          <input type="hidden" name="org" value={ctx.orgSlug} />
+                          <input type="hidden" name="recordId" value={p.id} />
+                          {p.rag ? (
+                            <span
+                              className={`px-1.5 py-0.5 rounded border text-xs font-semibold ${RAG_CLASS[p.rag] ?? "bg-neutral-100 text-neutral-600 border-neutral-300"}`}
+                            >
+                              {p.rag}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-neutral-400">—</span>
+                          )}
+                          <select
+                            name="rag"
+                            defaultValue={p.rag}
+                            aria-label="Set RAG"
+                            className="text-xs border border-neutral-200 rounded px-1 py-0.5"
+                          >
+                            <option value="">RAG…</option>
+                            <option value="Green">Green</option>
+                            <option value="Amber">Amber</option>
+                            <option value="Red">Red</option>
+                          </select>
+                          <button type="submit" className="btn-ae-outline text-xs">
+                            Set
+                          </button>
+                        </form>
                       </td>
                       <td className="py-2 pr-2 w-1/3">
                         <div className="h-2 rounded bg-neutral-100 overflow-hidden">
@@ -165,7 +218,7 @@ export default async function PhasesPage({
                     </tr>,
                     suggestion && (
                       <tr key={`${p.id}-suggestion`}>
-                        <td colSpan={5} className="pb-3">
+                        <td colSpan={6} className="pb-3">
                           <div className="border border-amber-300 bg-amber-50 rounded p-3 text-sm">
                             <p className="font-semibold">
                               Evidence review suggests {suggestion.suggestedPct}%{" "}

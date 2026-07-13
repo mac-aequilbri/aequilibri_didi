@@ -297,6 +297,9 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Is_AI_Draft", from: "isAiDraft", to: BOOL },
       { air: "Approved_By", from: "approvedBy", to: S },
       { air: "Job", from: "jobId", to: LINK },
+      // Spec 12 Module 5 RAG. Presence-gated: an empty rag ("") is never sent,
+      // so a create without a RAG leaves the singleSelect untouched.
+      { air: "RAG", from: "rag", to: S },
     ],
   },
   phase_evidence: {

@@ -21,7 +21,17 @@ export interface ProcurementView {
   vendorName: string;
   qty: number;
   total: number;
+  /** Expected delivery date (Spec 12 Expected_Date). Kept as `dueDate` for
+   *  back-compat with existing list/filter code. */
   dueDate: Date | string | null;
+  /** Actual delivery date (Spec 12 Actual_Date); null until delivered. */
+  actualDate: Date | string | null;
+  /** Delivery delta in whole days: Actual − Expected once delivered, else
+   *  today − Expected for a still-open order. Positive = late. null when the
+   *  expected date is unknown. */
+  deltaDays: number | null;
+  /** True when the order is behind its expected date and not yet closed out. */
+  isLate: boolean;
   status: string;
   /** Airtable rec id of the linked BUDGET row (Airtable mode only), for
    *  computing BUDGET.Actual app-side; null in Postgres mode / when unlinked. */
@@ -30,6 +40,40 @@ export interface ProcurementView {
 
 /** PROCUREMENT statuses that count toward BUDGET.Actual (Spec 12: Invoiced/Paid). */
 const ACTUAL_STATUSES = new Set(["invoiced", "paid"]);
+
+/** Statuses at which delivery is complete — no longer "running late". */
+const DELIVERED_STATUSES = new Set(["delivered", "invoiced", "paid"]);
+const MS_PER_DAY = 86_400_000;
+
+function toDate(v: Date | string | null): Date | null {
+  if (v == null) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Expected-vs-Actual delivery delta for one order (Spec 12 Module 8 Procurement
+ * Tracker). `now` is injectable for deterministic tests. Returns whole-day
+ * delta (positive = late) and whether the order is currently overdue.
+ */
+export function procurementLateness(
+  expected: Date | string | null,
+  actual: Date | string | null,
+  status: string,
+  now: Date = new Date(),
+): { deltaDays: number | null; isLate: boolean } {
+  const exp = toDate(expected);
+  if (!exp) return { deltaDays: null, isLate: false };
+  const act = toDate(actual);
+  const delivered = DELIVERED_STATUSES.has(status.toLowerCase());
+  if (act) {
+    const deltaDays = Math.round((act.getTime() - exp.getTime()) / MS_PER_DAY);
+    return { deltaDays, isLate: deltaDays > 0 };
+  }
+  if (delivered) return { deltaDays: null, isLate: false };
+  const deltaDays = Math.round((now.getTime() - exp.getTime()) / MS_PER_DAY);
+  return { deltaDays, isLate: deltaDays > 0 };
+}
 
 /**
  * Compute BUDGET.Actual per budget row app-side (the Airtable rollup we can't
@@ -63,23 +107,33 @@ async function fromPostgres(ctx: OrgCtx): Promise<ProcurementView[]> {
     orderBy: [{ status: "asc" }, { dueDate: "asc" }],
     include: { job: { select: { code: true } }, vendor: { select: { name: true } } },
   });
-  return rows.map((o) => ({
-    id: String(o.id),
-    item: o.item,
-    jobCode: o.job?.code ?? null,
-    vendorName: o.vendor?.name || o.vendorName,
-    qty: o.qty,
-    total: toNum(o.total),
-    dueDate: o.dueDate,
-    status: o.status,
-    budgetCategoryId: null,
-  }));
+  return rows.map((o) => {
+    const { deltaDays, isLate } = procurementLateness(o.dueDate, null, o.status);
+    return {
+      id: String(o.id),
+      item: o.item,
+      jobCode: o.job?.code ?? null,
+      vendorName: o.vendor?.name || o.vendorName,
+      qty: o.qty,
+      total: toNum(o.total),
+      dueDate: o.dueDate,
+      actualDate: null, // Postgres model has no actual-delivery column
+      deltaDays,
+      isLate,
+      status: o.status,
+      budgetCategoryId: null,
+    };
+  });
 }
 
 async function fromAirtable(ctx: OrgCtx): Promise<ProcurementView[]> {
   const rows = await core.list(ctx.orgSlug, "PROCUREMENT", { maxRecords: 200 });
   return rows.map((r) => {
     const qty = num(r["Quantity"]);
+    const expected = str(r["Expected_Date"]) || null;
+    const actual = str(r["Actual_Date"]) || null;
+    const status = str(r["Status"]) || "Ordered";
+    const { deltaDays, isLate } = procurementLateness(expected, actual, status);
     return {
       id: r.id,
       item: str(r["Procurement_Name"]) || "(untitled item)",
@@ -89,8 +143,11 @@ async function fromAirtable(ctx: OrgCtx): Promise<ProcurementView[]> {
       vendorName: "",
       qty,
       total: mulMoney(qty, num(r["Unit_Cost"])), // Total_Cost formula, computed app-side
-      dueDate: str(r["Expected_Date"]) || null,
-      status: str(r["Status"]) || "Ordered",
+      dueDate: expected,
+      actualDate: actual,
+      deltaDays,
+      isLate,
+      status,
       budgetCategoryId: firstLink(r["Budget_Category"]),
     };
   });

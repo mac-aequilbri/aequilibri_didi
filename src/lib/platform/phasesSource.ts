@@ -18,6 +18,26 @@ export interface PhaseView {
   jobId: string;
   evidenceSuggestion: string;
   _count: { evidence: number };
+  // Spec 12 Module 5 phase fields (Phase RAG board). RAG is the stored health
+  // signal; "" when unset. phaseType/loopPermitted describe linear-vs-cyclical
+  // engagement shape. sequence orders the lifecycle; openIssues counts linked
+  // ISSUES. Populated in Airtable mode; defaulted in Postgres mode.
+  rag: string;
+  phaseType: string;
+  loopPermitted: boolean;
+  sequence: number;
+  startDate: string | null;
+  endDate: string | null;
+  openIssues: number;
+}
+
+/** Canonical RAG label from a stored cell (tolerant of case / G-A-R shorthand). */
+export function normalizeRag(v: unknown): string {
+  const s = (typeof v === "string" ? v : "").trim().toLowerCase();
+  if (s.startsWith("r")) return "Red";
+  if (s.startsWith("a")) return "Amber";
+  if (s.startsWith("g")) return "Green";
+  return "";
 }
 
 export interface JobPhases {
@@ -58,6 +78,15 @@ async function fromPostgres(ctx: OrgCtx): Promise<JobPhases[]> {
       jobId: String(p.jobId),
       evidenceSuggestion: p.evidenceSuggestion,
       _count: { evidence: p._count.evidence },
+      // Postgres model has no RAG/type/loop columns (Airtable is system of
+      // record for these); dates come from the model, the rest default.
+      rag: "",
+      phaseType: "",
+      loopPermitted: false,
+      sequence: p.sortOrder,
+      startDate: p.startDate ? p.startDate.toISOString().slice(0, 10) : null,
+      endDate: p.endDate ? p.endDate.toISOString().slice(0, 10) : null,
+      openIssues: 0,
     })),
   }));
 }
@@ -71,6 +100,8 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobPhases[]> {
   for (const p of pRows) {
     const link = p["Job"];
     const key = Array.isArray(link) && link.length > 0 ? String(link[0]) : "_unassigned";
+    const issues = p["ISSUES"];
+    const sequence = num(p["Sequence"]) || num(p["Sort_Order"]);
     const row: PhaseView = {
       id: p.id,
       name: str(p["Phase_Name"]) || "(phase)",
@@ -80,9 +111,18 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobPhases[]> {
       jobId: key,
       evidenceSuggestion: "{}",
       _count: { evidence: 0 },
+      rag: normalizeRag(p["RAG"]),
+      phaseType: str(p["Phase_Type"]),
+      loopPermitted: p["Loop_Permitted"] === true,
+      sequence,
+      startDate: str(p["Start_Date"]) || null,
+      endDate: str(p["End_Date"]) || null,
+      openIssues: Array.isArray(issues) ? issues.length : 0,
     };
     (byJob.get(key) ?? byJob.set(key, []).get(key)!).push(row);
   }
+  // Order each job's phases by lifecycle sequence (spec: phases are sequenced).
+  for (const list of byJob.values()) list.sort((a, b) => a.sequence - b.sequence);
   return jobRows.map((j) => ({
     id: j.id,
     name: str(j["Job_Name"]) || "(job)",

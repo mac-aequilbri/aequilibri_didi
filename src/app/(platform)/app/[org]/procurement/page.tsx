@@ -60,7 +60,9 @@ export default async function ProcurementPage({
               <th className="py-1 pr-2">Vendor</th>
               <th className="py-1 pr-2 text-right">Qty</th>
               <th className="py-1 pr-2 text-right">Total</th>
-              <th className="py-1 pr-2">Due</th>
+              <th className="py-1 pr-2">Expected</th>
+              <th className="py-1 pr-2">Actual</th>
+              <th className="py-1 pr-2 text-right">Δ days</th>
               <th className="py-1">Status</th>
             </tr>
           </thead>
@@ -79,8 +81,23 @@ export default async function ProcurementPage({
                 <td className="py-2 pr-2 text-xs">{o.vendorName || "—"}</td>
                 <td className="py-2 pr-2 text-right text-xs">{o.qty}</td>
                 <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(toNum(o.total))}</td>
-                <td className="py-2 pr-2 whitespace-nowrap text-xs">
+                <td
+                  className={`py-2 pr-2 whitespace-nowrap text-xs ${o.isLate ? "text-red-600 font-medium" : ""}`}
+                  title={o.isLate ? "Overdue — past expected delivery, not yet received" : undefined}
+                >
                   {o.dueDate ? formatDate(o.dueDate) : "—"}
+                  {o.isLate && <span className="ml-1" aria-label="overdue">⚠</span>}
+                </td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs">
+                  {o.actualDate ? formatDate(o.actualDate) : "—"}
+                </td>
+                <td
+                  className={`py-2 pr-2 text-right whitespace-nowrap text-xs tabular-nums ${
+                    o.deltaDays != null && o.deltaDays > 0 ? "text-red-600 font-medium" : o.deltaDays != null && o.deltaDays < 0 ? "text-emerald-700" : "text-neutral-400"
+                  }`}
+                  title="Delivery delta: actual − expected (positive = late)"
+                >
+                  {o.deltaDays == null ? "—" : o.deltaDays > 0 ? `+${o.deltaDays}` : o.deltaDays}
                 </td>
                 <td className="py-2 whitespace-nowrap">
                   <form action={setProcurementStatus} className="flex items-center gap-1">
@@ -103,7 +120,7 @@ export default async function ProcurementPage({
             ))}
             {orders.length === 0 && (
               <tr>
-                <td className="py-4 text-neutral-500" colSpan={6}>
+                <td className="py-4 text-neutral-500" colSpan={8}>
                   {filtered ? "No orders match these filters." : "No orders yet."}
                 </td>
               </tr>

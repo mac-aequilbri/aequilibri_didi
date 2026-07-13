@@ -232,6 +232,10 @@ const phaseSchema = z.object({
   isAiDraft: bool.default(false),
   approvedBy: str(200).default(""),
   evidenceSuggestion: jsonStr.default("{}"),
+  // Spec 12 Module 5: RAG health signal. Airtable-only (pgOmit strips it before
+  // the Postgres delegate, which has no rag column) — Airtable is system of
+  // record for phase RAG. Empty/absent is never written (fieldMap presence-gate).
+  rag: str(10).default(""),
 });
 
 const phaseEvidenceSchema = z.object({
@@ -416,7 +420,7 @@ const REGISTRY = {
   comms: { physical: "COMMS", create: commsSchema, update: upd(commsSchema) },
   learning_rule: { physical: "plat_core_learningrule", delegate: d(prisma.platLearningRule), create: learningRuleSchema, update: upd(learningRuleSchema) },
   document: { physical: "plat_core_document", delegate: d(prisma.platDocument), create: documentSchema, update: upd(documentSchema) },
-  phase: { physical: "plat_con_phase", delegate: d(prisma.platConPhase), create: phaseSchema, update: upd(phaseSchema) },
+  phase: { physical: "plat_con_phase", delegate: d(prisma.platConPhase), pgOmit: ["rag"], create: phaseSchema, update: upd(phaseSchema) },
   phase_evidence: { physical: "plat_con_phaseevidence", delegate: d(prisma.platConPhaseEvidence), create: phaseEvidenceSchema, update: upd(phaseEvidenceSchema) },
   budget_line: { physical: "plat_con_budgetline", delegate: d(prisma.platConBudgetLine), create: budgetLineSchema, update: upd(budgetLineSchema) },
   cashflow: { physical: "CASHFLOWS", create: cashflowSchema, update: upd(cashflowSchema) },

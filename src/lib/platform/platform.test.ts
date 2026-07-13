@@ -4,6 +4,7 @@ import { diffForCorrections } from "./corrections";
 import { diffStoredVsSubmitted, valuesEquivalent } from "./reconciliation";
 import { getPrompt } from "./prompts";
 import { modelFor } from "./modelRouter";
+import { procurementLateness } from "./procurementSource";
 import { validateRecord } from "./recordWriter";
 
 describe("recordWriter validateRecord (typecast layer)", () => {
@@ -51,6 +52,44 @@ describe("recordWriter validateRecord (typecast layer)", () => {
   it("parses ISO date strings revived from stored proposals", () => {
     const out = validateRecord("action", "update", { dueDate: "2026-06-15T00:00:00.000Z" });
     expect(out.dueDate).toBeInstanceOf(Date);
+  });
+
+  it("accepts a phase RAG update (Spec 12 Module 5)", () => {
+    const out = validateRecord("phase", "update", { rag: "Amber" });
+    expect(out).toEqual({ rag: "Amber" });
+  });
+});
+
+describe("procurementLateness (Spec 12 procurement tracker)", () => {
+  const now = new Date("2026-07-13T00:00:00.000Z");
+
+  it("reports a late delivery when actual is after expected", () => {
+    const r = procurementLateness("2026-07-01", "2026-07-08", "delivered", now);
+    expect(r).toEqual({ deltaDays: 7, isLate: true });
+  });
+
+  it("reports early/on-time delivery as not late", () => {
+    expect(procurementLateness("2026-07-10", "2026-07-08", "invoiced", now).isLate).toBe(false);
+    expect(procurementLateness("2026-07-08", "2026-07-08", "paid", now).deltaDays).toBe(0);
+  });
+
+  it("flags an open order past its expected date as overdue", () => {
+    const r = procurementLateness("2026-07-01", null, "ordered", now);
+    expect(r).toEqual({ deltaDays: 12, isLate: true });
+  });
+
+  it("does not flag a delivered order with no actual date", () => {
+    expect(procurementLateness("2026-07-01", null, "delivered", now)).toEqual({
+      deltaDays: null,
+      isLate: false,
+    });
+  });
+
+  it("returns null delta when the expected date is unknown", () => {
+    expect(procurementLateness(null, null, "ordered", now)).toEqual({
+      deltaDays: null,
+      isLate: false,
+    });
   });
 });
 
