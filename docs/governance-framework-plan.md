@@ -2,6 +2,29 @@
 
 Source: "aequilibri Governance Framework v1.docx" (doc version 3.0, prepared from the live Dulong Downs DiDi base, 39 tables). This plan maps each framework section to the current codebase and sequences the work.
 
+## Status — 2026-07-15
+
+**Done (on master):**
+- Authentication & User Provisioning — provisioning service, Team & access page, last-owner guard (f96df69)
+- Phase 0 decision register `docs/governance-phase0-decisions.md`, D1–D9 with recommendations (4874070)
+- Phase 1 tooling — retag script + full §5.5 map; dry-run validated vs Didi: HIGH 336 · MED 212 · REVIEW 111 · unknown 0 (4874070)
+- Phase 2 — canonical-vocab enforcement at the write choke point + off-vocab write fixes (35a746e)
+
+**Pending:**
+| # | Item | Blocked on |
+|---|---|---|
+| P1 | D1–D9 sign-off (incl. the CHANGE_LOG Pending/Variation amendment in D1) | Claudia Salem |
+| P2 | Retag apply — HIGH batch (`--apply`), then MED (`--med`) after sampling | D1–D4 · D3 |
+| P3 | PLAN "Approved" (48 rec) + REVIEW rows resolution from the review CSV | D3 |
+| P4 | TEAM population (unblocks 335+ linked fields) | D7 names |
+| P5 | Manual option-list cleanup in Airtable UI (orphans, PLACEHOLDER) — §5.2 rule 5 | after P2 |
+| P6 | RISKS / TEAM / COMMS / CORRECTIONS status vocabularies — not enumerated in the framework doc | Product Owner to supply |
+| P7 | Clerk activation in prod (env keys, PLATFORM_ADMIN_EMAILS, restricted sign-up, self-invite first) | operator task |
+| P8 | Phase 3 — role taxonomy rename + sub-roles, permission matrix, CLS, RLS via TEAM→JOBS | D5–D6 |
+| P9 | Phase 4 — DOMAIN_LABELS read layer + population, onboarding questionnaire | D8 samples |
+| P10 | Phase 5 deferred — master-data linking, agent-allowlist UI, remaining reports | D9 scope |
+| P11 | Zod strict validation on the Airtable write path; assistant-prompt vocab note | engineering, unblocked |
+
 ## Gap summary (framework → code)
 
 | Framework requirement | Current state | Gap |
@@ -29,7 +52,7 @@ From §12, these block later phases; get sign-off from Claudia Salem first:
 5. Role taxonomy: confirm 4 main roles + Business Owner/Delivery Manager split, and the mapping from current code roles (proposal: owner→Administrator(tenant)/Business Owner, builder→Manager/Delivery Manager, architect→Contributor, broker→Viewer; platform admin = cross-tenant Administrator).
 6. TEAM population order; DOMAIN_LABELS ownership; Reporting MVP scope.
 
-## Phase 1 — Data remediation (unblocks everything else)
+## Phase 1 — Data remediation (unblocks everything else) — tooling built 2026-07-15, apply gated on D1–D4
 
 1. **Generic retag script** `scripts/airtable-retag-vocab.mjs`: takes a mapping file (field → {current value → canonical value, confidence}), applies HIGH rows in batch, emits MED/LOW rows to a review CSV, logs every change to EXECUTION_LOG. Dry-run mode default.
 2. **Mapping data**: encode the full §5.5 register as `scripts/data/governance-retag-map.json` (15 fields, incl. dimension-extraction rows that set Category/Priority + review-default status).
