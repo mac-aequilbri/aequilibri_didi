@@ -20,6 +20,7 @@ Source: "aequilibri Governance Framework v1.docx" (doc version 3.0, prepared fro
 
 ## Phase 0 — Product Owner decisions (blocking, no code)
 
+Decision register with recommendations + sign-off fields: `docs/governance-phase0-decisions.md`.
 From §12, these block later phases; get sign-off from Claudia Salem first:
 1. Final vocabularies for ISSUES.Status and PROCUREMENT.Status (incl. Ordered→Invoiced, removal of On Hold).
 2. Adopt the five control rules (§5.2) as policy — enables all §5.5 mappings.

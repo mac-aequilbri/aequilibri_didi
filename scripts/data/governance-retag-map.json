@@ -1,0 +1,141 @@
+{
+  "_comment": "Governance Framework v3.0 §5.5 remapping register. Consumed by scripts/airtable-retag-vocab.mjs. Map entry: current value → [canonical, confidence, {extract?, qualifierTo?}]. Values already in `canonical` are clean and need no entry. REVIEW rows are never auto-applied (D3 sign-off, docs/governance-phase0-decisions.md).",
+  "newFields": [
+    { "table": "ISSUES", "name": "Category", "options": ["Construction", "Procurement", "Smart Home/KNX", "Security", "Design", "General"] },
+    { "table": "PROCUREMENT", "name": "Priority", "options": ["Critical", "High", "Medium", "Low"] }
+  ],
+  "addOptions": [
+    { "table": "ISSUES", "field": "Priority", "add": ["Critical"] },
+    { "table": "CASHFLOWS", "field": "Status", "add": ["Scheduled"] }
+  ],
+  "fields": [
+    {
+      "table": "ISSUES", "field": "Status",
+      "canonical": ["Open", "In Progress", "Blocked", "Deferred", "Closed"],
+      "map": {
+        "Not Started": ["Open", "HIGH"],
+        "REMOVED": ["Closed", "MED"],
+        "Done": ["Closed", "HIGH"],
+        "Waiting Info": ["Blocked", "HIGH"],
+        "Procurement": ["Open", "REVIEW", { "extract": { "field": "Category", "value": "Procurement" } }],
+        "Construction": ["Open", "REVIEW", { "extract": { "field": "Category", "value": "Construction" } }],
+        "KNX / Smart Home": ["Open", "REVIEW", { "extract": { "field": "Category", "value": "Smart Home/KNX" } }],
+        "Selection Req": ["Blocked", "MED"],
+        "Action Required": ["Open", "MED"],
+        "Security": ["Open", "REVIEW", { "extract": { "field": "Category", "value": "Security" } }],
+        "Active": ["Open", "MED"],
+        "Follow Up": ["In Progress", "MED"],
+        "Design": ["Open", "REVIEW", { "extract": { "field": "Category", "value": "Design" } }],
+        "Decision Required": ["Blocked", "MED"],
+        "Order Required": ["Blocked", "MED"],
+        "Live": ["Open", "MED"]
+      }
+    },
+    {
+      "table": "PROCUREMENT", "field": "Status",
+      "canonical": ["Selection Required", "Selected", "Quoted", "Invoiced", "Paid", "Delivered", "Cancelled"],
+      "map": {
+        "Ordered": ["Invoiced", "HIGH"],
+        "Selection Made": ["Selected", "HIGH"],
+        "Pending": ["Quoted", "MED"],
+        "TBC": ["Selection Required", "MED"],
+        "Selection Req": ["Selection Required", "HIGH"],
+        "Updated": [null, "REVIEW"],
+        "CRITICAL": [null, "REVIEW", { "extract": { "field": "Priority", "value": "Critical" } }],
+        "New": ["Selection Required", "MED"],
+        "Reserved": ["Selected", "MED"],
+        "Approved": ["Invoiced", "MED"],
+        "On Hold": [null, "REVIEW"]
+      }
+    },
+    {
+      "table": "DECISIONS", "field": "Status",
+      "canonical": ["Pending", "Approved", "Reversed"],
+      "map": { "Confirmed": ["Approved", "MED"] }
+    },
+    {
+      "table": "DECISIONS", "field": "Decision_Type",
+      "canonical": ["Strategic", "Technical", "Commercial", "Operational", "Specification", "Schedule", "Scope", "Procurement"],
+      "map": {
+        "Specification Change": ["Specification", "HIGH"],
+        "Design Decision": [null, "REVIEW"],
+        "Scope Decision": ["Scope", "HIGH"],
+        "Schedule Change": ["Schedule", "HIGH"],
+        "Scope Change": ["Scope", "HIGH"],
+        "Technical Acceptance": ["Technical", "MED"]
+      }
+    },
+    {
+      "table": "DECISIONS", "field": "Reversibility",
+      "canonical": ["Reversible", "Difficult", "Irreversible"],
+      "map": {
+        "Irreversible once manufacturing commences": ["Irreversible", "HIGH", { "qualifierTo": "Rationale" }],
+        "Reversible before order placed": ["Reversible", "HIGH", { "qualifierTo": "Rationale" }],
+        "Reversible before installation": ["Reversible", "HIGH", { "qualifierTo": "Rationale" }],
+        "Reversible before manufacturing": ["Reversible", "HIGH", { "qualifierTo": "Rationale" }],
+        "Irreversible before installation": ["Irreversible", "HIGH", { "qualifierTo": "Rationale" }],
+        "Irreversible once wiring and fixtures installed": ["Irreversible", "HIGH", { "qualifierTo": "Rationale" }],
+        "Irreversible once manufactured": ["Irreversible", "HIGH", { "qualifierTo": "Rationale" }]
+      }
+    },
+    {
+      "table": "EXECUTION_LOG", "field": "Status",
+      "canonical": ["Not Started", "Ongoing", "Done", "Blocked"],
+      "map": { "Success": ["Done", "MED"], "executed": ["Done", "HIGH"] }
+    },
+    {
+      "table": "EXECUTION_LOG", "field": "Action_Type",
+      "canonical": ["Create", "Update", "Delete", "Propose", "Promote", "Chat"],
+      "map": { "chat": ["Chat", "HIGH"], "create": ["Create", "HIGH"], "update": ["Update", "HIGH"] }
+    },
+    {
+      "table": "PLAN", "field": "Status",
+      "canonical": ["Not Started", "In Progress", "Complete", "Blocked", "Deferred"],
+      "map": { "Approved": [null, "REVIEW"], "Draft": ["Not Started", "MED"] }
+    },
+    {
+      "table": "CHANGE_LOG", "field": "Status",
+      "canonical": ["Proposed", "Approved", "Rejected", "Implemented"],
+      "map": { "TBC": ["Proposed", "MED"], "Pending": ["Proposed", "MED"] }
+    },
+    {
+      "table": "CHANGE_LOG", "field": "Change_Type",
+      "canonical": ["Schedule", "Specification", "Selection", "Scope", "Procurement", "Budget", "Cost"],
+      "map": {
+        "Schedule Slip": ["Schedule", "MED"],
+        "Specification Change": ["Specification", "HIGH"],
+        "Selection Change": ["Selection", "HIGH"],
+        "Scope Change": ["Scope", "HIGH"],
+        "Procurement Variation": ["Procurement", "MED"],
+        "Budget Variation": ["Budget", "MED"],
+        "Variation": [null, "REVIEW"],
+        "Cost Variation": ["Cost", "MED"]
+      }
+    },
+    {
+      "table": "LEARNING_RULES", "field": "Rule_Status",
+      "canonical": ["Draft", "Published", "Retired"],
+      "map": { "Active": ["Published", "MED"] }
+    },
+    {
+      "table": "DOCUMENTS", "field": "Document_Type",
+      "canonical": ["Plan", "Report", "Legal", "Reference", "Form", "Template", "Contract", "Warranty", "Invoice", "Correspondence", "Other"],
+      "map": { "Correspondence Summary": ["Correspondence", "MED"], "correspondence": ["Correspondence", "HIGH"], "report": ["Report", "HIGH"] }
+    },
+    {
+      "table": "DOCUMENTS", "field": "Doc_Status",
+      "canonical": ["Active", "Superseded", "Archived"],
+      "map": { "classified": [null, "REVIEW"] }
+    },
+    {
+      "table": "HYPOTHESES", "field": "Hypothesis_Type",
+      "canonical": ["Business-Assumption", "Domain-Pattern", "Process-Pattern"],
+      "map": { "Domain Pattern": ["Domain-Pattern", "HIGH"] }
+    },
+    {
+      "table": "JOBS", "field": "Status",
+      "canonical": ["Open", "In Progress", "Closed"],
+      "map": { "Active": ["In Progress", "MED"] }
+    }
+  ]
+}
