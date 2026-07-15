@@ -491,6 +491,12 @@ export async function setOutboxStatus(recordId: string, status: string): Promise
 /** Active team members for an org (auth). Cached — member changes made outside
  *  the app (Airtable UI) take up to CONTROL_TTL_MS to apply. */
 export async function listControlTeam(slug: string): Promise<ControlTeamMember[]> {
+  return (await listControlTeamAll(slug)).filter((m) => m.isActive);
+}
+
+/** Every team member for an org, including deactivated ones — for the team
+ *  management page. Shares the cache with listControlTeam. */
+export async function listControlTeamAll(slug: string): Promise<ControlTeamMember[]> {
   const base = controlBaseId();
   if (!base) return [];
   return teamCache.get(slug, () => fetchControlTeam(base, slug));
@@ -501,17 +507,15 @@ async function fetchControlTeam(base: string, slug: string): Promise<ControlTeam
     filterByFormula: `{Org_Slug}='${formulaSafe(slug)}'`,
     maxRecords: 500,
   });
-  return recs
-    .map((r) => {
-      const f = r.fields;
-      return {
-        name: S(f["Name"]),
-        email: S(f["Email"]),
-        role: S(f["Role"]) || "owner",
-        isActive: f["Is_Active"] !== false,
-      };
-    })
-    .filter((m) => m.isActive);
+  return recs.map((r) => {
+    const f = r.fields;
+    return {
+      name: S(f["Name"]),
+      email: S(f["Email"]),
+      role: S(f["Role"]) || "owner",
+      isActive: f["Is_Active"] !== false,
+    };
+  });
 }
 
 /** Next org id: max existing + 1 (the registry replaces the Postgres
@@ -610,6 +614,29 @@ export async function createControlTeamMember(
     },
   ]);
   teamCache.delete(slug);
+}
+
+/** Update a team member's role and/or active flag, matched by slug + email
+ *  (case-insensitive). Returns false when no matching row exists. */
+export async function updateControlTeamMember(
+  slug: string,
+  email: string,
+  patch: { role?: string; isActive?: boolean; name?: string },
+): Promise<boolean> {
+  const base = controlBaseId();
+  if (!base) return false;
+  const recs = await listRecords(base, TEAM, {
+    filterByFormula: `AND({Org_Slug}='${formulaSafe(slug)}', LOWER({Email})='${formulaSafe(email.toLowerCase())}')`,
+    maxRecords: 10,
+  });
+  if (!recs.length) return false;
+  const fields: Record<string, unknown> = {};
+  if (patch.role !== undefined) fields["Role"] = patch.role;
+  if (patch.isActive !== undefined) fields["Is_Active"] = patch.isActive;
+  if (patch.name !== undefined) fields["Name"] = patch.name;
+  await updateRecords(base, TEAM, recs.map((r) => ({ id: r.id, fields })));
+  teamCache.delete(slug);
+  return true;
 }
 
 // ── Template registry ───────────────────────────────────────────────────────

@@ -94,6 +94,8 @@ export function buildNav(
   const admin: NavSection = {
     heading: "Admin",
     items: [
+      // Team management is owner-only (requireAdmin on the route as well).
+      ...(role === "owner" ? [{ href: p("/team"), label: "Team & access" }] : []),
       ...(f.portal ? [{ href: p("/portal"), label: "Client Portal" }] : []),
       ...(f.accounting ? [{ href: p("/accounting"), label: "Accounting" }] : []),
       { href: p("/integrations"), label: "Integrations" },

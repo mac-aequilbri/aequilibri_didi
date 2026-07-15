@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   // Native modules must not be bundled — load them from node_modules at runtime.
   serverExternalPackages: ["@napi-rs/canvas", "geotiff"],
 
+  // Dev only (ignored in prod builds): the dev server binds to :: and is
+  // browsed via http://[::1]:3000, which Next treats as a foreign origin and
+  // blocks from fetching dev resources (HMR, RSC payloads on client navs).
+  allowedDevOrigins: ["[::1]"],
+
   // Defense-in-depth for the BIMx embed: restrict which origins these pages
   // may frame. This backstops the graphisoft.com URL allowlist in
   // src/lib/platform/bimx.ts — even a stored bad URL cannot be framed. Scoped
