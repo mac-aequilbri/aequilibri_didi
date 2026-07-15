@@ -44,15 +44,18 @@ const present = (d: Record<string, unknown>, k: string): boolean =>
   k in d && d[k] !== undefined && d[k] !== "";
 
 // ── enum maps (only the canonical Core tables need these) ───────────────────
+// Option names follow the governance canonical vocabularies (§5.3) — see
+// lib/platform/vocab.ts, which also force-corrects any value that slips past
+// these maps at the write choke point.
 const DECISION_STATUS: Record<string, string> = {
   proposed: "Pending",
-  confirmed: "Made",
+  confirmed: "Approved",
   superseded: "Reversed",
 };
 const ACTION_STATUS: Record<string, string> = {
   open: "Open",
   in_progress: "In Progress",
-  done: "Complete",
+  done: "Closed",
   deferred: "Deferred",
 };
 const ACTION_PRIORITY: Record<string, string> = {
@@ -290,7 +293,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Procurement_Name", from: "item", to: (v) => S(v).slice(0, 300) || "Untitled item" },
       { air: "Quantity", from: "qty", to: (v) => NUM(v, 1) },
       { air: "Unit_Cost", from: "unitPrice", to: (v) => NUM(v) },
-      { air: "Status", from: "status", createDefault: "Ordered", to: S },
+      { air: "Status", from: "status", createDefault: "Selection Required", to: S },
       { air: "Expected_Date", from: "dueDate", to: DATE },
       { air: "Job", from: "jobId", to: LINK },
     ],
@@ -344,7 +347,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Amount", from: "amount", to: (v) => NUM(v) },
       { air: "Source_Or_Payee", from: "sourceOrPayee", to: S },
       { air: "Category", from: "category", to: S },
-      { air: "Status", from: "status", createDefault: "Forecast", to: S },
+      { air: "Status", from: "status", createDefault: "Scheduled", to: S },
       { air: "Notes", from: "notes", to: S },
       { air: "Job", from: "jobId", to: LINK },
     ],

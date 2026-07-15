@@ -31,6 +31,11 @@ export function normStatusKey(raw: string): string {
 const KNOWN_AIRTABLE_STATUS: Record<string, AppStatus> = {
   open: "open",
   "in progress": "in_progress",
+  // Governance canonical set (§5.3): Open · In Progress · Blocked · Deferred ·
+  // Closed. The app's 4-status model reads Blocked as in_progress (work exists
+  // but is held). "complete" stays recognised for pre-retag records.
+  blocked: "in_progress",
+  closed: "done",
   complete: "done",
   deferred: "deferred",
 };

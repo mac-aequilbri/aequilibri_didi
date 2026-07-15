@@ -95,12 +95,13 @@
     },
     {
       "table": "CHANGE_LOG", "field": "Status",
-      "canonical": ["Proposed", "Approved", "Rejected", "Implemented"],
-      "map": { "TBC": ["Proposed", "MED"], "Pending": ["Proposed", "MED"] }
+      "_comment": "Pending/Variation kept canonical pending D1 amendment — Spec 12 variation orders live in CHANGE_LOG and use Status=Pending for submitted; retagging them would break the app round-trip.",
+      "canonical": ["Proposed", "Pending", "Approved", "Rejected", "Implemented"],
+      "map": { "TBC": ["Proposed", "MED"] }
     },
     {
       "table": "CHANGE_LOG", "field": "Change_Type",
-      "canonical": ["Schedule", "Specification", "Selection", "Scope", "Procurement", "Budget", "Cost"],
+      "canonical": ["Schedule", "Specification", "Selection", "Scope", "Procurement", "Budget", "Cost", "Variation"],
       "map": {
         "Schedule Slip": ["Schedule", "MED"],
         "Specification Change": ["Specification", "HIGH"],
@@ -108,7 +109,6 @@
         "Scope Change": ["Scope", "HIGH"],
         "Procurement Variation": ["Procurement", "MED"],
         "Budget Variation": ["Budget", "MED"],
-        "Variation": [null, "REVIEW"],
         "Cost Variation": ["Cost", "MED"]
       }
     },

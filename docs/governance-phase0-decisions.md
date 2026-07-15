@@ -14,7 +14,9 @@ Adopt §5.3 as canonical, notably:
 - PROCUREMENT.Status = Selection Required · Selected · Quoted · Invoiced · Paid · Delivered · Cancelled
   — Ordered+Invoiced merge into **Invoiced**; **On Hold / New / Confirmed removed**.
 
-**Recommendation:** approve as written; the mapping register (§5.5) already resolves every live value against these sets.
+**Recommendation:** approve as written, with one amendment engineering requires: CHANGE_LOG gains
+**Status = Pending** and **Change_Type = Variation** — Spec 12 stores variation orders in CHANGE_LOG
+and uses those two values for its draft→submitted→approved flow; retagging them would break the app.
 **Decision:** _______  **Date:** _______
 
 ## D2 — Adopt the five control rules (§5.2) as policy ☐

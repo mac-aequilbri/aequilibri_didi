@@ -9,7 +9,7 @@ describe("fieldMaps", () => {
       Decision_Name: "Use slate tiles",
       Decision_Description: "Use slate tiles",
       Rationale: "durability",
-      Status: "Made", // confirmed -> Made
+      Status: "Approved", // confirmed -> Approved (governance canonical, §5.3)
     });
   });
 

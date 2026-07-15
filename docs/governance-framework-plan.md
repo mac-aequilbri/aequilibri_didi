@@ -38,7 +38,18 @@ From §12, these block later phases; get sign-off from Claudia Salem first:
 5. **TEAM population**: seed Administrator + Business Owner + delivery team (unblocks 335+ linked-record fields). Data-entry task with a small seeding script.
 6. Manual Airtable step (tracked, not coded): remove orphaned options/PLACEHOLDER values from choice lists (§5.2 rule 5).
 
-## Phase 2 — Vocabulary enforcement layer (write-path hardening)
+## Phase 2 — Vocabulary enforcement layer (write-path hardening) — built 2026-07-15
+
+Implemented: `src/lib/platform/vocab.ts` (canonical sets + review-defaults per §5.3) enforced at
+the single Airtable write choke point (`recordWriter.performWrite`, post-toFields) — covers human
+forms, AI tools, ingestion, and approved proposals. Case variants normalize; unknowns force to the
+review-default and are warn-logged. Fixed at source: EXECUTION_LOG audit writer ("executed"/
+lowercase ops → Done/Create/Update/Delete), DECISION_STATUS confirmed→Approved (was off-vocab
+"Made"), ACTION_STATUS done→Closed (was "Complete"), procurement create default Ordered→Selection
+Required, cashflow create default Forecast→Scheduled; read maps now recognise Approved/Closed/
+Blocked (live "Approved" decisions previously displayed as proposed). CHANGE_LOG keeps
+Pending/Variation pending the D1 amendment. Deferred: RISKS/TEAM/COMMS/CORRECTIONS sets (not
+enumerated in the doc), Zod strict-mode on the Airtable path, assistant-prompt vocab note.
 
 1. **Canonical vocab module** `src/lib/platform/vocab.ts`: single source for every Workflow + Classification field's canonical set and its review-default (Open / Selection Required / etc.), generated-checked against `schema.generated.ts`.
 2. **Enforce on the Airtable write path**: in `recordWriter.ts`, stop skipping validation in Airtable mode — validate controlled fields against vocab; unknown value → force-to-review default + flag (never guess, never auto-create options; disable typecast option-creation for controlled fields).

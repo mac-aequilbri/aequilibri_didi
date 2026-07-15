@@ -47,6 +47,10 @@ async function fromPostgres(ctx: OrgCtx): Promise<DecisionView[]> {
 // controls, keyed on app values, are reachable in Airtable mode).
 const AIR_TO_APP_DECISION_STATUS: Record<string, string> = {
   Pending: "proposed",
+  // Governance canonical (§5.3). "Made" stays recognised for records written
+  // before the vocab alignment; live "Approved" rows previously fell through
+  // to the "proposed" fallback and showed the wrong status.
+  Approved: "confirmed",
   Made: "confirmed",
   Reversed: "superseded",
 };

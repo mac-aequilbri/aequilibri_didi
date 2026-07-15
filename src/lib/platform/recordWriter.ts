@@ -15,6 +15,7 @@ import { logger, errMeta } from "@/lib/logger";
 import { Actor, OrgCtx } from "./types";
 import { emitOutboundEvent } from "./outbox";
 import { reconcileAirtableWrite } from "./reconciliation";
+import { enforceVocab, type VocabCoercion } from "./vocab";
 
 // ── field helpers (typecast layer) ────────────────────────────────────
 
@@ -557,13 +558,17 @@ async function performWrite(
         const { nextRuleCode } = await import("@/services/platform/learning");
         payload = { ...data, ruleCode: await nextRuleCode(ctx) };
       }
-      const rec = await core.create(ctx.orgSlug, map.table, toFields(map, payload, "create"));
+      const fields = toFields(map, payload, "create");
+      logVocabCoercions(ctx, map.table, enforceVocab(map.table, fields));
+      const rec = await core.create(ctx.orgSlug, map.table, fields);
       return rec.id;
     }
     if (recordId == null) throw new Error(`${op} requires recordId`);
     const rid = String(recordId);
     if (op === "update") {
-      await core.update(ctx.orgSlug, map.table, rid, toFields(map, data, "update"));
+      const fields = toFields(map, data, "update");
+      logVocabCoercions(ctx, map.table, enforceVocab(map.table, fields));
+      await core.update(ctx.orgSlug, map.table, rid, fields);
       return rid;
     }
     await core.remove(ctx.orgSlug, map.table, [rid]);
@@ -613,6 +618,21 @@ const INITIATED_BY: Record<Actor["type"], string> = {
   system: "System",
 };
 
+/** op → canonical EXECUTION_LOG.Action_Type (governance §5.3 — the lowercase
+ *  op names were the "create"/"executed" pollution the §5.5 register retags). */
+const AUDIT_ACTION_TYPE: Record<WriteRequest["op"], string> = {
+  create: "Create",
+  update: "Update",
+  delete: "Delete",
+};
+
+/** Surface force-to-review coercions (§5.2 rule 3): warn-logged with full
+ *  detail so off-vocabulary writes are visible instead of silently laundered. */
+function logVocabCoercions(ctx: OrgCtx, table: string, coercions: VocabCoercion[]): void {
+  if (!coercions.length) return;
+  logger.warn("Vocab force-to-review applied", { orgId: ctx.orgId, table, coercions });
+}
+
 /** Append an "executed" audit row. The Postgres targetId column only holds
  *  integer ids; an Airtable "rec…" id is recorded in `result` instead. In
  *  Airtable mode the audit is best-effort — a Postgres outage must not undo a
@@ -640,11 +660,11 @@ async function writeExecutedLog(
     try {
       await core.create(ctx.orgSlug, "EXECUTION_LOG", {
         Log_Entry: `${args.op} ${args.physical}`.slice(0, 200),
-        Action_Type: args.op,
+        Action_Type: AUDIT_ACTION_TYPE[args.op],
         Tables_Affected: args.physical,
         Summary: args.result || args.payload,
         Initiated_By: INITIATED_BY[args.actor.type] ?? "System",
-        Status: "executed",
+        Status: "Done",
         Date_Time: new Date().toISOString(),
       });
     } catch (err) {
