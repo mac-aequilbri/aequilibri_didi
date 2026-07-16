@@ -79,6 +79,32 @@ function referenceSeedRows(
  *  getLearningSettings) see the same data the Postgres txn just wrote. Best
  *  effort: a mirror failure must not fail onboarding (Postgres remains the
  *  fallback during the cutover), so callers swallow errors. */
+// Governance §6 onboarding metadata: one ENGAGEMENT_TYPE_CONFIG record per
+// active engagement type (canonical option names per the framework doc).
+const ENGAGEMENT_TYPE_OPTION: Record<string, string> = {
+  short_job: "Short Job",
+  long_project: "Long Project",
+  ongoing: "Ongoing Lifecycle",
+  seasonal: "Seasonal Cycle",
+};
+
+async function seedEngagementTypeConfig(
+  orgSlug: string,
+  allowed: string[],
+  defaultType: string,
+): Promise<void> {
+  for (const t of allowed) {
+    const option = ENGAGEMENT_TYPE_OPTION[t];
+    if (!option) continue;
+    await core.create(orgSlug, "ENGAGEMENT_TYPE_CONFIG", {
+      Config_Name: `${option}${t === defaultType ? " (default)" : ""}`,
+      Engagement_Type: option,
+      Active: true,
+      Notes: "Seeded at onboarding (governance §6).",
+    });
+  }
+}
+
 async function mirrorConfigToBase(
   orgSlug: string,
   categories: string[],
@@ -304,6 +330,7 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
     }
     try {
       await mirrorConfigToBase(slug, categories, rules, clientPriorities, tradeReferences);
+      await seedEngagementTypeConfig(slug, allowed, input.defaultEngagementType);
     } catch (err) {
       logger.warn("Airtable config mirror skipped", { slug, ...errMeta(err) });
     }
@@ -412,6 +439,7 @@ export async function provisionOrganisation(input: ProvisionInput): Promise<Prov
   if (airtableEnabled()) {
     try {
       await mirrorConfigToBase(slug, categories, rules, clientPriorities, tradeReferences);
+      await seedEngagementTypeConfig(slug, allowed, input.defaultEngagementType);
     } catch (err) {
       logger.warn("Airtable config mirror skipped", { slug, ...errMeta(err) });
     }

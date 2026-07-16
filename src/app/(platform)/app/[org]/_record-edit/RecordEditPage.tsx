@@ -4,13 +4,15 @@
 // times.
 
 import { EmptyState, PageHeader } from "@/components/PageHeader";
+import { localizeEditorConfig } from "@/lib/platform/domainLabels";
+import { getOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import type { EditorValues, RecordEditorConfig } from "@/lib/platform/recordEditor";
 import RecordEditor from "./RecordEditor";
 
-export default function RecordEditPage({
+export default async function RecordEditPage({
   orgSlug,
-  config,
+  config: rawConfig,
   values,
   recordId,
   subtitle,
@@ -22,6 +24,10 @@ export default function RecordEditPage({
   /** Short label under the header (e.g. the record's title). */
   subtitle?: string;
 }) {
+  // Governance §4: overlay per-vertical DOMAIN_LABELS onto the field labels —
+  // one hook localizes every record-edit window; no-op until labels exist.
+  const ctx = await getOrgCtx(orgSlug);
+  const config = ctx ? await localizeEditorConfig(ctx, rawConfig) : rawConfig;
   const backHref = orgPath(orgSlug, config.listPath);
   const backAction = { href: backHref, label: `← Back`, variant: "outline" as const };
 
