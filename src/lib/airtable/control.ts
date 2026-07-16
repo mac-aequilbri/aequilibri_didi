@@ -639,6 +639,20 @@ export async function updateControlTeamMember(
   return true;
 }
 
+/** Update an org's AI write-authority level (governance §8 management UI). */
+export async function setOrgAiAuthority(slug: string, aiAuthority: string): Promise<boolean> {
+  const base = controlBaseId();
+  if (!base) return false;
+  const recs = await listRecords(base, REGISTRY, {
+    filterByFormula: `{Slug}='${formulaSafe(slug)}'`,
+    maxRecords: 1,
+  });
+  if (!recs.length) return false;
+  await updateRecords(base, REGISTRY, [{ id: recs[0].id, fields: { Ai_Authority: aiAuthority } }]);
+  invalidateControlCache(slug);
+  return true;
+}
+
 // ── Template registry ───────────────────────────────────────────────────────
 // Industry → Sub-industry → template-base mapping, in the control base so new
 // industries can be onboarded by adding a row (via the admin page) instead of a

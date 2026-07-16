@@ -4,6 +4,7 @@
 
 import type { NavSection } from "@/components/Sidebar";
 import { orgPath } from "./paths";
+import { financeVisible } from "./roles";
 import { OrgCtx } from "./types";
 
 /** Live counts surfaced as nav pills. All optional; absent = no pill. */
@@ -24,7 +25,8 @@ export function buildNav(
   role: string = "owner",
 ): NavSection[] {
   const f = ctx.config.features;
-  const financial = role === "owner";
+  // CLS (governance §3): Owner, Finance Manager and Auditor sub-roles.
+  const financial = financeVisible(role);
   const p = (path: string) => orgPath(ctx.orgSlug, path);
   // Single-engagement long_project orgs (e.g. Dulong Downs) pin their one job;
   // everyone else navigates a projects list.
@@ -94,8 +96,13 @@ export function buildNav(
   const admin: NavSection = {
     heading: "Admin",
     items: [
-      // Team management is owner-only (requireAdmin on the route as well).
-      ...(role === "owner" ? [{ href: p("/team"), label: "Team & access" }] : []),
+      // Team + agent management are owner-only (requireAdmin on the routes too).
+      ...(role.startsWith("owner")
+        ? [
+            { href: p("/team"), label: "Team & access" },
+            { href: p("/agents"), label: "AI agents" },
+          ]
+        : []),
       ...(f.portal ? [{ href: p("/portal"), label: "Client Portal" }] : []),
       ...(f.accounting ? [{ href: p("/accounting"), label: "Accounting" }] : []),
       { href: p("/integrations"), label: "Integrations" },

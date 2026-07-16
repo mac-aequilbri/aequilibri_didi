@@ -20,9 +20,12 @@ Source: "aequilibri Governance Framework v1.docx" (doc version 3.0, prepared fro
 | P5 | Manual option-list cleanup in Airtable UI (orphans, PLACEHOLDER) — §5.2 rule 5 | after P2 |
 | P6 | RISKS / TEAM / COMMS / CORRECTIONS status vocabularies — not enumerated in the framework doc | Product Owner to supply |
 | P7 | Clerk activation in prod (env keys, PLATFORM_ADMIN_EMAILS, restricted sign-up, self-invite first) | operator task |
-| P8 | Phase 3 — role taxonomy rename + sub-roles, permission matrix, CLS, RLS via TEAM→JOBS | D5–D6 |
-| P9 | Phase 4 — DOMAIN_LABELS read layer + population, onboarding questionnaire | D8 samples |
-| P10 | Phase 5 deferred — master-data linking, agent-allowlist UI, remaining reports | D9 scope |
+| P8 | Phase 3 core built (matrix, sub-roles, CLS, approvals gating, RLS on projects list) — D5–D6 ratify | Claudia Salem |
+| P8b | RLS rollout to remaining job-scoped sources + job detail; Clerk custom-role sync | P8 + D7 TEAM data |
+| P9 | Phase 4 read layer + ENGAGEMENT_TYPE_CONFIG seeding built — label population | D8 samples |
+| P9b | Labels on list columns/nav; full §6 questionnaire (security roles, reporting prefs) | P9 |
+| P10 | Master-data linking APPLY (tool built; BUDGET dry-run done; CASHFLOWS master table missing) | P2 retag + PO master-list review |
+| P10b | Reports beyond MVP; agents UI + linking tool shipped 2026-07-16 | D9 scope |
 | P11 | Zod strict validation on the Airtable write path; assistant-prompt vocab note | engineering, unblocked |
 
 ## Gap summary (framework → code)
@@ -81,14 +84,35 @@ enumerated in the doc), Zod strict-mode on the Airtable path, assistant-prompt v
 5. **Agent binding** (§8): assistant tool write schemas in `tools.ts` use vocab enums; executor rejects/reroutes off-vocab values to review-default before proposing to PENDING_WRITES.
 6. Update assistant/system prompts + learning rules to state the vocab policy (§5.6 "assistant instructions updated on finalisation").
 
-## Phase 3 — RBAC expansion
+## Phase 3 — RBAC expansion — core built 2026-07-16 (pending D5–D6 ratification)
+
+Implemented: `src/lib/platform/roles.ts` — §2.2 permission matrix as data, sub-role mechanism
+("+finance", "+auditor", "+business_owner" suffixes on the stored Role string; D5 framework-name
+mapping as display layer). Enforcement: human writes matrix-checked at the recordWriter choke
+point; Approve re-gated per table in the approvals actions (financial tables need Owner or
+Finance Manager; learning rules Administrator-only). CLS: finance surfaces (nav, reporting
+policy, assistant query tables) open to Owner/Finance Manager/Auditor via `financeVisible()`.
+RLS: `rls.ts` resolves the viewer's TEAM→JOBS assignments tolerantly (unscoped until D7
+populates TEAM); wired into the projects list; Administrator/Auditor/Business Owner exempt.
+Still pending: RLS on the remaining job-scoped list sources + job detail (P8b), Clerk custom
+roles/permissions sync, Budget/Cashflows "Manager RU" vs Spec 12 owner-only (kept stricter —
+D5 note).
 
 1. **Role taxonomy**: extend `module1Governance.ts` to the 4 main roles + sub-role mechanism (sub-role = named permission bundle on top of a main role: Finance Manager, Auditor, Business Owner, Delivery Manager). Map to Clerk custom roles/permissions; one Clerk Organization per ORGANISATIONS record (resolves the flagged COMMS.Stakeholder_Role dependency).
 2. **Permission matrix** (§2.2): codify the CRUD+Approve matrix as data (table × role → rights) in one module; enforce in `getCurrentUser`/`writeRecord` (writes), approvals actions (Approve per table: Fin/Mgr vs Mgr+ vs Admin), and per-record approval flags (LEARNING_RULES.Override_Permission, HYPOTHESES.Promote_to_Rule).
 3. **CLS** (§3): finance fields (BUDGET.Estimated/Forecast, CASHFLOWS.Amount, PROCUREMENT.Unit_Cost/Total_Cost) filtered out of list/detail/AI-context reads for Contributor + base Viewer — enforce in the data sources, not just UI.
 4. **RLS** (§3/§7): TEAM records gain JOBS links; list sources filter to the user's assigned JOBS (Business Owner sub-role = whole tenant; Administrator/Auditor bypass). This touches every list source — reuse the shared `listQuery` layer so it lands once.
 
-## Phase 4 — Domain labels + onboarding metadata
+## Phase 4 — Domain labels + onboarding metadata — read layer built 2026-07-16
+
+Implemented: `src/lib/platform/domainLabels.ts` — cached (10-min TTL), tolerant DOMAIN_LABELS
+read layer keyed `${Core_Table}.${Core_Field_Label}`, vertical-matched with General fallback;
+overlaid onto every record-edit window via one hook in the shared RecordEditPage (app field →
+Core field translated through the write field maps; Context_Note becomes help text). Strict
+no-op until D8 populates the table. Onboarding now seeds one ENGAGEMENT_TYPE_CONFIG row per
+allowed engagement type (§6, canonical option names). Still pending: D8 label content
+(Product Owner samples), labels on list-window columns/nav (needs the listQuery merge, plan
+P9b), the full §6 questionnaire steps (security roles + reporting prefs at onboarding).
 
 1. **DOMAIN_LABELS read layer**: load once per session, cache (existing TTL-cache layer), render `Domain_Label` for Core fields across nav/list/detail; fall back to hardcoded labels when no record.
 2. **Populate** Construction/Roofing label sets (Product Owner supplies samples per §12).
@@ -120,7 +144,18 @@ Implementation: `src/lib/platform/provisioning.ts` (invite/role/deactivate + gua
 Still open: sub-role provisioning (Finance Manager, Auditor — Phase 3), MFA/SSO policy
 (Product Owner), TEAM-table JOBS-assignment links for RLS (Phase 3).
 
-## Phase 5 — Deferred (per §11)
+## Phase 5 — Deferred (per §11) — unblocked items built 2026-07-16
+
+Implemented: **/app/[org]/agents** — §8 Agent-to-Data Authorization dashboard (admin-gated):
+renders each agent's tools/tables/risk from the live registry + TOOL_POLICY (cannot drift from
+enforcement), approver labels derived from the §2.2 matrix, and the one management control —
+the org's AI write-authority level (updates control registry / Postgres, effective ≤60s).
+**scripts/airtable-link-master-data.mjs** — generic §5.1-class-3 conversion (distinct values →
+master rows → new link field → per-record links; additive, re-runnable, dry-run default,
+EXECUTION_LOG audit). Didi dry-run: BUDGET.Budget_Category = 44 distinct values vs 9 REF_BUDGET
+rows (incl. the PLACEHOLDER the doc flags). Not applied — P10 sequenced after the Phase 1 retag
+and PO review of the master list; CASHFLOWS needs its cost-category master table created first
+(REF_CATEGORIES absent from the Didi base). Reports beyond the MVP remain gated on D9.
 
 - Convert Budget/Cashflow category fields to linked master-data records (after retag settles).
 - Agent-allowlist management UI (backend already = PENDING_WRITES + TOOL_POLICY).
