@@ -24,7 +24,9 @@ import {
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { clerkEnabled } from "./authConfig";
-import { normalizeTeamRole } from "./module1Governance";
+// Composite-aware ("builder+finance") — sub-roles survive storage; owner
+// checks compare the parsed BASE role so "owner+business_owner" still counts.
+import { normalizeRoleString as normalizeTeamRole, parseRole } from "./roles";
 import type { OrgCtx } from "./types";
 
 export type InviteStatus =
@@ -62,7 +64,7 @@ function findByEmail(members: ControlTeamMember[], email: string): ControlTeamMe
  *  owner? Guard against admin lockout — every org must keep one. */
 function isLastActiveOwner(members: ControlTeamMember[], email: string): boolean {
   const e = email.toLowerCase();
-  const owners = members.filter((m) => m.isActive && normalizeTeamRole(m.role) === "owner");
+  const owners = members.filter((m) => m.isActive && parseRole(m.role).base === "owner");
   return owners.length === 1 && owners[0].email.toLowerCase() === e;
 }
 
@@ -135,7 +137,7 @@ export async function inviteMember(ctx: OrgCtx, input: InviteInput): Promise<Inv
 export async function setMemberRole(ctx: OrgCtx, email: string, role: string): Promise<void> {
   const next = normalizeTeamRole(role);
   const members = await listMembers(ctx);
-  if (next !== "owner" && isLastActiveOwner(members, email)) {
+  if (parseRole(next).base !== "owner" && isLastActiveOwner(members, email)) {
     throw new Error("Cannot demote the only active owner — promote another member first.");
   }
   const found = await patchMember(ctx, email, { role: next });

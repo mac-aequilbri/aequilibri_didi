@@ -12,11 +12,15 @@ import { inviteMemberAction, setMemberActiveAction, setMemberRoleAction } from "
 
 export const dynamic = "force-dynamic";
 
+// Governance roles (D5 mapping) incl. §2.1 sub-roles — the "+suffix" rides on
+// the stored Role string; lib/platform/roles.ts parses it.
 const ROLES: { value: string; label: string; hint: string }[] = [
-  { value: "owner", label: "Owner", hint: "full access incl. finance, approvals, admin" },
-  { value: "builder", label: "Builder", hint: "read/write, no finance or admin" },
-  { value: "architect", label: "Architect", hint: "read/write, no finance or admin" },
-  { value: "broker", label: "Broker", hint: "read-only" },
+  { value: "owner", label: "Owner (Administrator)", hint: "full access incl. finance, approvals, admin" },
+  { value: "builder", label: "Builder (Manager)", hint: "read/write + approvals, no finance or admin" },
+  { value: "builder+finance", label: "Builder — Finance Manager", hint: "Manager + finance visibility and financial approvals" },
+  { value: "architect", label: "Architect (Contributor)", hint: "read/write, no approvals, finance or admin" },
+  { value: "broker", label: "Broker (Viewer)", hint: "read-only" },
+  { value: "broker+auditor", label: "Broker — Auditor", hint: "read-only incl. finance, whole tenant" },
 ];
 
 function StatusBanner({ sp }: { sp: Record<string, string | string[] | undefined> }) {

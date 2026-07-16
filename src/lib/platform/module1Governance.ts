@@ -50,7 +50,9 @@ const LEGACY_ROLE_MAP: Record<LegacyRole, TeamRole> = {
 };
 
 export function normalizeTeamRole(role: string): TeamRole {
-  const r = role.trim().toLowerCase();
+  // Sub-role suffixes ("builder+finance") don't change the base role — see
+  // lib/platform/roles.ts for the composite parser.
+  const r = role.trim().toLowerCase().split("+")[0].trim();
   if (r === "owner" || r === "builder" || r === "architect" || r === "broker") return r;
   if (r === "admin" || r === "editor" || r === "readonly") return LEGACY_ROLE_MAP[r];
   return "broker";

@@ -10,6 +10,7 @@ import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
 import { executeProposal, recordIdParam, rejectProposal } from "@/lib/platform/recordWriter";
+import { canApprove } from "@/lib/platform/roles";
 
 // Approve/reject the same PlatPendingWrite proposals the assistant queues —
 // just from a dedicated inbox instead of inline in the chat. Revalidate the
@@ -30,6 +31,12 @@ export async function approveProposalAction(formData: FormData): Promise<void> {
   if (proposalId == null) return;
 
   const pending = (await loadPendingWrites(ctx)).find((p) => String(p.id) === String(proposalId));
+  // Governance §2.2 Approve column (FLS): resolving a proposal requires
+  // Approve rights on its table — e.g. financial tables need Owner or a
+  // Finance Manager sub-role; learning rules need the Administrator.
+  if (pending && !canApprove(user.role, pending.tableKey)) {
+    throw new Error(`Your role cannot approve ${pending.tableKey} proposals.`);
+  }
   let original: Record<string, unknown> = {};
   try {
     original = JSON.parse(pending?.payload ?? "{}") as Record<string, unknown>;
@@ -105,6 +112,10 @@ export async function rejectProposalAction(formData: FormData): Promise<void> {
   const user = await getCurrentUser(ctx);
   const proposalId = recordIdParam(formData.get("proposalId"));
   if (proposalId) {
+    const pending = (await loadPendingWrites(ctx)).find((p) => String(p.id) === String(proposalId));
+    if (pending && !canApprove(user.role, pending.tableKey)) {
+      throw new Error(`Your role cannot resolve ${pending.tableKey} proposals.`);
+    }
     try {
       await rejectProposal(ctx, proposalId, user.name);
     } catch {

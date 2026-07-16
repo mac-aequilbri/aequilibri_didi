@@ -9,7 +9,7 @@ import {
   parseListQuery,
   toClientConfig,
 } from "@/lib/platform/listQuery";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { projectsListConfig } from "./listConfig";
 
@@ -23,12 +23,13 @@ export default async function ProjectsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
+  const viewer = await getCurrentViewer(ctx);
   const query = parseListQuery(await searchParams, projectsListConfig);
   const filtered = hasActiveFilters(query);
   // Postgres (numeric ids) or Airtable (rec… ids) depending on the flag — the
   // ids here must match what the detail page (jobDetailSource) can resolve.
   const { items: jobs, total, matching, facets, page, pageCount } = applyListQuery(
-    await loadJobsList(ctx),
+    await loadJobsList(ctx, viewer),
     query,
     projectsListConfig,
   );

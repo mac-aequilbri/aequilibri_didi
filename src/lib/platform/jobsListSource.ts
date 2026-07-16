@@ -14,6 +14,8 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { assignedJobRecIds } from "./rls";
+import { rlsExempt } from "./roles";
 import type { OrgCtx } from "./types";
 
 export interface JobListView {
@@ -99,7 +101,15 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobListView[]> {
   });
 }
 
-/** Load the projects list from whichever backend is active. */
-export function loadJobsList(ctx: OrgCtx): Promise<JobListView[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+/** Load the projects list from whichever backend is active. Pass the viewer
+ *  to apply RLS (governance §3): non-exempt roles see only the JOBS their
+ *  TEAM record links to — unscoped until TEAM assignments exist (see rls.ts). */
+export async function loadJobsList(
+  ctx: OrgCtx,
+  viewer?: { email: string; role: string },
+): Promise<JobListView[]> {
+  const jobs = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  if (!viewer || rlsExempt(viewer.role)) return jobs;
+  const allowed = await assignedJobRecIds(ctx, viewer.email);
+  return allowed ? jobs.filter((j) => allowed.has(j.id)) : jobs;
 }

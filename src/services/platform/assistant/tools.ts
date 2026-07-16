@@ -6,6 +6,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { WritableTable } from "@/lib/platform/recordWriter";
 import { normalizeTeamRole } from "@/lib/platform/module1Governance";
+import { financeVisible } from "@/lib/platform/roles";
 
 export interface ToolPolicy {
   table?: WritableTable;
@@ -67,7 +68,14 @@ const ROLE_QUERY_DENY: Record<string, ReadonlySet<string>> = {
 export function roleCanQueryTable(role: string, table: string): boolean {
   const normalized = normalizeTeamRole(role);
   if (normalized === "owner") return true;
-  return !(ROLE_QUERY_DENY[normalized]?.has(table) ?? false);
+  const denied = ROLE_QUERY_DENY[normalized]?.has(table) ?? false;
+  if (!denied) return true;
+  // CLS (governance §3): Finance Manager / Auditor sub-roles unlock the
+  // financial tables their base role would otherwise be denied.
+  if (table === "budget_lines" || table === "cashflows" || table === "procurement") {
+    return financeVisible(role);
+  }
+  return false;
 }
 
 export const TOOL_POLICY: Record<string, ToolPolicy> = {

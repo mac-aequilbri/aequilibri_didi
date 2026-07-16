@@ -23,9 +23,11 @@ import {
   defaultModule1Governance,
   isAdminRole,
   isWriteRole,
-  normalizeTeamRole,
   rolePriority,
 } from "./module1Governance";
+// Composite-aware normalization ("builder+finance") — keeps sub-roles on the
+// viewer's role string so CLS/Approve checks (lib/platform/roles) can see them.
+import { normalizeRoleString as normalizeTeamRole } from "./roles";
 import {
   AiAuthority,
   DEFAULT_FEATURES,

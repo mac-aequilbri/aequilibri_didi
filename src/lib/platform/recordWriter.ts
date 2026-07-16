@@ -16,6 +16,7 @@ import { Actor, OrgCtx } from "./types";
 import { emitOutboundEvent } from "./outbox";
 import { reconcileAirtableWrite } from "./reconciliation";
 import { enforceVocab, type VocabCoercion } from "./vocab";
+import { canWrite } from "./roles";
 
 // ── field helpers (typecast layer) ────────────────────────────────────
 
@@ -700,6 +701,17 @@ async function writeExecutedLog(
 
 export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<WriteResult> {
   const def: TableDef = REGISTRY[req.table];
+  // Governance §2.2 permission matrix, enforced at the single write choke
+  // point for every human-initiated write (forms and direct actions). AI and
+  // system writes are governed by the aiAuthority/approval flow instead, and
+  // approvals are re-gated per table in the approvals actions.
+  if (req.actor.type === "human") {
+    const { getCurrentViewer } = await import("./org-context");
+    const viewer = await getCurrentViewer(ctx);
+    if (!canWrite(viewer.role, req.table, req.op)) {
+      throw new Error(`Your role does not permit ${req.op} on ${req.table}.`);
+    }
+  }
   // Airtable mode skips the Postgres-shaped Zod schema (which would reject the
   // string record ids / missing numeric FKs of the Airtable world) and lets the
   // field map do its own coercion from the raw payload.
