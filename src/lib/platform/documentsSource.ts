@@ -95,7 +95,7 @@ async function fromPostgresList(ctx: OrgCtx): Promise<DocumentView[]> {
   const docs = await prisma.platDocument.findMany({
     where: { orgId: ctx.orgId },
     orderBy: { createdAt: "desc" },
-    take: 200,
+    take: 2000,
     include: { job: { select: { code: true, name: true } } },
   });
   return docs.map((d) => ({

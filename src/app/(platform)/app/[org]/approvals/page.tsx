@@ -8,9 +8,10 @@
 // not an opaque payload.
 
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
-import { requireOrgCtx } from "@/lib/platform/org-context";
+import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { isWritableTable, readRecord } from "@/lib/platform/recordWriter";
 import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
+import { canApprove } from "@/lib/platform/roles";
 import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -89,12 +90,18 @@ function buildChanges(op: string, payload: string, current: Record<string, unkno
 
 export default async function ApprovalsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
+  const sp = await searchParams;
 
-  const all = await loadPendingWrites(ctx);
+  // Governance §2.2: only show proposals the viewer's role may resolve —
+  // financial diffs (amounts, payees) must not render for non-finance roles.
+  const viewer = await getCurrentViewer(ctx);
+  const all = (await loadPendingWrites(ctx)).filter((p) => canApprove(viewer.role, p.tableKey));
   const pending = all.filter((p) => p.status === "proposed");
   const recent = all
     .filter((p) => ["executed", "rejected", "expired", "failed"].includes(p.status))
@@ -119,6 +126,13 @@ export default async function ApprovalsPage({
         title="Approvals"
         subtitle={`${ctx.config.assistant.name} can propose changes but never writes without you. Review and approve each one here.`}
       />
+
+      {sp.error === "approve_failed" && (
+        <div role="alert" className="ae-card p-3 mb-4 border-red-300 text-sm text-red-700">
+          The approved write could not be executed — no change was made. The proposal is marked
+          failed below; it may have expired or the record may have changed.
+        </div>
+      )}
 
       {proposals.length === 0 ? (
         <div className="ae-card p-8 text-center">

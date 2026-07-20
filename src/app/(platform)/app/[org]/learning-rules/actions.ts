@@ -13,12 +13,14 @@ import {
 
 export async function runEngineAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  await getCurrentUser(ctx); // write gate — read-only roles cannot run the engine
   await runHypothesisEngine(ctx);
   revalidatePath(orgPath(ctx.orgSlug, "/learning-rules"));
 }
 
 export async function promoteHypothesisAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  await getCurrentUser(ctx); // write gate
   const id = recordIdParam(formData.get("hypothesisId"));
   const kind = String(formData.get("kind") ?? "adjustment") as "adjustment" | "guidance";
   if (id != null) await promoteHypothesisToRule(ctx, id, kind);
@@ -27,6 +29,7 @@ export async function promoteHypothesisAction(formData: FormData): Promise<void>
 
 export async function rejectHypothesisAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  await getCurrentUser(ctx); // write gate
   const id = recordIdParam(formData.get("hypothesisId"));
   if (id != null) await setHypothesisStatus(ctx, id, "rejected");
   revalidatePath(orgPath(ctx.orgSlug, "/learning-rules"));
@@ -50,6 +53,7 @@ export async function toggleRuleAction(formData: FormData): Promise<void> {
 
 export async function snapshotAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  await getCurrentUser(ctx); // write gate
   await snapshotIntelligence(ctx);
   revalidatePath(orgPath(ctx.orgSlug, "/learning-rules"));
 }

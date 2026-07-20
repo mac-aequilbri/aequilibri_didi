@@ -76,8 +76,10 @@ export default async function CashflowPage({
         for (const job of jobs) {
           for (const c of job.conCashflows) {
             const agg = byPeriod.get(c.period) ?? { projected: 0, actual: 0 };
-            if (c.status === "Paid") agg.actual += c.amount;
-            else agg.projected += c.amount;
+            // Net by direction: outflows subtract, so the trend shows net cash position.
+            const signed = c.type === "Out" ? -c.amount : c.amount;
+            if (c.status === "Paid") agg.actual += signed;
+            else agg.projected += signed;
             byPeriod.set(c.period, agg);
           }
         }

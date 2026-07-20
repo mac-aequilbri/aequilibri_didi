@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   CORRECTION_ROOT_CAUSES,
   emitCorrection,
@@ -69,9 +70,10 @@ export async function approveProposalAction(formData: FormData): Promise<void> {
   try {
     await executeProposal(ctx, proposalId, user.name, Object.keys(edits).length ? edits : undefined);
   } catch {
-    /* recorded as failed/expired on the pending row */
+    // Recorded as failed/expired on the pending row — but tell the reviewer:
+    // a silently vanishing card reads as success.
     await revalidate(ctx.orgSlug);
-    return;
+    redirect(orgPath(ctx.orgSlug, "/approvals?error=approve_failed"));
   }
 
   // Correction capture is best-effort — a logging failure must not undo an

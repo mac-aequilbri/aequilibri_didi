@@ -28,7 +28,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<DecisionView[]> {
   const rows = await prisma.platDecision.findMany({
     where: { orgId: ctx.orgId },
     orderBy: { createdAt: "desc" },
-    take: 200,
+    take: 2000,
     include: { job: { select: { code: true } } },
   });
   return rows.map((d) => ({

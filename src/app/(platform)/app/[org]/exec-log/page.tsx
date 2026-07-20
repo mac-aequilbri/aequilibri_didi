@@ -50,7 +50,8 @@ export default async function ExecLogPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const query = parseListQuery(await searchParams, execLogListConfig);
+  const sp = await searchParams;
+  const query = parseListQuery(sp, execLogListConfig);
 
   const [pending, allLogs] = await Promise.all([loadPendingWrites(ctx), loadExecLogHistory(ctx)]);
   const proposals = pending.filter((p) => p.status === "proposed");
@@ -64,6 +65,13 @@ export default async function ExecLogPage({
         title="Activity"
         subtitle="Every write is audited here — a full, append-only trail of who changed what, and when."
       />
+
+      {sp.error === "approve_failed" && (
+        <div role="alert" className="ae-card p-3 mb-4 border-red-300 text-sm text-red-700">
+          The approved write could not be executed — no change was made. The proposal is marked
+          failed in the trail below.
+        </div>
+      )}
 
       {proposals.length > 0 && (
         <section className="ae-card p-5 mb-6 border-amber-300">

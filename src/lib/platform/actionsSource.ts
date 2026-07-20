@@ -158,7 +158,7 @@ async function fromPostgres(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData
     prisma.platActionHub.findMany({
       where,
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
-      take: 200,
+      take: 2000, // must exceed any real register size — pagination slices in-memory after this
       include: { job: { select: { code: true } } },
     }),
     prisma.platActionHub.count({ where: { orgId: ctx.orgId } }),

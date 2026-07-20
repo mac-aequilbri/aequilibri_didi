@@ -37,7 +37,12 @@ function Field({
   value: string | number | boolean;
   onChange: (v: string | boolean) => void;
 }) {
-  const label = <span className="text-neutral-600">{field.label}</span>;
+  const label = (
+    <span className="text-neutral-600">
+      {field.label}
+      {field.required ? " *" : ""}
+    </span>
+  );
 
   if (field.type === "checkbox") {
     return (
@@ -67,6 +72,7 @@ function Field({
       return (
         <textarea
           name={field.name}
+          required={field.required}
           rows={4}
           value={String(value)}
           onChange={(e) => onChange(e.target.value)}
@@ -78,6 +84,7 @@ function Field({
       return (
         <select
           name={field.name}
+          required={field.required}
           value={String(value)}
           onChange={(e) => onChange(e.target.value)}
           className={inputCls}
