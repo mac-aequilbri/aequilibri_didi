@@ -96,6 +96,81 @@ function buildReportContext(job: JobContext, scopes: readonly ReportScope[]): st
   return JSON.stringify(out);
 }
 
+// ── deterministic register renderers (Phase 2) ─────────────────────────────
+const money = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
+const cell = (v: unknown): string => String(v ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+const table = (header: string[], rows: unknown[][]): string =>
+  [
+    `| ${header.join(" | ")} |`,
+    `| ${header.map(() => "---").join(" | ")} |`,
+    ...rows.map((r) => `| ${r.map(cell).join(" | ")} |`),
+  ].join("\n");
+const pct = (num: number, den: number): string =>
+  den ? `${Math.round((num / den) * 1000) / 10}%` : "—";
+
+const REGISTERS: Record<string, (job: JobContext, finance: boolean) => string> = {
+  budget_variance: (job) => {
+    if (!job.budget.length) return "_No budget lines._";
+    const tb = job.budget.reduce((s, b) => s + b.budgetAmount, 0);
+    const ta = job.budget.reduce((s, b) => s + b.actualAmount, 0);
+    const rows = job.budget.map((b) => [
+      b.category,
+      money(b.budgetAmount),
+      money(b.actualAmount),
+      money(b.actualAmount - b.budgetAmount),
+      pct(b.actualAmount - b.budgetAmount, b.budgetAmount),
+    ]);
+    rows.push(["**Total**", money(tb), money(ta), money(ta - tb), pct(ta - tb, tb)]);
+    return table(["Category", "Budget", "Actual", "Variance", "Var %"], rows);
+  },
+  cashflow_forecast: (job) => {
+    const cf = job.cashflow.length
+      ? table(
+          ["Period", "Projected", "Actual", "Variance"],
+          job.cashflow.map((c) => [c.period, money(c.projected), money(c.actual), money(c.actual - c.projected)]),
+        )
+      : "_No cashflow periods._";
+    const pending = job.variations.filter((v) => v.status !== "approved");
+    return `${cf}\n\n## Pending variation exposure\n\n${
+      pending.length
+        ? table(["Ref", "Variation", "Cost impact"], pending.map((v) => [v.refNumber || "—", v.title, money(v.costImpact)]))
+        : "_None._"
+    }`;
+  },
+  risk_register: (job) =>
+    job.risks.length
+      ? table(
+          ["Risk", "Likelihood", "Impact", "Score"],
+          [...job.risks]
+            .sort((a, b) => b.likelihood * b.impact - a.likelihood * a.impact)
+            .map((r) => [r.description, r.likelihood, r.impact, r.likelihood * r.impact]),
+        )
+      : "_No open risks._",
+  variations_register: (job, finance) =>
+    job.variations.length
+      ? table(
+          finance ? ["Ref", "Variation", "Status", "Cost impact"] : ["Ref", "Variation", "Status"],
+          job.variations.map((v) =>
+            finance ? [v.refNumber || "—", v.title, v.status, money(v.costImpact)] : [v.refNumber || "—", v.title, v.status],
+          ),
+        )
+      : "_No variations on record._",
+  actions_status: (job) => {
+    if (!job.actions.length) return "_No open actions._";
+    const today = new Date().toISOString().slice(0, 10);
+    const due = (d: Date | null): string => (d ? new Date(d).toISOString().slice(0, 10) : "—");
+    const overdue = job.actions.filter((a) => a.dueDate && due(a.dueDate) < today).length;
+    return `${overdue} of ${job.actions.length} open actions overdue.\n\n${table(
+      ["Action", "Owner", "Due", ""],
+      job.actions.map((a) => [a.title, a.owner || "—", due(a.dueDate), a.dueDate && due(a.dueDate) < today ? "⚠ overdue" : ""]),
+    )}`;
+  },
+  phase_schedule: (job) =>
+    job.phases.length
+      ? table(["Phase", "Status", "Complete %"], job.phases.map((p) => [p.name, p.status, `${p.completionPct}%`]))
+      : "_No phases._",
+};
+
 export interface ReportViewer {
   name: string;
   /** reportingCapabilities(role).showFinancialDetail — gates finance slices. */
@@ -114,19 +189,39 @@ export async function generateReport(
   const job = await loadJobContext(ctx, jobId);
   if (!job) throw new Error("Job not found");
 
-  const scopes = def.scopes.filter((s) => viewer.financeDetail || !FINANCE_SCOPES.includes(s));
-  const context = buildReportContext(job, scopes);
+  if (def.financeOnly && !viewer.financeDetail) {
+    throw new Error("This report requires financial access.");
+  }
 
-  const { system } = getPrompt(def.promptKey);
-  const res = await callClaude(system, `${def.periodLabel} ${periodEnding}. Project data:\n${context}`, {
-    model: modelFor("drafting"),
-    maxTokens: 1200,
-  });
-
-  const contentRaw = res.demo_mode
-    ? `## Progress\n_Demo mode — no API key. This report was generated from a template._\n\n- ${job.phases.map((p) => `${p.name}: ${p.completionPct}%`).join("\n- ")}\n\n## Risks\n- ${job.risks.length} open risks\n\n## Next week\n- ${job.actions.length} open actions to progress`
-    : res.content;
-  const content = def.sectionTemplate ? applyWeeklyTemplate(contentRaw) : contentRaw.trim();
+  let content: string;
+  let demoMode = false;
+  if (def.kind === "deterministic") {
+    const body = REGISTERS[def.id](job, viewer.financeDetail);
+    let summary = "";
+    if (def.aiSummary) {
+      const { system } = getPrompt("reports.register_summary");
+      const res = await callClaude(system, `${def.title}, ${def.periodLabel} ${periodEnding}:\n${body}`, {
+        model: modelFor("drafting"),
+        maxTokens: 300,
+      });
+      demoMode = res.demo_mode;
+      if (!res.demo_mode) summary = `## Summary\n\n${res.content.trim()}\n\n`;
+    }
+    content = `# ${job.name} — ${def.title}\n\n_${def.periodLabel} ${periodEnding}_\n\n${summary}${body}`;
+  } else {
+    const scopes = def.scopes.filter((s) => viewer.financeDetail || !FINANCE_SCOPES.includes(s));
+    const context = buildReportContext(job, scopes);
+    const { system } = getPrompt(def.promptKey!);
+    const res = await callClaude(system, `${def.periodLabel} ${periodEnding}. Project data:\n${context}`, {
+      model: modelFor("drafting"),
+      maxTokens: 1200,
+    });
+    demoMode = res.demo_mode;
+    const contentRaw = res.demo_mode
+      ? `## Progress\n_Demo mode — no API key. This report was generated from a template._\n\n- ${job.phases.map((p) => `${p.name}: ${p.completionPct}%`).join("\n- ")}\n\n## Risks\n- ${job.risks.length} open risks\n\n## Next week\n- ${job.actions.length} open actions to progress`
+      : res.content;
+    content = def.sectionTemplate ? applyWeeklyTemplate(contentRaw) : contentRaw.trim();
+  }
   const title =
     def.id === "weekly_progress"
       ? `Week ending ${periodEnding}`
@@ -180,7 +275,7 @@ export async function generateReport(
         ? { table: "document", op: "update", recordId: existing.id, data, actor: { type: "ai", name: "Report Writer" } }
         : { table: "document", op: "create", data, actor: { type: "ai", name: "Report Writer" } },
     );
-    return { id: result.recordId ?? existing?.id, demoMode: res.demo_mode };
+    return { id: result.recordId ?? existing?.id, demoMode };
   }
 
   // Postgres: rich weekly_report row + an immutable DOCUMENTS snapshot for audit.
@@ -220,7 +315,7 @@ export async function generateReport(
       });
     }
   }
-  return { id: result.recordId, demoMode: res.demo_mode };
+  return { id: result.recordId, demoMode };
 }
 
 /** Legacy alias for AI/system callers (scheduler, assistant executor) — the

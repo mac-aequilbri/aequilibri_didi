@@ -76,7 +76,7 @@ export default async function ReportsPage({
           <label className="block text-sm">
             <span className="text-neutral-600">Report</span>
             <select name="reportId" className="mt-1 block rounded border border-neutral-300 px-3 py-2">
-              {REPORT_CATALOG.map((d) => (
+              {REPORT_CATALOG.filter((d) => !d.financeOnly || reportCaps.showFinancialDetail).map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.title}
                 </option>

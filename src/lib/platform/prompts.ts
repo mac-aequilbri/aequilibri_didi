@@ -107,6 +107,14 @@ changed unless a specialist reported it (including whether it is pending approva
       "Progress, Budget, Risks, Next week. Ground every statement in the supplied data; " +
       "do not invent numbers. Keep it under 250 words.",
   },
+  "reports.register_summary": {
+    key: "reports.register_summary",
+    version: "1.0",
+    system:
+      "You are given a data-rendered construction report table. Write a 2-4 sentence executive " +
+      "summary of what it shows (plain prose, no heading, no markdown). Ground every statement " +
+      "in the supplied data; do not invent numbers.",
+  },
   "reports.monthly_client": {
     key: "reports.monthly_client",
     version: "1.0",
