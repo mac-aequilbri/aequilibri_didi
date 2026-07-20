@@ -33,7 +33,8 @@ export default async function RoomMatrixPage({ params }: { params: Promise<{ org
       {[...zones.entries()].map(([zone, zoneRooms]) => (
         <section key={zone} className="ae-card p-5 mb-6">
           <h2 className="font-semibold mb-3">{zone}</h2>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[36rem] text-sm">
             <thead className="text-left text-xs text-neutral-500">
               <tr>
                 <th className="py-1 pr-2">Room</th>
@@ -69,6 +70,7 @@ export default async function RoomMatrixPage({ params }: { params: Promise<{ org
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       ))}
       {rooms.length === 0 && <p className="text-sm text-neutral-500">No rooms recorded.</p>}

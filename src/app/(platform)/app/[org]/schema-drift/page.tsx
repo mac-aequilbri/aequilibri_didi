@@ -5,6 +5,7 @@
 // org from the control registry (or Postgres), not just the current one.
 
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { loadSchemaDrift, type OrgDrift } from "@/lib/platform/schemaDriftSource";
@@ -166,12 +167,13 @@ export default async function SchemaDriftPage({
                       <form action={migrateBaseAction}>
                         <input type="hidden" name="org" value={ctx.orgSlug} />
                         <input type="hidden" name="baseId" value={o.baseId} />
-                        <button
-                          type="submit"
+                        <ConfirmSubmitButton
+                          label="Migrate ↑"
+                          confirmLabel="Confirm migrate"
+                          pendingLabel="Migrating…"
+                          title="Additive-only: adds missing tables/fields, never removes data"
                           className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50"
-                        >
-                          Migrate ↑
-                        </button>
+                        />
                       </form>
                     ) : (
                       <span className="text-xs text-neutral-300">—</span>

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { listTemplateRegistry } from "@/lib/airtable/control";
 import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { INDUSTRY_TAXONOMY, industryOptions } from "@/lib/platform/industryTaxonomy";
@@ -61,9 +62,7 @@ export default async function NewTemplateMappingPage({
           <span className="text-neutral-600">Notes</span>
           <input name="notes" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </label>
-        <button type="submit" className="btn-ae">
-          Add mapping
-        </button>
+        <SubmitButton label="Add mapping" pendingLabel="Adding…" />
       </form>
     </main>
   );

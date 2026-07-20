@@ -8,6 +8,8 @@
 // not an opaque payload.
 
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { isWritableTable, readRecord } from "@/lib/platform/recordWriter";
 import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
@@ -178,12 +180,14 @@ export default async function ApprovalsPage({
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    <button type="submit" className="btn-ae text-sm">
-                      Approve
-                    </button>
-                    <button type="submit" formAction={rejectProposalAction} className="btn-ae-outline text-sm">
-                      Reject
-                    </button>
+                    <SubmitButton label="Approve" pendingLabel="Approving…" className="btn-ae text-sm" />
+                    <ConfirmSubmitButton
+                      label="Reject"
+                      confirmLabel="Confirm reject"
+                      pendingLabel="Rejecting…"
+                      className="btn-ae-outline text-sm"
+                      formAction={rejectProposalAction}
+                    />
                   </div>
                 </div>
 

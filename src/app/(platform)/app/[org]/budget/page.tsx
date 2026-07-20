@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { BarsCompare } from "@/components/charts";
-import { EmptyState, MetricCard, PageHeader } from "@/components/PageHeader";
+import { EmptyState, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
 import { loadBudgetJobs } from "@/lib/platform/budgetSource";
@@ -110,7 +110,9 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
                       >
                         {variance === 0 ? "—" : `${variance > 0 ? "+" : ""}${currency(variance)}`}
                       </td>
-                      <td className="py-2 pr-2 text-right whitespace-nowrap text-xs">{b.rag || "—"}</td>
+                      <td className="py-2 pr-2 text-right whitespace-nowrap text-xs">
+                        {b.rag ? <StatusBadge status={b.rag} /> : "—"}
+                      </td>
                     </tr>
                   );
                 })}

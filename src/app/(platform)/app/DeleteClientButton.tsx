@@ -1,8 +1,8 @@
-"use client";
+// Confirm-gated delete control for the org picker. The server action is
+// passed in from the (server) picker page. The two-step ConfirmSubmitButton
+// guards against accidental offboarding — this is a destructive admin action.
 
-// Small confirm-gated delete control for the org picker. The server action is
-// passed in from the (server) picker page. confirm() guards against accidental
-// offboarding — this is a destructive admin action.
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 
 interface Props {
   action: (formData: FormData) => void | Promise<void>;
@@ -12,22 +12,15 @@ interface Props {
 
 export function DeleteClientButton({ action, slug, name }: Props) {
   return (
-    <form
-      action={action}
-      onSubmit={(e) => {
-        if (
-          !window.confirm(
-            `Remove "${name}" from the registry?\n\nIt will disappear from the picker. Its Airtable base is NOT deleted — remove that manually in Airtable if you want it gone.`,
-          )
-        ) {
-          e.preventDefault();
-        }
-      }}
-    >
+    <form action={action}>
       <input type="hidden" name="slug" value={slug} />
-      <button type="submit" className="btn-ae-danger-outline">
-        <span aria-hidden>🗑</span> Delete client
-      </button>
+      <ConfirmSubmitButton
+        label="🗑 Delete client"
+        confirmLabel="Confirm — removes from registry"
+        pendingLabel="Removing…"
+        className="btn-ae-danger-outline"
+        title={`Removes "${name}" from the picker. Its Airtable base is NOT deleted — remove that manually in Airtable if you want it gone.`}
+      />
     </form>
   );
 }

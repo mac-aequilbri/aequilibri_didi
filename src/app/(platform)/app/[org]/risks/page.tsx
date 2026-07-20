@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { formatDate } from "@/lib/format";
 import {
   applyListQuery,
   hasActiveFilters,
@@ -141,8 +142,8 @@ export default async function RisksPage({
           </div>
         </div>
       )}
-      <div className="ae-card p-5">
-        <table className="w-full text-sm">
+      <div className="ae-card p-5 overflow-x-auto">
+        <table className="w-full min-w-[42rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th className="py-1 pr-2">Risk</th>
@@ -197,7 +198,7 @@ export default async function RisksPage({
                   <td className="py-2 pr-2 text-xs">
                     {r.escalatedAt ? (
                       <span className="text-red-600" title={r.escalationNote}>
-                        {r.escalatedAt.toISOString().slice(0, 10)}
+                        {formatDate(r.escalatedAt)}
                       </span>
                     ) : (
                       "—"

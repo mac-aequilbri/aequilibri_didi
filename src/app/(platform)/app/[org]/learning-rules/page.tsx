@@ -4,6 +4,8 @@
 
 import { TrendChart } from "@/components/charts";
 import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadLearning } from "@/lib/platform/learningSource";
@@ -45,15 +47,19 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
       <div className="mb-6 flex gap-2">
         <form action={runEngineAction}>
           <input type="hidden" name="org" value={ctx.orgSlug} />
-          <button type="submit" className="btn-ae" title={`${unclustered} unclustered corrections`}>
-            Run hypothesis engine ({unclustered} unclustered)
-          </button>
+          <SubmitButton
+            label={`Run hypothesis engine (${unclustered} unclustered)`}
+            pendingLabel="Running…"
+            title={`${unclustered} unclustered corrections`}
+          />
         </form>
         <form action={snapshotAction}>
           <input type="hidden" name="org" value={ctx.orgSlug} />
-          <button type="submit" className="btn-ae-outline">
-            Capture intelligence snapshot
-          </button>
+          <SubmitButton
+            label="Capture intelligence snapshot"
+            pendingLabel="Capturing…"
+            className="btn-ae-outline"
+          />
         </form>
       </div>
 
@@ -84,17 +90,23 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                       <input type="hidden" name="org" value={ctx.orgSlug} />
                       <input type="hidden" name="hypothesisId" value={h.id} />
                       <input type="hidden" name="kind" value="adjustment" />
-                      <button className="btn-ae text-xs" title="Drafts a numeric adjustment rule for you to activate">
-                        Draft adjustment rule
-                      </button>
+                      <SubmitButton
+                        label="Draft adjustment rule"
+                        pendingLabel="Drafting…"
+                        className="btn-ae text-xs"
+                        title="Drafts a numeric adjustment rule for you to activate"
+                      />
                     </form>
                     <form action={promoteHypothesisAction}>
                       <input type="hidden" name="org" value={ctx.orgSlug} />
                       <input type="hidden" name="hypothesisId" value={h.id} />
                       <input type="hidden" name="kind" value="guidance" />
-                      <button className="btn-ae-outline text-xs" title="Drafts a guidance rule for you to activate">
-                        Draft guidance rule
-                      </button>
+                      <SubmitButton
+                        label="Draft guidance rule"
+                        pendingLabel="Drafting…"
+                        className="btn-ae-outline text-xs"
+                        title="Drafts a guidance rule for you to activate"
+                      />
                     </form>
                   </>
                 ) : (
@@ -106,7 +118,12 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                 <form action={rejectHypothesisAction}>
                   <input type="hidden" name="org" value={ctx.orgSlug} />
                   <input type="hidden" name="hypothesisId" value={h.id} />
-                  <button className="btn-ae-outline text-xs text-red-600 border-red-300">Reject</button>
+                  <ConfirmSubmitButton
+                    label="Reject"
+                    confirmLabel="Confirm reject"
+                    pendingLabel="Rejecting…"
+                    className="btn-ae-outline text-xs text-red-600 border-red-300"
+                  />
                 </form>
               </div>
             </div>
@@ -156,9 +173,11 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={r.id} />
                     <input type="hidden" name="isActive" value={r.isActive ? "false" : "true"} />
-                    <button className="btn-ae-outline text-xs">
-                      {r.isActive ? "Deactivate" : "Activate"}
-                    </button>
+                    <SubmitButton
+                      label={r.isActive ? "Deactivate" : "Activate"}
+                      pendingLabel="Updating…"
+                      className="btn-ae-outline text-xs"
+                    />
                   </form>
                 </td>
               </tr>

@@ -2,6 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
 import { loadDocumentDetail } from "@/lib/platform/documentsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -101,9 +102,7 @@ export default async function DocumentDetailPage({
               <form action={verifyDocumentAction} className="pt-1">
                 <input type="hidden" name="org" value={ctx.orgSlug} />
                 <input type="hidden" name="recordId" value={doc.id} />
-                <button type="submit" className="underline">
-                  Verify integrity
-                </button>
+                <SubmitButton label="Verify integrity" pendingLabel="Verifying…" className="underline" />
               </form>
             )}
           </div>
@@ -154,9 +153,10 @@ export default async function DocumentDetailPage({
           <form action={analyzeDocumentAction}>
             <input type="hidden" name="org" value={ctx.orgSlug} />
             <input type="hidden" name="recordId" value={doc.id} />
-            <button type="submit" className="btn-ae">
-              {doc.status === "analyzed" ? "Re-analyse with AI" : "Analyse with AI"}
-            </button>
+            <SubmitButton
+              label={doc.status === "analyzed" ? "Re-analyse with AI" : "Analyse with AI"}
+              pendingLabel="Analysing…"
+            />
           </form>
         ) : doc.textContent ? (
           <p className="text-xs text-neutral-500">

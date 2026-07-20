@@ -4,6 +4,8 @@
 
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { listTemplateRegistry } from "@/lib/airtable/control";
 import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { deleteTemplateMapping, toggleTemplateMapping } from "./actions";
@@ -30,7 +32,8 @@ export default async function TemplateRegistryPage() {
           No mappings yet. Add one, or run <code>scripts/airtable-add-template-registry.mjs</code> to seed the defaults.
         </p>
       ) : (
-        <table className="w-full text-sm ae-card">
+        <div className="ae-card overflow-x-auto">
+        <table className="w-full min-w-[44rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th className="p-3">Industry</th>
@@ -52,23 +55,29 @@ export default async function TemplateRegistryPage() {
                   <form action={toggleTemplateMapping} className="inline">
                     <input type="hidden" name="recordId" value={r.recordId} />
                     <input type="hidden" name="isActive" value={String(r.isActive)} />
-                    <button type="submit" className={`text-xs font-semibold ${r.isActive ? "text-emerald-700" : "text-neutral-400"}`}>
-                      {r.isActive ? "Active" : "Inactive"}
-                    </button>
+                    <SubmitButton
+                      label={r.isActive ? "Active" : "Inactive"}
+                      pendingLabel="Updating…"
+                      className={`text-xs font-semibold ${r.isActive ? "text-emerald-700" : "text-neutral-400"}`}
+                    />
                   </form>
                 </td>
                 <td className="p-3 text-right">
                   <form action={deleteTemplateMapping} className="inline">
                     <input type="hidden" name="recordId" value={r.recordId} />
-                    <button type="submit" className="btn-ae-danger-outline">
-                      <span aria-hidden>🗑</span> Delete
-                    </button>
+                    <ConfirmSubmitButton
+                      label="🗑 Delete"
+                      confirmLabel="Confirm delete"
+                      pendingLabel="Deleting…"
+                      className="btn-ae-danger-outline"
+                    />
                   </form>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       <p className="mt-6 text-xs text-neutral-500">

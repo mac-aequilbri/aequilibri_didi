@@ -61,7 +61,7 @@ export default async function OrgDashboard({
       <PageHeader
         title={ctx.orgName}
         logo={ctx.config.branding?.logo}
-        subtitle={`${ctx.vertical} · ${ctx.defaultEngagementType.replace("_", " ")} · ${jobs.length} active job${jobs.length === 1 ? "" : "s"} shown · ${reportCaps.audienceLabel}`}
+        subtitle={`${ctx.vertical} · ${ctx.defaultEngagementType.replace(/_/g, " ")} · ${jobs.length} active job${jobs.length === 1 ? "" : "s"} shown · ${reportCaps.audienceLabel}`}
         actions={[{ href: p("/assistant"), label: `Ask ${ctx.config.assistant.name}` }]}
       />
 
@@ -132,7 +132,7 @@ export default async function OrgDashboard({
                 <span className="min-w-0">
                   <span className="font-medium group-hover:text-[var(--ae-space)]">{job.name}</span>
                   <span className="block text-xs text-neutral-500">
-                    {job.code} · {job.engagementType.replace("_", " ")}
+                    {job.code} · {job.engagementType.replace(/_/g, " ")}
                   </span>
                 </span>
                 <span className="flex items-center gap-3 shrink-0">

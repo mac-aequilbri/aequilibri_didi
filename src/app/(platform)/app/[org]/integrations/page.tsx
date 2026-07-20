@@ -3,6 +3,8 @@
 // n8n workflow at the inbound webhook. Admin (owner) only.
 
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { listConnections, listOutbox } from "@/lib/airtable/control";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -55,12 +57,11 @@ export default async function IntegrationsPage({
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={r.recordId} />
                     <input type="hidden" name="isActive" value={String(r.isActive)} />
-                    <button
-                      type="submit"
+                    <SubmitButton
+                      label={r.isActive ? "Enabled" : "Disabled"}
+                      pendingLabel="Updating…"
                       className={`text-xs font-semibold ${r.isActive ? "text-emerald-700" : "text-neutral-400"}`}
-                    >
-                      {r.isActive ? "Enabled" : "Disabled"}
-                    </button>
+                    />
                   </form>
                 </td>
                 <td className="p-3 text-xs">
@@ -78,9 +79,12 @@ export default async function IntegrationsPage({
                   <form action={removeConnection} className="inline">
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={r.recordId} />
-                    <button type="submit" className="btn-ae-danger-outline">
-                      <span aria-hidden>🗑</span> Delete
-                    </button>
+                    <ConfirmSubmitButton
+                      label="🗑 Delete"
+                      confirmLabel="Confirm delete"
+                      pendingLabel="Deleting…"
+                      className="btn-ae-danger-outline"
+                    />
                   </form>
                 </td>
               </tr>
@@ -118,9 +122,7 @@ export default async function IntegrationsPage({
             <span className="text-xs text-neutral-500">Event filter (optional)</span>
             <input name="eventFilter" className="border rounded px-2 py-1" placeholder="quote,invoice" />
           </label>
-          <button type="submit" className="btn-ae">
-            Add
-          </button>
+          <SubmitButton label="Add" pendingLabel="Adding…" />
         </form>
       </section>
 

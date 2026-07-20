@@ -6,6 +6,8 @@
 
 import { notFound } from "next/navigation";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { currency, formatDate } from "@/lib/format";
 import { loadQuoteDetail } from "@/lib/platform/quoteDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -108,7 +110,7 @@ export default async function QuoteDetailPage({
             <textarea name="notes" rows={2} defaultValue={quote.notes} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
           <div className="sm:col-span-2">
-            <button type="submit" className="btn-ae-outline text-sm">Save details</button>
+            <SubmitButton label="Save details" className="btn-ae-outline text-sm" />
           </div>
         </form>
       </section>
@@ -141,7 +143,7 @@ export default async function QuoteDetailPage({
                       <input name="unit" defaultValue={l.unit} className="w-16 rounded border border-neutral-200 px-2 py-1" aria-label="Unit" />
                       <input name="unitPrice" type="number" step="0.01" defaultValue={l.unitPrice} className="w-24 rounded border border-neutral-200 px-2 py-1 text-right" aria-label="Unit price" />
                       <span className="w-24 text-right font-medium whitespace-nowrap">{currency(l.lineTotal)}</span>
-                      <button type="submit" className="btn-ae-outline text-xs">Save</button>
+                      <SubmitButton label="Save" className="btn-ae-outline text-xs" />
                     </form>
                   </td>
                 </tr>
@@ -232,9 +234,11 @@ function StatusButton({
       <input type="hidden" name="org" value={org} />
       <input type="hidden" name="quoteId" value={id} />
       <input type="hidden" name="status" value={status} />
-      <button type="submit" className={`${outline ? "btn-ae-outline" : "btn-ae"} text-xs`}>
-        {label}
-      </button>
+      <SubmitButton
+        label={label}
+        pendingLabel="Updating…"
+        className={`${outline ? "btn-ae-outline" : "btn-ae"} text-xs`}
+      />
     </form>
   );
 }
@@ -246,9 +250,12 @@ function AcceptProposalButton({ org, id }: { org: string; id: string }) {
     <form action={acceptProposalAction}>
       <input type="hidden" name="org" value={org} />
       <input type="hidden" name="quoteId" value={id} />
-      <button type="submit" className="btn-ae text-xs">
-        Mark accepted (creates project)
-      </button>
+      <ConfirmSubmitButton
+        label="Mark accepted (creates project)"
+        confirmLabel="Confirm — creates a project"
+        pendingLabel="Accepting…"
+        className="btn-ae text-xs"
+      />
     </form>
   );
 }

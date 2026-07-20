@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate, toNum } from "@/lib/format";
 import {
   applyListQuery,
@@ -52,8 +52,8 @@ export default async function ProcurementPage({
         pageCount={pageCount}
         searchPlaceholder="Search orders…"
       >
-      <div className="ae-card p-5">
-        <table className="w-full text-sm">
+      <div className="ae-card p-5 overflow-x-auto">
+        <table className="w-full min-w-[48rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th className="py-1 pr-2">Item</th>
@@ -120,8 +120,16 @@ export default async function ProcurementPage({
             ))}
             {orders.length === 0 && (
               <tr>
-                <td className="py-4 text-neutral-500" colSpan={8}>
-                  {filtered ? "No orders match these filters." : "No orders yet."}
+                <td colSpan={8} className="py-6">
+                  <EmptyState
+                    title={filtered ? "No orders match these filters" : "No orders yet"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Track each order from pending through delivered, invoiced and paid."
+                    }
+                    action={{ href: orgPath(ctx.orgSlug, "/procurement/new"), label: "+ New order" }}
+                  />
                 </td>
               </tr>
             )}

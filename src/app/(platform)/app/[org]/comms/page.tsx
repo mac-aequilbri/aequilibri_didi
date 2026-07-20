@@ -4,7 +4,8 @@
 
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
-import { EmptyState, PageHeader } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { formatDate } from "@/lib/format";
 import { loadComms } from "@/lib/platform/commsSource";
 import {
   applyListQuery,
@@ -51,8 +52,8 @@ export default async function CommsPage({
         pageCount={pageCount}
         searchPlaceholder="Search communications…"
       >
-      <div className="ae-card p-5">
-        <table className="w-full text-sm">
+      <div className="ae-card p-5 overflow-x-auto">
+        <table className="w-full min-w-[40rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th className="py-1 pr-2">Topic</th>
@@ -79,7 +80,7 @@ export default async function CommsPage({
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">
                   {c.dueDate ? (
                     <span className={c.isOverdue ? "text-red-600 font-medium" : ""}>
-                      {c.dueDate.toISOString().slice(0, 10)}
+                      {formatDate(c.dueDate)}
                       {c.isOverdue && " (overdue)"}
                     </span>
                   ) : (
@@ -90,6 +91,7 @@ export default async function CommsPage({
                   <form action={setCommStatus} className="flex items-center gap-1">
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={c.id} />
+                    <StatusBadge status={c.status} />
                     <select name="status" defaultValue={c.status} className="text-xs border border-neutral-200 rounded px-1 py-0.5">
                       {STATUSES.map((s) => (
                         <option key={s} value={s}>

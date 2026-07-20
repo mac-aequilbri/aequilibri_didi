@@ -121,6 +121,9 @@ const STATUS_TONE: Record<string, string> = {
   overdue: "overdue", rejected: "rejected", cancelled: "cancelled", failed: "failed",
   // inert → muted
   draft: "draft", deferred: "draft", superseded: "draft", expired: "expired", captured: "draft", classified: "draft", uploaded: "draft", generated: "active", analyzed: "active",
+  inactive: "draft",
+  // RAG values → traffic-light tones
+  green: "active", amber: "pending", red: "overdue",
 };
 
 export function StatusBadge({ status }: { status: string }) {

@@ -4,6 +4,8 @@
 
 import { prisma } from "@/lib/db";
 import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { currency, formatDate } from "@/lib/format";
 import { xeroEnabled, type AccountingSummary } from "@/lib/platform/accounting";
 import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
@@ -79,23 +81,24 @@ export default async function AccountingPage({
             {!connected ? (
               <form action={connectAccountingAction}>
                 <input type="hidden" name="org" value={ctx.orgSlug} />
-                <button type="submit" className="btn-ae">
-                  Connect {live ? "Xero" : "demo ledger"}
-                </button>
+                <SubmitButton
+                  label={`Connect ${live ? "Xero" : "demo ledger"}`}
+                  pendingLabel="Connecting…"
+                />
               </form>
             ) : (
               <>
                 <form action={syncAccountingAction}>
                   <input type="hidden" name="org" value={ctx.orgSlug} />
-                  <button type="submit" className="btn-ae">
-                    Sync now
-                  </button>
+                  <SubmitButton label="Sync now" pendingLabel="Syncing…" />
                 </form>
                 <form action={disconnectAccountingAction}>
                   <input type="hidden" name="org" value={ctx.orgSlug} />
-                  <button type="submit" className="btn-ae-outline">
-                    Disconnect
-                  </button>
+                  <ConfirmSubmitButton
+                    label="Disconnect"
+                    confirmLabel="Confirm disconnect"
+                    pendingLabel="Disconnecting…"
+                  />
                 </form>
               </>
             )}

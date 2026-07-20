@@ -252,3 +252,22 @@ footer.ae-footer { background: var(--ae-ink); color: var(--ae-earth); text-align
 .det-badge { border-radius: 999px; padding: 3px 9px; font-size: .66rem; font-weight: 800; }
 .det-geoscape { background: rgba(39,174,96,.15); color: #1b8a4b; }
 .det-solar { background: rgba(41,128,185,.15); color: #2980b9; }
+
+/* --- UI/UX audit Phase 1: global keyboard-focus visibility + skip link --- */
+:focus-visible {
+  outline: 2px solid var(--ae-space-deep);
+  outline-offset: 2px;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 0.5rem 0.75rem;
+  background: var(--ae-space-deep);
+  color: #fff;
+  border-radius: 0 0 6px 0;
+}
+.skip-link:focus {
+  left: 0;
+}

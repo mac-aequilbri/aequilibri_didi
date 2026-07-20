@@ -3,6 +3,8 @@
 
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { deactivatePortalToken, generatePortalToken } from "./actions";
@@ -54,9 +56,7 @@ export default async function PortalPage({ params }: { params: Promise<{ org: st
           </label>
         </div>
         <input type="hidden" name="org" value={ctx.orgSlug} />
-        <button type="submit" className="btn-ae">
-          Generate link
-        </button>
+        <SubmitButton label="Generate link" pendingLabel="Generating…" />
       </form>
 
       <div className="ae-card p-5">
@@ -96,9 +96,12 @@ export default async function PortalPage({ params }: { params: Promise<{ org: st
                     <form action={deactivatePortalToken}>
                       <input type="hidden" name="org" value={ctx.orgSlug} />
                       <input type="hidden" name="recordId" value={t.id} />
-                      <button type="submit" className="btn-ae-outline text-xs text-red-600 border-red-300">
-                        Revoke
-                      </button>
+                      <ConfirmSubmitButton
+                        label="Revoke"
+                        confirmLabel="Confirm revoke"
+                        pendingLabel="Revoking…"
+                        className="btn-ae-outline text-xs text-red-600 border-red-300"
+                      />
                     </form>
                   )}
                 </td>

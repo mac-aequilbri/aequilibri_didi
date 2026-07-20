@@ -9,9 +9,14 @@ import { useFormStatus } from "react-dom";
 export function SubmitButton({
   label,
   pendingLabel = "Saving…",
+  className = "btn-ae",
+  title,
 }: {
   label: string;
   pendingLabel?: string;
+  /** Base button class — override for outline/small variants (spinner + disabled styles are appended). */
+  className?: string;
+  title?: string;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -19,7 +24,8 @@ export function SubmitButton({
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="btn-ae inline-flex items-center gap-2 disabled:opacity-60"
+      title={title}
+      className={`${className} inline-flex items-center gap-2 disabled:opacity-60`}
     >
       {pending && (
         <span

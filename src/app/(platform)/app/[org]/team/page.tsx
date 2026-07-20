@@ -4,6 +4,8 @@
 // inviting sends a Clerk invitation email; deactivating revokes access.
 
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { clerkEnabled } from "@/lib/platform/authConfig";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { listMembers } from "@/lib/platform/provisioning";
@@ -117,12 +119,11 @@ export default async function TeamPage({
               ))}
             </select>
           </label>
-          <button
-            type="submit"
+          <SubmitButton
+            label={authOn ? "Send invitation" : "Add member"}
+            pendingLabel={authOn ? "Sending…" : "Adding…"}
             className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
-          >
-            {authOn ? "Send invitation" : "Add member"}
-          </button>
+          />
         </form>
       </section>
 
@@ -163,12 +164,11 @@ export default async function TeamPage({
                           </option>
                         ))}
                       </select>
-                      <button
-                        type="submit"
+                      <SubmitButton
+                        label="Set"
+                        pendingLabel="Saving…"
                         className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50"
-                      >
-                        Set
-                      </button>
+                      />
                     </form>
                   </td>
                   <td className="py-2 pr-2 text-center">
@@ -185,12 +185,20 @@ export default async function TeamPage({
                       <input type="hidden" name="org" value={ctx.orgSlug} />
                       <input type="hidden" name="email" value={m.email} />
                       <input type="hidden" name="active" value={m.isActive ? "0" : "1"} />
-                      <button
-                        type="submit"
-                        className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50"
-                      >
-                        {m.isActive ? "Deactivate" : "Reactivate"}
-                      </button>
+                      {m.isActive ? (
+                        <ConfirmSubmitButton
+                          label="Deactivate"
+                          confirmLabel="Confirm deactivate"
+                          pendingLabel="Deactivating…"
+                          className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50"
+                        />
+                      ) : (
+                        <SubmitButton
+                          label="Reactivate"
+                          pendingLabel="Reactivating…"
+                          className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50"
+                        />
+                      )}
                     </form>
                   </td>
                 </tr>

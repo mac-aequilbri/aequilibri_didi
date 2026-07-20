@@ -109,8 +109,8 @@ export default async function ActionsPage({
         pageCount={pageCount}
         searchPlaceholder="Search actions…"
       >
-      <div className="ae-card p-5">
-        <table className="w-full text-sm">
+      <div className="ae-card p-5 overflow-x-auto">
+        <table className="w-full min-w-[42rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th className="py-1 pr-2">Action</th>

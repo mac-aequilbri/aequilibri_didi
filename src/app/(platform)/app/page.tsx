@@ -158,7 +158,7 @@ export default async function OrgPickerPage({
                     </span>
                   </div>
                   <p className="text-sm text-neutral-600 capitalize mt-0.5">
-                    {org.vertical} · {org.defaultEngagementType.replace("_", " ")}
+                    {org.vertical} · {org.defaultEngagementType.replace(/_/g, " ")}
                   </p>
                   <ClientCardMetrics slug={org.slug} cached={org.metrics} />
                 </div>

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { BimxViewer } from "@/components/BimxViewer";
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
 import { loadJobBimModels } from "@/lib/platform/bimModelsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -87,20 +89,22 @@ export default async function ProjectModelsPage({
                     <input type="hidden" name="recordId" value={m.id} />
                     <input type="hidden" name="jobId" value={jobId} />
                     <input type="hidden" name="clientVisible" value={m.clientVisible ? "false" : "true"} />
-                    <button type="submit" className="btn-ae-outline text-xs">
-                      {m.clientVisible ? "Hide from client" : "Show to client"}
-                    </button>
+                    <SubmitButton
+                      label={m.clientVisible ? "Hide from client" : "Show to client"}
+                      pendingLabel="Updating…"
+                      className="btn-ae-outline text-xs"
+                    />
                   </form>
                   <form action={deleteBimModel}>
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={m.id} />
                     <input type="hidden" name="jobId" value={jobId} />
-                    <button
-                      type="submit"
+                    <ConfirmSubmitButton
+                      label="Delete"
+                      confirmLabel="Confirm delete"
+                      pendingLabel="Deleting…"
                       className="btn-ae-outline text-xs text-red-600 border-red-300 hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
+                    />
                   </form>
                 </div>
               </div>

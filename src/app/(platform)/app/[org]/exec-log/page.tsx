@@ -3,6 +3,8 @@
 
 import { FilterBar } from "@/components/FilterBar";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import {
   parseListQuery,
   sortAndPaginate,
@@ -103,16 +105,17 @@ export default async function ExecLogPage({
                     <form action={approveProposalAction} className="inline">
                       <input type="hidden" name="org" value={ctx.orgSlug} />
                       <input type="hidden" name="proposalId" value={p.id} />
-                      <button className="btn-ae text-xs" type="submit">
-                        Approve
-                      </button>
+                      <ConfirmSubmitButton
+                        label="Approve"
+                        confirmLabel="Confirm — executes the write"
+                        pendingLabel="Approving…"
+                        className="btn-ae text-xs"
+                      />
                     </form>{" "}
                     <form action={rejectProposalAction} className="inline">
                       <input type="hidden" name="org" value={ctx.orgSlug} />
                       <input type="hidden" name="proposalId" value={p.id} />
-                      <button className="btn-ae-outline text-xs" type="submit">
-                        Reject
-                      </button>
+                      <SubmitButton label="Reject" pendingLabel="Rejecting…" className="btn-ae-outline text-xs" />
                     </form>
                   </td>
                 </tr>

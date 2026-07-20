@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadPhaseJobs } from "@/lib/platform/phasesSource";
 import { orgPath } from "@/lib/platform/paths";
@@ -29,7 +30,7 @@ const RAG_CLASS: Record<string, string> = {
 };
 
 function fmtDate(d: string | null): string {
-  return d ? d.slice(0, 10) : "";
+  return d ? formatDate(d) : "";
 }
 
 export default async function PhasesPage({

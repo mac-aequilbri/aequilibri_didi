@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { loadJobDetail } from "@/lib/platform/jobDetailSource";
@@ -82,9 +83,7 @@ export default async function EditProjectPage({
           <span className="text-neutral-600">Summary</span>
           <textarea name="summary" rows={3} defaultValue={job.summary} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </label>
-        <button type="submit" className="btn-ae">
-          Save changes
-        </button>
+        <SubmitButton label="Save changes" />
       </form>
     </div>
   );

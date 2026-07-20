@@ -6,6 +6,7 @@
 // Admin-gated.
 
 import { PageHeader } from "@/components/PageHeader";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { canApprove } from "@/lib/platform/roles";
 import { SPECIALISTS } from "@/services/platform/agents/registry";
@@ -87,12 +88,10 @@ export default async function AgentsPage({
               ))}
             </select>
           </label>
-          <button
-            type="submit"
+          <SubmitButton
+            label="Save"
             className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
-          >
-            Save
-          </button>
+          />
         </form>
       </section>
 
@@ -137,7 +136,7 @@ export default async function AgentsPage({
       })}
 
       <p className="text-xs text-neutral-400">
-        An agent's reach is defined by what it may propose into PENDING_WRITES — this page renders
+        An agent&apos;s reach is defined by what it may propose into PENDING_WRITES — this page renders
         the same registry the executor enforces, so it cannot drift from reality. Per-agent
         overrides beyond the authority level require a code change to TOOL_POLICY by design.
       </p>

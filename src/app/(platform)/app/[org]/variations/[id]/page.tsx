@@ -3,6 +3,8 @@
 
 import { notFound } from "next/navigation";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { currency, formatDate } from "@/lib/format";
 import { loadVariationDetail } from "@/lib/platform/variationDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -68,16 +70,17 @@ export default async function VariationDetailPage({
                   <input type="number" name="timeImpactDays" defaultValue={vo.timeImpactDays} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
                 </label>
               </div>
-              <button type="submit" className="btn-ae">
-                Approve variation
-              </button>
+              <SubmitButton label="Approve variation" pendingLabel="Approving…" />
             </form>
             <form action={rejectVariationAction} className="mt-2">
               <input type="hidden" name="org" value={ctx.orgSlug} />
               <input type="hidden" name="recordId" value={vo.id} />
-              <button type="submit" className="btn-ae-outline text-red-600 border-red-300">
-                Reject
-              </button>
+              <ConfirmSubmitButton
+                label="Reject"
+                confirmLabel="Confirm reject"
+                pendingLabel="Rejecting…"
+                className="btn-ae-outline text-red-600 border-red-300"
+              />
             </form>
           </div>
         )}

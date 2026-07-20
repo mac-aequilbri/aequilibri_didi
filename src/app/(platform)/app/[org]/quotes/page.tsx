@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate } from "@/lib/format";
 import {
   applyListQuery,
@@ -54,15 +54,15 @@ export default async function QuotesPage({
         searchPlaceholder="Search quotes…"
       >
       {quotes.length === 0 ? (
-        <p className="text-sm text-neutral-500">
-          {filtered ? (
-            "No quotes match these filters."
-          ) : (
-            <>
-              No quotes yet. <Link className="underline" href={orgPath(ctx.orgSlug, "/quotes/new")}>Create one</Link>.
-            </>
-          )}
-        </p>
+        <EmptyState
+          title={filtered ? "No quotes match these filters" : "No quotes yet"}
+          hint={
+            filtered
+              ? "Try widening or clearing the filters above."
+              : "Generate a quote from a job's budget or start one blank, then send and track acceptance."
+          }
+          action={{ href: orgPath(ctx.orgSlug, "/quotes/new"), label: "+ New quote" }}
+        />
       ) : (
         <section className="ae-card p-5">
           <div className="overflow-x-auto">

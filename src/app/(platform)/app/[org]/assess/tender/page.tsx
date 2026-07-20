@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { loadDocuments, loadDocumentDetail } from "@/lib/platform/documentsSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -70,9 +71,7 @@ export default async function TenderComparisonPage({
             className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs"
           />
         </label>
-        <button type="submit" className="btn-ae">
-          Run tender comparison
-        </button>
+        <SubmitButton label="Run tender comparison" pendingLabel="Analysing documents…" />
       </form>
 
       <section className="ae-card p-5">

@@ -67,8 +67,8 @@ export default async function DocumentsPage({
         pageCount={pageCount}
         searchPlaceholder="Search documents…"
       >
-      <div className="ae-card p-5">
-        <table className="w-full text-sm">
+      <div className="ae-card p-5 overflow-x-auto">
+        <table className="w-full min-w-[40rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th className="py-1 pr-2">Document</th>

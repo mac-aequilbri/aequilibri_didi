@@ -5,6 +5,7 @@
 
 import { notFound } from "next/navigation";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
 import { loadMinutesDetail } from "@/lib/platform/minutesDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -72,9 +73,10 @@ export default async function MinutesDetailPage({
           <form action={confirmMinutesAction}>
             <input type="hidden" name="org" value={ctx.orgSlug} />
             <input type="hidden" name="recordId" value={minutes.id} />
-            <button type="submit" className="btn-ae">
-              Confirm — create {actions.length} action{actions.length === 1 ? "" : "s"}
-            </button>
+            <SubmitButton
+              label={`Confirm — create ${actions.length} action${actions.length === 1 ? "" : "s"}`}
+              pendingLabel="Creating actions…"
+            />
           </form>
         )}
         {minutes.status === "confirmed" && (

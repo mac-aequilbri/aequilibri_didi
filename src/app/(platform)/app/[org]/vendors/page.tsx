@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
-import { EmptyState, PageHeader } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import {
   applyListQuery,
   hasActiveFilters,
@@ -48,8 +48,8 @@ export default async function VendorsPage({
         pageCount={pageCount}
         searchPlaceholder="Search vendors…"
       >
-      <div className="ae-card p-5">
-        <table className="w-full text-sm">
+      <div className="ae-card p-5 overflow-x-auto">
+        <table className="w-full min-w-[38rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th className="py-1 pr-2">Vendor</th>
@@ -81,7 +81,9 @@ export default async function VendorsPage({
                   {"★".repeat(Math.round(v.rating / 2)) || "—"}{" "}
                   <span className="text-neutral-400">{v.rating}/10</span>
                 </td>
-                <td className="py-2 text-xs">{v.isActive ? "Yes" : "No"}</td>
+                <td className="py-2 text-xs">
+                  <StatusBadge status={v.isActive ? "active" : "inactive"} />
+                </td>
               </tr>
             ))}
             {vendors.length === 0 && (

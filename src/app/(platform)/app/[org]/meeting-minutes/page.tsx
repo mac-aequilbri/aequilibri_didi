@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import {
   applyListQuery,
@@ -49,8 +49,8 @@ export default async function MeetingMinutesPage({
         pageCount={pageCount}
         searchPlaceholder="Search minutes…"
       >
-      <div className="ae-card p-5">
-        <table className="w-full text-sm">
+      <div className="ae-card p-5 overflow-x-auto">
+        <table className="w-full min-w-[36rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th className="py-1 pr-2">Meeting</th>
@@ -77,8 +77,16 @@ export default async function MeetingMinutesPage({
             ))}
             {minutes.length === 0 && (
               <tr>
-                <td className="py-4 text-neutral-500" colSpan={4}>
-                  {filtered ? "No minutes match these filters." : "No minutes yet."}
+                <td colSpan={4} className="py-6">
+                  <EmptyState
+                    title={filtered ? "No minutes match these filters" : "No minutes yet"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Paste raw minutes and the AI extracts action items for you to confirm."
+                    }
+                    action={{ href: orgPath(ctx.orgSlug, "/meeting-minutes/new"), label: "+ New minutes" }}
+                  />
                 </td>
               </tr>
             )}

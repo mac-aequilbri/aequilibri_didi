@@ -4,6 +4,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/PageHeader";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import type { CascadeResult } from "@/services/platform/construction/delay";
@@ -79,9 +80,7 @@ export default async function DelayCascadePage({ params }: { params: Promise<{ o
           <input type="checkbox" name="createFollowUps" value="1" defaultChecked />
           Propose follow-up actions/risks for approval
         </label>
-        <button type="submit" className="btn-ae">
-          Analyse cascade
-        </button>
+        <SubmitButton label="Analyse cascade" pendingLabel="Analysing…" />
       </form>
 
       {logs.map((log) => {
