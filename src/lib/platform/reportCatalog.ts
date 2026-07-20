@@ -4,6 +4,15 @@
 
 export type ReportScope = "phases" | "budget" | "cashflow" | "risks" | "actions" | "variations";
 
+export const ALL_SCOPES: readonly ReportScope[] = [
+  "phases",
+  "budget",
+  "cashflow",
+  "risks",
+  "actions",
+  "variations",
+];
+
 /** Slices that never serialize for a viewer without financial detail (CLS). */
 export const FINANCE_SCOPES: readonly ReportScope[] = ["budget", "cashflow"];
 

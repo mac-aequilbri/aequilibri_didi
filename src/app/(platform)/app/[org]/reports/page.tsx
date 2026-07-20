@@ -12,9 +12,9 @@ import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { loadWeeklyReports, type ReportView } from "@/lib/platform/domainListSources";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { orgPath } from "@/lib/platform/paths";
-import { REPORT_CATALOG } from "@/lib/platform/reportCatalog";
+import { ALL_SCOPES, FINANCE_SCOPES, REPORT_CATALOG } from "@/lib/platform/reportCatalog";
 import { reportModeFor, reportingCapabilities } from "@/lib/platform/reportingPolicy";
-import { generateReportAction } from "./actions";
+import { generateCustomReportAction, generateReportAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +100,48 @@ export default async function ReportsPage({
           <button type="submit" className="btn-ae">
             Generate with AI
           </button>
+        </form>
+      ) : null}
+
+      {reportCaps.canGenerateReports ? (
+        <form action={generateCustomReportAction} className="ae-card p-5 mb-6">
+          <input type="hidden" name="org" value={ctx.orgSlug} />
+          <div className="text-sm font-medium mb-2">Custom report — describe what you want</div>
+          <textarea
+            name="prompt"
+            required
+            rows={2}
+            placeholder="e.g. Compare spend against budget for the fit-out phase, flag anything more than 10% over, and list the variations that caused it"
+            className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          />
+          <div className="mt-3 flex flex-wrap items-end gap-4">
+            <label className="block text-sm">
+              <span className="text-neutral-600">Job</span>
+              <select name="jobId" className="mt-1 block rounded border border-neutral-300 px-3 py-2">
+                {jobs.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    {j.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600">As at</span>
+              <input type="date" name="weekEnding" className="mt-1 block rounded border border-neutral-300 px-3 py-2" />
+            </label>
+            <div className="flex flex-wrap gap-3 text-sm pb-2">
+              {ALL_SCOPES.filter(
+                (s) => reportCaps.showFinancialDetail || !FINANCE_SCOPES.includes(s),
+              ).map((s) => (
+                <label key={s} className="flex items-center gap-1 text-neutral-600">
+                  <input type="checkbox" name="scopes" value={s} defaultChecked /> {s}
+                </label>
+              ))}
+            </div>
+            <button type="submit" className="btn-ae">
+              Build with AI
+            </button>
+          </div>
         </form>
       ) : (
         <div className="ae-card p-5 mb-6 text-sm text-neutral-600">

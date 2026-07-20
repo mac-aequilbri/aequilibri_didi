@@ -1,6 +1,6 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
-import { parseReportModule8 } from "./reportDoc";
+import { parseReportModule8, type ReportPromptSpec } from "./reportDoc";
 import type { OrgCtx } from "./types";
 
 export interface ReportDetailView {
@@ -15,6 +15,8 @@ export interface ReportDetailView {
   sentAt: Date | null;
   jobCode: string;
   jobName: string;
+  /** Present on prompt-built custom reports — enables Regenerate. */
+  promptSpec: ReportPromptSpec | null;
 }
 
 function str(v: unknown): string {
@@ -52,6 +54,7 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<ReportDetailView |
     sentAt: report.sentAt,
     jobCode: report.job?.code ?? "",
     jobName: report.job?.name ?? "",
+    promptSpec: null,
   };
 }
 
@@ -78,6 +81,7 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<ReportDetailView |
     sentAt: dateOrNull(m8.sentAt),
     jobCode: "",
     jobName: job ? str(job["Job_Name"]) : "",
+    promptSpec: m8.promptSpec ?? null,
   };
 }
 

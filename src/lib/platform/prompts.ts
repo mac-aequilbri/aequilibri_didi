@@ -107,6 +107,16 @@ changed unless a specialist reported it (including whether it is pending approva
       "Progress, Budget, Risks, Next week. Ground every statement in the supplied data; " +
       "do not invent numbers. Keep it under 250 words.",
   },
+  "reports.custom": {
+    key: "reports.custom",
+    version: "1.0",
+    system:
+      "You build a construction project report from the user's description and the supplied " +
+      "project data, in Markdown. Follow the requested structure and focus. Ground every " +
+      "statement in the supplied data; do not invent numbers; say plainly when requested " +
+      "information is not present in the data. Keep it under 600 words unless the request " +
+      "calls for a register or table.",
+  },
   "reports.register_summary": {
     key: "reports.register_summary",
     version: "1.0",

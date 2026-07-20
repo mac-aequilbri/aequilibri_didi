@@ -14,7 +14,7 @@ import { loadJobContext } from "@/lib/platform/jobContextSource";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
 import { emitOutboundEvent } from "@/lib/platform/outbox";
-import { FINANCE_SCOPES, reportDef, type ReportScope } from "@/lib/platform/reportCatalog";
+import { ALL_SCOPES, FINANCE_SCOPES, reportDef, type ReportScope } from "@/lib/platform/reportCatalog";
 import {
   buildReportAnalysis,
   parseReportModule8,
@@ -316,6 +316,71 @@ export async function generateReport(
     }
   }
   return { id: result.recordId, demoMode };
+}
+
+export const CUSTOM_REPORT_ID = "custom_report";
+
+/** Phase 3: prompt-built report. The promptSpec is stored in module8 for audit
+ *  and Regenerate (pass recordId to re-run the same spec onto that record —
+ *  the result is a fresh draft). Airtable-only, like all catalog work. */
+export async function generateCustomReport(
+  ctx: OrgCtx,
+  viewer: ReportViewer,
+  args: {
+    jobId: RecordId;
+    periodEnding: string;
+    prompt: string;
+    scopes: string[];
+    recordId?: RecordId;
+  },
+): Promise<{ id?: RecordId; demoMode: boolean }> {
+  if (!airtableEnabled()) throw new Error("Custom reports require the Airtable backend.");
+  const job = await loadJobContext(ctx, args.jobId);
+  if (!job) throw new Error("Job not found");
+
+  // Server-side CLS: intersect the requested scopes with what this viewer may
+  // see, whatever the client sent. Empty request = all allowed slices.
+  const requested = args.scopes.length ? args.scopes : [...ALL_SCOPES];
+  const scopes = ALL_SCOPES.filter(
+    (s) => requested.includes(s) && (viewer.financeDetail || !FINANCE_SCOPES.includes(s)),
+  );
+  const context = buildReportContext(job, scopes);
+
+  const { system } = getPrompt("reports.custom");
+  const res = await callClaude(
+    system,
+    `As at ${args.periodEnding}. Request: ${args.prompt}\n\nProject data:\n${context}`,
+    { model: modelFor("drafting"), maxTokens: 1500 },
+  );
+  const content = res.demo_mode
+    ? `_Demo mode — no API key. Request was: ${args.prompt}_`
+    : res.content.trim();
+  const title = `Custom: ${args.prompt.slice(0, 60)}${args.prompt.length > 60 ? "…" : ""} — ${args.periodEnding}`;
+
+  const data = {
+    jobId: args.jobId,
+    title,
+    docType: REPORT_DOC_TYPE,
+    status: "Active",
+    uploadedBy: viewer.name,
+    textContent: content,
+    aiAnalysis: buildReportAnalysis({
+      kind: "weekly_report",
+      reportId: CUSTOM_REPORT_ID,
+      weekEnding: args.periodEnding,
+      status: "draft",
+      isAiGenerated: true,
+      generatedAt: new Date().toISOString(),
+      promptSpec: { prompt: args.prompt, scopes, jobId: String(args.jobId) },
+    }),
+  };
+  const result = await writeRecord(
+    ctx,
+    args.recordId != null
+      ? { table: "document", op: "update", recordId: args.recordId, data, actor: { type: "ai", name: "Report Writer" } }
+      : { table: "document", op: "create", data, actor: { type: "ai", name: "Report Writer" } },
+  );
+  return { id: result.recordId ?? args.recordId, demoMode: res.demo_mode };
 }
 
 /** Legacy alias for AI/system callers (scheduler, assistant executor) — the
