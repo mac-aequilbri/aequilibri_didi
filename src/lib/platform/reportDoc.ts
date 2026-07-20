@@ -13,6 +13,8 @@ export const REPORT_DOC_TYPE = "Report"; // canonical Document_Type option (voca
 
 export interface ReportModule8 {
   kind: "weekly_report";
+  /** reportCatalog id; legacy rows have none and read as "weekly_progress". */
+  reportId?: string;
   weekEnding: string;
   status: "draft" | "approved" | "sent";
   isAiGenerated: boolean;
@@ -37,6 +39,7 @@ export function parseReportModule8(aiAnalysis: unknown): ReportModule8 | null {
     if (!m8 || m8.kind !== "weekly_report") return null;
     return {
       kind: "weekly_report",
+      reportId: typeof m8.reportId === "string" ? m8.reportId : undefined,
       weekEnding: typeof m8.weekEnding === "string" ? m8.weekEnding : "",
       status: m8.status === "approved" || m8.status === "sent" ? m8.status : "draft",
       isAiGenerated: m8.isAiGenerated === true,

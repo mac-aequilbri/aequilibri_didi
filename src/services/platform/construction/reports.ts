@@ -14,7 +14,13 @@ import { loadJobContext } from "@/lib/platform/jobContextSource";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
 import { emitOutboundEvent } from "@/lib/platform/outbox";
-import { buildReportAnalysis, patchReportAnalysis, REPORT_DOC_TYPE } from "@/lib/platform/reportDoc";
+import { FINANCE_SCOPES, reportDef, type ReportScope } from "@/lib/platform/reportCatalog";
+import {
+  buildReportAnalysis,
+  parseReportModule8,
+  patchReportAnalysis,
+  REPORT_DOC_TYPE,
+} from "@/lib/platform/reportDoc";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { getStorer } from "@/lib/platform/storage";
 import { OrgCtx } from "@/lib/platform/types";
@@ -49,40 +55,70 @@ function applyWeeklyTemplate(content: string): string {
   return blocks.length ? `${text}\n\n${blocks.join("\n").trim()}` : text;
 }
 
-export async function generateWeeklyReport(
+type JobContext = NonNullable<Awaited<ReturnType<typeof loadJobContext>>>;
+
+/** Serialize only the requested job-context slices (CLS: finance slices are
+ *  filtered out before this is called). Keys match the legacy weekly context. */
+function buildReportContext(job: JobContext, scopes: readonly ReportScope[]): string {
+  const slices: Record<ReportScope, () => [string, unknown]> = {
+    phases: () => [
+      "phases",
+      job.phases.map((p) => ({ name: p.name, status: p.status, pct: p.completionPct })),
+    ],
+    risks: () => [
+      "openRisks",
+      job.risks.map((r) => ({ desc: r.description, score: r.likelihood * r.impact })),
+    ],
+    budget: () => [
+      "budget",
+      job.budget.map((b) => ({ category: b.category, budget: b.budgetAmount, actual: b.actualAmount })),
+    ],
+    cashflow: () => [
+      "cashflow",
+      job.cashflow.map((c) => ({ period: c.period, projected: c.projected, actual: c.actual })),
+    ],
+    actions: () => [
+      "openActions",
+      job.actions.map((a) => ({ title: a.title, owner: a.owner, due: a.dueDate })),
+    ],
+    variations: () => [
+      "variations",
+      job.variations.map((v) => ({ ref: v.refNumber, title: v.title, cost: v.costImpact, status: v.status })),
+    ],
+  };
+  const out: Record<string, unknown> = {
+    job: { name: job.name, completionPct: job.completionPct, healthScore: job.healthScore },
+  };
+  for (const s of scopes) {
+    const [key, value] = slices[s]();
+    out[key] = value;
+  }
+  return JSON.stringify(out);
+}
+
+export interface ReportViewer {
+  name: string;
+  /** reportingCapabilities(role).showFinancialDetail — gates finance slices. */
+  financeDetail: boolean;
+}
+
+export async function generateReport(
   ctx: OrgCtx,
-  userName: string,
+  viewer: ReportViewer,
+  reportId: string,
   jobId: RecordId,
-  weekEnding: string,
+  periodEnding: string,
 ): Promise<{ id?: RecordId; demoMode: boolean }> {
+  const def = reportDef(reportId);
+  if (!def) throw new Error(`Unknown report type: ${reportId}`);
   const job = await loadJobContext(ctx, jobId);
   if (!job) throw new Error("Job not found");
 
-  const context = JSON.stringify({
-    job: { name: job.name, completionPct: job.completionPct, healthScore: job.healthScore },
-    phases: job.phases.map((p) => ({ name: p.name, status: p.status, pct: p.completionPct })),
-    openRisks: job.risks.map((r) => ({ desc: r.description, score: r.likelihood * r.impact })),
-    budget: job.budget.map((b) => ({
-      category: b.category,
-      budget: b.budgetAmount,
-      actual: b.actualAmount,
-    })),
-    cashflow: job.cashflow.map((c) => ({
-      period: c.period,
-      projected: c.projected,
-      actual: c.actual,
-    })),
-    openActions: job.actions.map((a) => ({ title: a.title, owner: a.owner, due: a.dueDate })),
-    variations: job.variations.map((v) => ({
-      ref: v.refNumber,
-      title: v.title,
-      cost: v.costImpact,
-      status: v.status,
-    })),
-  });
+  const scopes = def.scopes.filter((s) => viewer.financeDetail || !FINANCE_SCOPES.includes(s));
+  const context = buildReportContext(job, scopes);
 
-  const { system } = getPrompt("reports.weekly");
-  const res = await callClaude(system, `Week ending ${weekEnding}. Project data:\n${context}`, {
+  const { system } = getPrompt(def.promptKey);
+  const res = await callClaude(system, `${def.periodLabel} ${periodEnding}. Project data:\n${context}`, {
     model: modelFor("drafting"),
     maxTokens: 1200,
   });
@@ -90,8 +126,11 @@ export async function generateWeeklyReport(
   const contentRaw = res.demo_mode
     ? `## Progress\n_Demo mode — no API key. This report was generated from a template._\n\n- ${job.phases.map((p) => `${p.name}: ${p.completionPct}%`).join("\n- ")}\n\n## Risks\n- ${job.risks.length} open risks\n\n## Next week\n- ${job.actions.length} open actions to progress`
     : res.content;
-  const content = applyWeeklyTemplate(contentRaw);
-  const title = `Week ending ${weekEnding}`;
+  const content = def.sectionTemplate ? applyWeeklyTemplate(contentRaw) : contentRaw.trim();
+  const title =
+    def.id === "weekly_progress"
+      ? `Week ending ${periodEnding}`
+      : `${def.title} — ${periodEnding}`;
 
   // Airtable (Spec 12): the report is a DOCUMENTS row — body in Text_Content,
   // lifecycle in AI_Analysis.module8. Doc_Status stays a neutral "Active".
@@ -99,29 +138,49 @@ export async function generateWeeklyReport(
     const stored = await getStorer()
       .put({ orgSlug: ctx.orgSlug, docType: REPORT_DOC_TYPE, name: `${title}.md` }, Buffer.from(content, "utf8"))
       .catch(() => null);
-    const result = await writeRecord(ctx, {
-      table: "document",
-      op: "create",
-      data: {
-        jobId,
-        title,
-        docType: REPORT_DOC_TYPE,
-        status: "Active",
-        uploadedBy: userName,
-        textContent: content,
-        storageProvider: stored?.provider ?? "",
-        storageRef: stored?.ref ?? "",
-        aiAnalysis: buildReportAnalysis({
-          kind: "weekly_report",
-          weekEnding,
-          status: "draft",
-          isAiGenerated: true,
-          generatedAt: new Date().toISOString(),
-        }),
-      },
-      actor: { type: "ai", name: "Report Writer" },
+    // Supersede rule: regenerating the same (report type, period) overwrites the
+    // existing draft instead of stacking duplicates. DOCUMENTS carries no job
+    // link, so the match is per report+period (orgs are single-job today).
+    const existing = (
+      await core
+        .list(ctx.orgSlug, "DOCUMENTS", {
+          maxRecords: 500,
+          filterByFormula: `LOWER({Document_Type})='${REPORT_DOC_TYPE.toLowerCase()}'`,
+        })
+        .catch(() => [])
+    ).find((r) => {
+      const m8 = parseReportModule8(r["AI_Analysis"]);
+      return (
+        m8?.status === "draft" &&
+        m8.weekEnding === periodEnding &&
+        (m8.reportId ?? "weekly_progress") === def.id
+      );
     });
-    return { id: result.recordId, demoMode: res.demo_mode };
+    const data = {
+      jobId,
+      title,
+      docType: REPORT_DOC_TYPE,
+      status: "Active",
+      uploadedBy: viewer.name,
+      textContent: content,
+      storageProvider: stored?.provider ?? "",
+      storageRef: stored?.ref ?? "",
+      aiAnalysis: buildReportAnalysis({
+        kind: "weekly_report",
+        reportId: def.id,
+        weekEnding: periodEnding,
+        status: "draft",
+        isAiGenerated: true,
+        generatedAt: new Date().toISOString(),
+      }),
+    };
+    const result = await writeRecord(
+      ctx,
+      existing
+        ? { table: "document", op: "update", recordId: existing.id, data, actor: { type: "ai", name: "Report Writer" } }
+        : { table: "document", op: "create", data, actor: { type: "ai", name: "Report Writer" } },
+    );
+    return { id: result.recordId ?? existing?.id, demoMode: res.demo_mode };
   }
 
   // Postgres: rich weekly_report row + an immutable DOCUMENTS snapshot for audit.
@@ -130,7 +189,7 @@ export async function generateWeeklyReport(
     op: "create",
     data: {
       jobId,
-      weekEnding,
+      weekEnding: periodEnding,
       title,
       content,
       isAiGenerated: true,
@@ -139,9 +198,9 @@ export async function generateWeeklyReport(
     actor: { type: "ai", name: "Report Writer" },
   });
   if (result.recordId != null) {
-    const snapshot = await generateManagedDocument(ctx, userName, {
+    const snapshot = await generateManagedDocument(ctx, viewer.name, {
       jobId,
-      title: `Weekly report (${weekEnding})`,
+      title: `${title} (snapshot)`,
       docType: "report",
       outputType: "weekly_report_snapshot",
       format: "pdf",
@@ -162,6 +221,17 @@ export async function generateWeeklyReport(
     }
   }
   return { id: result.recordId, demoMode: res.demo_mode };
+}
+
+/** Legacy alias for AI/system callers (scheduler, assistant executor) — the
+ *  weekly report has always carried full financial detail on those paths. */
+export function generateWeeklyReport(
+  ctx: OrgCtx,
+  userName: string,
+  jobId: RecordId,
+  weekEnding: string,
+): Promise<{ id?: RecordId; demoMode: boolean }> {
+  return generateReport(ctx, { name: userName, financeDetail: true }, "weekly_progress", jobId, weekEnding);
 }
 
 export async function approveReport(ctx: OrgCtx, userName: string, id: RecordId): Promise<void> {

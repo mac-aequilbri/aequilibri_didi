@@ -2,24 +2,35 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
+import { getCurrentUser, getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { recordIdParam } from "@/lib/platform/recordWriter";
+import { reportingCapabilities } from "@/lib/platform/reportingPolicy";
 import {
   approveReport,
-  generateWeeklyReport,
+  generateReport,
   markReportSent,
 } from "@/services/platform/construction/reports";
 
 export async function generateReportAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
+  const viewer = await getCurrentViewer(ctx);
+  const caps = reportingCapabilities(viewer.role);
+  if (!caps.canGenerateReports) throw new Error("Your role cannot generate reports.");
   const jobId = recordIdParam(formData.get("jobId"));
-  const weekEnding =
+  const reportId = String(formData.get("reportId") ?? "") || "weekly_progress";
+  const periodEnding =
     String(formData.get("weekEnding") ?? "") || new Date().toISOString().slice(0, 10);
   if (jobId == null) return;
 
-  const { id } = await generateWeeklyReport(ctx, user.name, jobId, weekEnding);
+  const { id } = await generateReport(
+    ctx,
+    { name: user.name, financeDetail: caps.showFinancialDetail },
+    reportId,
+    jobId,
+    periodEnding,
+  );
   revalidatePath(orgPath(ctx.orgSlug, "/reports"));
   redirect(orgPath(ctx.orgSlug, id ? `/reports/${id}` : "/reports"));
 }

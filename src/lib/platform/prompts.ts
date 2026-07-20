@@ -107,6 +107,22 @@ changed unless a specialist reported it (including whether it is pending approva
       "Progress, Budget, Risks, Next week. Ground every statement in the supplied data; " +
       "do not invent numbers. Keep it under 250 words.",
   },
+  "reports.monthly_client": {
+    key: "reports.monthly_client",
+    version: "1.0",
+    system:
+      "You write a monthly construction project summary for the client in Markdown with sections: " +
+      "Highlights, Progress, Budget position, Variations, Looking ahead. Professional, client-friendly " +
+      "tone. Ground every statement in the supplied data; do not invent numbers. Keep it under 350 words.",
+  },
+  "reports.project_health": {
+    key: "reports.project_health",
+    version: "1.0",
+    system:
+      "You write a one-page project health snapshot in Markdown with sections: " +
+      "Health summary, Schedule, Budget, Top risks, Recommended actions. Blunt and factual; " +
+      "ground every statement in the supplied data; do not invent numbers. Keep it under 250 words.",
+  },
   "assessment.construction": {
     key: "assessment.construction",
     version: "1.2",

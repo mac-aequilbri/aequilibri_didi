@@ -12,6 +12,7 @@ import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { loadWeeklyReports, type ReportView } from "@/lib/platform/domainListSources";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { orgPath } from "@/lib/platform/paths";
+import { REPORT_CATALOG } from "@/lib/platform/reportCatalog";
 import { reportModeFor, reportingCapabilities } from "@/lib/platform/reportingPolicy";
 import { generateReportAction } from "./actions";
 
@@ -73,6 +74,16 @@ export default async function ReportsPage({
         <form action={generateReportAction} className="ae-card p-5 mb-6 flex flex-wrap items-end gap-4">
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <label className="block text-sm">
+            <span className="text-neutral-600">Report</span>
+            <select name="reportId" className="mt-1 block rounded border border-neutral-300 px-3 py-2">
+              {REPORT_CATALOG.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
             <span className="text-neutral-600">Job</span>
             <select name="jobId" className="mt-1 block rounded border border-neutral-300 px-3 py-2">
               {jobs.map((j) => (
@@ -83,7 +94,7 @@ export default async function ReportsPage({
             </select>
           </label>
           <label className="block text-sm">
-            <span className="text-neutral-600">Week ending</span>
+            <span className="text-neutral-600">Period ending</span>
             <input type="date" name="weekEnding" className="mt-1 block rounded border border-neutral-300 px-3 py-2" />
           </label>
           <button type="submit" className="btn-ae">
