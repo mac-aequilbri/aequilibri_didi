@@ -41,11 +41,15 @@ export default async function NewBimModelPage({
         </p>
       </div>
       {error === "invalid_url" && (
-        <p className="text-red-600 text-sm mb-3">
+        <p role="alert" className="text-red-600 text-sm mb-3">
           That embed link was rejected — only HTTPS graphisoft.com share/embed links are allowed.
         </p>
       )}
-      {error === "name_required" && <p className="text-red-600 text-sm mb-3">A model name is required.</p>}
+      {error === "name_required" && (
+        <p role="alert" className="text-red-600 text-sm mb-3">
+          A model name is required.
+        </p>
+      )}
       <form action={addBimModel} className="ae-card p-5 space-y-4">
         <input type="hidden" name="org" value={ctx.orgSlug} />
         <input type="hidden" name="jobId" value={jobId} />

@@ -53,7 +53,7 @@ const config: RecordEditorConfig = {
         { value: "overdue", label: "overdue" },
       ],
     },
-    { name: "dueDate", label: "Due date", type: "date" },
+    { name: "dueDate", label: "Due date", type: "date", noPast: true },
     { name: "sentBy", label: "Sent by", type: "text" },
     { name: "notes", label: "Notes", type: "textarea", full: true, aiFillable: true },
   ],

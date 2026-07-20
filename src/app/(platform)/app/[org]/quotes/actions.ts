@@ -24,15 +24,21 @@ export async function createQuoteAction(formData: FormData): Promise<void> {
   const title = String(formData.get("title") ?? "").trim();
   if (jobId == null || !title) return;
   const fromBudget = formData.get("fromBudget") === "on";
-  const quoteId = fromBudget
-    ? await generateQuoteFromBudget(ctx, user.name, jobId)
-    : await createQuote(ctx, user.name, {
-        jobId,
-        title,
-        clientName: String(formData.get("clientName") ?? "").trim(),
-        notes: String(formData.get("notes") ?? "").trim(),
-        validUntil: String(formData.get("validUntil") ?? "").trim(),
-      });
+  let quoteId;
+  try {
+    quoteId = fromBudget
+      ? await generateQuoteFromBudget(ctx, user.name, jobId)
+      : await createQuote(ctx, user.name, {
+          jobId,
+          title,
+          clientName: String(formData.get("clientName") ?? "").trim(),
+          notes: String(formData.get("notes") ?? "").trim(),
+          validUntil: String(formData.get("validUntil") ?? "").trim(),
+        });
+  } catch (e) {
+    console.error("[createQuoteAction] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/quotes/new?error=save_failed"));
+  }
   redirect(orgPath(ctx.orgSlug, `/quotes/${quoteId}`));
 }
 

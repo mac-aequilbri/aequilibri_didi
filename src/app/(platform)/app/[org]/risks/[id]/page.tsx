@@ -15,8 +15,18 @@ const config: RecordEditorConfig = {
     "You are an operations assistant helping a construction / field-service manager keep a risk register sharp — clear risk statements and actionable mitigations.",
   fields: [
     { name: "description", label: "Risk", type: "textarea", full: true, required: true, aiFillable: true },
-    { name: "likelihood", label: "Likelihood (1–5)", type: "number", min: 1, max: 5 },
-    { name: "impact", label: "Impact (1–5)", type: "number", min: 1, max: 5 },
+    {
+      name: "likelihood",
+      label: "Likelihood (1–5)",
+      type: "select",
+      options: [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) })),
+    },
+    {
+      name: "impact",
+      label: "Impact (1–5)",
+      type: "select",
+      options: [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) })),
+    },
     { name: "mitigation", label: "Mitigation", type: "textarea", full: true, aiFillable: true },
     { name: "owner", label: "Owner", type: "text" },
     {

@@ -16,12 +16,17 @@ export async function createProcurement(formData: FormData): Promise<void> {
   const unitPrice = Number(data.unitPrice) || 0;
   data.total = mulMoney(qty, unitPrice);
 
-  await writeRecord(ctx, {
-    table: "procurement",
-    op: "create",
-    data,
-    actor: { type: "human", name: user.name },
-  });
+  try {
+    await writeRecord(ctx, {
+      table: "procurement",
+      op: "create",
+      data,
+      actor: { type: "human", name: user.name },
+    });
+  } catch (e) {
+    console.error("[createProcurement] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/procurement/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/procurement"));
   redirect(orgPath(ctx.orgSlug, "/procurement"));
 }

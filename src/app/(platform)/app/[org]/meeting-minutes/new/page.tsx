@@ -6,8 +6,15 @@ import { processMinutesAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewMinutesPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function NewMinutesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  const { error } = await searchParams;
   const jobs = await loadJobOptions(ctx);
 
   return (
@@ -16,12 +23,21 @@ export default async function NewMinutesPage({ params }: { params: Promise<{ org
         title="New meeting minutes"
         subtitle="The AI extracts action items with owners and due dates for your confirmation."
       />
+      {error === "save_failed" && (
+        <p role="alert" className="text-red-600 text-sm mb-3">
+          The minutes couldn&apos;t be processed — the org&apos;s base rejected the write. Check
+          the server log for details.
+        </p>
+      )}
       <form action={processMinutesAction} className="ae-card p-5 space-y-4">
         <input type="hidden" name="org" value={ctx.orgSlug} />
         <div className="grid grid-cols-2 gap-4">
           <label className="block text-sm">
             <span className="text-neutral-600">Job *</span>
-            <select name="jobId" required className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+            <select name="jobId" required defaultValue="" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+              <option value="" disabled>
+                Select a project…
+              </option>
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
                   {j.label}

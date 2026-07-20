@@ -8,6 +8,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   toAiFields,
   toSpecLite,
@@ -19,11 +20,18 @@ import { suggestRecordEdits, updateRecordDetail } from "@/lib/platform/recordEdi
 
 const inputCls = "mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm";
 
-function SaveButton() {
+/** Today as the YYYY-MM-DD an <input type="date"> emits, in local time —
+ *  mirrors the shared DateField's noPast behavior. */
+function todayInput(): string {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function SaveButton({ saved }: { saved: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn-ae disabled:opacity-60" disabled={pending}>
-      {pending ? "Saving…" : "Save changes"}
+    <button type="submit" className="btn-ae disabled:opacity-60" disabled={pending || saved}>
+      {pending ? "Saving…" : saved ? "Saved — returning…" : "Save changes"}
     </button>
   );
 }
@@ -97,12 +105,15 @@ function Field({
         </select>
       );
     }
+    const inputType = ["number", "date", "email", "tel"].includes(field.type)
+      ? field.type
+      : "text";
     return (
       <input
-        type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+        type={inputType}
         name={field.name}
         value={String(value)}
-        min={field.min}
+        min={field.type === "date" ? (field.noPast ? todayInput() : undefined) : field.min}
         max={field.max}
         step={field.step}
         required={field.required}
@@ -134,8 +145,9 @@ export default function RecordEditor({
   recordId: string;
   backHref: string;
 }) {
-  const [state, setState] = useState<EditorValues>(() => {
-    // Seed every field so React inputs stay controlled even if a value is absent.
+  // Seed every field so React inputs stay controlled even if a value is absent.
+  // The seed is kept as the pristine baseline for the unsaved-changes guard.
+  const [initial] = useState<EditorValues>(() => {
     const seed: EditorValues = {};
     for (const f of config.fields) {
       const v = values[f.name];
@@ -143,6 +155,34 @@ export default function RecordEditor({
     }
     return seed;
   });
+  const [state, setState] = useState<EditorValues>(initial);
+
+  const router = useRouter();
+
+  // Save runs the server action; on success we show "Saved — returning…" and
+  // navigate client-side after a beat (a redirect inside the action would route
+  // through the [org] loading fallback and blank the page). A failed write
+  // surfaces its error inline and keeps the user's values.
+  const [saveState, saveAction] = useActionState(updateRecordDetail, null);
+  const saved = Boolean(saveState?.ok);
+  useEffect(() => {
+    if (!saved) return;
+    const t = setTimeout(() => router.push(backHref), 600);
+    return () => clearTimeout(t);
+  }, [saved, router, backHref]);
+
+  // Unsaved-changes guard: warn on tab close / hard nav while edits are pending.
+  // String-compare so a loaded number (e.g. likelihood 3) equals its form echo "3".
+  const dirty = !saved && config.fields.some((f) => String(state[f.name]) !== String(initial[f.name]));
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   const aiFields = toAiFields(config.fields);
   const [aiState, runAi, aiPending] = useActionState(suggestRecordEdits, null);
@@ -168,7 +208,7 @@ export default function RecordEditor({
   };
 
   return (
-    <form action={updateRecordDetail} className="ae-card p-5 space-y-4">
+    <form action={saveAction} className="ae-card p-5 space-y-4">
       <input type="hidden" name="org" value={orgSlug} />
       <input type="hidden" name="recordId" value={recordId} />
       <input type="hidden" name="table" value={config.table} />
@@ -208,6 +248,19 @@ export default function RecordEditor({
           {aiState.error}
         </p>
       )}
+      {saved && (
+        <p
+          role="status"
+          className="rounded border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800"
+        >
+          Saved — returning…
+        </p>
+      )}
+      {saveState && !saveState.ok && saveState.error && (
+        <p role="alert" className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-700">
+          Couldn&apos;t save — {saveState.error}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {config.fields.map((f) => (
@@ -216,8 +269,14 @@ export default function RecordEditor({
       </div>
 
       <div className="flex items-center gap-3 pt-1">
-        <SaveButton />
-        <Link href={backHref} className="btn-ae-outline">
+        <SaveButton saved={saved} />
+        <Link
+          href={backHref}
+          onClick={(e) => {
+            if (dirty && !window.confirm("Discard unsaved changes?")) e.preventDefault();
+          }}
+          className="btn-ae-outline"
+        >
           Cancel
         </Link>
       </div>

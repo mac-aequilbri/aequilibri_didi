@@ -5,12 +5,25 @@ import { createVendor } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewVendorPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function NewVendorPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  const { error } = await searchParams;
 
   return (
     <div className="p-6 max-w-xl">
       <PageHeader title="New vendor" />
+      {error === "save_failed" && (
+        <p role="alert" className="text-red-600 text-sm mb-3">
+          The vendor couldn&apos;t be saved — the org&apos;s base rejected the write. Check the
+          server log for details.
+        </p>
+      )}
       <form action={createVendor} className="ae-card p-5 space-y-4">
         <input type="hidden" name="org" value={ctx.orgSlug} />
         <div className="grid grid-cols-2 gap-4">

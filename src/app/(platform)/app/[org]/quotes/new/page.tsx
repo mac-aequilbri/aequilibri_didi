@@ -11,8 +11,15 @@ import { createQuoteAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewQuotePage({ params }: { params: Promise<{ org: string }> }) {
+export default async function NewQuotePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  const { error } = await searchParams;
   const jobs = await loadJobOptions(ctx);
 
   return (
@@ -23,6 +30,12 @@ export default async function NewQuotePage({ params }: { params: Promise<{ org: 
         actions={[{ href: orgPath(ctx.orgSlug, "/quotes"), label: "Back to quotes", variant: "outline" }]}
       />
 
+      {error === "save_failed" && (
+        <p role="alert" className="text-red-600 text-sm mb-3">
+          The quote couldn&apos;t be saved — the org&apos;s base rejected the write. Check the
+          server log for details.
+        </p>
+      )}
       {jobs.length === 0 ? (
         <p className="text-sm text-neutral-500">Create a job first — run a New Assessment.</p>
       ) : (
@@ -30,7 +43,10 @@ export default async function NewQuotePage({ params }: { params: Promise<{ org: 
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <label className="block text-sm">
             <span className="text-neutral-600">Job *</span>
-            <select name="jobId" required className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+            <select name="jobId" required defaultValue="" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+              <option value="" disabled>
+                Select a project…
+              </option>
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
                   {j.label}

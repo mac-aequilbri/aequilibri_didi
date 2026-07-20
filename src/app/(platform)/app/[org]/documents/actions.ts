@@ -37,28 +37,38 @@ export async function uploadDocument(formData: FormData): Promise<void> {
     const jobCode = !airtableEnabled() && typeof jobId === "number"
       ? (await prisma.platJob.findFirst({ where: { id: jobId, orgId: ctx.orgId }, select: { code: true } }))?.code
       : undefined;
-    await ingestDocumentFile(ctx, user.name, {
-      jobId,
-      jobCode,
-      title: title || file.name,
-      name: file.name,
-      mimeType: file.type || "application/octet-stream",
-      buf: Buffer.from(await file.arrayBuffer()),
-      topicHint: topic || undefined,
-      referenceHint: reference || undefined,
-      dateHint: documentDate || undefined,
-      docTypeOverride: docType || undefined,
-    });
+    try {
+      await ingestDocumentFile(ctx, user.name, {
+        jobId,
+        jobCode,
+        title: title || file.name,
+        name: file.name,
+        mimeType: file.type || "application/octet-stream",
+        buf: Buffer.from(await file.arrayBuffer()),
+        topicHint: topic || undefined,
+        referenceHint: reference || undefined,
+        dateHint: documentDate || undefined,
+        docTypeOverride: docType || undefined,
+      });
+    } catch (e) {
+      console.error("[uploadDocument] file ingest rejected:", e);
+      redirect(orgPath(ctx.orgSlug, "/documents/new?error=save_failed"));
+    }
   } else if (url) {
-    await ingestDocumentLink(ctx, user.name, {
-      jobId,
-      title: title || url,
-      url,
-      docType,
-      topicHint: topic || undefined,
-      referenceHint: reference || undefined,
-      dateHint: documentDate || undefined,
-    });
+    try {
+      await ingestDocumentLink(ctx, user.name, {
+        jobId,
+        title: title || url,
+        url,
+        docType,
+        topicHint: topic || undefined,
+        referenceHint: reference || undefined,
+        dateHint: documentDate || undefined,
+      });
+    } catch (e) {
+      console.error("[uploadDocument] link ingest rejected:", e);
+      redirect(orgPath(ctx.orgSlug, "/documents/new?error=save_failed"));
+    }
   } else {
     redirect(orgPath(ctx.orgSlug, "/documents/new?error=nothing_to_save"));
   }

@@ -18,12 +18,17 @@ export async function createVariation(formData: FormData): Promise<void> {
   const data = formToObject(formData);
   data.submittedBy = user.name;
   data.status = "submitted";
-  await writeRecord(ctx, {
-    table: "variation_order",
-    op: "create",
-    data,
-    actor: { type: "human", name: user.name },
-  });
+  try {
+    await writeRecord(ctx, {
+      table: "variation_order",
+      op: "create",
+      data,
+      actor: { type: "human", name: user.name },
+    });
+  } catch (e) {
+    console.error("[createVariation] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/variations/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/variations"));
   redirect(orgPath(ctx.orgSlug, "/variations"));
 }
@@ -33,7 +38,13 @@ export async function aiDraftVariationAction(formData: FormData): Promise<void> 
   const jobId = recordIdParam(formData.get("jobId"));
   const brief = String(formData.get("brief") ?? "").trim();
   if (jobId == null || !brief) return;
-  const { id } = await aiDraftVariation(ctx, ctx.config.assistant.name, jobId, brief);
+  let id;
+  try {
+    ({ id } = await aiDraftVariation(ctx, ctx.config.assistant.name, jobId, brief));
+  } catch (e) {
+    console.error("[aiDraftVariationAction] draft rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/variations/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/variations"));
   redirect(orgPath(ctx.orgSlug, id ? `/variations/${id}` : "/variations"));
 }

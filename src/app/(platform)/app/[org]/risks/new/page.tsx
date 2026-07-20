@@ -21,7 +21,7 @@ export default async function NewRiskPage({
     <div className="p-6 max-w-xl">
       <PageHeader title="New risk" />
       {error === "save_failed" && (
-        <p className="text-red-600 text-sm mb-3">
+        <p role="alert" className="text-red-600 text-sm mb-3">
           The risk couldn&apos;t be saved — the org&apos;s base rejected the write. Check the server
           log for details.
         </p>
@@ -35,7 +35,10 @@ export default async function NewRiskPage({
         <div className="grid grid-cols-2 gap-4">
           <label className="block text-sm">
             <span className="text-neutral-600">Job *</span>
-            <select name="jobId" required className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+            <select name="jobId" required defaultValue="" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+              <option value="" disabled>
+                Select a project…
+              </option>
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
                   {j.label}

@@ -14,11 +14,12 @@ import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { isWritableTable, readRecord } from "@/lib/platform/recordWriter";
 import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
 import { canApprove } from "@/lib/platform/roles";
+import { friendlyTableLabel } from "@/lib/platform/tableLabels";
 import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const tableLabel = (key: string) => key.replace(/_/g, " ");
+const tableLabel = friendlyTableLabel;
 const opLabel = (op: string) => ({ create: "Create", update: "Update", delete: "Delete" })[op] ?? op;
 
 // Storage/plumbing fields that are noise in a human review.

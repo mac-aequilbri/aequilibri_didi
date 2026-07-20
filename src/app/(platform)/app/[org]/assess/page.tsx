@@ -193,7 +193,7 @@ export default async function AssessPage({
                 <h3 className="font-semibold text-sm">Budget breakdown</h3>
                 {assessment.category === "reroof" && (
                   <span className="text-[11px] text-neutral-500">
-                    seeded from UC1 rates{assessment.budgetRefined ? " · edited" : ""}
+                    seeded from the roofing rate library{assessment.budgetRefined ? " · edited" : ""}
                   </span>
                 )}
               </div>

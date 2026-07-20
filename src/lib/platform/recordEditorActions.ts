@@ -7,7 +7,6 @@
 // validates, typecasts, stamps orgId, and audits — so no new write path exists.
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { airtableEnabled } from "@/lib/airtable";
 import { callClaude } from "@/lib/claude";
 import { getCurrentUser, requireOrgCtx } from "./org-context";
@@ -44,22 +43,35 @@ function coerce(type: EditorFieldType, raw: string, air: boolean): unknown | typ
   }
 }
 
+/** Result of a Save from the shared editor, surfaced back via useActionState so
+ *  a failed write is visible and the client controls navigation (a redirect
+ *  here would route through the [org] loading fallback and blank the editor). */
+export interface UpdateRecordResult {
+  ok: boolean;
+  error?: string;
+}
+
 /** Save edits to a single record. Field metadata rides in the hidden `__spec`
  *  input so this one action serves every table. */
-export async function updateRecordDetail(formData: FormData): Promise<void> {
+export async function updateRecordDetail(
+  _prev: UpdateRecordResult | null,
+  formData: FormData,
+): Promise<UpdateRecordResult> {
   const ctx = await requireOrgCtx(str(formData.get("org")));
   const user = await getCurrentUser(ctx); // enforces the write gate
 
   const table = str(formData.get("table"));
   const recordId = str(formData.get("recordId"));
   const listPath = str(formData.get("listPath")) || "";
-  if (!isWritableTable(table) || !recordId) return;
+  if (!isWritableTable(table) || !recordId) {
+    return { ok: false, error: "Missing record reference." };
+  }
 
   let spec: FieldSpecLite[] = [];
   try {
     spec = JSON.parse(str(formData.get("__spec")) || "[]") as FieldSpecLite[];
   } catch {
-    return;
+    return { ok: false, error: "The form spec could not be read — reload and try again." };
   }
 
   const air = airtableEnabled();
@@ -73,16 +85,20 @@ export async function updateRecordDetail(formData: FormData): Promise<void> {
     if (value !== SKIP) data[f.name] = value;
   }
 
-  await writeRecord(ctx, {
-    table: table as WritableTable,
-    op: "update",
-    recordId,
-    data,
-    actor: { type: "human", name: user.name },
-  });
+  try {
+    await writeRecord(ctx, {
+      table: table as WritableTable,
+      op: "update",
+      recordId,
+      data,
+      actor: { type: "human", name: user.name },
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "The change could not be saved." };
+  }
 
   if (listPath) revalidatePath(orgPath(ctx.orgSlug, listPath));
-  redirect(orgPath(ctx.orgSlug, listPath));
+  return { ok: true };
 }
 
 // ── AI assist ───────────────────────────────────────────────────────────────

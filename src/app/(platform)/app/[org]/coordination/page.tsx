@@ -45,7 +45,7 @@ export default async function CoordinationPage({
                 <span className="block text-xs text-neutral-500">{item.detail}</span>
               </span>
               <span className={`px-1.5 py-0.5 rounded text-xs font-semibold shrink-0 ${tone(item.priority)}`}>
-                {item.priority}
+                {item.priority === "MED" ? "Medium" : item.priority}
               </span>
             </Link>
           ))}

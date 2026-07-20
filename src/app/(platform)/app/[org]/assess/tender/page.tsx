@@ -38,7 +38,7 @@ export default async function TenderComparisonPage({
     <div className="p-6 max-w-4xl space-y-5">
       <PageHeader
         title="Builder tender comparison"
-        subtitle="Module 3 capability: compares builder tenders against canonical trade-item scope."
+        subtitle="Compares builder tenders against canonical trade-item scope."
         actions={[{ href: `/app/${ctx.orgSlug}/assess`, label: "Back to assessment", variant: "outline" }]}
       />
 

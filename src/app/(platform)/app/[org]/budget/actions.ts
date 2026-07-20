@@ -10,12 +10,17 @@ import { writeRecord } from "@/lib/platform/recordWriter";
 export async function createBudgetLine(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await requireFinancialAccess(ctx);
-  await writeRecord(ctx, {
-    table: "budget_line",
-    op: "create",
-    data: formToObject(formData),
-    actor: { type: "human", name: user.name },
-  });
+  try {
+    await writeRecord(ctx, {
+      table: "budget_line",
+      op: "create",
+      data: formToObject(formData),
+      actor: { type: "human", name: user.name },
+    });
+  } catch (e) {
+    console.error("[createBudgetLine] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/budget/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/budget"));
   redirect(orgPath(ctx.orgSlug, "/budget"));
 }

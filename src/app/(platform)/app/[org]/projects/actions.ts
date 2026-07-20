@@ -11,12 +11,18 @@ import { recordIdParam, writeRecord } from "@/lib/platform/recordWriter";
 export async function createJob(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
-  const result = await writeRecord(ctx, {
-    table: "job",
-    op: "create",
-    data: formToObject(formData),
-    actor: { type: "human", name: user.name },
-  });
+  let result;
+  try {
+    result = await writeRecord(ctx, {
+      table: "job",
+      op: "create",
+      data: formToObject(formData),
+      actor: { type: "human", name: user.name },
+    });
+  } catch (e) {
+    console.error("[createJob] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/projects/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/projects"));
   redirect(orgPath(ctx.orgSlug, `/projects/${result.recordId}`));
 }

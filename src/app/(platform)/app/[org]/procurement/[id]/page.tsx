@@ -29,7 +29,7 @@ const config: RecordEditorConfig = {
         { value: "paid", label: "paid" },
       ],
     },
-    { name: "dueDate", label: "Due date", type: "date" },
+    { name: "dueDate", label: "Due date", type: "date", noPast: true },
   ],
 };
 

@@ -7,8 +7,15 @@ import { createDecision } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewDecisionPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function NewDecisionPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  const { error } = await searchParams;
   const [jobs, categories] = await Promise.all([
     loadJobOptions(ctx),
     loadReferenceOptions(ctx, "budget_category"),
@@ -17,6 +24,12 @@ export default async function NewDecisionPage({ params }: { params: Promise<{ or
   return (
     <div className="p-6 max-w-xl">
       <PageHeader title="New decision" />
+      {error === "save_failed" && (
+        <p role="alert" className="text-red-600 text-sm mb-3">
+          The decision couldn&apos;t be saved — the org&apos;s base rejected the write. Check the
+          server log for details.
+        </p>
+      )}
       <form action={createDecision} className="ae-card p-5 space-y-4">
         <input type="hidden" name="org" value={ctx.orgSlug} />
         <label className="block text-sm">
@@ -55,6 +68,7 @@ export default async function NewDecisionPage({ params }: { params: Promise<{ or
             <select name="status" defaultValue="proposed" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
               <option value="proposed">Proposed</option>
               <option value="confirmed">Confirmed</option>
+              <option value="superseded">Superseded</option>
             </select>
           </label>
         </div>

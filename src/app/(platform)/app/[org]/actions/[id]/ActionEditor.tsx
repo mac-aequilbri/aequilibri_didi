@@ -75,6 +75,31 @@ export default function ActionEditor({
     if (saveState?.ok) startNav(() => router.push(backHref));
   }, [saveState, router, backHref]);
 
+  // Unsaved-changes guard: warn on tab close / hard nav while edits are
+  // pending, and confirm before Cancel/Back discards them.
+  const dirty =
+    !saveState?.ok &&
+    (title !== action.title ||
+      detail !== action.detail ||
+      owner !== action.owner ||
+      dueDate !== toDateInput(action.dueDate) ||
+      priority !== (action.priority || "P2") ||
+      status !== (action.status || "open"));
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const goBack = () => {
+    if (dirty && !window.confirm("Discard unsaved changes?")) return;
+    startNav(() => router.push(backHref));
+  };
+
   // AI assist over fetch (not a server action) so the editor stays mounted while
   // it runs — a server action would refresh this force-dynamic route.
   const [aiLoading, setAiLoading] = useState(false);
@@ -123,7 +148,7 @@ export default function ActionEditor({
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
-          onClick={() => startNav(() => router.push(backHref))}
+          onClick={goBack}
           disabled={navigating}
           className="btn-ae-outline text-xs inline-flex items-center gap-1.5 disabled:opacity-60"
         >
@@ -215,7 +240,7 @@ export default function ActionEditor({
         </button>
         <button
           type="button"
-          onClick={() => startNav(() => router.push(backHref))}
+          onClick={goBack}
           disabled={busy}
           className="btn-ae-outline inline-flex items-center gap-1.5 disabled:opacity-60"
         >

@@ -23,9 +23,21 @@ export default async function NewDocumentPage({
         title="Add document"
         subtitle="Upload a file (classified + parsed automatically) or save an external link."
       />
-      {error === "too_large" && <p className="text-red-600 text-sm mb-3">File too large (max 5 MB).</p>}
+      {error === "too_large" && (
+        <p role="alert" className="text-red-600 text-sm mb-3">
+          File too large (max 5 MB).
+        </p>
+      )}
       {error === "nothing_to_save" && (
-        <p className="text-red-600 text-sm mb-3">Choose a file or enter a link.</p>
+        <p role="alert" className="text-red-600 text-sm mb-3">
+          Choose a file or enter a link.
+        </p>
+      )}
+      {error === "save_failed" && (
+        <p role="alert" className="text-red-600 text-sm mb-3">
+          The document couldn&apos;t be saved — the org&apos;s base rejected the write. Check the
+          server log for details.
+        </p>
       )}
       <form action={uploadDocument} className="ae-card p-5 space-y-4">
         <input type="hidden" name="org" value={ctx.orgSlug} />

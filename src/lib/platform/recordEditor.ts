@@ -7,7 +7,15 @@
 
 import type { WritableTable } from "./recordWriter";
 
-export type EditorFieldType = "text" | "textarea" | "number" | "date" | "select" | "checkbox";
+export type EditorFieldType =
+  | "text"
+  | "email"
+  | "tel"
+  | "textarea"
+  | "number"
+  | "date"
+  | "select"
+  | "checkbox";
 
 /** One editable field. `name` is the recordWriter (app) data key — the same key
  *  the field map keys off. `options` drives a <select>. `aiFillable` includes the
@@ -27,6 +35,9 @@ export interface EditorField {
   readOnly?: boolean;
   help?: string;
   required?: boolean;
+  /** Date fields only: reject dates before today (native `min`), matching the
+   *  DateField behavior on the New-record forms. */
+  noPast?: boolean;
 }
 
 export interface RecordEditorConfig {

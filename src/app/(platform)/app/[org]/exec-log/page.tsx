@@ -15,6 +15,7 @@ import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadExecLogHistory, type LogView } from "@/lib/platform/execLogSource";
 import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
 import { orgPath } from "@/lib/platform/paths";
+import { friendlyTableLabel } from "@/lib/platform/tableLabels";
 import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -34,13 +35,22 @@ const execLogListConfig: ListViewConfig<LogView> = {
 
 function Payload({ raw }: { raw: string }) {
   let pretty = raw;
+  let summary = "raw payload";
   try {
-    pretty = JSON.stringify(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    pretty = JSON.stringify(parsed);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const count = Object.keys(parsed).length;
+      summary = `${count} field${count === 1 ? "" : "s"}`;
+    }
   } catch {
     /* keep raw */
   }
   return (
-    <code className="text-xs text-neutral-500 break-all line-clamp-2">{pretty.slice(0, 240)}</code>
+    <details className="text-xs text-neutral-500">
+      <summary className="cursor-pointer select-none">{summary}</summary>
+      <code className="break-all">{pretty}</code>
+    </details>
   );
 }
 
@@ -59,7 +69,7 @@ export default async function ExecLogPage({
   const proposals = pending.filter((p) => p.status === "proposed");
   const { items: logs, page, pageCount } = sortAndPaginate(allLogs, query, execLogListConfig);
 
-  const tableLabel = (t: string) => t.replace(/^plat_(core|con|cfg)_/, "");
+  const tableLabel = friendlyTableLabel;
 
   return (
     <div className="p-6">
@@ -91,7 +101,7 @@ export default async function ExecLogPage({
                 <tr key={p.id} className="border-t border-neutral-100 align-top">
                   <td className="py-2 pr-2 whitespace-nowrap">
                     <span className="font-medium">
-                      {p.op} {p.tableKey.replace(/_/g, " ")}
+                      {p.op} {tableLabel(p.tableKey)}
                     </span>
                     <span className="block text-xs text-neutral-500">
                       #{p.id} · {p.actorName || p.actorType} · expires{" "}

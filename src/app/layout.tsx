@@ -36,12 +36,10 @@ export default async function RootLayout({
             {showAppSwitcher && (
               <>
                 <Link href="/uc1" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)] whitespace-nowrap shrink-0">
-                  <span className="uc-badge uc1-badge mr-1">UC1</span>
-                  <span className="hidden sm:inline">Roofing</span>
+                  Roofing
                 </Link>
                 <Link href="/app" className="text-sm text-[var(--ae-earth)] hover:text-[var(--ae-space)] whitespace-nowrap shrink-0">
-                  <span className="uc-badge uc3-badge mr-1">UC3</span>
-                  <span className="hidden sm:inline">MSME</span>
+                  MSME platform
                 </Link>
               </>
             )}
@@ -55,7 +53,7 @@ export default async function RootLayout({
           </div>
         </nav>
         <div className="flex-1">{children}</div>
-        <footer className="ae-footer">æquilibri POC — Next.js port</footer>
+        <footer className="ae-footer">æquilibri — operations platform</footer>
       </body>
     </html>
   );

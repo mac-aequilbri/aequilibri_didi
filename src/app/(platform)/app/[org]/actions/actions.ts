@@ -18,12 +18,17 @@ export async function createActionItem(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx); // also enforces the write gate
 
-  await writeRecord(ctx, {
-    table: "action",
-    op: "create",
-    data: formToObject(formData),
-    actor: { type: "human", name: user.name },
-  });
+  try {
+    await writeRecord(ctx, {
+      table: "action",
+      op: "create",
+      data: formToObject(formData),
+      actor: { type: "human", name: user.name },
+    });
+  } catch (e) {
+    console.error("[createActionItem] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/actions/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/actions"));
   redirect(orgPath(ctx.orgSlug, "/actions"));
 }

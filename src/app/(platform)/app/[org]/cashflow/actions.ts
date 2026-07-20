@@ -10,12 +10,17 @@ import { writeRecord } from "@/lib/platform/recordWriter";
 export async function createCashflowEntry(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await requireFinancialAccess(ctx);
-  await writeRecord(ctx, {
-    table: "cashflow",
-    op: "create",
-    data: formToObject(formData),
-    actor: { type: "human", name: user.name },
-  });
+  try {
+    await writeRecord(ctx, {
+      table: "cashflow",
+      op: "create",
+      data: formToObject(formData),
+      actor: { type: "human", name: user.name },
+    });
+  } catch (e) {
+    console.error("[createCashflowEntry] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/cashflow/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/cashflow"));
   redirect(orgPath(ctx.orgSlug, "/cashflow"));
 }

@@ -13,12 +13,17 @@ export async function createDecision(formData: FormData): Promise<void> {
   const data = formToObject(formData);
   data.madeBy = data.madeBy || user.name;
 
-  await writeRecord(ctx, {
-    table: "decision",
-    op: "create",
-    data,
-    actor: { type: "human", name: user.name },
-  });
+  try {
+    await writeRecord(ctx, {
+      table: "decision",
+      op: "create",
+      data,
+      actor: { type: "human", name: user.name },
+    });
+  } catch (e) {
+    console.error("[createDecision] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/decisions/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/decisions"));
   redirect(orgPath(ctx.orgSlug, "/decisions"));
 }

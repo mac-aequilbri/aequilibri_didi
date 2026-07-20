@@ -16,13 +16,19 @@ export async function processMinutesAction(formData: FormData): Promise<void> {
   const jobId = recordIdParam(formData.get("jobId"));
   const rawMinutes = String(formData.get("rawMinutes") ?? "").trim();
   if (jobId == null || !rawMinutes) return;
-  const { id } = await processMeetingMinutes(ctx, user.name, {
-    jobId,
-    meetingDate: String(formData.get("meetingDate") ?? "") || new Date().toISOString().slice(0, 10),
-    title: String(formData.get("title") ?? ""),
-    attendees: String(formData.get("attendees") ?? ""),
-    rawMinutes,
-  });
+  let id;
+  try {
+    ({ id } = await processMeetingMinutes(ctx, user.name, {
+      jobId,
+      meetingDate: String(formData.get("meetingDate") ?? "") || new Date().toISOString().slice(0, 10),
+      title: String(formData.get("title") ?? ""),
+      attendees: String(formData.get("attendees") ?? ""),
+      rawMinutes,
+    }));
+  } catch (e) {
+    console.error("[processMinutesAction] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/meeting-minutes/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/meeting-minutes"));
   redirect(orgPath(ctx.orgSlug, id ? `/meeting-minutes/${id}` : "/meeting-minutes"));
 }

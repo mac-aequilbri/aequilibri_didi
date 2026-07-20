@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { friendlyTableLabel } from "@/lib/platform/tableLabels";
 import {
   approveFromChatAction,
   closeSessionReviewAction,
@@ -11,6 +12,34 @@ import {
   saveConversationNoteFromChatAction,
   sendMessageAction,
 } from "./actions";
+
+/** Human phrasing for the assistant's tool chips — users should read what the
+ *  assistant did, not internal tool identifiers like "query_records". */
+const TOOL_LABELS: Record<string, string> = {
+  query_records: "Looked up records",
+  capture_source_note: "Saved a note",
+  create_action: "Created an action",
+  update_action: "Updated an action",
+  save_decision: "Saved a decision",
+  propose_rule: "Proposed a learning rule",
+  update_budget_line: "Updated a budget line",
+  create_variation_draft: "Drafted a variation",
+  create_risk: "Logged a risk",
+  log_workstream_update: "Updated a workstream",
+  generate_weekly_report: "Generated a weekly report",
+  run_construction_intake: "Ran document intake",
+  suggest_ingestion_routes: "Suggested filing routes",
+  onboarding_status: "Checked onboarding status",
+};
+
+/** Delegation markers ("→ Finance") are already human-readable; unknown tool
+ *  names fall back to humanised snake_case. */
+function toolLabel(tool: string): string {
+  if (TOOL_LABELS[tool]) return TOOL_LABELS[tool];
+  if (tool.startsWith("→")) return tool;
+  const words = tool.replace(/_/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export interface ChatMessageView {
   id: number | string;
@@ -240,7 +269,7 @@ export default function AssistantClient({
     formRef.current.requestSubmit();
   };
 
-  const tableLabel = (t: string) => t.replace(/^plat_(core|con|cfg)_/, "");
+  const tableLabel = friendlyTableLabel;
   const avatarLabel = assistantName.trim()[0]?.toUpperCase() ?? "A";
 
   return (
@@ -334,7 +363,7 @@ export default function AssistantClient({
                                   : "text-red-700 bg-red-50"
                           }`}
                         >
-                          {t.tool}
+                          {toolLabel(t.tool)}
                           {t.count > 1 ? ` ×${t.count}` : ""}
                           {t.status === "proposed" ? " · pending" : ""}
                         </span>

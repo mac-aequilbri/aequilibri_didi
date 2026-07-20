@@ -38,7 +38,7 @@ export default async function ArchitecturalScopePage({
     <div className="p-6 max-w-4xl space-y-5">
       <PageHeader
         title="Architectural scope assessment"
-        subtitle="Module 3 capability: parses architectural inputs into room-scope records and follow-up actions."
+        subtitle="Parses architectural inputs into room-scope records and follow-up actions."
         actions={[{ href: `/app/${ctx.orgSlug}/assess`, label: "Back to assessment", variant: "outline" }]}
       />
 

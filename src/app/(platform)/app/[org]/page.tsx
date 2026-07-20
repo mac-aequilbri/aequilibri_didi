@@ -10,6 +10,7 @@ import { loadDashboard } from "@/lib/platform/dashboardSource";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { reportingCapabilities } from "@/lib/platform/reportingPolicy";
+import { friendlyTableLabel } from "@/lib/platform/tableLabels";
 import { currency } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -161,7 +162,7 @@ export default async function OrgDashboard({
                 <tr key={log.id} className="border-t border-neutral-100">
                   <td className="py-2 pr-2">
                     <span className="font-medium">
-                      {log.operation} {log.targetTable.replace(/^plat_(core|con|cfg)_/, "")}
+                      {log.operation} {friendlyTableLabel(log.targetTable)}
                     </span>
                     <span className="block text-xs text-neutral-500">
                       {log.actorType}

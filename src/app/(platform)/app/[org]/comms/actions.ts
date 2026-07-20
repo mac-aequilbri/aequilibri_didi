@@ -13,12 +13,17 @@ export async function createComm(formData: FormData): Promise<void> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx); // also enforces the write gate
 
-  await writeRecord(ctx, {
-    table: "comms",
-    op: "create",
-    data: formToObject(formData),
-    actor: { type: "human", name: user.name },
-  });
+  try {
+    await writeRecord(ctx, {
+      table: "comms",
+      op: "create",
+      data: formToObject(formData),
+      actor: { type: "human", name: user.name },
+    });
+  } catch (e) {
+    console.error("[createComm] write rejected:", e);
+    redirect(orgPath(ctx.orgSlug, "/comms/new?error=save_failed"));
+  }
   revalidatePath(orgPath(ctx.orgSlug, "/comms"));
   redirect(orgPath(ctx.orgSlug, "/comms"));
 }
