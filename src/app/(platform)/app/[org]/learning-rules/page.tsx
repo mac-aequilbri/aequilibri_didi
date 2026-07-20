@@ -36,6 +36,10 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
         title="Automation rules"
         subtitle="Corrections → hypotheses → validated rules. Confidence compounds with every activation."
       />
+      <p className="-mt-3 mb-6 text-sm text-neutral-500">
+        Rules the platform learns from your corrections — review hypotheses, promote the good
+        ones, and they start shaping estimates.
+      </p>
 
       <div className="grid gap-4 sm:grid-cols-4 mb-6">
         <MetricCard value={active.length} label="Active rules" />

@@ -85,7 +85,14 @@ export default async function ProjectsPage({
               </div>
               <StatusBadge status={job.status} />
             </div>
-            <div className="mt-3 h-2 rounded bg-neutral-100 overflow-hidden">
+            <div
+              className="mt-3 h-2 rounded bg-neutral-100 overflow-hidden"
+              role="progressbar"
+              aria-valuenow={job.completionPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${job.name} completion`}
+            >
               <div
                 className="h-full rounded bg-[var(--ae-space,#1f2937)]"
                 style={{ width: `${job.completionPct}%` }}

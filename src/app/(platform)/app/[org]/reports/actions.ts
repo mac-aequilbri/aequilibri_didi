@@ -73,11 +73,13 @@ export async function saveTemplateAction(formData: FormData): Promise<void> {
   const spec = report?.promptSpec;
   if (!spec) return;
 
+  // Optional user-supplied name; fall back to the prompt-derived title.
+  const templateTitle = String(formData.get("templateTitle") ?? "").trim();
   const { createReportTemplate } = await import("@/lib/airtable/control");
   await createReportTemplate({
     orgSlug: ctx.orgSlug,
     key: `tpl_${Date.now().toString(36)}`,
-    title: spec.prompt.slice(0, 60) + (spec.prompt.length > 60 ? "…" : ""),
+    title: templateTitle || spec.prompt.slice(0, 60) + (spec.prompt.length > 60 ? "…" : ""),
     prompt: spec.prompt,
     scopes: spec.scopes,
   });

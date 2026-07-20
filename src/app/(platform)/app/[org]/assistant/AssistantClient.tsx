@@ -168,6 +168,17 @@ function Avatar({ label, kind }: { label: string; kind: "assistant" | "user" }) 
 }
 
 function ThinkingBubble({ avatar }: { avatar: string }) {
+  // Long waits (multi-tool turns) used to look frozen — after ~5s the bubble
+  // starts counting elapsed seconds so the user can tell it's still alive.
+  // The interval lives and dies with the bubble: it mounts when a message goes
+  // in-flight and unmounts on completion or failure, so no external cleanup.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   return (
     <div className="flex justify-start gap-2.5">
       <Avatar label={avatar} kind="assistant" />
@@ -177,6 +188,9 @@ function ThinkingBubble({ avatar }: { avatar: string }) {
           <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce [animation-delay:-0.3s]" />
           <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce [animation-delay:-0.15s]" />
           <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" />
+          {elapsed >= 5 && (
+            <span className="ml-1.5 text-[0.7rem] text-neutral-400">Still working… {elapsed}s</span>
+          )}
         </div>
       </div>
     </div>
@@ -218,10 +232,13 @@ export default function AssistantClient({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const reviewDetailsRef = useRef<HTMLDetailsElement>(null);
   const reviewFormRef = useRef<HTMLFormElement>(null);
   const [inFlight, setInFlight] = useState<string | null>(null);
+  /** Text of the last message that failed to send — drives the inline error bar
+   *  and its Retry button. Cleared when the next send starts. */
+  const [sendError, setSendError] = useState<string | null>(null);
   const [closedNotice, setClosedNotice] = useState(false);
 
   // Clear the optimistic in-flight bubble once the server round-trip brings
@@ -260,6 +277,16 @@ export default function AssistantClient({
     const t = setTimeout(() => setClosedNotice(false), 6000);
     return () => clearTimeout(t);
   }, [closedNotice]);
+
+  // The composer is a textarea that grows with its content (1–~6 rows). Height
+  // is data-driven (scrollHeight), so it must be re-measured on input, after
+  // reset, and after restoring failed text.
+  const resizeComposer = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 144)}px`; // cap ≈ 6 rows
+  };
 
   // Drop a starter prompt into the composer and send it straight away.
   const sendSuggestion = (text: string) => {
@@ -401,28 +428,71 @@ export default function AssistantClient({
         </div>
       )}
 
+      {sendError !== null && (
+        <div
+          role="alert"
+          className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
+          <span className="flex-1">Message failed to send — nothing was lost.</span>
+          <button
+            type="button"
+            onClick={() => sendSuggestion(sendError)}
+            className="btn-ae-outline shrink-0 text-xs"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <form
         ref={formRef}
         action={async (formData: FormData) => {
           const text = String(formData.get("message") ?? "").trim();
           if (!text) return;
+          setSendError(null);
           setInFlight(text);
           formRef.current?.reset();
-          await sendMessageAction(formData);
+          resizeComposer();
+          try {
+            await sendMessageAction(formData);
+          } catch {
+            // The action threw (network drop, server error) — without this the
+            // thinking bubble would spin forever and the typed message be gone.
+            setInFlight(null);
+            setSendError(text);
+            // Put the text back in the composer, unless the user already
+            // started typing something new while the send was in flight.
+            if (inputRef.current && !inputRef.current.value) {
+              inputRef.current.value = text;
+              resizeComposer();
+            }
+          }
         }}
-        className="mt-3 flex items-center gap-2 rounded-full border border-neutral-300 bg-white py-1.5 pl-4 pr-1.5 shadow-sm focus-within:border-ae-space focus-within:ring-2 focus-within:ring-[var(--ae-space,#1f2937)]"
+        className="mt-3 flex items-center gap-2 rounded-3xl border border-neutral-300 bg-white py-1.5 pl-4 pr-1.5 shadow-sm focus-within:border-ae-space focus-within:ring-2 focus-within:ring-[var(--ae-space,#1f2937)]"
       >
         <input type="hidden" name="org" value={orgSlug} />
         <input type="hidden" name="sessionId" value={sessionId} />
-        <input
+        <textarea
           ref={inputRef}
           name="message"
+          rows={1}
           autoComplete="off"
           placeholder={`Message ${assistantName}…`}
-          className="flex-1 bg-transparent text-sm focus:outline-none"
+          onInput={resizeComposer}
+          onKeyDown={(e) => {
+            // Enter sends; Shift+Enter makes a newline. Skip while an IME
+            // composition is in progress so CJK input doesn't send early.
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              formRef.current?.requestSubmit();
+            }
+          }}
+          className="max-h-36 flex-1 resize-none self-center overflow-y-auto bg-transparent text-sm focus:outline-none"
         />
         <SendButton />
       </form>
+      <p className="mt-1.5 text-center text-[0.7rem] text-neutral-400">
+        AI can make mistakes — verify important figures.
+      </p>
       <details ref={reviewDetailsRef} className="mt-2 ae-card p-4">
         <summary className="cursor-pointer text-sm font-medium">End session with review</summary>
         <form ref={reviewFormRef} action={closeSessionReviewAction} className="mt-3 space-y-3">

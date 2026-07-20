@@ -175,7 +175,14 @@ export default async function PublicPortalPage({
                         <span className="text-xs font-semibold text-neutral-700">{pct}%</span>
                       </div>
                     </div>
-                    <div className="w-full bg-neutral-100 rounded-full h-2">
+                    <div
+                      className="w-full bg-neutral-100 rounded-full h-2"
+                      role="progressbar"
+                      aria-valuenow={pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${phase.name} progress`}
+                    >
                       <div
                         className="bg-blue-500 h-2 rounded-full transition-all"
                         style={{ width: `${pct}%` }}

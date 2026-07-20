@@ -74,6 +74,10 @@ export default async function SchemaDriftPage({
         title="Schema drift"
         subtitle="Which customer bases have fallen behind the template schema."
       />
+      <p className="-mt-3 mb-6 text-sm text-neutral-500">
+        Compares each customer base against the current template; migrate adds anything missing —
+        it never removes data.
+      </p>
 
       <MigrateResultBanner sp={sp} />
 

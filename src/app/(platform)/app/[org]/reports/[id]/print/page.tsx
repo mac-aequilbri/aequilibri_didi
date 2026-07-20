@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/format";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { reportModeFor, reportingCapabilities } from "@/lib/platform/reportingPolicy";
 import { loadReportDetail } from "@/lib/platform/reportDetailSource";
+import { PrintButton } from "./PrintButton";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,9 @@ export default async function ReportPrintPage({
 
   return (
     <div className="mx-auto max-w-2xl p-10 print:p-0 bg-white">
+      <div className="mb-6 flex justify-end print:hidden">
+        <PrintButton />
+      </div>
       <header className="mb-8 border-b border-neutral-300 pb-4">
         <div className="flex items-center gap-2">
           <OrgLogo logo={ctx.config.branding?.logo} name={ctx.orgName} size={22} />

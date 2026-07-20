@@ -84,7 +84,7 @@ export default async function NewOrganisationPage({
               ))}
             </ul>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block text-sm">
               <span className="text-neutral-600">Customer name *</span>
               <input name="name" required placeholder="New Builder Co" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
@@ -147,7 +147,7 @@ export default async function NewOrganisationPage({
           </div>
           <fieldset className="text-sm">
             <legend className="text-neutral-600 mb-1">Allowed engagement types</legend>
-            <div className="grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
               {ENGAGEMENTS.map(([value, label]) => (
                 <label key={value} className="flex items-center gap-2 text-xs">
                   <input type="checkbox" name={`engagement_${value}`} defaultChecked={value === "long_project" || value === "short_job"} />
@@ -156,7 +156,7 @@ export default async function NewOrganisationPage({
               ))}
             </div>
           </fieldset>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block text-sm">
               <span className="text-neutral-600">First team member name</span>
               <input name="adminName" placeholder="Pat Builder" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
@@ -179,7 +179,7 @@ export default async function NewOrganisationPage({
 
         <section className="ae-card p-5 space-y-4">
           <h2 className="font-semibold text-sm">2 · Assistant & features</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block text-sm">
               <span className="text-neutral-600">Assistant name</span>
               <input name="assistantName" placeholder="Site Assistant" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
@@ -196,7 +196,7 @@ export default async function NewOrganisationPage({
           </label>
           <fieldset className="text-sm">
             <legend className="text-neutral-600 mb-1">Enabled screens</legend>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1">
               {Object.keys(DEFAULT_FEATURES).map((key) => (
                 <label key={key} className="flex items-center gap-2 text-xs">
                   <input type="checkbox" name={`feature_${key}`} defaultChecked={DEFAULT_FEATURES[key]} />

@@ -2,10 +2,11 @@
 // wired for this org, their enable state + delivery health, and how to point an
 // n8n workflow at the inbound webhook. Admin (owner) only.
 
+import { CopyButton } from "@/components/CopyButton";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
-import { listConnections, listOutbox } from "@/lib/airtable/control";
+import { getOrgWebhookSecret, listConnections, listOutbox } from "@/lib/airtable/control";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { addConnection, removeConnection, toggleConnection } from "./actions";
@@ -24,6 +25,14 @@ export default async function IntegrationsPage({
   await requireAdmin(ctx);
   const rows = await listConnections(ctx.orgSlug);
   const outbox = await listOutbox(ctx.orgSlug);
+  // Admin-only page (requireAdmin above) — safe to surface the signing secret.
+  const webhookSecret = await getOrgWebhookSecret(ctx.orgSlug);
+
+  // Delivery-health roll-up. lastStatus is free text written by
+  // touchConnectionHealth ("ok", "ok (deduped)", "error: …"); outbound retry
+  // states use failed/dead — treat any of those as unhealthy.
+  const unhealthy = rows.filter((r) => /error|failed|dead/i.test(r.lastStatus)).length;
+  const exampleBody = `{ "orgSlug": "${ctx.orgSlug}", "channel": "email", "externalId": "<provider message id>", "from": "", "subject": "", "body": "", "attachments": [] }`;
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-10">
@@ -36,6 +45,17 @@ export default async function IntegrationsPage({
       {rows.length === 0 ? (
         <p className="text-sm text-neutral-600">No channels wired yet. Add one below.</p>
       ) : (
+        <>
+        <p
+          className={`mb-3 rounded-md border px-3 py-2 text-xs font-medium ${
+            unhealthy > 0
+              ? "border-[var(--ae-warning)] bg-[var(--ae-warning-bg)] text-[var(--ae-warning)]"
+              : "border-[var(--ae-success)] bg-[var(--ae-success-bg)] text-[var(--ae-success)]"
+          }`}
+        >
+          {rows.length} channel{rows.length === 1 ? "" : "s"} ·{" "}
+          {unhealthy > 0 ? `${unhealthy} with failures` : "all healthy"}
+        </p>
         <table className="w-full text-sm ae-card">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
@@ -91,6 +111,7 @@ export default async function IntegrationsPage({
             ))}
           </tbody>
         </table>
+        </>
       )}
 
       <section className="mt-8 ae-card p-4">
@@ -135,7 +156,10 @@ export default async function IntegrationsPage({
         <dl className="space-y-2 text-xs">
           <div>
             <dt className="text-neutral-500">Endpoint</dt>
-            <dd className="font-mono">POST /api/platform/hooks</dd>
+            <dd className="font-mono flex flex-wrap items-center gap-2">
+              POST /api/platform/hooks
+              <CopyButton path="/api/platform/hooks" label="Copy URL" title="Copy the full endpoint URL" />
+            </dd>
           </div>
           <div>
             <dt className="text-neutral-500">Headers</dt>
@@ -151,14 +175,29 @@ export default async function IntegrationsPage({
           </div>
           <div>
             <dt className="text-neutral-500">Body</dt>
-            <dd className="font-mono">
-              {`{ orgSlug: "${ctx.orgSlug}", channel, externalId, from?, subject?, body?, attachments? }`}
+            <dd className="font-mono flex flex-wrap items-center gap-2">
+              <span className="break-all">{exampleBody}</span>
+              <CopyButton value={exampleBody} label="Copy body" title="Copy the example request body" />
+            </dd>
+            <dd className="text-neutral-400 mt-0.5">
+              from / subject / body / attachments are optional.
             </dd>
           </div>
+          {webhookSecret && (
+            <div>
+              <dt className="text-neutral-500">Signing secret</dt>
+              <dd className="font-mono flex flex-wrap items-center gap-2">
+                <span>••••••••{webhookSecret.slice(-4)}</span>
+                <CopyButton value={webhookSecret} label="Copy secret" title="Copy the full signing secret" />
+              </dd>
+            </div>
+          )}
         </dl>
         <p className="text-neutral-500 mt-3 text-xs">
-          The per-org signing secret is set in the control base for now (via <code>setOrgWebhookSecret</code> /
-          Airtable). A rotate-from-UI control is planned. Provider credentials (OAuth tokens) live in n8n — never here.
+          {webhookSecret
+            ? "The signing secret is managed in the control base for now; a rotate-from-UI control is planned."
+            : "No signing secret is set for this org yet — set one in the control base (setOrgWebhookSecret / Airtable)."}{" "}
+          Provider credentials (OAuth tokens) live in n8n — never here.
         </p>
       </section>
 

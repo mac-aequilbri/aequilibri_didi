@@ -77,9 +77,14 @@ export default async function VendorsPage({
                     <span className="block text-neutral-500">{v.contactEmail}</span>
                   )}
                 </td>
-                <td className="py-2 pr-2 text-xs whitespace-nowrap">
-                  {"★".repeat(Math.round(v.rating / 2)) || "—"}{" "}
-                  <span className="text-neutral-400">{v.rating}/10</span>
+                <td
+                  className="py-2 pr-2 text-xs whitespace-nowrap"
+                  aria-label={`Rated ${v.rating} out of 10`}
+                >
+                  <span aria-hidden="true">
+                    {"★".repeat(Math.round(v.rating / 2)) || "—"}{" "}
+                    <span className="text-neutral-400">{v.rating}/10</span>
+                  </span>
                 </td>
                 <td className="py-2 text-xs">
                   <StatusBadge status={v.isActive ? "active" : "inactive"} />

@@ -53,6 +53,10 @@ export function FilterBar({
   const [openField, setOpenField] = useState<string | null>(null);
   const [search, setSearch] = useState(query.q);
   const barRef = useRef<HTMLDivElement>(null);
+  // Only one popover is open at a time, so a single ref covers whichever is
+  // mounted; pillRefs lets Escape hand focus back to the pill that opened it.
+  const popRef = useRef<HTMLDivElement>(null);
+  const pillRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   // The latest INTENDED query — every mutation reads from and writes to this
   // ref, never the (possibly one-round-trip-stale) query prop. Without it, a
   // pending search debounce closes over an old query and silently re-applies
@@ -84,14 +88,27 @@ export function FilterBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  // Close any open popover on outside click or Escape.
+  // When a popover opens, move focus to its first control so keyboard users
+  // land inside it rather than having to tab past the rest of the bar.
+  useEffect(() => {
+    if (!openField) return;
+    popRef.current
+      ?.querySelector<HTMLElement>("input, select, button, [tabindex]:not([tabindex='-1'])")
+      ?.focus();
+  }, [openField]);
+
+  // Close any open popover on outside click or Escape (Escape hands focus
+  // back to the pill button that opened it).
   useEffect(() => {
     if (!openField) return;
     const onDown = (e: MouseEvent) => {
       if (barRef.current && !barRef.current.contains(e.target as Node)) setOpenField(null);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenField(null);
+      if (e.key === "Escape") {
+        setOpenField(null);
+        pillRefs.current[openField]?.focus();
+      }
     };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
@@ -168,6 +185,9 @@ export function FilterBar({
         <div key={f.name} className="filter-pill-wrap">
           <button
             type="button"
+            ref={(el) => {
+              pillRefs.current[f.name] = el;
+            }}
             className={`filter-pill${active ? " active" : ""}`}
             aria-expanded={open}
             onClick={() => setOpenField(open ? null : f.name)}
@@ -177,7 +197,7 @@ export function FilterBar({
             <span aria-hidden="true">▾</span>
           </button>
           {open && (
-            <div className="filter-pop">
+            <div className="filter-pop" ref={popRef}>
               {(f.options ?? []).map((o) => (
                 <label key={o.value} className="filter-opt">
                   <input
@@ -201,6 +221,9 @@ export function FilterBar({
       <div key={f.name} className="filter-pill-wrap">
         <button
           type="button"
+          ref={(el) => {
+            pillRefs.current[f.name] = el;
+          }}
           className={`filter-pill${r ? " active" : ""}`}
           aria-expanded={open}
           onClick={() => setOpenField(open ? null : f.name)}
@@ -210,7 +233,7 @@ export function FilterBar({
           <span aria-hidden="true">▾</span>
         </button>
         {open && (
-          <div className="filter-pop filter-range">
+          <div className="filter-pop filter-range" ref={popRef}>
             <label>
               From
               <input
@@ -256,6 +279,9 @@ export function FilterBar({
           <div className="filter-pill-wrap">
             <button
               type="button"
+              ref={(el) => {
+                pillRefs.current["__sort"] = el;
+              }}
               className={`filter-pill${activeSort ? " active" : ""}`}
               aria-expanded={sortOpen}
               onClick={() => setOpenField(sortOpen ? null : "__sort")}
@@ -269,7 +295,7 @@ export function FilterBar({
               <span aria-hidden="true">▾</span>
             </button>
             {sortOpen && (
-              <div className="filter-pop">
+              <div className="filter-pop" ref={popRef}>
                 {config.sort?.map((s) => (
                   <button
                     key={s.name}
@@ -332,7 +358,7 @@ export function FilterBar({
             type="button"
             className="btn-ae-outline text-xs disabled:opacity-40"
             onClick={() => goToPage(page - 1)}
-            disabled={page <= 1}
+            disabled={page <= 1 || isPending}
           >
             ← Prev
           </button>
@@ -343,7 +369,7 @@ export function FilterBar({
             type="button"
             className="btn-ae-outline text-xs disabled:opacity-40"
             onClick={() => goToPage(page + 1)}
-            disabled={page >= pageCount}
+            disabled={page >= pageCount || isPending}
           >
             Next →
           </button>

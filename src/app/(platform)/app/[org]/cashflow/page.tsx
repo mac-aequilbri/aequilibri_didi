@@ -94,7 +94,15 @@ export default async function CashflowPage({
           }
         }
         const periods = [...byPeriod.entries()].sort(([a], [b]) => comparePeriods(a, b));
-        if (periods.length < 2) return null;
+        if (periods.length < 2) {
+          // With zero shown entries the EmptyState below already explains; with
+          // exactly one period, say why the trend chart isn't drawn.
+          return periods.length === 1 ? (
+            <p className="mb-6 text-xs text-neutral-500">
+              Add entries across two or more periods to see the trend.
+            </p>
+          ) : null;
+        }
         return (
           <section className="ae-card p-5 mb-6">
             <h2 className="font-semibold mb-3">Organisation cashflow</h2>

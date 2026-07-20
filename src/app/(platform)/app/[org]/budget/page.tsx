@@ -53,7 +53,12 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
           .map(([label, v]) => ({ label, ...v }))
           .sort((a, b) => b.primary - a.primary)
           .slice(0, 10);
-        if (!rows.length) return null;
+        if (!rows.length)
+          return (
+            <p className="mb-6 text-xs text-neutral-500">
+              Add budget lines to see the category comparison.
+            </p>
+          );
         return (
           <section className="ae-card p-5 mb-6">
             <h2 className="font-semibold mb-3">Estimated vs actual by category</h2>

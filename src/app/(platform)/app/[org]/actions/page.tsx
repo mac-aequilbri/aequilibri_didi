@@ -172,6 +172,7 @@ export default async function ActionsPage({
                     <select
                       name="status"
                       defaultValue={a.needsMapping ? "open" : a.status}
+                      aria-label={`Status for ${a.title}`}
                       className="text-xs border border-neutral-200 rounded px-1 py-0.5"
                     >
                       {ACTION_STATUSES.map((s) => (

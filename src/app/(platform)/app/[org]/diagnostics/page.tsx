@@ -72,6 +72,9 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
         title="Backend diagnostics"
         subtitle="Where this organisation's records actually live."
       />
+      <p className="-mt-3 mb-6 text-sm text-neutral-500">
+        Healthy = new records land in the Airtable column below.
+      </p>
 
       <section className="ae-card p-5 mb-6 space-y-2 text-sm">
         <div className="flex justify-between">

@@ -66,7 +66,7 @@ export function Sidebar({
   return (
     <>
       {/* Mobile top bar — hamburger + current org (hidden on desktop). */}
-      <div className="lg:hidden flex items-center gap-3 px-4 py-2 bg-white border-b border-[var(--ae-earth)]">
+      <div className="lg:hidden print:hidden flex items-center gap-3 px-4 py-2 bg-white border-b border-[var(--ae-earth)]">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -79,7 +79,7 @@ export function Sidebar({
         <OrgLogo logo={orgLogo} name={orgName} size={24} />
         {orgName ? (
           <Link href="/app" className="text-xs text-neutral-700 font-semibold truncate" title="Switch organisation">
-            {orgName} <span className="text-neutral-400 font-normal">▾</span>
+            {orgName}
           </Link>
         ) : (
           <span className="text-xs font-semibold text-neutral-700 truncate">{menuLabel}</span>
@@ -112,7 +112,7 @@ export function Sidebar({
             <OrgLogo logo={orgLogo} name={orgName} size={28} />
             {orgName ? (
               <Link href="/app" className="hover:underline truncate font-semibold text-neutral-700" title="Switch organisation">
-                {orgName} <span className="text-neutral-400 font-normal">▾</span>
+                {orgName}
               </Link>
             ) : (
               <span className="font-semibold text-neutral-700 truncate">{menuLabel}</span>

@@ -92,7 +92,7 @@ export default async function CommsPage({
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={c.id} />
                     <StatusBadge status={c.status} />
-                    <select name="status" defaultValue={c.status} className="text-xs border border-neutral-200 rounded px-1 py-0.5">
+                    <select name="status" defaultValue={c.status} aria-label={`Status for ${c.topic}`} className="text-xs border border-neutral-200 rounded px-1 py-0.5">
                       {STATUSES.map((s) => (
                         <option key={s} value={s}>
                           {s}

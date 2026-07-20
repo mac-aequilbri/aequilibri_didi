@@ -4,8 +4,18 @@
 // layout) plus a modal that queries the org-scoped /search route as you type.
 // Keyboard: ⌘K toggles, ↑/↓ move, Enter opens, Esc closes.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+
+// Hydration-safe client-only read: the server snapshot is null, so SSR and the
+// first client render agree; the real value appears right after hydration.
+const emptySubscribe = () => () => {};
+const useKbdHint = () =>
+  useSyncExternalStore(
+    emptySubscribe,
+    () => (/mac/i.test(navigator.platform) ? "⌘K" : "Ctrl K"),
+    () => null,
+  );
 
 interface Hit {
   type: string;
@@ -21,6 +31,9 @@ export function CommandSearch({ orgSlug }: { orgSlug: string }) {
   const [results, setResults] = useState<Hit[]>([]);
   const [active, setActive] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  // Platform-aware shortcut hint — null during SSR/hydration, filled on the client.
+  const kbdHint = useKbdHint();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Global ⌘K / Ctrl-K toggle (and Esc to close).
@@ -52,6 +65,7 @@ export function CommandSearch({ orgSlug }: { orgSlug: string }) {
       if (term.length < 2) {
         setResults([]);
         setLoading(false);
+        setError(false);
         return;
       }
       setLoading(true);
@@ -62,8 +76,11 @@ export function CommandSearch({ orgSlug }: { orgSlug: string }) {
         const data = await res.json();
         setResults(Array.isArray(data.results) ? data.results : []);
         setActive(0);
+        setError(false);
       } catch {
-        /* aborted or failed — leave prior results */
+        // Aborted (superseded keystroke) — leave prior results; real failures
+        // surface an error line in the results panel.
+        if (!ctl.signal.aborted) setError(true);
       } finally {
         setLoading(false);
       }
@@ -78,6 +95,7 @@ export function CommandSearch({ orgSlug }: { orgSlug: string }) {
     setOpen(false);
     setQ("");
     setResults([]);
+    setError(false);
   };
 
   const go = (hit: Hit | undefined) => {
@@ -103,7 +121,7 @@ export function CommandSearch({ orgSlug }: { orgSlug: string }) {
     <>
       <button type="button" onClick={() => setOpen(true)} className="cmdk-trigger" aria-label="Search">
         <span className="cmdk-trigger-text">Search…</span>
-        <kbd className="cmdk-kbd">⌘K</kbd>
+        {kbdHint && <kbd className="cmdk-kbd">{kbdHint}</kbd>}
       </button>
 
       {open && (
@@ -117,9 +135,15 @@ export function CommandSearch({ orgSlug }: { orgSlug: string }) {
               placeholder="Search projects, actions, risks, documents…"
               className="cmdk-input"
               autoComplete="off"
+              role="combobox"
+              aria-expanded={results.length > 0}
+              aria-controls="cmdk-listbox"
+              aria-activedescendant={results.length > 0 ? `cmdk-option-${active}` : undefined}
             />
-            <div className="cmdk-results">
-              {q.trim().length < 2 ? (
+            <div className="cmdk-results" id="cmdk-listbox" role="listbox" aria-label="Search results">
+              {error && q.trim().length >= 2 ? (
+                <p className="cmdk-hint">Search is unavailable — try again.</p>
+              ) : q.trim().length < 2 ? (
                 <p className="cmdk-hint">Type at least 2 characters to search.</p>
               ) : loading && results.length === 0 ? (
                 <p className="cmdk-hint">Searching…</p>
@@ -130,6 +154,9 @@ export function CommandSearch({ orgSlug }: { orgSlug: string }) {
                   <button
                     key={`${hit.href}-${i}`}
                     type="button"
+                    id={`cmdk-option-${i}`}
+                    role="option"
+                    aria-selected={i === active}
                     onClick={() => go(hit)}
                     onMouseEnter={() => setActive(i)}
                     className={`cmdk-row ${i === active ? "active" : ""}`}

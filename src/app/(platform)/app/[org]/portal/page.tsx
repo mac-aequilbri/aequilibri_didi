@@ -2,6 +2,7 @@
 // read-only links (/portal/<token>).
 
 import { prisma } from "@/lib/db";
+import { CopyButton } from "@/components/CopyButton";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
@@ -11,8 +12,19 @@ import { deactivatePortalToken, generatePortalToken } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function PortalPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function PortalPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  // Set by generatePortalToken's redirect — a prefix of the just-issued token,
+  // used to highlight that row so the link is easy to grab.
+  const sp = await searchParams;
+  const issued = typeof sp.issued === "string" ? sp.issued : "";
+  const today = new Date().toISOString().slice(0, 10);
   const [jobs, tokens] = await Promise.all([
     prisma.platJob.findMany({
       where: { orgId: ctx.orgId },
@@ -52,7 +64,7 @@ export default async function PortalPage({ params }: { params: Promise<{ org: st
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Expires</span>
-            <input type="date" name="expiresAt" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
+            <input type="date" name="expiresAt" min={today} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
         </div>
         <input type="hidden" name="org" value={ctx.orgSlug} />
@@ -72,17 +84,33 @@ export default async function PortalPage({ params }: { params: Promise<{ org: st
             </tr>
           </thead>
           <tbody>
-            {tokens.map((t) => (
-              <tr key={t.id} className={`border-t border-neutral-100 ${t.isActive ? "" : "opacity-50"}`}>
+            {tokens.map((t) => {
+              const justIssued = !!issued && t.token.startsWith(issued);
+              return (
+              <tr
+                key={t.id}
+                className={`border-t border-neutral-100 ${t.isActive ? "" : "opacity-50"} ${
+                  justIssued ? "bg-[var(--ae-success-bg)]" : ""
+                }`}
+              >
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">
                   {t.job?.code}
                   {t.label && <span className="block text-neutral-500">{t.label}</span>}
                 </td>
                 <td className="py-2 pr-2">
                   {t.isActive ? (
-                    <a href={`/portal/${t.token}`} target="_blank" className="font-mono text-xs hover:underline break-all">
-                      /portal/{t.token.slice(0, 18)}… ↗
-                    </a>
+                    <span className="flex items-center gap-2">
+                      <a href={`/portal/${t.token}`} target="_blank" className="font-mono text-xs hover:underline break-all">
+                        /portal/{t.token.slice(0, 18)}… ↗
+                      </a>
+                      <CopyButton
+                        path={`/portal/${t.token}`}
+                        label="Copy link"
+                        title="Copy the full public URL"
+                        autoFocus={justIssued}
+                        className={justIssued ? "animate-pulse ring-2 ring-emerald-300" : ""}
+                      />
+                    </span>
                   ) : (
                     <span className="font-mono text-xs">revoked</span>
                   )}
@@ -106,7 +134,8 @@ export default async function PortalPage({ params }: { params: Promise<{ org: st
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {tokens.length === 0 && (
               <tr>
                 <td className="py-4 text-neutral-500" colSpan={5}>

@@ -104,7 +104,7 @@ export default async function ProcurementPage({
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={o.id} />
                     <StatusBadge status={o.status} />
-                    <select name="status" defaultValue={o.status} className="text-xs border border-neutral-200 rounded px-1 py-0.5">
+                    <select name="status" defaultValue={o.status} aria-label={`Status for ${o.item}`} className="text-xs border border-neutral-200 rounded px-1 py-0.5">
                       {STATUSES.map((s) => (
                         <option key={s} value={s}>
                           {s}

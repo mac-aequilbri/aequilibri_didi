@@ -203,9 +203,15 @@ h1, h2, h3, h4, h5 {
 
 footer.ae-footer { background: var(--ae-ink); color: var(--ae-earth); text-align: center; padding: 16px; font-size: 0.8rem; margin-top: 48px; }
 
-/* Print: drop the app chrome so print/PDF views (quotes, reports) are clean. */
+/* Print: drop the app chrome so print/PDF views (quotes, reports) are clean.
+   Covers the sidebar (and its mobile top bar via print:hidden in Sidebar.tsx),
+   the breadcrumb/⌘K header row (print:hidden in the org layout), and list
+   filter chrome. */
 @media print {
-  .ae-navbar, .sidebar, footer.ae-footer { display: none !important; }
+  .ae-navbar, .sidebar, footer.ae-footer,
+  .ae-breadcrumbs, .cmdk-trigger, .skip-link,
+  .filter-bar, .filter-pager { display: none !important; }
+  body { background: #fff; }
 }
 
 /* ── Quote journey (ported from quote_create.html) ─────────────────── */

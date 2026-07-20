@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
@@ -72,13 +73,27 @@ export default async function ReportDetailPage({
             <form action={regenerateReportAction}>
               <input type="hidden" name="org" value={ctx.orgSlug} />
               <input type="hidden" name="recordId" value={report.id} />
-              <SubmitButton label="Regenerate" pendingLabel="Regenerating…" />
+              <ConfirmSubmitButton
+                label="Regenerate"
+                confirmLabel={
+                  report.status === "approved" || report.status === "sent"
+                    ? `Confirm — replaces this ${report.status} report`
+                    : "Confirm — replaces current content"
+                }
+                pendingLabel="Regenerating…"
+                title="Re-runs the prompt against fresh data, overwrites the current content and returns the report to draft."
+              />
             </form>
           )}
           {report.promptSpec && reportCaps.canGenerateReports && (
-            <form action={saveTemplateAction}>
+            <form action={saveTemplateAction} className="flex items-center gap-2">
               <input type="hidden" name="org" value={ctx.orgSlug} />
               <input type="hidden" name="recordId" value={report.id} />
+              <input
+                name="templateTitle"
+                placeholder="Template name (optional)"
+                className="w-44 rounded border border-neutral-300 px-2 py-1.5 text-xs"
+              />
               <SubmitButton label="Save as template" pendingLabel="Saving…" />
             </form>
           )}

@@ -38,7 +38,7 @@ export default async function OrgLayout({
         pendingCount={counts.pending}
       />
       <main id="main" className="flex-1 overflow-auto min-w-0">
-        <div className="flex items-center gap-3 px-6 pt-3">
+        <div className="flex items-center gap-3 px-6 pt-3 print:hidden">
           <Breadcrumbs orgName={ctx.orgName} orgSlug={ctx.orgSlug} orgLogo={ctx.config.branding?.logo} />
           <div className="ml-auto shrink-0">
             <CommandSearch orgSlug={ctx.orgSlug} />

@@ -106,6 +106,12 @@ export default async function AccountingPage({
         </div>
       </section>
 
+      {connected && !summary && (
+        <section className="ae-card p-5 text-sm text-neutral-600">
+          Connected — no data synced yet. Run a sync to pull invoices and bills.
+        </section>
+      )}
+
       {summary && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
