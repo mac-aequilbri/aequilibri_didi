@@ -1,25 +1,12 @@
-// Single-room edit page. Reachable by clicking a room on the Room Matrix.
+// Single-room detail page (read-only). Reachable by clicking a room on the
+// Room Matrix; editing is an explicit step via the header's Edit action.
 
-import RecordEditPage from "../../_record-edit/RecordEditPage";
+import RecordDetailPage from "../../_record-edit/RecordDetailPage";
+import { roomEditorConfig as config } from "../editorConfig";
 import { loadRoomDetail } from "@/lib/platform/domainListSources";
 import { requireOrgCtx } from "@/lib/platform/org-context";
-import type { RecordEditorConfig } from "@/lib/platform/recordEditor";
 
 export const dynamic = "force-dynamic";
-
-const config: RecordEditorConfig = {
-  table: "room",
-  noun: "room",
-  listPath: "/room-matrix",
-  aiRole:
-    "You are an operations assistant helping a construction manager keep a room/finishes matrix tidy — sensible zone groupings.",
-  fields: [
-    { name: "name", label: "Room name", type: "text", required: true },
-    { name: "zone", label: "Zone", type: "text", aiFillable: true },
-    { name: "areaSqm", label: "Area (m²)", type: "number", min: 0, step: 0.01 },
-    { name: "ceilingHeight", label: "Ceiling height", type: "text" },
-  ],
-};
 
 export default async function RoomDetailPage({
   params,
@@ -29,13 +16,5 @@ export default async function RoomDetailPage({
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
   const values = await loadRoomDetail(ctx, id);
-  return (
-    <RecordEditPage
-      orgSlug={ctx.orgSlug}
-      config={config}
-      values={values}
-      recordId={id}
-      subtitle={values ? String(values.name) : undefined}
-    />
-  );
+  return <RecordDetailPage orgSlug={ctx.orgSlug} config={config} values={values} recordId={id} />;
 }

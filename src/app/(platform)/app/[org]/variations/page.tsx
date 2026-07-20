@@ -53,23 +53,23 @@ export default async function VariationsPage({
         <table className="w-full min-w-[38rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Ref</th>
-              <th className="py-1 pr-2">Title</th>
-              <th className="py-1 pr-2 text-right">Cost impact</th>
-              <th className="py-1 pr-2 text-right">Time</th>
-              <th className="py-1">Status</th>
+              <th scope="col" className="py-1 pr-2">Ref</th>
+              <th scope="col" className="py-1 pr-2">Title</th>
+              <th scope="col" className="py-1 pr-2 text-right">Cost impact</th>
+              <th scope="col" className="py-1 pr-2 text-right">Time</th>
+              <th scope="col" className="py-1">Status</th>
             </tr>
           </thead>
           <tbody>
             {variations.map((v) => (
-              <tr key={v.id} className="border-t border-neutral-100">
+              <tr key={v.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2 whitespace-nowrap font-mono text-xs">
                   <Link href={orgPath(ctx.orgSlug, `/variations/${v.id}`)} className="hover:underline">
                     {v.refNumber || `#${v.id}`}
                   </Link>
                 </td>
                 <td className="py-2 pr-2">
-                  <Link href={orgPath(ctx.orgSlug, `/variations/${v.id}`)} className="font-medium hover:underline">
+                  <Link href={orgPath(ctx.orgSlug, `/variations/${v.id}`)} className="font-medium hover:underline before:absolute before:inset-0">
                     {v.title}
                   </Link>
                   <span className="ml-1 text-xs text-neutral-400">{v.jobCode}</span>

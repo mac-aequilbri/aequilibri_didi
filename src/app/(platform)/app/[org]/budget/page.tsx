@@ -28,10 +28,16 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
         subtitle="Estimated vs forecast vs actual. Actual is derived from confirmed procurement (Invoiced/Paid), not hand-entered."
         actions={[{ href: orgPath(ctx.orgSlug, "/budget/new"), label: "+ New line" }]}
       />
-      <div className="grid gap-4 sm:grid-cols-3 mb-6">
+      <div className="grid gap-4 sm:grid-cols-4 mb-6">
         <MetricCard value={currency(totBudget)} label="Estimated" />
         <MetricCard value={currency(totForecast)} label="Forecast" />
         <MetricCard value={currency(totActual)} label="Actual" />
+        <MetricCard
+          value={currency(totForecast - totBudget)}
+          label="Variance"
+          tone={totForecast > totBudget ? "bad" : "neutral"}
+          hint="forecast vs estimated"
+        />
       </div>
 
       {(() => {
@@ -50,10 +56,10 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
         if (!rows.length) return null;
         return (
           <section className="ae-card p-5 mb-6">
-            <h2 className="font-semibold mb-3">Budget vs actual by category</h2>
+            <h2 className="font-semibold mb-3">Estimated vs actual by category</h2>
             <BarsCompare
               rows={rows}
-              primaryLabel="Budget"
+              primaryLabel="Estimated"
               secondaryLabel="Actual"
               formatValue={(n) => currency(n)}
             />

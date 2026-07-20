@@ -113,21 +113,21 @@ export default async function ActionsPage({
         <table className="w-full min-w-[42rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Action</th>
-              <th className="py-1 pr-2">Owner</th>
-              <th className="py-1 pr-2">Due</th>
-              <th className="py-1 pr-2">Priority</th>
-              <th className="py-1 pr-2">Source</th>
-              <th className="py-1">Status</th>
+              <th scope="col" className="py-1 pr-2">Action</th>
+              <th scope="col" className="py-1 pr-2">Owner</th>
+              <th scope="col" className="py-1 pr-2">Due</th>
+              <th scope="col" className="py-1 pr-2">Priority</th>
+              <th scope="col" className="py-1 pr-2">Source</th>
+              <th scope="col" className="py-1">Status</th>
             </tr>
           </thead>
           <tbody>
             {items.map((a) => (
-              <tr key={a.id} className="border-t border-neutral-100">
+              <tr key={a.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   <Link
                     href={orgPath(ctx.orgSlug, `/actions/${a.id}`)}
-                    className="group inline-flex items-baseline gap-1"
+                    className="group inline-flex items-baseline gap-1 before:absolute before:inset-0"
                   >
                     <span className="font-medium group-hover:text-[var(--ae-space)] group-hover:underline">
                       {a.title}
@@ -155,7 +155,7 @@ export default async function ActionsPage({
                 <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">
                   {a.sourceType.replace("_", " ")}
                 </td>
-                <td className="py-2">
+                <td className="relative z-10 py-2">
                   <form action={updateActionStatus} className="flex items-center gap-1">
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={a.id} />

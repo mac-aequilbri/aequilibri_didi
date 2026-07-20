@@ -13,8 +13,14 @@ export async function runTenderComparisonAction(formData: FormData): Promise<voi
   const jobId = recordIdParam(formData.get("jobId"));
   if (jobId == null) return;
 
-  const ids = parseDelimitedIds(String(formData.get("documentIds") ?? ""));
-  if (ids.length === 0) return;
+  // Document selection comes from the checkbox column on the documents table.
+  const ids = parseDelimitedIds(
+    formData
+      .getAll("docIds")
+      .filter((v): v is string => typeof v === "string")
+      .join("\n"),
+  );
+  if (ids.length === 0) redirect(orgPath(ctx.orgSlug, "/assess/tender?error=no_docs"));
 
   const title = String(formData.get("title") ?? "").trim();
   const { resultId } = await runModule3Capability(ctx, user.name, {

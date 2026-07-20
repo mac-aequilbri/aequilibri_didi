@@ -4,8 +4,8 @@
 import { CashflowLedger } from "./CashflowLedger";
 import { FilterBar } from "@/components/FilterBar";
 import { TrendChart } from "@/components/charts";
-import { EmptyState, PageHeader } from "@/components/PageHeader";
-import { comparePeriods, formatPeriodLabel } from "@/lib/format";
+import { EmptyState, MetricCard, PageHeader } from "@/components/PageHeader";
+import { comparePeriods, currency, formatPeriodLabel } from "@/lib/format";
 import {
   countEnumOptions,
   hasActiveFilters,
@@ -44,6 +44,10 @@ export default async function CashflowPage({
   }));
   const shownCount = jobs.reduce((s, j) => s + j.conCashflows.length, 0);
 
+  const totIn = allTxns.reduce((s, c) => s + (c.type === "In" ? c.amount : 0), 0);
+  const totOut = allTxns.reduce((s, c) => s + (c.type === "Out" ? c.amount : 0), 0);
+  const net = totIn - totOut;
+
   // Pagination is per job section (a row pager would split the groupings);
   // the org-wide chart still aggregates every filtered row across pages.
   const visibleJobs = jobs.filter((j) => j.conCashflows.length > 0);
@@ -59,6 +63,12 @@ export default async function CashflowPage({
         subtitle="Money in and out by period. Paid entries are actuals; the rest are projected."
         actions={[{ href: orgPath(ctx.orgSlug, "/cashflow/new"), label: "+ New entry" }]}
       />
+
+      <div className="grid gap-4 sm:grid-cols-3 mb-6">
+        <MetricCard value={currency(totIn)} label="In" />
+        <MetricCard value={currency(totOut)} label="Out" />
+        <MetricCard value={currency(net)} label="Net" tone={net < 0 ? "bad" : "neutral"} />
+      </div>
 
       <FilterBar
         basePath={orgPath(ctx.orgSlug, "/cashflow")}
@@ -93,7 +103,9 @@ export default async function CashflowPage({
                 { name: "Projected", points: periods.map(([label, v]) => ({ label: formatPeriodLabel(label), value: v.projected })) },
                 { name: "Actual", points: periods.map(([label, v]) => ({ label: formatPeriodLabel(label), value: v.actual })) },
               ]}
-              formatValue={(n) => `$${Math.round(n / 1000)}k`}
+              formatValue={(n) =>
+                Math.abs(n) < 1000 ? currency(n) : `${n < 0 ? "-" : ""}$${(Math.abs(n) / 1000).toFixed(1)}k`
+              }
             />
           </section>
         );

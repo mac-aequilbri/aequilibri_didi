@@ -38,12 +38,13 @@ export default async function PhasesPage({
   searchParams,
 }: {
   params: Promise<{ org: string }>;
-  searchParams: Promise<{ err?: string }>;
+  searchParams: Promise<{ err?: string; job?: string }>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const { err } = await searchParams;
+  const { err, job: jobFilter } = await searchParams;
   const jobs = await loadPhaseJobs(ctx);
-  const drafts = jobs.flatMap((j) => j.conPhases.filter((p) => p.isAiDraft));
+  const shownJobs = jobFilter ? jobs.filter((j) => String(j.id) === jobFilter) : jobs;
+  const drafts = shownJobs.flatMap((j) => j.conPhases.filter((p) => p.isAiDraft));
 
   return (
     <div className="p-4 sm:p-6">
@@ -57,6 +58,28 @@ export default async function PhasesPage({
           {err}
         </p>
       )}
+
+      <form method="get" action={orgPath(ctx.orgSlug, "/phases")} className="mb-4 flex items-center gap-2 text-sm">
+        <label htmlFor="phases-job-filter" className="text-neutral-600">
+          Project
+        </label>
+        <select
+          id="phases-job-filter"
+          name="job"
+          defaultValue={jobFilter ?? ""}
+          className="text-sm border border-neutral-200 rounded px-2 py-1"
+        >
+          <option value="">All projects</option>
+          {jobs.map((j) => (
+            <option key={j.id} value={String(j.id)}>
+              {j.name} {j.code ? `(${j.code})` : ""}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className="btn-ae-outline text-xs">
+          Filter
+        </button>
+      </form>
 
       {drafts.length > 0 && (
         <section className="ae-card p-5 mb-6 border-amber-300">
@@ -84,13 +107,23 @@ export default async function PhasesPage({
         </section>
       )}
 
-      {jobs.map((job) => (
+      {shownJobs.map((job) => (
         <section key={job.id} className="ae-card p-5 mb-6">
           <h2 className="font-semibold mb-3">
             {job.name} <span className="text-xs font-normal text-neutral-500">{job.code}</span>
           </h2>
           <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[34rem]">
+            <thead className="text-left text-xs text-neutral-500">
+              <tr>
+                <th scope="col" className="py-1 pr-2">Phase</th>
+                <th scope="col" className="py-1 pr-2">RAG</th>
+                <th scope="col" className="py-1 pr-2">Progress</th>
+                <th scope="col" className="py-1 pr-2">Set %</th>
+                <th scope="col" className="py-1 pr-2">Evidence</th>
+                <th scope="col" className="py-1 text-right">Status</th>
+              </tr>
+            </thead>
             <tbody>
               {job.conPhases
                 .filter((p) => !p.isAiDraft)

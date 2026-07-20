@@ -13,8 +13,15 @@ export async function runArchitecturalScopeAction(formData: FormData): Promise<v
   const jobId = recordIdParam(formData.get("jobId"));
   if (jobId == null) return;
 
-  const ids = parseDelimitedIds(String(formData.get("documentIds") ?? ""));
-  if (ids.length === 0) return;
+  // Document selection comes from the checkbox column on the documents table.
+  const ids = parseDelimitedIds(
+    formData
+      .getAll("docIds")
+      .filter((v): v is string => typeof v === "string")
+      .join("\n"),
+  );
+  if (ids.length === 0) redirect(orgPath(ctx.orgSlug, "/assess/architectural?error=no_docs"));
+
   const zone = String(formData.get("zone") ?? "").trim() || undefined;
   const title = String(formData.get("title") ?? "").trim() || undefined;
 

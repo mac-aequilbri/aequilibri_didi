@@ -10,7 +10,12 @@ import {
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
-import { executeProposal, recordIdParam, rejectProposal } from "@/lib/platform/recordWriter";
+import {
+  executeProposal,
+  recordIdParam,
+  rejectProposal,
+  type WriteResult,
+} from "@/lib/platform/recordWriter";
 import { canApprove } from "@/lib/platform/roles";
 
 // Approve/reject the same PlatPendingWrite proposals the assistant queues —
@@ -67,8 +72,14 @@ export async function approveProposalAction(formData: FormData): Promise<void> {
     String(formData.get("rootCauseNote") ?? "").trim() ||
     "Reviewer corrected the proposed value during approval";
 
+  let writeResult: WriteResult;
   try {
-    await executeProposal(ctx, proposalId, user.name, Object.keys(edits).length ? edits : undefined);
+    writeResult = await executeProposal(
+      ctx,
+      proposalId,
+      user.name,
+      Object.keys(edits).length ? edits : undefined,
+    );
   } catch {
     // Recorded as failed/expired on the pending row — but tell the reviewer:
     // a silently vanishing card reads as success.
@@ -107,6 +118,15 @@ export async function approveProposalAction(formData: FormData): Promise<void> {
   }
 
   await revalidate(ctx.orgSlug);
+
+  // Post-approval confirmation banner (with a "View record" link when the
+  // executed record maps to a known detail route — no extra reads needed:
+  // tableKey comes from the already-loaded proposal, recordId from the write).
+  const confirmed = new URLSearchParams({ approved: String(proposalId) });
+  if (pending?.tableKey) confirmed.set("t", pending.tableKey);
+  const recId = writeResult.recordId ?? (pending?.recordId || undefined);
+  if (recId != null && recId !== "") confirmed.set("r", String(recId));
+  redirect(orgPath(ctx.orgSlug, `/approvals?${confirmed.toString()}`));
 }
 
 export async function rejectProposalAction(formData: FormData): Promise<void> {
@@ -118,8 +138,11 @@ export async function rejectProposalAction(formData: FormData): Promise<void> {
     if (pending && !canApprove(user.role, pending.tableKey)) {
       throw new Error(`Your role cannot resolve ${pending.tableKey} proposals.`);
     }
+    // Optional reviewer-supplied reason (input name="reason" on the card) —
+    // stored on the pending row / exec log, mirroring the exec-log variant.
+    const reason = String(formData.get("reason") ?? "").trim();
     try {
-      await rejectProposal(ctx, proposalId, user.name);
+      await rejectProposal(ctx, proposalId, user.name, reason);
     } catch {
       /* already resolved */
     }

@@ -7,6 +7,7 @@
 // for an update, a removal notice for a delete — so you approve a concrete change,
 // not an opaque payload.
 
+import Link from "next/link";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
@@ -16,6 +17,7 @@ import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
 import { canApprove } from "@/lib/platform/roles";
 import { friendlyTableLabel } from "@/lib/platform/tableLabels";
 import { approveProposalAction, rejectProposalAction } from "./actions";
+import { ProposalFields } from "./ProposalFields";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,32 @@ function fmt(v: unknown): string {
   if (v === null || v === undefined) return "—";
   const s = typeof v === "object" ? JSON.stringify(v) : String(v);
   return s.length > 90 ? s.slice(0, 90) + "…" : s;
+}
+
+// Post-approval "View record" links: logical write-registry key → list route
+// with a /[id] detail page. Only registers with a real detail route are
+// mapped; anything else simply omits the link (no extra reads either way).
+const DETAIL_ROUTES: Record<string, string> = {
+  job: "projects",
+  action: "actions",
+  decision: "decisions",
+  document: "documents",
+  phase: "phases",
+  budget_line: "budget",
+  cashflow: "cashflow",
+  risk: "risks",
+  variation_order: "variations",
+  vendor: "vendors",
+  procurement: "procurement",
+  room: "room-matrix",
+  meeting_minutes: "meeting-minutes",
+  comms: "comms",
+  quote: "quotes",
+};
+
+function detailHref(orgSlug: string, tableKey: string, recordId: string): string | null {
+  const seg = DETAIL_ROUTES[tableKey];
+  return seg && recordId ? `/app/${orgSlug}/${seg}/${encodeURIComponent(recordId)}` : null;
 }
 
 const isEmpty = (v: unknown) =>
@@ -130,6 +158,26 @@ export default async function ApprovalsPage({
         subtitle={`${ctx.config.assistant.name} can propose changes but never writes without you. Review and approve each one here.`}
       />
 
+      {typeof sp.approved === "string" && sp.approved !== "" && (
+        <div role="status" className="ae-card p-3 mb-4 border-green-300 text-sm text-green-700">
+          Change approved and written.
+          {(() => {
+            const href =
+              typeof sp.t === "string" && typeof sp.r === "string"
+                ? detailHref(ctx.orgSlug, sp.t, sp.r)
+                : null;
+            return href ? (
+              <>
+                {" "}
+                <Link href={href} className="underline font-medium">
+                  View record
+                </Link>
+              </>
+            ) : null;
+          })()}
+        </div>
+      )}
+
       {sp.error === "approve_failed" && (
         <div role="alert" className="ae-card p-3 mb-4 border-red-300 text-sm text-red-700">
           The approved write could not be executed — no change was made. The proposal is marked
@@ -157,6 +205,10 @@ export default async function ApprovalsPage({
               // value before approving emits a CORRECTIONS record (Spec 12
               // Module 2 — propose, review/correct, confirm).
               <form key={prop.id} action={approveProposalAction} className="ae-card p-4">
+                {/* Disabled default button: blocks implicit (Enter-key) submission,
+                    which would otherwise fire Approve while typing a corrected
+                    value or a reject reason. Approve/Reject require a click. */}
+                <button type="submit" disabled hidden aria-hidden tabIndex={-1} />
                 <input type="hidden" name="org" value={ctx.orgSlug} />
                 <input type="hidden" name="proposalId" value={prop.id} />
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -180,8 +232,14 @@ export default async function ApprovalsPage({
                       <span className={exp.soon ? "text-red-600 font-medium" : ""}>{exp.text}</span>
                     </p>
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <SubmitButton label="Approve" pendingLabel="Approving…" className="btn-ae text-sm" />
+                    <input
+                      name="reason"
+                      placeholder="Reason (optional)"
+                      aria-label="Reject reason (optional)"
+                      className="w-40 rounded border border-neutral-200 px-2 py-1 text-sm focus:border-neutral-400 focus:outline-none"
+                    />
                     <ConfirmSubmitButton
                       label="Reject"
                       confirmLabel="Confirm reject"
@@ -197,65 +255,10 @@ export default async function ApprovalsPage({
                     Permanently deletes this {tableLabel(prop.tableKey)} record.
                   </p>
                 ) : (
-                  <dl className="mt-3 pt-3 border-t border-neutral-100 space-y-1.5 text-sm">
-                    {changes.length === 0 && (
-                      <p className="text-xs text-neutral-400">No effective change.</p>
-                    )}
-                    {changes.map((c) => (
-                      <div key={c.key} className="flex flex-wrap items-baseline gap-x-2">
-                        <dt className="text-[0.7rem] uppercase tracking-wide text-neutral-400 w-32 shrink-0">
-                          {c.key}
-                        </dt>
-                        <dd className="min-w-0 text-neutral-700 flex-1">
-                          {c.raw !== null ? (
-                            <span className="flex flex-wrap items-baseline gap-x-1.5">
-                              {c.before !== null && (
-                                <>
-                                  <span className="line-through text-neutral-400">{c.before}</span>
-                                  <span className="text-neutral-300">→</span>
-                                </>
-                              )}
-                              <input
-                                name={`field:${c.key}`}
-                                defaultValue={c.raw}
-                                className="flex-1 min-w-40 rounded border border-neutral-200 px-1.5 py-0.5 text-sm font-medium text-[var(--ae-space-deep)] focus:border-neutral-400 focus:outline-none"
-                              />
-                            </span>
-                          ) : c.before === null ? (
-                            <span className="text-[var(--ae-success)]">{c.after}</span>
-                          ) : (
-                            <>
-                              <span className="line-through text-neutral-400">{c.before}</span>
-                              <span className="mx-1.5 text-neutral-300">→</span>
-                              <span className="font-medium text-[var(--ae-space-deep)]">{c.after}</span>
-                            </>
-                          )}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-
-                {editable && (
-                  <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                    <span>If you corrected a value, why was the proposal wrong?</span>
-                    <select
-                      name="rootCauseCategory"
-                      defaultValue="Estimation Error"
-                      className="rounded border border-neutral-200 px-1.5 py-0.5 text-xs"
-                    >
-                      <option>Estimation Error</option>
-                      <option>Data Quality</option>
-                      <option>Scope Change</option>
-                      <option>External Factor</option>
-                      <option>Model Error</option>
-                    </select>
-                    <input
-                      name="rootCauseNote"
-                      placeholder="Optional note (e.g. supplier quote superseded)"
-                      className="flex-1 min-w-48 rounded border border-neutral-200 px-1.5 py-0.5 text-xs"
-                    />
-                  </div>
+                  // Client child: renders the field diff (input names unchanged)
+                  // and reveals the root-cause block only once the reviewer has
+                  // actually changed a field value.
+                  <ProposalFields changes={changes} editable={editable} />
                 )}
               </form>
             );

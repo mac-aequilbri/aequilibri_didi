@@ -56,23 +56,23 @@ export default async function ProcurementPage({
         <table className="w-full min-w-[48rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Item</th>
-              <th className="py-1 pr-2">Vendor</th>
-              <th className="py-1 pr-2 text-right">Qty</th>
-              <th className="py-1 pr-2 text-right">Total</th>
-              <th className="py-1 pr-2">Expected</th>
-              <th className="py-1 pr-2">Actual</th>
-              <th className="py-1 pr-2 text-right">Δ days</th>
-              <th className="py-1">Status</th>
+              <th scope="col" className="py-1 pr-2">Item</th>
+              <th scope="col" className="py-1 pr-2">Vendor</th>
+              <th scope="col" className="py-1 pr-2 text-right">Qty</th>
+              <th scope="col" className="py-1 pr-2 text-right">Total</th>
+              <th scope="col" className="py-1 pr-2">Expected</th>
+              <th scope="col" className="py-1 pr-2">Actual</th>
+              <th scope="col" className="py-1 pr-2 text-right">Δ days</th>
+              <th scope="col" className="py-1">Status</th>
             </tr>
           </thead>
           <tbody>
             {orders.map((o) => (
-              <tr key={o.id} className="border-t border-neutral-100">
+              <tr key={o.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   <Link
                     href={orgPath(ctx.orgSlug, `/procurement/${o.id}`)}
-                    className="font-medium hover:text-[var(--ae-space)] hover:underline"
+                    className="font-medium hover:text-[var(--ae-space)] hover:underline before:absolute before:inset-0"
                   >
                     {o.item}
                   </Link>
@@ -99,7 +99,7 @@ export default async function ProcurementPage({
                 >
                   {o.deltaDays == null ? "—" : o.deltaDays > 0 ? `+${o.deltaDays}` : o.deltaDays}
                 </td>
-                <td className="py-2 whitespace-nowrap">
+                <td className="relative z-10 py-2 whitespace-nowrap">
                   <form action={setProcurementStatus} className="flex items-center gap-1">
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={o.id} />

@@ -52,20 +52,20 @@ export default async function VendorsPage({
         <table className="w-full min-w-[38rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Vendor</th>
-              <th className="py-1 pr-2">Category</th>
-              <th className="py-1 pr-2">Contact</th>
-              <th className="py-1 pr-2">Rating</th>
-              <th className="py-1">Active</th>
+              <th scope="col" className="py-1 pr-2">Vendor</th>
+              <th scope="col" className="py-1 pr-2">Category</th>
+              <th scope="col" className="py-1 pr-2">Contact</th>
+              <th scope="col" className="py-1 pr-2">Rating</th>
+              <th scope="col" className="py-1">Active</th>
             </tr>
           </thead>
           <tbody>
             {vendors.map((v) => (
-              <tr key={v.id} className="border-t border-neutral-100">
+              <tr key={v.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2 font-medium">
                   <Link
                     href={orgPath(ctx.orgSlug, `/vendors/${v.id}`)}
-                    className="hover:text-[var(--ae-space)] hover:underline"
+                    className="hover:text-[var(--ae-space)] hover:underline before:absolute before:inset-0"
                   >
                     {v.name}
                   </Link>

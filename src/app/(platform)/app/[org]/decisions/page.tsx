@@ -57,20 +57,20 @@ export default async function DecisionsPage({
         <table className="w-full min-w-[40rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Decision</th>
-              <th className="py-1 pr-2">By</th>
-              <th className="py-1 pr-2">Source</th>
-              <th className="py-1 pr-2">Date</th>
-              <th className="py-1">Status</th>
+              <th scope="col" className="py-1 pr-2">Decision</th>
+              <th scope="col" className="py-1 pr-2">By</th>
+              <th scope="col" className="py-1 pr-2">Source</th>
+              <th scope="col" className="py-1 pr-2">Date</th>
+              <th scope="col" className="py-1">Status</th>
             </tr>
           </thead>
           <tbody>
             {decisions.map((d) => (
-              <tr key={d.id} className="border-t border-neutral-100 align-top">
+              <tr key={d.id} className="relative border-t border-neutral-100 align-top hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   <Link
                     href={orgPath(ctx.orgSlug, `/decisions/${d.id}`)}
-                    className="font-medium hover:text-[var(--ae-space)] hover:underline"
+                    className="font-medium hover:text-[var(--ae-space)] hover:underline before:absolute before:inset-0"
                   >
                     {d.description}
                   </Link>
@@ -86,7 +86,7 @@ export default async function DecisionsPage({
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">
                   {formatDate(d.date)}
                 </td>
-                <td className="py-2 whitespace-nowrap">
+                <td className="relative z-10 py-2 whitespace-nowrap">
                   <StatusBadge status={d.status} />
                   {d.status === "proposed" && (
                     <form action={setDecisionStatus} className="inline-flex gap-1 ml-2">

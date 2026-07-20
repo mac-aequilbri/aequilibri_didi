@@ -63,15 +63,15 @@ export async function GET(
       ...actions
         .filter((a) => contains(a["Action_Name"], q))
         .slice(0, take)
-        .map((a) => ({ type: "Action", label: str(a["Action_Name"]), sublabel: str(a["Status"]), href: p("/actions") })),
+        .map((a) => ({ type: "Action", label: str(a["Action_Name"]), sublabel: str(a["Status"]), href: p(`/actions/${a.id}`) })),
       ...risks
         .filter((r) => contains(r["Risk"], q))
         .slice(0, take)
-        .map((r) => ({ type: "Risk", label: str(r["Risk"]), sublabel: str(r["Status"]), href: p("/risks") })),
+        .map((r) => ({ type: "Risk", label: str(r["Risk"]), sublabel: str(r["Status"]), href: p(`/risks/${r.id}`) })),
       ...decisions
         .filter((d) => contains(d["Decision_Name"], q) || contains(d["Decision_Description"], q))
         .slice(0, take)
-        .map((d) => ({ type: "Decision", label: str(d["Decision_Name"]), sublabel: str(d["Status"]), href: p("/decisions") })),
+        .map((d) => ({ type: "Decision", label: str(d["Decision_Name"]), sublabel: str(d["Status"]), href: p(`/decisions/${d.id}`) })),
       ...variations
         .filter((v) => contains(v["Change_Name"], q) || contains(v["Ref_Number"], q))
         .slice(0, take)
@@ -83,7 +83,7 @@ export async function GET(
       ...vendors
         .filter((v) => contains(v["Vendor_Name"], q))
         .slice(0, take)
-        .map((v) => ({ type: "Vendor", label: str(v["Vendor_Name"]), sublabel: str(v["Category"]), href: p("/vendors") })),
+        .map((v) => ({ type: "Vendor", label: str(v["Vendor_Name"]), sublabel: str(v["Category"]), href: p(`/vendors/${v.id}`) })),
       ...quotes
         .filter((q2) => contains(q2["Title"], q) || contains(q2["Ref_Number"], q))
         .slice(0, take)
@@ -139,12 +139,12 @@ export async function GET(
 
   const results: Hit[] = [
     ...jobs.map((j) => ({ type: "Project", label: j.name, sublabel: j.code, href: p(`/projects/${j.id}`) })),
-    ...actions.map((a) => ({ type: "Action", label: a.title, sublabel: a.status, href: p("/actions") })),
-    ...risks.map((r) => ({ type: "Risk", label: r.description, sublabel: r.status, href: p("/risks") })),
-    ...decisions.map((d) => ({ type: "Decision", label: d.description, sublabel: d.status, href: p("/decisions") })),
+    ...actions.map((a) => ({ type: "Action", label: a.title, sublabel: a.status, href: p(`/actions/${a.id}`) })),
+    ...risks.map((r) => ({ type: "Risk", label: r.description, sublabel: r.status, href: p(`/risks/${r.id}`) })),
+    ...decisions.map((d) => ({ type: "Decision", label: d.description, sublabel: d.status, href: p(`/decisions/${d.id}`) })),
     ...variations.map((v) => ({ type: "Variation", label: v.title, sublabel: v.refNumber || v.status, href: p(`/variations/${v.id}`) })),
     ...documents.map((d) => ({ type: "Document", label: d.title, sublabel: d.docType, href: p(`/documents/${d.id}`) })),
-    ...vendors.map((v) => ({ type: "Vendor", label: v.name, sublabel: v.category, href: p("/vendors") })),
+    ...vendors.map((v) => ({ type: "Vendor", label: v.name, sublabel: v.category, href: p(`/vendors/${v.id}`) })),
     ...quotes.map((q2) => ({ type: "Quote", label: q2.title, sublabel: q2.refNumber || q2.status, href: p(`/quotes/${q2.id}`) })),
   ];
 

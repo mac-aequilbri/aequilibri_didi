@@ -4,6 +4,7 @@
 
 const INK = "#1f2937"; // var(--ae-space) resolved — SVG-safe
 const ACCENT = "#d97706";
+const OVER = "#dc2626"; // over-budget signal (secondary exceeds primary)
 const MUTED = "#e5e7eb";
 
 export interface CompareRow {
@@ -45,11 +46,23 @@ export function BarsCompare({
         return (
           <g key={row.label + i}>
             <text x={labelW - 8} y={y + 15} textAnchor="end" fontSize="11" fill={INK}>
+              <title>{row.label}</title>
               {row.label.slice(0, 22)}
             </text>
             <rect x={labelW} y={y + 4} width={w1} height={9} rx={2} fill={INK} opacity={0.85} />
-            <rect x={labelW} y={y + 16} width={w2} height={9} rx={2} fill={ACCENT} opacity={0.85} />
-            <text x={labelW + Math.max(w1, w2) + 6} y={y + 17} fontSize="9.5" fill="#737373">
+            <rect
+              x={labelW}
+              y={y + 16}
+              width={w2}
+              height={9}
+              rx={2}
+              fill={row.secondary > row.primary ? OVER : ACCENT}
+              opacity={0.85}
+            />
+            <text x={labelW + w1 + 6} y={y + 12} fontSize="9.5" fill="#737373">
+              {formatValue(row.primary)}
+            </text>
+            <text x={labelW + w2 + 6} y={y + 24} fontSize="9.5" fill="#737373">
               {formatValue(row.secondary)}
             </text>
           </g>
@@ -113,6 +126,7 @@ export function TrendChart({
       {labels.map((p, i) =>
         maxPoints <= 12 || i % Math.ceil(maxPoints / 12) === 0 ? (
           <text key={i} x={x(i)} y={height - 8} textAnchor="middle" fontSize="9" fill="#737373">
+            <title>{p.label}</title>
             {p.label.slice(0, 10)}
           </text>
         ) : null,

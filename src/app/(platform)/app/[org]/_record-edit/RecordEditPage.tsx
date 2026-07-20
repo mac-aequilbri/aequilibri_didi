@@ -16,6 +16,7 @@ export default async function RecordEditPage({
   values,
   recordId,
   subtitle,
+  returnPath,
 }: {
   orgSlug: string;
   config: RecordEditorConfig;
@@ -23,12 +24,17 @@ export default async function RecordEditPage({
   recordId: string;
   /** Short label under the header (e.g. the record's title). */
   subtitle?: string;
+  /** Org-relative path Back/Cancel and post-save navigation return to.
+   *  Defaults to the list; registers with a read-only detail view pass their
+   *  detail path ("/risks/rec123"). Revalidation still targets the list. */
+  returnPath?: string;
 }) {
   // Governance §4: overlay per-vertical DOMAIN_LABELS onto the field labels —
   // one hook localizes every record-edit window; no-op until labels exist.
   const ctx = await getOrgCtx(orgSlug);
   const config = ctx ? await localizeEditorConfig(ctx, rawConfig) : rawConfig;
-  const backHref = orgPath(orgSlug, config.listPath);
+  const listHref = orgPath(orgSlug, config.listPath);
+  const backHref = orgPath(orgSlug, returnPath ?? config.listPath);
   const backAction = { href: backHref, label: `← Back`, variant: "outline" as const };
 
   if (!values) {
@@ -39,7 +45,7 @@ export default async function RecordEditPage({
           <EmptyState
             title={`${config.noun[0].toUpperCase()}${config.noun.slice(1)} not found`}
             hint="It may have been removed, or the link is out of date."
-            action={{ href: backHref, label: "Back to list" }}
+            action={{ href: listHref, label: "Back to list" }}
           />
         </div>
       </div>

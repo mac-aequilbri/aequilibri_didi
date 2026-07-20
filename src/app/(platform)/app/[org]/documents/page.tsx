@@ -71,23 +71,23 @@ export default async function DocumentsPage({
         <table className="w-full min-w-[40rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Document</th>
-              <th className="py-1 pr-2">Type</th>
-              <th className="py-1 pr-2">Kind</th>
-              <th className="py-1 pr-2">Added</th>
-              <th className="py-1">Status</th>
+              <th scope="col" className="py-1 pr-2">Document</th>
+              <th scope="col" className="py-1 pr-2">Type</th>
+              <th scope="col" className="py-1 pr-2">Kind</th>
+              <th scope="col" className="py-1 pr-2">Added</th>
+              <th scope="col" className="py-1">Status</th>
             </tr>
           </thead>
           <tbody>
             {docs.map((d) => (
-              <tr key={d.id} className="border-t border-neutral-100">
+              <tr key={d.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   {d.kind === "link" ? (
-                    <a href={d.storageRef} target="_blank" rel="noreferrer" className="font-medium hover:underline">
+                    <a href={d.storageRef} target="_blank" rel="noreferrer" className="font-medium hover:underline before:absolute before:inset-0">
                       {d.title} ↗
                     </a>
                   ) : (
-                    <Link href={orgPath(ctx.orgSlug, `/documents/${d.id}`)} className="font-medium hover:underline">
+                    <Link href={orgPath(ctx.orgSlug, `/documents/${d.id}`)} className="font-medium hover:underline before:absolute before:inset-0">
                       {d.title}
                     </Link>
                   )}

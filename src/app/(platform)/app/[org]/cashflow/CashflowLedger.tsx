@@ -59,7 +59,11 @@ export function CashflowLedger({ txns, orgSlug }: { txns: CashflowTxn[]; orgSlug
               <td className={`py-2 pr-2 text-xs font-semibold ${c.type === "In" ? "text-emerald-700" : "text-neutral-600"}`}>
                 {c.type}
               </td>
-              <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(c.amount)}</td>
+              <td
+                className={`py-2 pr-2 text-right whitespace-nowrap tabular-nums ${c.type === "Out" ? "text-red-700" : "text-emerald-700"}`}
+              >
+                {c.type === "Out" ? `-${currency(c.amount)}` : currency(c.amount)}
+              </td>
               <td className="py-2 pr-2 text-right text-xs whitespace-nowrap">{c.status}</td>
             </tr>
           ))}

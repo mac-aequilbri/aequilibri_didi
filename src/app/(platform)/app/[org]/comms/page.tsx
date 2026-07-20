@@ -56,20 +56,20 @@ export default async function CommsPage({
         <table className="w-full min-w-[40rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Topic</th>
-              <th className="py-1 pr-2">Type</th>
-              <th className="py-1 pr-2">Role</th>
-              <th className="py-1 pr-2">Due</th>
-              <th className="py-1">Status</th>
+              <th scope="col" className="py-1 pr-2">Topic</th>
+              <th scope="col" className="py-1 pr-2">Type</th>
+              <th scope="col" className="py-1 pr-2">Role</th>
+              <th scope="col" className="py-1 pr-2">Due</th>
+              <th scope="col" className="py-1">Status</th>
             </tr>
           </thead>
           <tbody>
             {comms.map((c) => (
-              <tr key={c.id} className="border-t border-neutral-100 align-top">
+              <tr key={c.id} className="relative border-t border-neutral-100 align-top hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   <Link
                     href={orgPath(ctx.orgSlug, `/comms/${c.id}`)}
-                    className="font-medium hover:text-[var(--ae-space)] hover:underline"
+                    className="font-medium hover:text-[var(--ae-space)] hover:underline before:absolute before:inset-0"
                   >
                     {c.topic}
                   </Link>
@@ -87,7 +87,7 @@ export default async function CommsPage({
                     "—"
                   )}
                 </td>
-                <td className="py-2 whitespace-nowrap">
+                <td className="relative z-10 py-2 whitespace-nowrap">
                   <form action={setCommStatus} className="flex items-center gap-1">
                     <input type="hidden" name="org" value={ctx.orgSlug} />
                     <input type="hidden" name="recordId" value={c.id} />

@@ -69,20 +69,20 @@ export default async function QuotesPage({
             <table className="w-full text-sm min-w-[40rem]">
               <thead className="text-left text-xs text-neutral-500">
                 <tr>
-                  <th className="py-1 pr-2">Ref</th>
-                  <th className="py-1 pr-2">Quote</th>
-                  <th className="py-1 pr-2">Job</th>
-                  <th className="py-1 pr-2">Valid until</th>
-                  <th className="py-1 pr-2 text-right">Total</th>
-                  <th className="py-1 pr-2 text-right">Status</th>
+                  <th scope="col" className="py-1 pr-2">Ref</th>
+                  <th scope="col" className="py-1 pr-2">Quote</th>
+                  <th scope="col" className="py-1 pr-2">Job</th>
+                  <th scope="col" className="py-1 pr-2">Valid until</th>
+                  <th scope="col" className="py-1 pr-2 text-right">Total</th>
+                  <th scope="col" className="py-1 pr-2 text-right">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {quotes.map((q) => (
-                  <tr key={q.id} className="border-t border-neutral-100">
+                  <tr key={q.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                     <td className="py-2 pr-2 font-mono text-xs">{q.refNumber}</td>
                     <td className="py-2 pr-2">
-                      <Link className="font-medium hover:underline" href={orgPath(ctx.orgSlug, `/quotes/${q.id}`)}>
+                      <Link className="font-medium hover:underline before:absolute before:inset-0" href={orgPath(ctx.orgSlug, `/quotes/${q.id}`)}>
                         {q.title}
                       </Link>
                       {q.clientName ? (

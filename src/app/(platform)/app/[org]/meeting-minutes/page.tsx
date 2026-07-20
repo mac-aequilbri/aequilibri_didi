@@ -53,17 +53,17 @@ export default async function MeetingMinutesPage({
         <table className="w-full min-w-[36rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Meeting</th>
-              <th className="py-1 pr-2">Date</th>
-              <th className="py-1 pr-2 text-right">Actions</th>
-              <th className="py-1">Status</th>
+              <th scope="col" className="py-1 pr-2">Meeting</th>
+              <th scope="col" className="py-1 pr-2">Date</th>
+              <th scope="col" className="py-1 pr-2 text-right">Actions</th>
+              <th scope="col" className="py-1">Status</th>
             </tr>
           </thead>
           <tbody>
             {minutes.map((m) => (
-              <tr key={m.id} className="border-t border-neutral-100">
+              <tr key={m.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2">
-                  <Link href={orgPath(ctx.orgSlug, `/meeting-minutes/${m.id}`)} className="font-medium hover:underline">
+                  <Link href={orgPath(ctx.orgSlug, `/meeting-minutes/${m.id}`)} className="font-medium hover:underline before:absolute before:inset-0">
                     {m.title || `Meeting ${formatDate(m.meetingDate)}`}
                   </Link>
                   <span className="ml-1 text-xs text-neutral-400">{m.jobCode}</span>

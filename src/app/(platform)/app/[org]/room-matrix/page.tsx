@@ -8,16 +8,26 @@ import { orgPath } from "@/lib/platform/paths";
 
 export const dynamic = "force-dynamic";
 
-export default async function RoomMatrixPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function RoomMatrixPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<{ zone?: string }>;
+}) {
   const ctx = await requireOrgCtx((await params).org);
+  const { zone: zoneFilter } = await searchParams;
   const rooms = await loadRoomMatrix(ctx);
 
-  const zones = new Map<string, typeof rooms>();
+  const allZones = new Map<string, typeof rooms>();
   for (const r of rooms) {
     const key = r.zone || "Unzoned";
-    if (!zones.has(key)) zones.set(key, []);
-    zones.get(key)!.push(r);
+    if (!allZones.has(key)) allZones.set(key, []);
+    allZones.get(key)!.push(r);
   }
+  const zones = zoneFilter
+    ? new Map([...allZones.entries()].filter(([zone]) => zone === zoneFilter))
+    : allZones;
 
   const parseFinishes = (raw: string): [string, string][] => {
     try {
@@ -30,6 +40,33 @@ export default async function RoomMatrixPage({ params }: { params: Promise<{ org
   return (
     <div className="p-6">
       <PageHeader title="Room Matrix" subtitle="Rooms, areas and finishes by zone." />
+      {allZones.size > 0 && (
+        <form
+          method="get"
+          action={orgPath(ctx.orgSlug, "/room-matrix")}
+          className="mb-4 flex items-center gap-2 text-sm"
+        >
+          <label htmlFor="room-matrix-zone-filter" className="text-neutral-600">
+            Zone
+          </label>
+          <select
+            id="room-matrix-zone-filter"
+            name="zone"
+            defaultValue={zoneFilter ?? ""}
+            className="text-sm border border-neutral-200 rounded px-2 py-1"
+          >
+            <option value="">All zones</option>
+            {[...allZones.keys()].map((z) => (
+              <option key={z} value={z}>
+                {z}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="btn-ae-outline text-xs">
+            Filter
+          </button>
+        </form>
+      )}
       {[...zones.entries()].map(([zone, zoneRooms]) => (
         <section key={zone} className="ae-card p-5 mb-6">
           <h2 className="font-semibold mb-3">{zone}</h2>
@@ -37,10 +74,10 @@ export default async function RoomMatrixPage({ params }: { params: Promise<{ org
           <table className="w-full min-w-[36rem] text-sm">
             <thead className="text-left text-xs text-neutral-500">
               <tr>
-                <th className="py-1 pr-2">Room</th>
-                <th className="py-1 pr-2 text-right">Area</th>
-                <th className="py-1 pr-2">Ceiling</th>
-                <th className="py-1">Finishes</th>
+                <th scope="col" className="py-1 pr-2">Room</th>
+                <th scope="col" className="py-1 pr-2 text-right">Area</th>
+                <th scope="col" className="py-1 pr-2">Ceiling</th>
+                <th scope="col" className="py-1">Finishes</th>
               </tr>
             </thead>
             <tbody>
