@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import {
@@ -108,9 +109,7 @@ export default async function ReportsPage({
             <span className="text-neutral-600">Period ending</span>
             <input type="date" name="weekEnding" className="mt-1 block rounded border border-neutral-300 px-3 py-2" />
           </label>
-          <button type="submit" className="btn-ae">
-            Generate with AI
-          </button>
+          <SubmitButton label="Generate with AI" pendingLabel="Generating report…" />
         </form>
       ) : null}
 
@@ -149,9 +148,7 @@ export default async function ReportsPage({
                 </label>
               ))}
             </div>
-            <button type="submit" className="btn-ae">
-              Build with AI
-            </button>
+            <SubmitButton label="Build with AI" pendingLabel="Building report…" />
           </div>
         </form>
       ) : (

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
@@ -64,36 +65,28 @@ export default async function ReportDetailPage({
             <form action={approveReportAction}>
               <input type="hidden" name="org" value={ctx.orgSlug} />
               <input type="hidden" name="recordId" value={report.id} />
-              <button type="submit" className="btn-ae">
-                Approve report
-              </button>
+              <SubmitButton label="Approve report" pendingLabel="Approving…" />
             </form>
           )}
           {report.promptSpec && reportCaps.canGenerateReports && (
             <form action={regenerateReportAction}>
               <input type="hidden" name="org" value={ctx.orgSlug} />
               <input type="hidden" name="recordId" value={report.id} />
-              <button type="submit" className="btn-ae" title={report.promptSpec.prompt}>
-                Regenerate
-              </button>
+              <SubmitButton label="Regenerate" pendingLabel="Regenerating…" />
             </form>
           )}
           {report.promptSpec && reportCaps.canGenerateReports && (
             <form action={saveTemplateAction}>
               <input type="hidden" name="org" value={ctx.orgSlug} />
               <input type="hidden" name="recordId" value={report.id} />
-              <button type="submit" className="btn-ae">
-                Save as template
-              </button>
+              <SubmitButton label="Save as template" pendingLabel="Saving…" />
             </form>
           )}
           {report.status === "approved" && reportCaps.canGenerateReports && (
             <form action={markSentAction}>
               <input type="hidden" name="org" value={ctx.orgSlug} />
               <input type="hidden" name="recordId" value={report.id} />
-              <button type="submit" className="btn-ae">
-                Mark as sent
-              </button>
+              <SubmitButton label="Mark as sent" pendingLabel="Marking…" />
             </form>
           )}
         </div>
