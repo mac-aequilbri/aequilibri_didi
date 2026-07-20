@@ -15,6 +15,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { emitCorrection } from "@/lib/platform/corrections";
+import { enforceVocab } from "@/lib/platform/vocab";
 import { logger } from "@/lib/logger";
 import type { Actor, OrgCtx } from "@/lib/platform/types";
 
@@ -87,6 +88,11 @@ export async function reconcileAirtableWrite(
 
   try {
     const sent = toFields(map, data, op);
+    // Mirror the write path: vocab coercion ran on the fields actually sent,
+    // and derived cells (no `from`, e.g. write-time timestamps) recompute to
+    // different values here — comparing either would flag every write.
+    enforceVocab(map.table, sent);
+    for (const s of map.specs) if (!s.from) delete sent[s.air];
     const rec = await core.get(ctx.orgSlug, map.table, recordId);
     const mismatches = diffStoredVsSubmitted(sent, rec as Record<string, unknown>);
     if (!mismatches.length) return [];

@@ -9,7 +9,7 @@
 // is the shared shape for the Airtable path (service + read sources).
 
 /** Airtable Document_Type for a weekly report row. */
-export const REPORT_DOC_TYPE = "report";
+export const REPORT_DOC_TYPE = "Report"; // canonical Document_Type option (vocab §5.3)
 
 export interface ReportModule8 {
   kind: "weekly_report";

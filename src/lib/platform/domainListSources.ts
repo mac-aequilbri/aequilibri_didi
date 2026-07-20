@@ -259,7 +259,7 @@ export async function loadWeeklyReports(ctx: OrgCtx): Promise<ReportView[]> {
   // the query, then confirm the module8 tag so other "report" docs are excluded.
   const rows = await core.list(ctx.orgSlug, "DOCUMENTS", {
     maxRecords: 500,
-    filterByFormula: `LOWER({Document_Type})='${REPORT_DOC_TYPE}'`,
+    filterByFormula: `LOWER({Document_Type})='${REPORT_DOC_TYPE.toLowerCase()}'`,
   });
   return rows
     .map((r) => ({ r, m8: parseReportModule8(r["AI_Analysis"]) }))

@@ -153,32 +153,48 @@ export async function emitCorrection(
     await recordRuleOverride(ctx, ruleCode).catch(() => {});
   }
 
-  await prisma.platExecutionLog
-    .create({
-      data: {
-        orgId: ctx.orgId,
-        jobId: input.jobId,
-        actorType: actor.type,
-        actorName: actor.name,
-        operation: "create",
-        targetTable: "plat_core_correction",
-        // targetId is an Int column; an Airtable "rec…" id rides in `result`.
-        targetId: typeof correctionId === "number" ? correctionId : null,
-        result: typeof correctionId === "string" ? `airtable:${correctionId}` : "",
-        payload: JSON.stringify({
-          dimension: input.dimension,
-          aiValue: input.aiValue,
-          humanValue: input.humanValue,
-          rootCause: `${input.rootCauseCategory}: ${input.rootCause}`,
-          sourceModule: input.sourceModule,
-          direction,
-        }),
-        status: "executed",
-        executedAt: new Date(),
-        sourceMessageId: actor.sourceMessageId,
-      },
-    })
-    .catch(() => {}); // audit failure must not lose the correction
+  const auditPayload = JSON.stringify({
+    dimension: input.dimension,
+    aiValue: input.aiValue,
+    humanValue: input.humanValue,
+    rootCause: `${input.rootCauseCategory}: ${input.rootCause}`,
+    sourceModule: input.sourceModule,
+    direction,
+  });
+  // Audit failure must not lose the correction. Airtable mode audits into the
+  // org base's EXECUTION_LOG (Postgres may not exist at all in that world).
+  if (airtableEnabled()) {
+    await core
+      .create(ctx.orgSlug, "EXECUTION_LOG", {
+        Log_Entry: `correction ${input.dimension}`.slice(0, 200),
+        Action_Type: "Create",
+        Tables_Affected: "CORRECTIONS",
+        Summary: auditPayload,
+        Initiated_By: actor.type === "ai" ? "AI" : actor.type === "human" ? "Owner" : "System",
+        Status: "Done",
+        Date_Time: new Date().toISOString(),
+      })
+      .catch(() => {});
+  } else {
+    await prisma.platExecutionLog
+      .create({
+        data: {
+          orgId: ctx.orgId,
+          jobId: input.jobId,
+          actorType: actor.type,
+          actorName: actor.name,
+          operation: "create",
+          targetTable: "plat_core_correction",
+          targetId: typeof correctionId === "number" ? correctionId : null,
+          result: "",
+          payload: auditPayload,
+          status: "executed",
+          executedAt: new Date(),
+          sourceMessageId: actor.sourceMessageId,
+        },
+      })
+      .catch(() => {});
+  }
 
   return correctionId;
 }
