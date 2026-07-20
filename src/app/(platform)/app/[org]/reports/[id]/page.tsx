@@ -9,7 +9,12 @@ import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { reportModeFor, reportingCapabilities } from "@/lib/platform/reportingPolicy";
 import { loadReportDetail } from "@/lib/platform/reportDetailSource";
-import { approveReportAction, markSentAction, regenerateReportAction } from "../actions";
+import {
+  approveReportAction,
+  markSentAction,
+  regenerateReportAction,
+  saveTemplateAction,
+} from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +75,15 @@ export default async function ReportDetailPage({
               <input type="hidden" name="recordId" value={report.id} />
               <button type="submit" className="btn-ae" title={report.promptSpec.prompt}>
                 Regenerate
+              </button>
+            </form>
+          )}
+          {report.promptSpec && reportCaps.canGenerateReports && (
+            <form action={saveTemplateAction}>
+              <input type="hidden" name="org" value={ctx.orgSlug} />
+              <input type="hidden" name="recordId" value={report.id} />
+              <button type="submit" className="btn-ae">
+                Save as template
               </button>
             </form>
           )}

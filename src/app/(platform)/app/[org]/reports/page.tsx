@@ -57,9 +57,11 @@ export default async function ReportsPage({
   const query = parseListQuery(sp, reportsListConfig);
   const viewer = await getCurrentViewer(ctx);
   const reportCaps = reportingCapabilities(viewer.role);
-  const [allReports, jobs] = await Promise.all([
+  const { listReportTemplates } = await import("@/lib/airtable/control");
+  const [allReports, jobs, templates] = await Promise.all([
     loadWeeklyReports(ctx),
     loadJobOptions(ctx), // jobs feed the AI-generate dropdown
+    listReportTemplates(ctx.orgSlug), // saved templates (Phase 4)
   ]);
   const { items: reports, page, pageCount } = sortAndPaginate(allReports, query, reportsListConfig);
 
@@ -81,6 +83,15 @@ export default async function ReportsPage({
                   {d.title}
                 </option>
               ))}
+              {templates.length > 0 && (
+                <optgroup label="Saved templates">
+                  {templates.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.title}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </label>
           <label className="block text-sm">

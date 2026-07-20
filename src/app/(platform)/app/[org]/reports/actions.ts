@@ -59,6 +59,32 @@ export async function generateCustomReportAction(formData: FormData): Promise<vo
   redirect(orgPath(ctx.orgSlug, id ? `/reports/${id}` : "/reports"));
 }
 
+/** Promote a custom report's promptSpec to a reusable saved template
+ *  (PLAT_REPORT_CATALOG) — it then appears in the Reports dropdown. */
+export async function saveTemplateAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  const viewer = await getCurrentViewer(ctx);
+  if (!reportingCapabilities(viewer.role).canGenerateReports) {
+    throw new Error("Your role cannot manage report templates.");
+  }
+  const recordId = recordIdParam(formData.get("recordId"));
+  if (recordId == null) return;
+  const report = await loadReportDetail(ctx, String(recordId));
+  const spec = report?.promptSpec;
+  if (!spec) return;
+
+  const { createReportTemplate } = await import("@/lib/airtable/control");
+  await createReportTemplate({
+    orgSlug: ctx.orgSlug,
+    key: `tpl_${Date.now().toString(36)}`,
+    title: spec.prompt.slice(0, 60) + (spec.prompt.length > 60 ? "…" : ""),
+    prompt: spec.prompt,
+    scopes: spec.scopes,
+  });
+  revalidatePath(orgPath(ctx.orgSlug, "/reports"));
+  redirect(orgPath(ctx.orgSlug, "/reports"));
+}
+
 /** Re-run a custom report's stored promptSpec against fresh data; the record
  *  is updated in place and returns to draft. */
 export async function regenerateReportAction(formData: FormData): Promise<void> {

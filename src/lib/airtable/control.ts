@@ -41,6 +41,7 @@ const TEAM = "PLAT_TEAM";
 const TEMPLATE_REGISTRY = "PLAT_TEMPLATE_REGISTRY";
 const JOB_CATALOG = "PLAT_JOB_CATALOG";
 const CONNECTIONS = "PLAT_CONNECTIONS";
+const REPORT_CATALOG_TBL = "PLAT_REPORT_CATALOG";
 const OUTBOX = "PLAT_OUTBOX";
 
 /** The shared control base id, or null when not configured. */
@@ -486,6 +487,99 @@ export async function setOutboxStatus(recordId: string, status: string): Promise
   const base = controlBaseId();
   if (!base) return;
   await updateRecords(base, OUTBOX, [{ id: recordId, fields: { Status: status } }]);
+}
+
+// ── PLAT_REPORT_CATALOG — saved report templates (reporting Phase 4) ────────
+// An org's custom promptSpec promoted to a reusable definition: it appears in
+// the Reports dropdown alongside the code catalog and generates via the stored
+// prompt + scopes. All reads fail soft (missing table → empty) so the Reports
+// page degrades gracefully on a control base that predates the table.
+
+export interface ReportTemplateEntry {
+  recordId: string;
+  key: string;
+  orgSlug: string;
+  title: string;
+  prompt: string;
+  scopes: string[];
+  isActive: boolean;
+}
+
+function toReportTemplate(r: { id: string; fields: Record<string, unknown> }): ReportTemplateEntry {
+  const f = r.fields;
+  let scopes: string[] = [];
+  try {
+    const p = JSON.parse(S(f["Scopes"]) || "[]");
+    if (Array.isArray(p)) scopes = p.map(String);
+  } catch {
+    /* leave empty on malformed JSON */
+  }
+  return {
+    recordId: r.id,
+    key: S(f["Key"]),
+    orgSlug: S(f["Org_Slug"]),
+    title: S(f["Title"]),
+    prompt: S(f["Prompt"]),
+    scopes,
+    isActive: f["Is_Active"] !== false,
+  };
+}
+
+/** Active saved templates for an org (Reports dropdown). */
+export async function listReportTemplates(orgSlug: string): Promise<ReportTemplateEntry[]> {
+  const base = controlBaseId();
+  if (!base || !orgSlug) return [];
+  try {
+    const recs = await listRecords(base, REPORT_CATALOG_TBL, {
+      filterByFormula: `{Org_Slug}='${formulaSafe(orgSlug)}'`,
+      maxRecords: 200,
+    });
+    return recs
+      .map(toReportTemplate)
+      .filter((e) => e.key && e.isActive)
+      .sort((a, b) => a.title.localeCompare(b.title));
+  } catch {
+    return [];
+  }
+}
+
+/** Resolve one template by its stable key, or null. */
+export async function getReportTemplate(orgSlug: string, key: string): Promise<ReportTemplateEntry | null> {
+  const base = controlBaseId();
+  if (!base || !key) return null;
+  try {
+    const recs = await listRecords(base, REPORT_CATALOG_TBL, {
+      filterByFormula: `AND({Org_Slug}='${formulaSafe(orgSlug)}',{Key}='${formulaSafe(key)}')`,
+      maxRecords: 1,
+    });
+    const entry = recs.length ? toReportTemplate(recs[0]) : null;
+    return entry && entry.isActive ? entry : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist a template ("Save as template" on a custom report). */
+export async function createReportTemplate(entry: {
+  orgSlug: string;
+  key: string;
+  title: string;
+  prompt: string;
+  scopes: string[];
+}): Promise<void> {
+  const base = controlBaseId();
+  if (!base) throw new Error("AIRTABLE_CONTROL_BASE_ID is not set");
+  await createRecords(base, REPORT_CATALOG_TBL, [
+    {
+      Key: entry.key,
+      Org_Slug: entry.orgSlug,
+      Title: entry.title,
+      Prompt: entry.prompt,
+      Scopes: JSON.stringify(entry.scopes),
+      Source: "saved",
+      Is_Active: true,
+    },
+  ]);
 }
 
 /** Active team members for an org (auth). Cached — member changes made outside

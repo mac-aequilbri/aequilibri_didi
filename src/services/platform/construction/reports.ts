@@ -185,7 +185,19 @@ export async function generateReport(
   periodEnding: string,
 ): Promise<{ id?: RecordId; demoMode: boolean }> {
   const def = reportDef(reportId);
-  if (!def) throw new Error(`Unknown report type: ${reportId}`);
+  if (!def) {
+    // Not in the code catalog → try the org's saved templates (Phase 4):
+    // a template is a stored promptSpec, so it generates via the custom path.
+    const { getReportTemplate } = await import("@/lib/airtable/control");
+    const tpl = await getReportTemplate(ctx.orgSlug, reportId);
+    if (!tpl) throw new Error(`Unknown report type: ${reportId}`);
+    return generateCustomReport(ctx, viewer, {
+      jobId,
+      periodEnding,
+      prompt: tpl.prompt,
+      scopes: tpl.scopes,
+    });
+  }
   const job = await loadJobContext(ctx, jobId);
   if (!job) throw new Error("Job not found");
 
