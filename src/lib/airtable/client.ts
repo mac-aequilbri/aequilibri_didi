@@ -29,6 +29,16 @@ const API_ROOT = "https://api.airtable.com/v0";
 const READ_TTL_MS = 15_000;
 const readCache = new TtlCache<unknown>(READ_TTL_MS);
 
+// A `maxRecords` at or above this is a DISPLAY CEILING, not a hard limit: the
+// platform's list/detail/dashboard sources pass 200/500 to bound the common
+// case, but a data-rich org (e.g. a law firm carrying thousands of matters, and
+// their phases/cashflows/budget lines) must still render *everything*. So a cap
+// this large is treated as "fetch all pages" — pagination is followed to the
+// end. Genuine top-N limits (existence probes, "recent N" lists) pass a small
+// maxRecords (1/5/10/25) and are honoured exactly. Change the threshold, not the
+// call sites, to retune what counts as "uncapped".
+const UNCAP_THRESHOLD = 100;
+
 const tablePrefix = (baseId: string, table: string): string => `${baseId}/${table} `;
 
 // Per-base timestamp of the last in-process write. Derived caches whose source
@@ -124,12 +134,17 @@ async function fetchAllRecords(
   table: string,
   opts: ListOptions,
 ): Promise<AirtableRecord[]> {
+  // A large maxRecords is a display ceiling to lift, not a hard cap (see
+  // UNCAP_THRESHOLD): fetch every page for it. Only a small maxRecords is a real
+  // top-N limit that bounds both the API request and the pagination loop.
+  const hardCap =
+    opts.maxRecords && opts.maxRecords < UNCAP_THRESHOLD ? opts.maxRecords : undefined;
   const out: AirtableRecord[] = [];
   let offset: string | undefined;
   do {
     const params = new URLSearchParams();
     if (opts.pageSize) params.set("pageSize", String(opts.pageSize));
-    if (opts.maxRecords) params.set("maxRecords", String(opts.maxRecords));
+    if (hardCap) params.set("maxRecords", String(hardCap));
     if (opts.filterByFormula) params.set("filterByFormula", opts.filterByFormula);
     if (opts.view) params.set("view", opts.view);
     if (offset) params.set("offset", offset);
@@ -140,7 +155,7 @@ async function fetchAllRecords(
 
     out.push(...data.records);
     offset = data.offset;
-    if (opts.maxRecords && out.length >= opts.maxRecords) break;
+    if (hardCap && out.length >= hardCap) break;
   } while (offset);
   return out;
 }

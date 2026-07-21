@@ -12,6 +12,8 @@
 // list-page sources (budgetSource/phasesSource/risksSource).
 
 import { airtableEnabled, core } from "@/lib/airtable";
+import type { CoreRow } from "@/lib/airtable";
+import type { CoreTableName } from "@/lib/airtable/schema.generated";
 import { prisma } from "@/lib/db";
 import { budgetActuals, loadProcurement } from "./procurementSource";
 import { toNum } from "@/lib/format";
@@ -67,6 +69,24 @@ function linkCount(v: unknown): number {
 /** Whether a linked-record cell points at the given record id. */
 function linksTo(v: unknown, recordId: string): boolean {
   return Array.isArray(v) && v.some((x) => String(x) === recordId);
+}
+
+/** Rec ids in a linked-record cell (array of "rec…" strings), else []. */
+function linkIds(v: unknown): string[] {
+  return Array.isArray(v) ? v.map(String).filter((s) => s.startsWith("rec")) : [];
+}
+
+/** Fetch specific records by id via a RECORD_ID() formula — exact and robust
+ *  (no name-matching), so a detail page reads only its matter's children
+ *  instead of scanning the whole table. Empty id list → no query. */
+async function listByIds(
+  orgSlug: string,
+  table: CoreTableName,
+  ids: string[],
+): Promise<CoreRow[]> {
+  if (ids.length === 0) return [];
+  const formula = `OR(${ids.map((id) => `RECORD_ID()='${id}'`).join(",")})`;
+  return core.list(orgSlug, table, { filterByFormula: formula });
 }
 
 async function fromPostgres(ctx: OrgCtx, id: string): Promise<JobDetailView | null> {
@@ -134,12 +154,14 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<JobDetailView | nu
     return null; // 404 / deleted / wrong-base → not found
   }
 
-  // Related rows live in the canonical tables; filter by their Job link rather
-  // than trusting the (possibly stale) linked-record arrays on the job record.
+  // Read only THIS job's children — by their record ids, taken from the job's
+  // own link fields — instead of scanning the whole table. Essential for orgs
+  // with thousands of matters (a detail page reads ~a dozen rows, not 15k). The
+  // in-memory linksTo() filter below stays as an exact guard.
   const [phaseRows, riskRows, budgetRows, procRows] = await Promise.all([
-    core.list(ctx.orgSlug, "PHASES", { maxRecords: 500 }),
-    core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
-    core.list(ctx.orgSlug, "BUDGET", { maxRecords: 500 }),
+    listByIds(ctx.orgSlug, "PHASES", linkIds(job["PHASES"])),
+    listByIds(ctx.orgSlug, "RISKS", linkIds(job["RISKS"])),
+    listByIds(ctx.orgSlug, "BUDGET", linkIds(job["BUDGET"])),
     loadProcurement(ctx),
   ]);
   const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual

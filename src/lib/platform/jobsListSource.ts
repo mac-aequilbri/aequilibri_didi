@@ -68,23 +68,58 @@ async function fromPostgres(ctx: OrgCtx): Promise<JobListView[]> {
   }));
 }
 
+// Rough progress for a list card when we don't scan the phase table (large
+// orgs) — the detail page still shows exact phase-derived completion. Keyed on
+// the matter status vocabulary; closed states are 100%, everything else a
+// representative mid-point.
+function completionFromStatus(status: string): number {
+  const s = status.toLowerCase();
+  if (s.startsWith("closed") || s === "complete" || s === "filled") return 100;
+  if (s === "intake") return 5;
+  if (s === "on hold") return 40;
+  if (s === "in discovery") return 55;
+  if (s === "in mediation") return 65;
+  if (s === "awaiting court") return 75;
+  return 45; // active / in progress / other
+}
+
 async function fromAirtable(ctx: OrgCtx): Promise<JobListView[]> {
-  const [jobRows, phaseRows, riskRows] = await Promise.all([
-    core.list(ctx.orgSlug, "JOBS", { maxRecords: 200 }),
-    core.list(ctx.orgSlug, "PHASES", { maxRecords: 500 }),
-    core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
-  ]);
+  const jobRows = await core.list(ctx.orgSlug, "JOBS", { maxRecords: 200 });
+
+  // For a data-rich org (thousands of matters → tens of thousands of phases),
+  // scanning the whole PHASES/RISKS tables just to count per-job children is the
+  // dominant cost (and is duplicated on the dashboard). Above a threshold we
+  // read counts straight off each job's own link-field arrays and approximate
+  // completion from status — no child-table scan. Smaller orgs keep the exact
+  // phase-derived numbers (unchanged behaviour, cheap at that size).
+  const big = jobRows.length > 300;
+  const [phaseRows, riskRows] = big
+    ? [[] as Record<string, unknown>[], [] as Record<string, unknown>[]]
+    : await Promise.all([
+        core.list(ctx.orgSlug, "PHASES", { maxRecords: 500 }),
+        core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
+      ]);
 
   return jobRows.map((job) => {
-    const phases = phaseRows.filter(
-      (p) => linksTo(p["Job"], job.id) && p["Is_AI_Draft"] !== true,
-    );
-    const openRisks = riskRows.filter(
-      (r) => linksTo(r["Job"], job.id) && (str(r["Status"]) || "open") === "open",
-    );
-    const completionPct = phases.length
-      ? Math.round(phases.reduce((s, p) => s + num(p["Completion_Pct"]), 0) / phases.length)
-      : 0;
+    const status = str(job["Status"]) || "open";
+    let phaseCount: number;
+    let riskCount: number;
+    let completionPct: number;
+    if (big) {
+      phaseCount = Array.isArray(job["PHASES"]) ? job["PHASES"].length : 0;
+      riskCount = Array.isArray(job["RISKS"]) ? job["RISKS"].length : 0;
+      completionPct = completionFromStatus(status);
+    } else {
+      const phases = phaseRows.filter((p) => linksTo(p["Job"], job.id) && p["Is_AI_Draft"] !== true);
+      const openRisks = riskRows.filter(
+        (r) => linksTo(r["Job"], job.id) && (str(r["Status"]) || "open") === "open",
+      );
+      phaseCount = phases.length;
+      riskCount = openRisks.length;
+      completionPct = phases.length
+        ? Math.round(phases.reduce((s, p) => s + num(p["Completion_Pct"]), 0) / phases.length)
+        : 0;
+    }
     return {
       id: job.id,
       name: str(job["Job_Name"]) || "(job)",
@@ -92,11 +127,11 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobListView[]> {
       engagementType: "",
       address: "",
       suburb: "",
-      status: str(job["Status"]) || "open",
+      status,
       completionPct,
       healthScore: 0, // not tracked in Airtable JOBS
       budgetTotal: num(job["Estimated_Value"]),
-      counts: { phases: phases.length, actions: 0, risks: openRisks.length },
+      counts: { phases: phaseCount, actions: 0, risks: riskCount },
     };
   });
 }

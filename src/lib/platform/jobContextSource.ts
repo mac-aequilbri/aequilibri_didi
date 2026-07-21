@@ -11,6 +11,7 @@
 // math stays in app code (see money.ts).
 
 import { airtableEnabled, core } from "@/lib/airtable";
+import type { CoreRow } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { VARIATION_FILTER, variationStatusFromAir } from "./changeLog";
@@ -139,13 +140,30 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
   // base can lack them, and Airtable answers a missing table with a 403 that
   // would otherwise reject this whole batch and crash generation. Read them
   // tolerantly (→ [] when absent); the core tables stay strict.
+  // Read only THIS job's children — by their record ids from the job's own link
+  // fields — so this stays fast on orgs with thousands of matters (the in-memory
+  // linksTo() filters below remain an exact guard). CHANGE_LOG is fetched by the
+  // job's linked ids too, then the variation filter is applied in memory.
+  const EMPTY = Promise.resolve([] as CoreRow[]);
+  const byIds = (v: unknown) => {
+    const ids = Array.isArray(v) ? v.map(String).filter((s) => s.startsWith("rec")) : [];
+    return ids.length ? { filterByFormula: `OR(${ids.map((id) => `RECORD_ID()='${id}'`).join(",")})` } : null;
+  };
+  const phaseOpts = byIds(job["PHASES"]);
+  const riskOpts = byIds(job["RISKS"]);
+  const budgetOpts = byIds(job["BUDGET"]);
+  const cashOpts = byIds(job["CASHFLOWS"]);
+  const changeIds = byIds(job["CHANGE_LOG"]);
+  // Keep the variation-type filter (CHANGE_LOG also holds non-variation rows).
+  const changeOpts = changeIds
+    ? { filterByFormula: `AND(${VARIATION_FILTER},${changeIds.filterByFormula})` }
+    : null;
   const [phaseRows, riskRows, budgetRows, cashflowRows, variationRows, procRows] = await Promise.all([
-    core.list(ctx.orgSlug, "PHASES", { maxRecords: 500 }),
-    listOptional(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
-    core.list(ctx.orgSlug, "BUDGET", { maxRecords: 500 }),
-    core.list(ctx.orgSlug, "CASHFLOWS", { maxRecords: 500 }),
-    // Spec 12: variations are CHANGE_LOG rows (Change_Type="Variation").
-    listOptional(ctx.orgSlug, "CHANGE_LOG", { maxRecords: 500, filterByFormula: VARIATION_FILTER }),
+    phaseOpts ? core.list(ctx.orgSlug, "PHASES", phaseOpts) : EMPTY,
+    riskOpts ? listOptional(ctx.orgSlug, "RISKS", riskOpts) : EMPTY,
+    budgetOpts ? core.list(ctx.orgSlug, "BUDGET", budgetOpts) : EMPTY,
+    cashOpts ? core.list(ctx.orgSlug, "CASHFLOWS", cashOpts) : EMPTY,
+    changeOpts ? listOptional(ctx.orgSlug, "CHANGE_LOG", changeOpts) : EMPTY,
     loadProcurement(ctx),
   ]);
   const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual
