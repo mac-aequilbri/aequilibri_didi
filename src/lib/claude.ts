@@ -243,11 +243,11 @@ function demoResponse(userMessage: string): ChatResult {
       "Recommend confirming the 15-May delivery before processing payment.";
   } else if (has("hello", "hi", "start", "session")) {
     reply =
-      `${tag} Good morning! Starting session for Dulong Downs. I've loaded 32 LEARNING_RULES and reviewed the ` +
-      "CHANGE_LOG. No writes since last session (48 hours ago). ACTION_HUB shows 3 items overdue. How can I help you today?";
+      `${tag} Good morning! Starting a new session. I've loaded your active learning rules and reviewed the ` +
+      "activity log. No writes since last session (48 hours ago). ACTION_HUB shows 3 items overdue. How can I help you today?";
   } else {
     reply =
-      `${tag} I've queried the Dulong Downs database. Your question: *"${userMessage.slice(0, 80)}"* — ` +
+      `${tag} I've queried your workspace. Your question: *"${userMessage.slice(0, 80)}"* — ` +
       "Here's what the data shows: the project is currently 54% complete overall, on track for the August 2026 " +
       "target completion. Would you like me to drill into a specific phase, table, or topic?";
   }

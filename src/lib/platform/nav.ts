@@ -40,6 +40,7 @@ export function buildNav(
       items: [
         { href: p(""), label: "Dashboard", exact: true },
         { href: p("/assistant"), label: ctx.config.assistant.name },
+        ...(f.chat ? [{ href: p("/chat"), label: "Chat" }] : []),
         { href: p("/approvals"), label: "Approvals", badge: counts.pending || undefined },
       ],
     },

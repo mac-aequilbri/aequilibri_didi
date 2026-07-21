@@ -278,6 +278,7 @@ export default function AssistantClient({
   pendingProposals,
   suggestions = [],
   defaultJobId,
+  basePath = "/assistant",
 }: {
   orgSlug: string;
   assistantName: string;
@@ -287,6 +288,9 @@ export default function AssistantClient({
   pendingProposals: PendingProposalView[];
   /** Data-grounded starter prompts shown in the empty state. */
   suggestions?: string[];
+  /** Feature route this chat lives under; drives the streaming endpoint URL.
+   *  "/assistant" (project assistant) or "/chat" (standalone chat). */
+  basePath?: string;
 }) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -363,7 +367,7 @@ export default function AssistantClient({
     formRef.current?.reset();
     resizeComposer();
     try {
-      const res = await fetch(`/app/${orgSlug}/assistant/stream`, {
+      const res = await fetch(`/app/${orgSlug}${basePath}/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, sessionId, jobId: defaultJobId }),

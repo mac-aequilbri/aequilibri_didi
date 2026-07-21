@@ -15,6 +15,7 @@ import { LogoField } from "./LogoField";
 export const dynamic = "force-dynamic";
 
 const FEATURE_LABELS: Record<string, string> = {
+  chat: "Standalone chat",
   risks: "Risk register",
   variations: "Variation orders",
   reports: "Weekly reports",

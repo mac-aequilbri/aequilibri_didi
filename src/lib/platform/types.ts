@@ -45,6 +45,10 @@ export interface Actor {
 
 /** Feature flags that gate nav items and screens; org settings override these. */
 export const DEFAULT_FEATURES: Record<string, boolean> = {
+  // Standalone conversational chat, surfaced as its own screen at /chat and
+  // independent of the project-delivery ("UC3") module bundle. On by default so
+  // every onboarded org gets it; turn it off per-org to withhold the feature.
+  chat: true,
   risks: true,
   variations: true,
   quotes: true,

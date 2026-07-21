@@ -69,15 +69,30 @@ async function listSessionMessagesAirtable(ctx: OrgCtx, sessionId: RecordId): Pr
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
-export async function getOrCreateSession(ctx: OrgCtx, jobId?: RecordId): Promise<RecordId> {
+/** Which surface a session belongs to. The project assistant (/assistant) and
+ *  the standalone chat (/chat) share the same tables but keep separate threads;
+ *  the session title carries the channel so the two never pick up each other's
+ *  open session — no schema change needed across the Airtable/Postgres stores. */
+export type SessionChannel = "project" | "standalone";
+const CHANNEL_TITLE: Record<SessionChannel, string> = {
+  project: "Session",
+  standalone: "Standalone Chat",
+};
+
+export async function getOrCreateSession(
+  ctx: OrgCtx,
+  jobId?: RecordId,
+  channel: SessionChannel = "project",
+): Promise<RecordId> {
+  const title = CHANNEL_TITLE[channel];
   if (airtableEnabled()) {
     const rows = await core.list(ctx.orgSlug, "CHAT_SESSIONS", { maxRecords: 200 });
     const open = rows
-      .filter((r) => !str(r["Ended_At"]))
+      .filter((r) => !str(r["Ended_At"]) && str(r["Session_Title"]) === title)
       .sort((a, b) => dt(b["Started_At"]).getTime() - dt(a["Started_At"]).getTime())[0];
     if (open) return open.id;
     const created = await core.create(ctx.orgSlug, "CHAT_SESSIONS", {
-      Session_Title: "Session",
+      Session_Title: title,
       Job_Id: jobId == null ? "" : String(jobId),
       Started_At: new Date().toISOString(),
       Summary: "",
@@ -85,12 +100,12 @@ export async function getOrCreateSession(ctx: OrgCtx, jobId?: RecordId): Promise
     return created.id;
   }
   const open = await prisma.platChatSession.findFirst({
-    where: { orgId: ctx.orgId, endedAt: null },
+    where: { orgId: ctx.orgId, endedAt: null, title },
     orderBy: { startedAt: "desc" },
   });
   if (open) return open.id;
   const session = await prisma.platChatSession.create({
-    data: { orgId: ctx.orgId, jobId: typeof jobId === "number" ? jobId : undefined, title: "Session" },
+    data: { orgId: ctx.orgId, jobId: typeof jobId === "number" ? jobId : undefined, title },
   });
   return session.id;
 }
