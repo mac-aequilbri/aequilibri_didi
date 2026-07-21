@@ -187,7 +187,10 @@ export async function callClaudeConversation(
     const params: Anthropic.MessageCreateParamsNonStreaming = {
       model,
       max_tokens: maxTokens,
-      system: systemPrompt,
+      // Cache the system prompt: it's large (persona + rules + data snapshot)
+      // and re-sent on every call of an agent's multi-round tool loop. The API
+      // ignores the breakpoint for short prompts, so this is a no-op elsewhere.
+      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
       messages,
     };
     if (tools?.length) params.tools = tools;

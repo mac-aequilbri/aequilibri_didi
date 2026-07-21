@@ -98,7 +98,10 @@ export async function runOrchestrator(
     const res = await callClaudeConversation(system, oconvo, {
       tools: [delegateTool],
       maxTokens: 1500,
-      model: modelFor("chat"),
+      // The coordinator only routes (delegate tool) and stitches specialist
+      // replies together — a classification/routing job, not domain reasoning.
+      // Run it on the cheaper/faster tier; specialists stay on the chat model.
+      model: modelFor("classification"),
       onEvent,
     });
     demoMode = res.demo_mode;
