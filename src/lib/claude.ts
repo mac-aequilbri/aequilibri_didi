@@ -34,11 +34,27 @@ export interface ChatResult {
   demo_mode: boolean;
 }
 
+/** Incremental output for streamed chat turns. `reset` marks the start of a new
+ *  model call (the client discards any prior deltas), so only the final
+ *  answer's text survives across an orchestrator's multi-call fan-out. */
+export type ChatStreamEvent = { type: "reset" } | { type: "delta"; text: string };
+
 function textFrom(content: Anthropic.ContentBlock[]): string {
   return content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n");
+}
+
+function parseBlocks(content: Anthropic.ContentBlock[]): { content: string; tool_uses: ToolUse[] } {
+  const textParts: string[] = [];
+  const toolUses: ToolUse[] = [];
+  for (const block of content) {
+    if (block.type === "text") textParts.push(block.text);
+    else if (block.type === "tool_use")
+      toolUses.push({ name: block.name, input: block.input, id: block.id });
+  }
+  return { content: textParts.join("\n"), tool_uses: toolUses };
 }
 
 /** Single base64 image + text prompt. Pass temperature=0 for deterministic output. */
@@ -140,9 +156,16 @@ export async function callClaude(
 export async function callClaudeConversation(
   systemPrompt: string,
   messages: Anthropic.MessageParam[],
-  opts: { tools?: Anthropic.Tool[]; maxTokens?: number; model?: string } = {},
+  opts: {
+    tools?: Anthropic.Tool[];
+    maxTokens?: number;
+    model?: string;
+    /** When supplied, the reply is streamed: `reset` then a `delta` per text
+     *  chunk. Tool-use turns still resolve normally via the return value. */
+    onEvent?: (e: ChatStreamEvent) => void;
+  } = {},
 ): Promise<ChatResult> {
-  const { tools, maxTokens = 1024, model = MODEL } = opts;
+  const { tools, maxTokens = 1024, model = MODEL, onEvent } = opts;
   const apiKey = getApiKey();
   if (!apiKey) {
     const last = messages[messages.length - 1];
@@ -152,7 +175,12 @@ export async function callClaudeConversation(
         : (last?.content ?? [])
             .map((b) => (typeof b === "object" && "text" in b ? (b as { text: string }).text : ""))
             .join(" ");
-    return demoResponse(lastText);
+    const demo = demoResponse(lastText);
+    if (onEvent) {
+      onEvent({ type: "reset" });
+      onEvent({ type: "delta", text: demo.content });
+    }
+    return demo;
   }
   try {
     const client = new Anthropic({ apiKey });
@@ -163,15 +191,15 @@ export async function callClaudeConversation(
       messages,
     };
     if (tools?.length) params.tools = tools;
-    const response = await client.messages.create(params);
-    const textParts: string[] = [];
-    const toolUses: ToolUse[] = [];
-    for (const block of response.content) {
-      if (block.type === "text") textParts.push(block.text);
-      else if (block.type === "tool_use")
-        toolUses.push({ name: block.name, input: block.input, id: block.id });
+    if (onEvent) {
+      onEvent({ type: "reset" });
+      const stream = client.messages.stream(params);
+      stream.on("text", (delta) => onEvent({ type: "delta", text: delta }));
+      const final = await stream.finalMessage();
+      return { ...parseBlocks(final.content), demo_mode: false };
     }
-    return { content: textParts.join("\n"), tool_uses: toolUses, demo_mode: false };
+    const response = await client.messages.create(params);
+    return { ...parseBlocks(response.content), demo_mode: false };
   } catch (e) {
     return { content: `[Claude API error: ${e}]`, tool_uses: [], demo_mode: false };
   }

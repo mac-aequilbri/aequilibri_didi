@@ -10,7 +10,7 @@
 // recursion so agents can't loop on each other.
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { callClaudeConversation } from "@/lib/claude";
+import { callClaudeConversation, type ChatStreamEvent } from "@/lib/claude";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { Actor, OrgCtx } from "@/lib/platform/types";
 import { executeToolUse, ToolOutcome } from "@/services/platform/assistant/executor";
@@ -64,6 +64,7 @@ export async function runAgentLoop(
   actor: Actor,
   userRole?: string,
   delegation?: DelegationContext,
+  onEvent?: (e: ChatStreamEvent) => void,
 ): Promise<AgentLoopResult> {
   const outcomes: ToolOutcome[] = [];
   let reply = "";
@@ -77,6 +78,7 @@ export async function runAgentLoop(
       tools,
       maxTokens: 1500,
       model: modelFor(agent.modelTask),
+      onEvent,
     });
     demoMode = res.demo_mode;
     if (res.demo_mode || res.tool_uses.length === 0 || round === MAX_TOOL_ROUNDS) {
@@ -110,10 +112,16 @@ export async function runAgentLoop(
         const subSystem = task
           ? `${target.system}\n\nRouted from the ${agent.label} agent: ${task}`
           : target.system;
-        const sub = await runAgentLoop(target.agent, ctx, subSystem, [...convo], actor, userRole, {
-          ...delegation,
-          depth: delegation.depth + 1,
-        });
+        const sub = await runAgentLoop(
+          target.agent,
+          ctx,
+          subSystem,
+          [...convo],
+          actor,
+          userRole,
+          { ...delegation, depth: delegation.depth + 1 },
+          onEvent,
+        );
         outcomes.push(...sub.outcomes);
         resultBlocks.push({
           type: "tool_result",

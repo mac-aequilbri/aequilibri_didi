@@ -13,7 +13,7 @@
 // by MAX_AGENT_DELEGATION_DEPTH.
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { callClaudeConversation } from "@/lib/claude";
+import { callClaudeConversation, type ChatStreamEvent } from "@/lib/claude";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
 import { Actor, OrgCtx } from "@/lib/platform/types";
@@ -46,13 +46,14 @@ async function delegateToSpecialist(
   task: string,
   userRole: string | undefined,
   delegation: DelegationContext,
+  onEvent?: (e: ChatStreamEvent) => void,
 ): Promise<{ reply: string; outcomes: ToolOutcome[] }> {
   // The specialist answers the real conversation (full context); the routing
   // task is added as a hint so it knows why it was picked.
   const system = task
     ? `${target.system}\n\nThe coordinator routed this request to you: ${task}`
     : target.system;
-  const sub = await runAgentLoop(target.agent, ctx, system, [...convo], actor, userRole, delegation);
+  const sub = await runAgentLoop(target.agent, ctx, system, [...convo], actor, userRole, delegation, onEvent);
   return { reply: sub.reply || "(the specialist returned no reply)", outcomes: sub.outcomes };
 }
 
@@ -60,15 +61,20 @@ export async function runOrchestrator(
   ctx: OrgCtx,
   convo: Anthropic.MessageParam[],
   actor: Actor,
-  opts: { specialists: Specialist[]; orgName: string; userRole?: string },
+  opts: {
+    specialists: Specialist[];
+    orgName: string;
+    userRole?: string;
+    onEvent?: (e: ChatStreamEvent) => void;
+  },
 ): Promise<OrchestratorResult> {
-  const { specialists, orgName, userRole } = opts;
+  const { specialists, orgName, userRole, onEvent } = opts;
 
   // No routing choice to make — run the one specialist directly.
   if (specialists.length <= 1) {
     const only = specialists[0];
     if (!only) return { reply: "No assistant is configured.", demoMode: false, outcomes: [], delegations: [] };
-    const r = await runAgentLoop(only.agent, ctx, only.system, convo, actor, userRole);
+    const r = await runAgentLoop(only.agent, ctx, only.system, convo, actor, userRole, undefined, onEvent);
     return { reply: r.reply, demoMode: r.demoMode, outcomes: r.outcomes, delegations: [] };
   }
 
@@ -93,6 +99,7 @@ export async function runOrchestrator(
       tools: [delegateTool],
       maxTokens: 1500,
       model: modelFor("chat"),
+      onEvent,
     });
     demoMode = res.demo_mode;
     if (res.demo_mode || res.tool_uses.length === 0 || round === MAX_DELEGATION_ROUNDS) {
@@ -117,7 +124,7 @@ export async function runOrchestrator(
         });
         continue;
       }
-      const sub = await delegateToSpecialist(target, ctx, convo, actor, String(input.task ?? ""), userRole, delegation);
+      const sub = await delegateToSpecialist(target, ctx, convo, actor, String(input.task ?? ""), userRole, delegation, onEvent);
       outcomes.push(...sub.outcomes);
       delegations.push({ agent: target.agent.key, label: target.agent.label });
       lastSpecialistReply = sub.reply;

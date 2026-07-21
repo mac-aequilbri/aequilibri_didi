@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { friendlyTableLabel } from "@/lib/platform/tableLabels";
@@ -10,7 +11,6 @@ import {
   closeSessionReviewAction,
   rejectFromChatAction,
   saveConversationNoteFromChatAction,
-  sendMessageAction,
 } from "./actions";
 
 /** Human phrasing for the assistant's tool chips — users should read what the
@@ -230,12 +230,16 @@ export default function AssistantClient({
   /** Data-grounded starter prompts shown in the empty state. */
   suggestions?: string[];
 }) {
+  const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const reviewDetailsRef = useRef<HTMLDetailsElement>(null);
   const reviewFormRef = useRef<HTMLFormElement>(null);
   const [inFlight, setInFlight] = useState<string | null>(null);
+  /** The reply as it streams in. null before the first token; reset to "" each
+   *  time the backend starts a new model call so only the final answer shows. */
+  const [streamText, setStreamText] = useState<string | null>(null);
   /** Text of the last message that failed to send — drives the inline error bar
    *  and its Retry button. Cleared when the next send starts. */
   const [sendError, setSendError] = useState<string | null>(null);
@@ -248,6 +252,7 @@ export default function AssistantClient({
   if (messages.length !== seenCount) {
     setSeenCount(messages.length);
     setInFlight(null);
+    setStreamText(null);
   }
 
   // A new sessionId means the close-session review just completed: getOrCreateSession
@@ -262,9 +267,10 @@ export default function AssistantClient({
   }
 
   // Scrolling to the newest message is a real DOM side-effect, so it stays here.
+  // Follows both new messages and the streaming reply as it grows.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages.length]);
+  }, [messages.length, streamText]);
 
   // On a fresh session, collapse and clear the review panel so it's ready for
   // next time, and auto-dismiss the confirmation after a few seconds.
@@ -288,12 +294,60 @@ export default function AssistantClient({
     el.style.height = `${Math.min(el.scrollHeight, 144)}px`; // cap ≈ 6 rows
   };
 
-  // Drop a starter prompt into the composer and send it straight away.
-  const sendSuggestion = (text: string) => {
-    if (!inputRef.current || !formRef.current) return;
-    inputRef.current.value = text;
+  // Send a turn over the streaming route and render the reply as it arrives.
+  // Reads newline-delimited JSON events; on completion refreshes the RSC so the
+  // persisted message + any pending proposals render from the server.
+  const sendMessage = async (text: string) => {
+    if (!text) return;
+    setSendError(null);
     setInFlight(text);
-    formRef.current.requestSubmit();
+    setStreamText(null);
+    formRef.current?.reset();
+    resizeComposer();
+    try {
+      const res = await fetch(`/app/${orgSlug}/assistant/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, sessionId, jobId: defaultJobId }),
+      });
+      if (!res.ok || !res.body) throw new Error("stream failed");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let errored = false;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          const ev = JSON.parse(line) as { t: string; v?: string };
+          if (ev.t === "reset") setStreamText("");
+          else if (ev.t === "delta") setStreamText((s) => (s ?? "") + (ev.v ?? ""));
+          else if (ev.t === "error") errored = true;
+        }
+      }
+      if (errored) throw new Error("send failed");
+      router.refresh();
+    } catch {
+      // Network drop / server error — surface it and restore the typed text so
+      // the thinking bubble doesn't spin forever and nothing is lost.
+      setInFlight(null);
+      setStreamText(null);
+      setSendError(text);
+      if (inputRef.current && !inputRef.current.value) {
+        inputRef.current.value = text;
+        resizeComposer();
+      }
+    }
+  };
+
+  // Drop a starter prompt (or a failed message on Retry) and send it straight away.
+  const sendSuggestion = (text: string) => {
+    void sendMessage(text);
   };
 
   const tableLabel = friendlyTableLabel;
@@ -410,7 +464,19 @@ export default function AssistantClient({
               <Avatar label="Y" kind="user" />
             </div>
           )}
-          {inFlight && <ThinkingBubble avatar={avatarLabel} />}
+          {inFlight &&
+            (streamText ? (
+              <div className="flex justify-start gap-2.5">
+                <Avatar label={avatarLabel} kind="assistant" />
+                <div className="max-w-[80%] rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm shadow-sm bg-white border border-neutral-200">
+                  <div className="prose prose-sm max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamText}</ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <ThinkingBubble avatar={avatarLabel} />
+            ))}
         </div>
       </div>
 
@@ -446,26 +512,7 @@ export default function AssistantClient({
       <form
         ref={formRef}
         action={async (formData: FormData) => {
-          const text = String(formData.get("message") ?? "").trim();
-          if (!text) return;
-          setSendError(null);
-          setInFlight(text);
-          formRef.current?.reset();
-          resizeComposer();
-          try {
-            await sendMessageAction(formData);
-          } catch {
-            // The action threw (network drop, server error) — without this the
-            // thinking bubble would spin forever and the typed message be gone.
-            setInFlight(null);
-            setSendError(text);
-            // Put the text back in the composer, unless the user already
-            // started typing something new while the send was in flight.
-            if (inputRef.current && !inputRef.current.value) {
-              inputRef.current.value = text;
-              resizeComposer();
-            }
-          }
+          await sendMessage(String(formData.get("message") ?? "").trim());
         }}
         className="mt-3 flex items-center gap-2 rounded-3xl border border-neutral-300 bg-white py-1.5 pl-4 pr-1.5 shadow-sm focus-within:border-ae-space focus-within:ring-2 focus-within:ring-[var(--ae-space,#1f2937)]"
       >

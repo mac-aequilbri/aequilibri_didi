@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import type { ChatStreamEvent } from "@/lib/claude";
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { normalizeTeamRole } from "@/lib/platform/module1Governance";
@@ -175,7 +176,12 @@ export async function sendChatMessage(
   ctx: OrgCtx,
   userName: string,
   text: string,
-  opts: { sessionId?: RecordId; jobId?: RecordId; userRole?: string } = {},
+  opts: {
+    sessionId?: RecordId;
+    jobId?: RecordId;
+    userRole?: string;
+    onEvent?: (e: ChatStreamEvent) => void;
+  } = {},
 ): Promise<SendResult> {
   const sessionId = opts.sessionId ?? (await getOrCreateSession(ctx, opts.jobId));
   let userMsgId: number | undefined;
@@ -256,6 +262,7 @@ export async function sendChatMessage(
     specialists,
     orgName: ctx.orgName,
     userRole: opts.userRole,
+    onEvent: opts.onEvent,
   });
 
   const pendingApprovals = outcomes
