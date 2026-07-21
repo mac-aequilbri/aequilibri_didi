@@ -1,19 +1,30 @@
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { airtableEnabled } from "@/lib/airtable";
+import { getOrgRegistry, readMetricsSnapshot } from "@/lib/airtable/control";
 import { currency } from "@/lib/format";
-import { loadJobsList } from "@/lib/platform/jobsListSource";
+import { loadJobsList, loadJobsPage, type JobListView } from "@/lib/platform/jobsListSource";
 import {
   applyListQuery,
   hasActiveFilters,
   parseListQuery,
   toClientConfig,
+  type ClientListConfig,
+  type FacetCounts,
 } from "@/lib/platform/listQuery";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { projectsListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
+
+// Above this many matters, the Airtable path can't afford to pull the whole
+// table to filter/facet client-side, so the window switches to true
+// server-side pagination (fetch one page; search + prev/next). Smaller orgs
+// keep the richer client-side list (per-status facets, exact total, sort,
+// jump-to-page). Postgres orgs always use the client-side path.
+const SERVER_PAGINATE_ABOVE = 500;
 
 export default async function ProjectsPage({
   params,
@@ -26,13 +37,38 @@ export default async function ProjectsPage({
   const viewer = await getCurrentViewer(ctx);
   const query = parseListQuery(await searchParams, projectsListConfig);
   const filtered = hasActiveFilters(query);
-  // Postgres (numeric ids) or Airtable (rec… ids) depending on the flag — the
-  // ids here must match what the detail page (jobDetailSource) can resolve.
-  const { items: jobs, total, matching, facets, page, pageCount } = applyListQuery(
-    await loadJobsList(ctx, viewer),
-    query,
-    projectsListConfig,
-  );
+
+  // Decide the pagination strategy from the org's cached matter count.
+  const reg = airtableEnabled() ? await getOrgRegistry(ctx.orgSlug) : null;
+  const projectCount = reg ? (readMetricsSnapshot(reg.settings)?.projects ?? 0) : 0;
+  const serverPaged = projectCount > SERVER_PAGINATE_ABOVE;
+
+  let jobs: JobListView[], total: number, matching: number, page: number, pageCount: number;
+  let facets: FacetCounts | undefined;
+  let clientConfig: ClientListConfig;
+
+  if (serverPaged) {
+    const pageSize = query.pageSize ?? projectsListConfig.pageSize ?? 50;
+    const res = await loadJobsPage(ctx, { page: query.page, pageSize, q: query.q });
+    jobs = res.items;
+    page = res.page;
+    pageCount = res.hasNext ? res.page + 1 : res.page; // prev/next (no exact total)
+    total = projectCount; // approximate grand total from the cached snapshot
+    matching = jobs.length;
+    facets = undefined; // per-status facets need a full scan — omitted at this scale
+    // Only search + rows survive server-side; status facets/sort need the full set.
+    clientConfig = { hasSearch: true, fields: [], pageSize };
+  } else {
+    // Postgres (numeric ids) or small Airtable orgs — rich client-side list.
+    const applied = applyListQuery(await loadJobsList(ctx, viewer), query, projectsListConfig);
+    jobs = applied.items;
+    total = applied.total;
+    matching = applied.matching;
+    facets = applied.facets;
+    page = applied.page;
+    pageCount = applied.pageCount;
+    clientConfig = toClientConfig(projectsListConfig);
+  }
 
   return (
     <div className="p-6">
@@ -43,7 +79,7 @@ export default async function ProjectsPage({
       />
       <FilterBar
         basePath={orgPath(ctx.orgSlug, "/projects")}
-        config={toClientConfig(projectsListConfig)}
+        config={clientConfig}
         query={query}
         shown={matching}
         total={total}

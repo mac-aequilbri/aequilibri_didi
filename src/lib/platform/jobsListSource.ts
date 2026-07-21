@@ -12,6 +12,8 @@
 // action count is 0 in Airtable mode — matching jobDetailSource).
 
 import { airtableEnabled, core } from "@/lib/airtable";
+import { listPage } from "@/lib/airtable/client";
+import { resolveBaseId } from "@/lib/airtable/config";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { assignedJobRecIds } from "./rls";
@@ -134,6 +136,81 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobListView[]> {
       counts: { phases: phaseCount, actions: 0, risks: riskCount },
     };
   });
+}
+
+export interface JobsPage {
+  items: JobListView[];
+  page: number;
+  pageSize: number;
+  hasNext: boolean;
+}
+
+/** Escape a user string for an Airtable double-quoted formula literal. */
+function airStr(s: string): string {
+  return `"${s.replace(/["\\]/g, "")}"`;
+}
+
+/** Map a raw Airtable JOBS record (fields keyed by name) to a JobListView.
+ *  Counts come from the record's own link-field arrays and completion from
+ *  status — no child-table reads (see fromAirtable's `big` path). */
+function rawJobToView(rec: { id: string; fields: Record<string, unknown> }): JobListView {
+  const f = rec.fields;
+  const status = str(f["Status"]) || "open";
+  return {
+    id: rec.id,
+    name: str(f["Job_Name"]) || "(job)",
+    code: "",
+    engagementType: "",
+    address: "",
+    suburb: "",
+    status,
+    completionPct: completionFromStatus(status),
+    healthScore: 0,
+    budgetTotal: num(f["Estimated_Value"]),
+    counts: {
+      phases: Array.isArray(f["PHASES"]) ? f["PHASES"].length : 0,
+      actions: 0,
+      risks: Array.isArray(f["RISKS"]) ? f["RISKS"].length : 0,
+    },
+  };
+}
+
+/** True server-side pagination for the Airtable path — fetches only the
+ *  requested page from Airtable (sort + optional text search pushed to the
+ *  API), so a firm with thousands of matters renders a page in ~one request
+ *  instead of pulling the whole table. Trade-off vs. loadJobsList: no exact
+ *  total / per-status facets (Airtable can't count), and navigation is
+ *  prev/next (a numbered pager would need the total). Used only for large orgs;
+ *  smaller orgs keep the richer client-side loadJobsList path. */
+export async function loadJobsPage(
+  ctx: OrgCtx,
+  opts: { page: number; pageSize: number; q?: string },
+): Promise<JobsPage> {
+  const page = Math.max(1, opts.page);
+  const pageSize = Math.max(1, opts.pageSize);
+  const baseId = await resolveBaseId(ctx.orgSlug);
+  const q = (opts.q ?? "").trim();
+  const filterByFormula = q
+    ? `SEARCH(LOWER(${airStr(q)}), LOWER({Job_Name}&""))`
+    : undefined;
+  // Recent matters first — a sensible, cheap default the API can sort on.
+  const sort = [{ field: "Date_Estimated", direction: "desc" as const }];
+
+  // Page forward via the API cursor to reach the requested page. Shallow pages
+  // (the demo norm) cost one request each; deep pages cost N. If the cursor runs
+  // out before the target page, the requested page is past the end → empty.
+  let offset: string | undefined;
+  let records: { id: string; fields: Record<string, unknown> }[] = [];
+  for (let i = 1; i <= page; i++) {
+    const res = await listPage(baseId, "JOBS", { filterByFormula, sort, pageSize, offset });
+    offset = res.offset;
+    if (i === page) {
+      records = res.records; // the requested page
+      break;
+    }
+    if (!offset) break; // ran out before reaching the requested page → empty
+  }
+  return { items: records.map(rawJobToView), page, pageSize, hasNext: Boolean(offset) };
 }
 
 /** Load the projects list from whichever backend is active. Pass the viewer

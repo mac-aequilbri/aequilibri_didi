@@ -19,11 +19,11 @@ import {
 import { FIRM } from "./data.mjs";
 
 const CONSTRUCTION_TEMPLATE = "appXfwBLE6zBEL5Zr";
-// The PAT can create bases in this workspace (verified empirically). The
-// AIRTABLE_WORKSPACE_ID in .env (wsppysXBoesIgMtpA) is the pre-transfer
-// workspace and 403s on base creation, so override it here; a LEGAL_DEMO_WORKSPACE_ID
-// env var wins if set.
-const WORKSPACE_ID = env("LEGAL_DEMO_WORKSPACE_ID") || "wsp0SwxU3j8IwLZJ1";
+// The PAT creates bases in this workspace (verified empirically). Prefer an
+// explicit override, then AIRTABLE_WORKSPACE_ID from .env (fixed to the
+// post-transfer workspace), then the known-good literal as a last resort.
+const WORKSPACE_ID =
+  env("LEGAL_DEMO_WORKSPACE_ID") || env("AIRTABLE_WORKSPACE_ID") || "wsp0SwxU3j8IwLZJ1";
 const force = process.argv.includes("--force");
 
 const PLATFORM_TABLES = new Set([

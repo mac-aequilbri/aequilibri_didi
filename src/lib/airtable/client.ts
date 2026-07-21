@@ -160,6 +160,38 @@ async function fetchAllRecords(
   return out;
 }
 
+export interface PageOptions {
+  filterByFormula?: string;
+  sort?: Array<{ field: string; direction: "asc" | "desc" }>;
+  pageSize?: number;
+  /** Airtable pagination cursor from a previous page's response. */
+  offset?: string;
+}
+
+/** Fetch ONE page of records (server-side filter/sort), returning the page plus
+ *  the next-page cursor. Unlike listRecords this does NOT follow pagination or
+ *  cache — it's the primitive behind true server-side pagination for data-rich
+ *  tables (e.g. a firm's thousands of matters), where fetching the whole table
+ *  to slice client-side is the bottleneck. */
+export async function listPage(
+  baseId: string,
+  table: string,
+  opts: PageOptions = {},
+): Promise<{ records: AirtableRecord[]; offset?: string }> {
+  const params = new URLSearchParams();
+  params.set("pageSize", String(opts.pageSize ?? 50));
+  if (opts.filterByFormula) params.set("filterByFormula", opts.filterByFormula);
+  (opts.sort ?? []).forEach((s, i) => {
+    params.set(`sort[${i}][field]`, s.field);
+    params.set(`sort[${i}][direction]`, s.direction);
+  });
+  if (opts.offset) params.set("offset", opts.offset);
+  const data = (await request(baseId, `${baseId}/${encodeURIComponent(table)}?${params}`, {
+    method: "GET",
+  })) as ListResponse;
+  return { records: data.records, offset: data.offset };
+}
+
 /** Fetch a single record by ID. Cached like listRecords. */
 export function getRecord(
   baseId: string,
