@@ -55,6 +55,59 @@ export interface PendingProposalView {
   payload: string;
 }
 
+/** Plain-English verbs for the proposal header, matching the Approvals page. */
+const OP_LABELS: Record<string, string> = { create: "Create", update: "Update", delete: "Delete" };
+const opLabel = (op: string): string => OP_LABELS[op] ?? op;
+
+/** Payload fields that carry a human-readable headline, best first. */
+const HEADLINE_FIELDS = ["description", "title", "name", "summary", "label", "note", "content"];
+
+/** Plumbing keys that never make a useful headline — mirrors the Approvals
+ *  page's SKIP_FIELDS so both surfaces hide the same noise. */
+const SKIP_PAYLOAD_FIELDS = new Set([
+  "context",
+  "meta",
+  "aiDraft",
+  "aiAnalysis",
+  "extractedActions",
+  "jobId",
+  "sourceType",
+]);
+
+const readableScalar = (v: unknown): string | null =>
+  typeof v === "string" && v.trim() !== ""
+    ? v.trim()
+    : typeof v === "number" || typeof v === "boolean"
+      ? String(v)
+      : null;
+
+const clip = (s: string): string => (s.length > 90 ? s.slice(0, 90) + "…" : s);
+
+/** Turn a raw write payload into a short, human-readable headline for the
+ *  approval card — e.g. "VARIATION ORDER VO-001" — instead of a slice of JSON
+ *  full of field names and record ids. Prefers a descriptive field; otherwise
+ *  the first meaningful scalar (skipping plumbing and record ids); finally
+ *  falls back to a trimmed payload slice for un-parseable payloads. */
+export function summariseProposalPayload(payload: string): string {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return payload.slice(0, 90);
+  }
+  for (const key of HEADLINE_FIELDS) {
+    const v = readableScalar(parsed[key]);
+    if (v) return clip(v);
+  }
+  for (const [key, val] of Object.entries(parsed)) {
+    if (SKIP_PAYLOAD_FIELDS.has(key)) continue;
+    const v = readableScalar(val);
+    // Skip bare Airtable record ids ("rec" + 14 chars) — they read as noise.
+    if (v && !/^rec[A-Za-z0-9]{14}$/.test(v)) return clip(`${key.replace(/_/g, " ")}: ${v}`);
+  }
+  return payload.slice(0, 90);
+}
+
 function SendButton() {
   const { pending } = useFormStatus();
   return (
@@ -105,9 +158,11 @@ function ProposalRow({
       <div className="flex items-center gap-2 text-xs">
         <span className="flex-1 truncate">
           <span className="font-medium">
-            {proposal.operation} {tableLabel(proposal.targetTable)}
+            {opLabel(proposal.operation)} {tableLabel(proposal.targetTable)}
           </span>{" "}
-          <code className="text-neutral-500">{proposal.payload.slice(0, 90)}</code>
+          <span className="text-neutral-500">
+            — {summariseProposalPayload(proposal.payload)}
+          </span>
         </span>
         <form action={approveAction}>
           <input type="hidden" name="org" value={orgSlug} />
