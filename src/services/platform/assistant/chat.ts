@@ -10,8 +10,30 @@ import { learningPromptText } from "../learning";
 import type { ToolOutcome } from "./executor";
 import { runOrchestrator, type Specialist } from "../agents/orchestrator";
 import { SPECIALISTS } from "../agents/registry";
+import { PROPOSED_PENDING_FORMULA } from "@/lib/platform/pendingWritesSource";
 
 const HISTORY_LIMIT = 20;
+
+const formulaSafe = (v: string): string => v.replace(/'/g, "");
+const OPEN_ISSUES_FORMULA = `OR({Status}='Open',{Status}='In Progress')`;
+
+/** Scalar fields worth grounding on — omits the many link arrays that make a
+ *  raw JOBS row huge in the prompt. */
+const JOB_SUMMARY_FIELDS = [
+  "Job_Name",
+  "Status",
+  "Target_Completion",
+  "Outcome",
+  "Estimated_Value",
+  "Actual_Value",
+  "Variance_Percent",
+] as const;
+
+function compactJob(job: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: job.id };
+  for (const k of JOB_SUMMARY_FIELDS) if (job[k] != null) out[k] = job[k];
+  return out;
+}
 
 interface ChatMessageRow {
   id: RecordId;
@@ -32,9 +54,10 @@ function dt(v: unknown): Date {
 }
 
 async function listSessionMessagesAirtable(ctx: OrgCtx, sessionId: RecordId): Promise<ChatMessageRow[]> {
-  const rows = await core.list(ctx.orgSlug, "CHAT_MESSAGES", { maxRecords: 1000 });
+  const rows = await core.list(ctx.orgSlug, "CHAT_MESSAGES", {
+    filterByFormula: `{Session_Id}='${formulaSafe(String(sessionId))}'`,
+  });
   return rows
-    .filter((r) => str(r["Session_Id"]) === String(sessionId))
     .map((r) => ({
       id: r.id,
       role: str(r["Role"]),
@@ -106,17 +129,12 @@ async function dataContext(ctx: OrgCtx): Promise<string> {
   if (airtableEnabled()) {
     const [jobs, actions, pending] = await Promise.all([
       core.list(ctx.orgSlug, "JOBS", { maxRecords: 10 }),
-      core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
-      core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000 }),
+      core.list(ctx.orgSlug, "ISSUES", { filterByFormula: OPEN_ISSUES_FORMULA }),
+      core.list(ctx.orgSlug, "PENDING_WRITES", { filterByFormula: PROPOSED_PENDING_FORMULA }),
     ]);
-    const openActions = actions.filter((a) => {
-      const s = str(a["Status"]);
-      return s === "Open" || s === "In Progress";
-    }).length;
-    const pendingProposals = pending.filter((p) => str(p["Status"]).toLowerCase() === "proposed").length;
     return [
-      `Jobs: ${JSON.stringify(jobs)}`,
-      `Open actions: ${openActions}. Pending write proposals awaiting human approval: ${pendingProposals}.`,
+      `Jobs: ${JSON.stringify(jobs.map(compactJob))}`,
+      `Open actions: ${actions.length}. Pending write proposals awaiting human approval: ${pending.length}.`,
     ].join("\n");
   }
   const jobs = await prisma.platJob.findMany({
