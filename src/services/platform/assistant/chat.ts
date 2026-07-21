@@ -196,6 +196,30 @@ export async function renameChatSession(ctx: OrgCtx, sessionId: RecordId, title:
   });
 }
 
+/** Permanently delete a standalone conversation and its messages. Callers must
+ *  first confirm the id belongs to this org's standalone set (isChatSession). */
+export async function deleteChatSession(ctx: OrgCtx, sessionId: RecordId): Promise<void> {
+  if (airtableEnabled()) {
+    const msgs = await core.list(ctx.orgSlug, "CHAT_MESSAGES", {
+      filterByFormula: `{Session_Id}='${formulaSafe(String(sessionId))}'`,
+    });
+    // deleteRecords chunks the 10-per-call Airtable limit and no-ops on empty.
+    await core.remove(ctx.orgSlug, "CHAT_MESSAGES", msgs.map((m) => m.id));
+    await core.remove(ctx.orgSlug, "CHAT_SESSIONS", [String(sessionId)]);
+    return;
+  }
+  await prisma.platChatMessage.deleteMany({ where: { orgId: ctx.orgId, sessionId: Number(sessionId) } });
+  await prisma.platChatSession.deleteMany({ where: { id: Number(sessionId), orgId: ctx.orgId } });
+}
+
+/** Whether an id is one of this org's standalone conversations — the ownership
+ *  gate for rename/delete, so a forged ?s= / form id can't touch a project or
+ *  cross-org session. */
+export async function isChatSession(ctx: OrgCtx, sessionId: RecordId): Promise<boolean> {
+  const sessions = await listChatSessions(ctx);
+  return sessions.some((s) => String(s.id) === String(sessionId));
+}
+
 /** Resolve which standalone conversation to show: the requested id when it is a
  *  valid standalone session for this org, else the most recent, else a new one.
  *  Validating against the org's standalone list also blocks viewing a project or

@@ -5,7 +5,6 @@
 // pinned to a project/job. Gated by the `chat` feature flag and, like every
 // platform route, by requireOrgCtx — reachable only for an onboarded org's members.
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
@@ -18,6 +17,7 @@ import {
   resolveChatSession,
 } from "@/services/platform/assistant/chat";
 import AssistantClient, { ChatMessageView } from "../assistant/AssistantClient";
+import ConversationList from "./ConversationList";
 import { newChatAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -80,28 +80,12 @@ export default async function ChatPage({
         <h2 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">
           Conversations
         </h2>
-        <ul className="space-y-1">
-          {sessions.map((s) => {
-            const active = String(s.id) === String(sessionId);
-            return (
-              <li key={s.id}>
-                <Link
-                  href={`${chatPath}?s=${s.id}`}
-                  className={`block truncate rounded px-2.5 py-1.5 text-sm ${
-                    active
-                      ? "bg-neutral-100 font-medium text-neutral-900"
-                      : "text-neutral-600 hover:bg-neutral-50"
-                  }`}
-                >
-                  {s.title}
-                </Link>
-              </li>
-            );
-          })}
-          {sessions.length === 0 && (
-            <li className="px-2.5 text-xs text-neutral-400">No conversations yet.</li>
-          )}
-        </ul>
+        <ConversationList
+          orgSlug={ctx.orgSlug}
+          chatPath={chatPath}
+          currentId={sessionId}
+          sessions={sessions.map((s) => ({ id: s.id, title: s.title }))}
+        />
       </aside>
       <div>
         <PageHeader title={ctx.config.assistant.name} subtitle={`Chat — ${authorityLabel}; ${roleLabel}.`} />
