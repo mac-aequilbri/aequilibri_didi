@@ -51,9 +51,11 @@ export function ConfirmSubmitButton({
         }
       }}
       onBlur={() => setArmed(false)}
-      className={`${className} inline-flex items-center gap-2 disabled:opacity-60 ${
-        armed ? "!border-red-400 !text-red-700" : ""
-      }`}
+      className={`${className} inline-flex items-center gap-2 disabled:opacity-60`}
+      // Armed state tints to the warm brand danger colour. Inline style (not a
+      // Tailwind important utility) so it reliably overrides the base variant's
+      // border/text colour regardless of which `className` variant is passed.
+      style={armed ? { borderColor: "var(--ae-danger)", color: "var(--ae-danger)" } : undefined}
     >
       {pending && (
         <span
