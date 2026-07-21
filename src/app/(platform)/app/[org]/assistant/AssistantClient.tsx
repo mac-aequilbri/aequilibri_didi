@@ -108,8 +108,11 @@ export function summariseProposalPayload(payload: string): string {
   return payload.slice(0, 90);
 }
 
-function SendButton() {
-  const { pending } = useFormStatus();
+// Pending is driven by the parent's `inFlight` state rather than useFormStatus:
+// the composer submits via a plain onSubmit handler (not React's form `action`)
+// so the optimistic user bubble paints instantly instead of waiting behind the
+// action's transition.
+function SendButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -566,8 +569,12 @@ export default function AssistantClient({
       )}
       <form
         ref={formRef}
-        action={async (formData: FormData) => {
-          await sendMessage(String(formData.get("message") ?? "").trim());
+        onSubmit={(e) => {
+          // Plain onSubmit (not React's form `action`) so the optimistic
+          // setInFlight update inside sendMessage paints urgently rather than
+          // being deferred behind the action's pending transition.
+          e.preventDefault();
+          void sendMessage(String(new FormData(e.currentTarget).get("message") ?? "").trim());
         }}
         className="mt-3 flex items-center gap-2 rounded-3xl border border-neutral-300 bg-white py-1.5 pl-4 pr-1.5 shadow-sm focus-within:border-ae-space focus-within:ring-2 focus-within:ring-[var(--ae-space,#1f2937)]"
       >
@@ -590,7 +597,7 @@ export default function AssistantClient({
           }}
           className="max-h-36 flex-1 resize-none self-center overflow-y-auto bg-transparent text-sm focus:outline-none"
         />
-        <SendButton />
+        <SendButton pending={inFlight !== null} />
       </form>
       <p className="mt-1.5 text-center text-[0.7rem] text-neutral-400">
         AI can make mistakes — verify important figures.
