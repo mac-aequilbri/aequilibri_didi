@@ -183,6 +183,7 @@ export async function sendChatMessage(
     onEvent?: (e: ChatStreamEvent) => void;
   } = {},
 ): Promise<SendResult> {
+  const startedAt = Date.now();
   const sessionId = opts.sessionId ?? (await getOrCreateSession(ctx, opts.jobId));
   let userMsgId: number | undefined;
   let userMsgRecordId: string | undefined;
@@ -202,6 +203,7 @@ export async function sendChatMessage(
     userMsgId = userMsg.id;
   }
 
+  const readsAt = Date.now();
   const [rulesBlock, context, historyRows] = await Promise.all([
     learningPromptText(ctx),
     dataContext(ctx),
@@ -215,6 +217,7 @@ export async function sendChatMessage(
           take: HISTORY_LIMIT,
         }),
   ]);
+  const readMs = Date.now() - readsAt;
 
   const { system, version } = getPrompt("assistant.chat", {
     persona: ctx.config.assistant.persona,
@@ -258,12 +261,17 @@ export async function sendChatMessage(
     agent,
     system: `${system}\n\nYou are the ${agent.label} specialist for this workspace. Scope: ${agent.description} Use only the tools you have been given; if a request falls outside your scope, say so briefly so it can be routed elsewhere.`,
   }));
+  const modelAt = Date.now();
   const { reply, demoMode, outcomes, delegations } = await runOrchestrator(ctx, convo, actor, {
     specialists,
     orgName: ctx.orgName,
     userRole: opts.userRole,
     onEvent: opts.onEvent,
   });
+  // Per-stage latency (ms): reads = pre-model data fetch; model = full
+  // orchestrator fan-out; total = whole turn. Written to EXECUTION_LOG so the
+  // perf work is confirmable from the logs rather than assumed.
+  const timing = { readMs, modelMs: Date.now() - modelAt, totalMs: Date.now() - startedAt };
 
   const pendingApprovals = outcomes
     .filter((o) => o.status === "proposed" && o.proposalId)
@@ -295,7 +303,7 @@ export async function sendChatMessage(
         Log_Entry: "chat",
         Action_Type: "chat",
         Tables_Affected: "CHAT_MESSAGES",
-        Summary: JSON.stringify({ user: userName, tools: outcomes.length, demoMode }),
+        Summary: JSON.stringify({ user: userName, tools: outcomes.length, demoMode, ...timing }),
         Initiated_By: "AI",
         Status: "executed",
         Date_Time: new Date().toISOString(),
@@ -320,7 +328,7 @@ export async function sendChatMessage(
           actorName: ctx.config.assistant.name,
           operation: "chat",
           targetTable: "plat_core_chatmessage",
-          payload: JSON.stringify({ user: userName, tools: outcomes.length, demoMode }),
+          payload: JSON.stringify({ user: userName, tools: outcomes.length, demoMode, ...timing }),
           status: "executed",
           executedAt: new Date(),
           sourceMessageId: userMsgId,
