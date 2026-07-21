@@ -279,6 +279,7 @@ export default function AssistantClient({
   suggestions = [],
   defaultJobId,
   basePath = "/assistant",
+  showSessionReview = true,
 }: {
   orgSlug: string;
   assistantName: string;
@@ -291,6 +292,10 @@ export default function AssistantClient({
   /** Feature route this chat lives under; drives the streaming endpoint URL.
    *  "/assistant" (project assistant) or "/chat" (standalone chat). */
   basePath?: string;
+  /** The project assistant's "end session with review" closeout (corrections +
+   *  learning loop). Off for the standalone chat, which manages conversations
+   *  via its own history list / "New chat" instead. */
+  showSessionReview?: boolean;
 }) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -324,7 +329,9 @@ export default function AssistantClient({
   const [prevSession, setPrevSession] = useState(sessionId);
   if (sessionId !== prevSession) {
     setPrevSession(sessionId);
-    setClosedNotice(true);
+    // Only the project close-review flow means "fresh session" here; on /chat a
+    // sessionId change is just switching conversations, so skip the notice.
+    if (showSessionReview) setClosedNotice(true);
     setInFlight(null);
   }
 
@@ -606,6 +613,7 @@ export default function AssistantClient({
       <p className="mt-1.5 text-center text-[0.7rem] text-neutral-400">
         AI can make mistakes — verify important figures.
       </p>
+      {showSessionReview && (
       <details ref={reviewDetailsRef} className="mt-2 ae-card p-4">
         <summary className="cursor-pointer text-sm font-medium">End session with review</summary>
         <form ref={reviewFormRef} action={closeSessionReviewAction} className="mt-3 space-y-3">
@@ -663,6 +671,7 @@ export default function AssistantClient({
           <CloseSessionButton />
         </form>
       </details>
+      )}
       <details className="mt-3 ae-card p-4">
         <summary className="cursor-pointer text-sm font-medium">Capture a source note</summary>
         <form action={saveConversationNoteFromChatAction} className="mt-3 space-y-3">

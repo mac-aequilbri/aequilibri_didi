@@ -9,7 +9,12 @@
 import { NextRequest } from "next/server";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { recordIdParam } from "@/lib/platform/recordWriter";
-import { sendChatMessage } from "@/services/platform/assistant/chat";
+import {
+  deriveChatTitle,
+  listMessages,
+  renameChatSession,
+  sendChatMessage,
+} from "@/services/platform/assistant/chat";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +38,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ org
   if (!text) return new Response("Missing message", { status: 400 });
 
   const sessionId = idFrom(body.sessionId) ?? undefined;
+
+  // Auto-title a brand-new conversation from its first message. Cosmetic, so a
+  // failure here must never block the send.
+  if (sessionId != null) {
+    try {
+      const prior = await listMessages(ctx, sessionId);
+      if (prior.length === 0) await renameChatSession(ctx, sessionId, deriveChatTitle(text));
+    } catch {
+      /* titling is best-effort */
+    }
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({

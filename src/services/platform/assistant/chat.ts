@@ -70,29 +70,60 @@ async function listSessionMessagesAirtable(ctx: OrgCtx, sessionId: RecordId): Pr
 }
 
 /** Which surface a session belongs to. The project assistant (/assistant) and
- *  the standalone chat (/chat) share the same tables but keep separate threads;
- *  the session title carries the channel so the two never pick up each other's
- *  open session — no schema change needed across the Airtable/Postgres stores. */
+ *  the standalone chat (/chat) share the same tables but keep separate threads.
+ *  The channel is encoded in the session title so the two never pick up each
+ *  other's session — no schema field needed across the Airtable/Postgres stores.
+ *  Project keeps the fixed "Session" title (one rolling thread, unchanged);
+ *  standalone conversations are titled "chat: <name>", so each carries its own
+ *  display name for the /chat history list. */
 export type SessionChannel = "project" | "standalone";
-const CHANNEL_TITLE: Record<SessionChannel, string> = {
-  project: "Session",
-  standalone: "Standalone Chat",
-};
+const PROJECT_TITLE = "Session";
+const STANDALONE_PREFIX = "chat:";
+const DEFAULT_CHAT_TITLE = "New chat";
+
+const encodeChatTitle = (display: string): string =>
+  `${STANDALONE_PREFIX} ${display.trim() || DEFAULT_CHAT_TITLE}`;
+const isStandaloneTitle = (raw: string): boolean =>
+  raw.trimStart().toLowerCase().startsWith(STANDALONE_PREFIX);
+function chatDisplayTitle(raw: string): string {
+  const t = raw.trimStart();
+  if (!isStandaloneTitle(t)) return t || DEFAULT_CHAT_TITLE;
+  return t.slice(STANDALONE_PREFIX.length).trim() || DEFAULT_CHAT_TITLE;
+}
+
+/** A short conversation name derived from the first user message. */
+export function deriveChatTitle(message: string): string {
+  const line = message.replace(/\s+/g, " ").trim();
+  if (!line) return DEFAULT_CHAT_TITLE;
+  return line.length > 48 ? `${line.slice(0, 47).trimEnd()}…` : line;
+}
+
+export interface ChatSessionSummary {
+  id: RecordId;
+  title: string;
+  startedAt: Date;
+  ended: boolean;
+}
 
 export async function getOrCreateSession(
   ctx: OrgCtx,
   jobId?: RecordId,
   channel: SessionChannel = "project",
 ): Promise<RecordId> {
-  const title = CHANNEL_TITLE[channel];
+  // Standalone reuses the most recent conversation (or opens a fresh one); it is
+  // the /chat page + stream-route fallback that manages the multi-thread list.
+  if (channel === "standalone") {
+    const existing = await listChatSessions(ctx);
+    return existing.length ? existing[0].id : createChatSession(ctx);
+  }
   if (airtableEnabled()) {
     const rows = await core.list(ctx.orgSlug, "CHAT_SESSIONS", { maxRecords: 200 });
     const open = rows
-      .filter((r) => !str(r["Ended_At"]) && str(r["Session_Title"]) === title)
+      .filter((r) => !str(r["Ended_At"]) && str(r["Session_Title"]) === PROJECT_TITLE)
       .sort((a, b) => dt(b["Started_At"]).getTime() - dt(a["Started_At"]).getTime())[0];
     if (open) return open.id;
     const created = await core.create(ctx.orgSlug, "CHAT_SESSIONS", {
-      Session_Title: title,
+      Session_Title: PROJECT_TITLE,
       Job_Id: jobId == null ? "" : String(jobId),
       Started_At: new Date().toISOString(),
       Summary: "",
@@ -100,14 +131,82 @@ export async function getOrCreateSession(
     return created.id;
   }
   const open = await prisma.platChatSession.findFirst({
-    where: { orgId: ctx.orgId, endedAt: null, title },
+    where: { orgId: ctx.orgId, endedAt: null, title: PROJECT_TITLE },
     orderBy: { startedAt: "desc" },
   });
   if (open) return open.id;
   const session = await prisma.platChatSession.create({
-    data: { orgId: ctx.orgId, jobId: typeof jobId === "number" ? jobId : undefined, title },
+    data: { orgId: ctx.orgId, jobId: typeof jobId === "number" ? jobId : undefined, title: PROJECT_TITLE },
   });
   return session.id;
+}
+
+/** All standalone-chat conversations for the org, most recent first. */
+export async function listChatSessions(ctx: OrgCtx): Promise<ChatSessionSummary[]> {
+  if (airtableEnabled()) {
+    const rows = await core.list(ctx.orgSlug, "CHAT_SESSIONS", { maxRecords: 200 });
+    return rows
+      .filter((r) => isStandaloneTitle(str(r["Session_Title"])))
+      .map((r) => ({
+        id: r.id,
+        title: chatDisplayTitle(str(r["Session_Title"])),
+        startedAt: dt(r["Started_At"]),
+        ended: Boolean(str(r["Ended_At"])),
+      }))
+      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+  }
+  const rows = await prisma.platChatSession.findMany({
+    where: { orgId: ctx.orgId, title: { startsWith: STANDALONE_PREFIX } },
+    orderBy: { startedAt: "desc" },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    title: chatDisplayTitle(r.title),
+    startedAt: r.startedAt,
+    ended: Boolean(r.endedAt),
+  }));
+}
+
+/** Open a fresh standalone conversation and return its id. */
+export async function createChatSession(ctx: OrgCtx, title?: string): Promise<RecordId> {
+  const encoded = encodeChatTitle(title ?? DEFAULT_CHAT_TITLE);
+  if (airtableEnabled()) {
+    const created = await core.create(ctx.orgSlug, "CHAT_SESSIONS", {
+      Session_Title: encoded,
+      Job_Id: "",
+      Started_At: new Date().toISOString(),
+      Summary: "",
+    });
+    return created.id;
+  }
+  const session = await prisma.platChatSession.create({ data: { orgId: ctx.orgId, title: encoded } });
+  return session.id;
+}
+
+/** Rename a standalone conversation (used for first-message auto-titling). */
+export async function renameChatSession(ctx: OrgCtx, sessionId: RecordId, title: string): Promise<void> {
+  const encoded = encodeChatTitle(title);
+  if (airtableEnabled()) {
+    await core.update(ctx.orgSlug, "CHAT_SESSIONS", String(sessionId), { Session_Title: encoded });
+    return;
+  }
+  await prisma.platChatSession.updateMany({
+    where: { id: Number(sessionId), orgId: ctx.orgId },
+    data: { title: encoded },
+  });
+}
+
+/** Resolve which standalone conversation to show: the requested id when it is a
+ *  valid standalone session for this org, else the most recent, else a new one.
+ *  Validating against the org's standalone list also blocks viewing a project or
+ *  cross-org session by guessing its id in ?s=. */
+export async function resolveChatSession(ctx: OrgCtx, requestedId?: RecordId): Promise<RecordId> {
+  const sessions = await listChatSessions(ctx);
+  if (requestedId != null) {
+    const match = sessions.find((s) => String(s.id) === String(requestedId));
+    if (match) return match.id;
+  }
+  return sessions.length ? sessions[0].id : createChatSession(ctx);
 }
 
 export async function endSession(ctx: OrgCtx, sessionId: RecordId): Promise<void> {
