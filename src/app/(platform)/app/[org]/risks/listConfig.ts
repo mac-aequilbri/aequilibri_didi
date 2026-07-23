@@ -48,5 +48,36 @@ export const risksListConfig: ListViewConfig<RiskView> = {
     { name: "owner", label: "Owner", getValue: (r) => r.owner.toLowerCase() },
     { name: "description", label: "Description", getValue: (r) => r.description.toLowerCase() },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      getValue: (r) => r.status.toLowerCase(),
+      options: [
+        { value: "open" },
+        { value: "accepted" },
+        { value: "mitigated" },
+        { value: "closed" },
+      ],
+    },
+    {
+      name: "severity",
+      label: "Severity",
+      getValue: (r) => (score(r) >= 15 ? "high" : score(r) >= 8 ? "medium" : "low"),
+      options: [
+        { value: "high", label: "High (15+)" },
+        { value: "medium", label: "Medium (8–14)" },
+        { value: "low", label: "Low (under 8)" },
+      ],
+    },
+    {
+      name: "rag",
+      label: "RAG",
+      getValue: (r) => r.rag || null,
+      options: [{ value: "Red" }, { value: "Amber" }, { value: "Green" }],
+    },
+    { name: "category", label: "Category", getValue: (r) => r.category || null },
+    { name: "owner", label: "Owner", getValue: (r) => r.owner || null },
+  ],
   pageSize: 50,
 };

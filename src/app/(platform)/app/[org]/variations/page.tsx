@@ -1,11 +1,14 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, toNum } from "@/lib/format";
 import {
   applyListQuery,
   hasActiveFilters,
   parseListQuery,
+  splitIntoGroups,
   toClientConfig,
 } from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -61,7 +64,12 @@ export default async function VariationsPage({
             </tr>
           </thead>
           <tbody>
-            {variations.map((v) => (
+            {splitIntoGroups(variations, query, variationsListConfig).map((section) => (
+              <Fragment key={section.key}>
+                {query.group && (
+                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
+                )}
+                {section.rows.map((v) => (
               <tr key={v.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2 whitespace-nowrap font-mono text-xs">
                   <Link href={orgPath(ctx.orgSlug, `/variations/${v.id}`)} className="hover:underline">
@@ -85,6 +93,8 @@ export default async function VariationsPage({
                   <StatusBadge status={v.status} />
                 </td>
               </tr>
+                ))}
+              </Fragment>
             ))}
             {variations.length === 0 && (
               <tr>

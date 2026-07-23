@@ -6,6 +6,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { loadJobLabelMap } from "./jobOptionsSource";
 import { dateInput, type EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -22,6 +23,9 @@ export interface DecisionView {
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
+}
+function firstLink(v: unknown): string | null {
+  return Array.isArray(v) && v.length > 0 ? String(v[0]) : null;
 }
 
 async function fromPostgres(ctx: OrgCtx): Promise<DecisionView[]> {
@@ -56,14 +60,18 @@ const AIR_TO_APP_DECISION_STATUS: Record<string, string> = {
 };
 
 async function fromAirtable(ctx: OrgCtx): Promise<DecisionView[]> {
-  const rows = await core.list(ctx.orgSlug, "DECISIONS", { maxRecords: 200 });
+  const [rows, jobLabels] = await Promise.all([
+    core.list(ctx.orgSlug, "DECISIONS", { maxRecords: 200 }),
+    loadJobLabelMap(ctx),
+  ]);
   return rows.map((r) => {
     const owner = r["Owner"];
+    const jobRec = firstLink(r["Job"]);
     return {
       id: r.id,
       description:
         str(r["Decision_Description"]) || str(r["Decision_Name"]) || "(untitled decision)",
-      jobCode: null,
+      jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
       rationale: str(r["Rationale"]),
       // Owner is a TEAM linked record; name resolution is a later step.
       madeBy: Array.isArray(owner) && owner.length > 0 ? "(linked)" : "—",

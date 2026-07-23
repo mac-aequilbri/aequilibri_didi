@@ -1,7 +1,9 @@
 // Action Hub (core tier) — actions from any source: manual, chat, minutes.
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { ACTION_STATUSES } from "@/lib/platform/actionStatus";
@@ -11,6 +13,7 @@ import {
   hasActiveFilters,
   parseListQuery,
   sortAndPaginate,
+  splitIntoGroups,
   toClientConfig,
 } from "@/lib/platform/listQuery";
 import { orgPath } from "@/lib/platform/paths";
@@ -122,7 +125,12 @@ export default async function ActionsPage({
             </tr>
           </thead>
           <tbody>
-            {items.map((a) => (
+            {splitIntoGroups(items, query, actionsListConfig).map((section) => (
+              <Fragment key={section.key}>
+                {query.group && (
+                  <GroupHeaderRow colSpan={6} label={section.label} count={section.count} />
+                )}
+                {section.rows.map((a) => (
               <tr key={a.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   <Link
@@ -187,6 +195,8 @@ export default async function ActionsPage({
                   </form>
                 </td>
               </tr>
+                ))}
+              </Fragment>
             ))}
             {items.length === 0 && (
               <tr>

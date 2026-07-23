@@ -26,5 +26,15 @@ export const decisionsListConfig: ListViewConfig<DecisionView> = {
     { name: "madeBy", label: "Made by", getValue: (d) => d.madeBy.toLowerCase() },
     { name: "status", label: "Status", getValue: (d) => d.status.toLowerCase() },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      getValue: (d) => d.status.toLowerCase(),
+      options: [{ value: "proposed" }, { value: "confirmed" }, { value: "superseded" }],
+    },
+    { name: "source", label: "Source", getValue: (d) => d.sourceType || null },
+    { name: "project", label: "Project", getValue: (d) => d.jobCode || null },
+  ],
   pageSize: 50,
 };

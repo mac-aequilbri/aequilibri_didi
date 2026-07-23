@@ -41,5 +41,14 @@ export const minutesListConfig: ListViewConfig<MinutesView> = {
     { name: "actions", label: "Action items", getValue: (m) => m.actionsCount },
     { name: "status", label: "Status", getValue: (m) => m.status.toLowerCase() },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      getValue: (m) => m.status.toLowerCase(),
+      options: ["raw", "processed", "confirmed"].map((v) => ({ value: v })),
+    },
+    { name: "project", label: "Project", getValue: (m) => m.jobCode || null },
+  ],
   pageSize: 50,
 };

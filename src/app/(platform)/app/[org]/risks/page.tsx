@@ -1,13 +1,16 @@
 // Risk register with likelihood × impact scoring and batch escalation.
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import {
   applyListQuery,
   hasActiveFilters,
   parseListQuery,
+  splitIntoGroups,
   toClientConfig,
 } from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -154,9 +157,14 @@ export default async function RisksPage({
             </tr>
           </thead>
           <tbody>
-            {risks.map((r) => {
-              const score = r.likelihood * r.impact;
-              return (
+            {splitIntoGroups(risks, query, risksListConfig).map((section) => (
+              <Fragment key={section.key}>
+                {query.group && (
+                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
+                )}
+                {section.rows.map((r) => {
+                  const score = r.likelihood * r.impact;
+                  return (
                 <tr key={r.id} className="relative border-t border-neutral-100 align-top hover:bg-neutral-50">
                   <td className="py-2 pr-2">
                     <Link
@@ -222,8 +230,10 @@ export default async function RisksPage({
                     </form>
                   </td>
                 </tr>
-              );
-            })}
+                  );
+                })}
+              </Fragment>
+            ))}
             {risks.length === 0 && (
               <tr>
                 <td colSpan={5} className="py-6">

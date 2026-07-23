@@ -2,8 +2,10 @@
 // required communications: who gets told what, by when. Pending items sort to
 // the top by due date; overdue items are flagged.
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { loadComms } from "@/lib/platform/commsSource";
@@ -11,6 +13,7 @@ import {
   applyListQuery,
   hasActiveFilters,
   parseListQuery,
+  splitIntoGroups,
   toClientConfig,
 } from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -64,7 +67,12 @@ export default async function CommsPage({
             </tr>
           </thead>
           <tbody>
-            {comms.map((c) => (
+            {splitIntoGroups(comms, query, commsListConfig).map((section) => (
+              <Fragment key={section.key}>
+                {query.group && (
+                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
+                )}
+                {section.rows.map((c) => (
               <tr key={c.id} className="relative border-t border-neutral-100 align-top hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   <Link
@@ -105,6 +113,8 @@ export default async function CommsPage({
                   </form>
                 </td>
               </tr>
+                ))}
+              </Fragment>
             ))}
             {comms.length === 0 && (
               <tr>

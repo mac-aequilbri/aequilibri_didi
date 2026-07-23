@@ -150,6 +150,10 @@ export function FilterBar({
     navigate({ ...base, sort, page: 1 });
   };
 
+  // Selecting a dimension groups by it; "No grouping" clears it.
+  const setGroup = (field: string | null) =>
+    navigate({ ...latest.current, group: field, page: 1 });
+
   const goToPage = (p: number) => navigate({ ...latest.current, page: p });
 
   // Chosen size only goes to the URL when it differs from the config default.
@@ -167,6 +171,7 @@ export function FilterBar({
       enums: {},
       ranges: {},
       sort: latest.current.sort,
+      group: latest.current.group,
       pageSize: latest.current.pageSize,
       page: 1,
     });
@@ -261,6 +266,11 @@ export function FilterBar({
     ? config.sort?.find((s) => s.name === query.sort?.field)
     : undefined;
 
+  const groupOpen = openField === "__group";
+  const activeGroup = query.group
+    ? config.groups?.find((g) => g.name === query.group)
+    : undefined;
+
   return (
     <>
       <div ref={barRef} className="filter-bar">
@@ -318,6 +328,47 @@ export function FilterBar({
                     onClick={() => setSort(null)}
                   >
                     <span className="filter-opt-label">Default order</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {(config.groups?.length ?? 0) > 0 && (
+          <div className="filter-pill-wrap">
+            <button
+              type="button"
+              ref={(el) => {
+                pillRefs.current["__group"] = el;
+              }}
+              className={`filter-pill${activeGroup ? " active" : ""}`}
+              aria-expanded={groupOpen}
+              onClick={() => setOpenField(groupOpen ? null : "__group")}
+            >
+              Group
+              {activeGroup && <span className="filter-pill-count">{activeGroup.label}</span>}
+              <span aria-hidden="true">▾</span>
+            </button>
+            {groupOpen && (
+              <div className="filter-pop" ref={popRef}>
+                {config.groups?.map((g) => (
+                  <button
+                    key={g.name}
+                    type="button"
+                    className="filter-opt filter-opt-btn"
+                    onClick={() => setGroup(g.name)}
+                  >
+                    <span className="filter-opt-label">{g.label}</span>
+                    {query.group === g.name && <span className="filter-opt-count">✓</span>}
+                  </button>
+                ))}
+                {query.group && (
+                  <button
+                    type="button"
+                    className="filter-opt filter-opt-btn"
+                    onClick={() => setGroup(null)}
+                  >
+                    <span className="filter-opt-label">No grouping</span>
                   </button>
                 )}
               </div>

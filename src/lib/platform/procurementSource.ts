@@ -10,6 +10,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { loadJobLabelMap } from "./jobOptionsSource";
 import { mulMoney, sumMoney } from "./money";
 import { dateInput, type EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
@@ -127,17 +128,21 @@ async function fromPostgres(ctx: OrgCtx): Promise<ProcurementView[]> {
 }
 
 async function fromAirtable(ctx: OrgCtx): Promise<ProcurementView[]> {
-  const rows = await core.list(ctx.orgSlug, "PROCUREMENT", { maxRecords: 200 });
+  const [rows, jobLabels] = await Promise.all([
+    core.list(ctx.orgSlug, "PROCUREMENT", { maxRecords: 200 }),
+    loadJobLabelMap(ctx),
+  ]);
   return rows.map((r) => {
     const qty = num(r["Quantity"]);
     const expected = str(r["Expected_Date"]) || null;
     const actual = str(r["Actual_Date"]) || null;
     const status = str(r["Status"]) || "Ordered";
     const { deltaDays, isLate } = procurementLateness(expected, actual, status);
+    const jobRec = firstLink(r["Job"]);
     return {
       id: r.id,
       item: str(r["Procurement_Name"]) || "(untitled item)",
-      jobCode: null,
+      jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
       // Supplier is a link to ORGANISATIONS, not a text field — left blank here
       // (resolving the link to a name is out of scope for this pass).
       vendorName: "",

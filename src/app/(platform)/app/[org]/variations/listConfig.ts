@@ -31,5 +31,23 @@ export const variationsListConfig: ListViewConfig<VariationView> = {
     { name: "time", label: "Time impact", getValue: (v) => v.timeImpactDays },
     { name: "status", label: "Status", getValue: (v) => v.status.toLowerCase() },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      getValue: (v) => v.status.toLowerCase(),
+      options: ["draft", "submitted", "approved", "rejected"].map((v) => ({ value: v })),
+    },
+    {
+      name: "origin",
+      label: "Origin",
+      getValue: (v) => (v.isAiDrafted ? "ai" : "manual"),
+      options: [
+        { value: "ai", label: "AI-drafted" },
+        { value: "manual", label: "Manual" },
+      ],
+    },
+    { name: "project", label: "Project", getValue: (v) => v.jobCode || null },
+  ],
   pageSize: 50,
 };

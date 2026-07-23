@@ -26,5 +26,18 @@ export const projectsListConfig: ListViewConfig<JobListView> = {
     { name: "health", label: "Health score", getValue: (j) => j.healthScore },
     { name: "budget", label: "Budget", getValue: (j) => j.budgetTotal },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      getValue: (j) => j.status.toLowerCase(),
+      options: ["open", "active", "on_hold", "complete", "closed"].map((s) => ({
+        value: s,
+        label: s.replace("_", " "),
+      })),
+    },
+    { name: "engagementType", label: "Engagement type", getValue: (j) => j.engagementType || null },
+    { name: "suburb", label: "Suburb", getValue: (j) => j.suburb || null },
+  ],
   pageSize: 50,
 };

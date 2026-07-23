@@ -57,6 +57,23 @@ export interface SortFieldDef<Row> {
   getValue?: (row: Row) => string | number | Date | null | undefined;
 }
 
+/** A categorical group-by dimension (?group=name). Independent of `fields` and
+ *  the rendered columns — you can group by a field the table neither filters
+ *  nor shows, as long as getValue can read it off the row. getValue must map
+ *  each row to a SINGLE bucket key (unlike the multi-match filter predicates). */
+export interface GroupFieldDef<Row> {
+  /** URL token. */
+  name: string;
+  label: string;
+  /** The bucket key for a row; null/undefined/"" all fall into the empty bucket. */
+  getValue: (row: Row) => string | null | undefined;
+  /** Known buckets: drives display order (declaration order) and labels.
+   *  Keys not listed here sort after these, alphabetically. */
+  options?: Array<{ value: string; label?: string }>;
+  /** Label for the null/blank bucket. Defaults to "— none —". */
+  emptyLabel?: string;
+}
+
 export interface ListViewConfig<Row> {
   fields: FilterField<Row>[];
   /** Row accessors the free-text q param searches on the predicate path. */
@@ -65,6 +82,8 @@ export interface ListViewConfig<Row> {
   prismaSearch?: string[];
   /** Sortable fields (?sort=name:asc). Omit for source-order lists. */
   sort?: SortFieldDef<Row>[];
+  /** Group-by dimensions (?group=name). Omit for windows that don't group. */
+  groups?: GroupFieldDef<Row>[];
   /** Rows per page (?page=N). Omit to render everything. */
   pageSize?: number;
 }
@@ -81,6 +100,8 @@ export interface ListQuery {
   ranges: Record<string, { from?: string; to?: string }>;
   /** Active sort, validated against config.sort. */
   sort: { field: string; dir: "asc" | "desc" } | null;
+  /** Active group-by dimension, validated against config.groups. */
+  group: string | null;
   /** 1-based page; meaningful only when config.pageSize is set. */
   page: number;
   /** User-chosen rows per page (?ps=N); null = config.pageSize default. */
@@ -134,13 +155,17 @@ export function parseListQuery<Row>(sp: SearchParams, config: ListViewConfig<Row
     }
   }
 
+  let group: string | null = null;
+  const groupRaw = first(sp.group);
+  if (groupRaw && config.groups?.some((g) => g.name === groupRaw)) group = groupRaw;
+
   const pageRaw = Number(first(sp.page));
   const page = Number.isInteger(pageRaw) && pageRaw > 1 ? pageRaw : 1;
 
   const psRaw = Number(first(sp.ps));
   const pageSize = config.pageSize && PAGE_SIZE_OPTIONS.includes(psRaw) ? psRaw : null;
 
-  return { q: first(sp.q).trim(), enums, ranges, sort, page, pageSize };
+  return { q: first(sp.q).trim(), enums, ranges, sort, group, page, pageSize };
 }
 
 /** Whether any row-narrowing filter is active (sort/page don't count). */
@@ -162,6 +187,7 @@ export function buildQueryString(query: ListQuery): string {
     if (r.to) p.set(`${name}_to`, r.to);
   }
   if (query.sort) p.set("sort", `${query.sort.field}:${query.sort.dir}`);
+  if (query.group) p.set("group", query.group);
   if (query.page > 1) p.set("page", String(query.page));
   if (query.pageSize) p.set("ps", String(query.pageSize));
   const s = p.toString();
@@ -273,6 +299,8 @@ export interface ClientListConfig {
   fields: ClientFilterField[];
   /** Sortable fields for the Sort pill (name + label only). */
   sort?: Array<{ name: string; label: string }>;
+  /** Group-by dimensions for the Group pill (name + label only). */
+  groups?: Array<{ name: string; label: string }>;
   /** Default rows per page; presence enables the FilterBar's Rows selector. */
   pageSize?: number;
 }
@@ -281,6 +309,7 @@ export function toClientConfig<Row>(config: ListViewConfig<Row>): ClientListConf
   return {
     hasSearch: Boolean(config.search?.length || config.prismaSearch?.length),
     sort: config.sort?.map((s) => ({ name: s.name, label: s.label })),
+    groups: config.groups?.map((g) => ({ name: g.name, label: g.label })),
     pageSize: config.pageSize,
     fields: config.fields.map((f) =>
       f.kind === "enum"
@@ -295,10 +324,37 @@ export function toClientConfig<Row>(config: ListViewConfig<Row>): ClientListConf
   };
 }
 
-/** Sort + paginate an already-filtered list per the query. Windows that filter
- *  in their source (Actions) call this in the page; applyListQuery calls it
- *  for everyone else. Page is clamped so a stale ?page= never strands the user
- *  on an empty slice. */
+/** Normalise a group getValue result to a bucket key ("" = the empty bucket). */
+function groupKeyOf<Row>(def: GroupFieldDef<Row>, row: Row): string {
+  const v = def.getValue(row);
+  return v == null ? "" : String(v);
+}
+
+/** Comparator ordering rows by their group bucket: declared options first (in
+ *  declaration order), then unlisted keys alphabetically, then the empty bucket
+ *  last. Direction-independent — the group order never flips with the sort dir. */
+function groupComparator<Row>(def: GroupFieldDef<Row>): (a: Row, b: Row) => number {
+  const order = new Map((def.options ?? []).map((o, i) => [o.value, i] as const));
+  const rank = (key: string): [number, number | string] => {
+    if (key === "") return [2, ""]; // empty bucket always last
+    const idx = order.get(key);
+    if (idx !== undefined) return [0, idx]; // declared option: by declaration order
+    return [1, key]; // known-but-unlisted key: alphabetical
+  };
+  return (a, b) => {
+    const [ta, ka] = rank(groupKeyOf(def, a));
+    const [tb, kb] = rank(groupKeyOf(def, b));
+    if (ta !== tb) return ta - tb;
+    if (typeof ka === "number" && typeof kb === "number") return ka - kb;
+    return String(ka).localeCompare(String(kb));
+  };
+}
+
+/** Sort + paginate an already-filtered list per the query. When a group is
+ *  active it becomes the primary ordering key and the sort (if any) orders rows
+ *  within each group. Windows that filter in their source (Actions) call this
+ *  in the page; applyListQuery calls it for everyone else. Page is clamped so a
+ *  stale ?page= never strands the user on an empty slice. */
 export function sortAndPaginate<Row>(
   rows: Row[],
   query: ListQuery,
@@ -306,13 +362,22 @@ export function sortAndPaginate<Row>(
 ): { items: Row[]; page: number; pageCount: number } {
   let items = rows;
 
+  const groupDef = query.group ? config.groups?.find((g) => g.name === query.group) : undefined;
   const sortDef = query.sort ? config.sort?.find((s) => s.name === query.sort?.field) : undefined;
-  if (query.sort && sortDef) {
-    const get =
-      sortDef.getValue ??
-      ((row: Row) => (row as Record<string, unknown>)[sortDef.name] as string | number | Date | null);
-    const flip = query.sort.dir === "desc" ? -1 : 1;
+
+  if (groupDef || sortDef) {
+    const byGroup = groupDef ? groupComparator(groupDef) : null;
+    const get = sortDef
+      ? (sortDef.getValue ??
+        ((row: Row) => (row as Record<string, unknown>)[sortDef.name] as string | number | Date | null))
+      : null;
+    const flip = query.sort?.dir === "desc" ? -1 : 1;
     items = [...items].sort((a, b) => {
+      if (byGroup) {
+        const g = byGroup(a, b);
+        if (g !== 0) return g;
+      }
+      if (!get) return 0;
       const va = get(a);
       const vb = get(b);
       if (va == null && vb == null) return 0;
@@ -331,6 +396,48 @@ export function sortAndPaginate<Row>(
   const page = Math.min(Math.max(1, query.page), pageCount);
   const start = (page - 1) * size;
   return { items: items.slice(start, start + size), page, pageCount };
+}
+
+export interface GroupSection<Row> {
+  /** Bucket key ("" for the empty bucket). */
+  key: string;
+  /** Display label for the section header. */
+  label: string;
+  count: number;
+  rows: Row[];
+}
+
+/** Segment an already-sorted, already-paginated slice into contiguous group
+ *  sections for rendering. Call only when query.group is set; rows must already
+ *  be group-ordered (sortAndPaginate does that). A bucket split across a page
+ *  boundary yields a section on each page — the header simply repeats atop the
+ *  next page, which is the intended behaviour. With no active/valid group it
+ *  returns a single unlabelled section holding every row (or none when empty). */
+export function splitIntoGroups<Row>(
+  items: Row[],
+  query: ListQuery,
+  config: ListViewConfig<Row>,
+): GroupSection<Row>[] {
+  const def = query.group ? config.groups?.find((g) => g.name === query.group) : undefined;
+  if (!def) {
+    return items.length ? [{ key: "", label: "", count: items.length, rows: items }] : [];
+  }
+  const labelFor = (key: string) =>
+    key === ""
+      ? (def.emptyLabel ?? "— none —")
+      : (def.options?.find((o) => o.value === key)?.label ?? key);
+  const sections: GroupSection<Row>[] = [];
+  let current: GroupSection<Row> | null = null;
+  for (const row of items) {
+    const key = groupKeyOf(def, row);
+    if (!current || current.key !== key) {
+      current = { key, label: labelFor(key), count: 0, rows: [] };
+      sections.push(current);
+    }
+    current.rows.push(row);
+    current.count += 1;
+  }
+  return sections;
 }
 
 /** One-call page helper for windows whose source already returns the full

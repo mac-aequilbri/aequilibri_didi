@@ -1,8 +1,10 @@
 // Decisions (core tier) — confirmed knowledge; assistant drafts arrive as
 // "proposed" with sourceType=chat and are confirmed or superseded here.
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -11,6 +13,7 @@ import {
   applyListQuery,
   hasActiveFilters,
   parseListQuery,
+  splitIntoGroups,
   toClientConfig,
 } from "@/lib/platform/listQuery";
 import { orgPath } from "@/lib/platform/paths";
@@ -65,7 +68,12 @@ export default async function DecisionsPage({
             </tr>
           </thead>
           <tbody>
-            {decisions.map((d) => (
+            {splitIntoGroups(decisions, query, decisionsListConfig).map((section) => (
+              <Fragment key={section.key}>
+                {query.group && (
+                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
+                )}
+                {section.rows.map((d) => (
               <tr key={d.id} className="relative border-t border-neutral-100 align-top hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   <Link
@@ -111,6 +119,8 @@ export default async function DecisionsPage({
                   )}
                 </td>
               </tr>
+                ))}
+              </Fragment>
             ))}
             {decisions.length === 0 && (
               <tr>

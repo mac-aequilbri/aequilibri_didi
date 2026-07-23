@@ -41,3 +41,14 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobOption[]> {
 export function loadJobOptions(ctx: OrgCtx): Promise<JobOption[]> {
   return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
 }
+
+/** Airtable JOBS record id → job display name, for resolving the `Job` link on
+ *  list rows into a groupable/displayable label. Reuses the same TTL-cached
+ *  JOBS read as loadJobOptions, so it adds no Airtable API calls when the cache
+ *  is warm. Empty in Postgres mode — those sources resolve the job through a
+ *  Prisma relation include instead. (Plan P4: unlocks "group by project".) */
+export async function loadJobLabelMap(ctx: OrgCtx): Promise<Map<string, string>> {
+  if (!airtableEnabled()) return new Map();
+  const jobs = await core.list(ctx.orgSlug, "JOBS", { maxRecords: 200 });
+  return new Map(jobs.map((j) => [j.id, str(j["Job_Name"]) || "(job)"]));
+}

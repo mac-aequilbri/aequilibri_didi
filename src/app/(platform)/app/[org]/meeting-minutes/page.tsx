@@ -1,11 +1,14 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import {
   applyListQuery,
   hasActiveFilters,
   parseListQuery,
+  splitIntoGroups,
   toClientConfig,
 } from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -60,7 +63,12 @@ export default async function MeetingMinutesPage({
             </tr>
           </thead>
           <tbody>
-            {minutes.map((m) => (
+            {splitIntoGroups(minutes, query, minutesListConfig).map((section) => (
+              <Fragment key={section.key}>
+                {query.group && (
+                  <GroupHeaderRow colSpan={4} label={section.label} count={section.count} />
+                )}
+                {section.rows.map((m) => (
               <tr key={m.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   <Link href={orgPath(ctx.orgSlug, `/meeting-minutes/${m.id}`)} className="font-medium hover:underline before:absolute before:inset-0">
@@ -74,6 +82,8 @@ export default async function MeetingMinutesPage({
                   <StatusBadge status={m.status} />
                 </td>
               </tr>
+                ))}
+              </Fragment>
             ))}
             {minutes.length === 0 && (
               <tr>

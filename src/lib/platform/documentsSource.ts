@@ -1,5 +1,6 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { loadJobLabelMap } from "./jobOptionsSource";
 import type { OrgCtx } from "./types";
 
 export interface DocumentView {
@@ -45,6 +46,10 @@ function dateOrNull(v: unknown): Date | null {
 
 function linksTo(v: unknown, recordId: string): boolean {
   return Array.isArray(v) && v.some((x) => String(x) === recordId);
+}
+
+function firstLink(v: unknown): string | null {
+  return Array.isArray(v) && v.length > 0 ? String(v[0]) : null;
 }
 
 function docKindFrom(row: Record<string, unknown>): string {
@@ -118,11 +123,16 @@ async function fromPostgresList(ctx: OrgCtx): Promise<DocumentView[]> {
 }
 
 async function fromAirtableList(ctx: OrgCtx): Promise<DocumentView[]> {
-  const rows = await core.list(ctx.orgSlug, "DOCUMENTS", { maxRecords: 200 });
+  const [rows, jobLabels] = await Promise.all([
+    core.list(ctx.orgSlug, "DOCUMENTS", { maxRecords: 200 }),
+    loadJobLabelMap(ctx),
+  ]);
   return rows.map((r) => {
     const title = str(r["Document_Name"]) || "(untitled document)";
     const aiAnalysis = str(r["AI_Analysis"]) || "{}";
     const module2 = module2Meta({ title, aiAnalysis });
+    const jobRec = firstLink(r["Job"]);
+    const jobName = jobRec ? (jobLabels.get(jobRec) ?? null) : null;
     return {
       id: r.id,
       title,
@@ -136,7 +146,7 @@ async function fromAirtableList(ctx: OrgCtx): Promise<DocumentView[]> {
       uploadedBy: str(r["Uploaded_By"]),
       aiSummary: str(r["AI_Summary"]),
       jobCode: null,
-      jobName: null,
+      jobName,
       version: module2.version,
       lineageKey: module2.lineageKey,
     };

@@ -1,14 +1,17 @@
 // Quotes across the org's jobs — client-facing priced offers. New quotes can
 // be started blank or generated from a job's assessment budget breakdown.
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate } from "@/lib/format";
 import {
   applyListQuery,
   hasActiveFilters,
   parseListQuery,
+  splitIntoGroups,
   toClientConfig,
 } from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -78,7 +81,12 @@ export default async function QuotesPage({
                 </tr>
               </thead>
               <tbody>
-                {quotes.map((q) => (
+                {splitIntoGroups(quotes, query, quotesListConfig).map((section) => (
+                  <Fragment key={section.key}>
+                    {query.group && (
+                      <GroupHeaderRow colSpan={6} label={section.label} count={section.count} />
+                    )}
+                    {section.rows.map((q) => (
                   <tr key={q.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                     <td className="py-2 pr-2 font-mono text-xs">{q.refNumber}</td>
                     <td className="py-2 pr-2">
@@ -98,6 +106,8 @@ export default async function QuotesPage({
                       <StatusBadge status={q.status} />
                     </td>
                   </tr>
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

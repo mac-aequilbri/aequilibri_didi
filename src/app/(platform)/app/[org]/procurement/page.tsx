@@ -1,11 +1,14 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { currency, formatDate, toNum } from "@/lib/format";
 import {
   applyListQuery,
   hasActiveFilters,
   parseListQuery,
+  splitIntoGroups,
   toClientConfig,
 } from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -67,7 +70,12 @@ export default async function ProcurementPage({
             </tr>
           </thead>
           <tbody>
-            {orders.map((o) => (
+            {splitIntoGroups(orders, query, procurementListConfig).map((section) => (
+              <Fragment key={section.key}>
+                {query.group && (
+                  <GroupHeaderRow colSpan={8} label={section.label} count={section.count} />
+                )}
+                {section.rows.map((o) => (
               <tr key={o.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   <Link
@@ -117,6 +125,8 @@ export default async function ProcurementPage({
                   </form>
                 </td>
               </tr>
+                ))}
+              </Fragment>
             ))}
             {orders.length === 0 && (
               <tr>

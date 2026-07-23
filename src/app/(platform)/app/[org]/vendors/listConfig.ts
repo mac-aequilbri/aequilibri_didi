@@ -33,5 +33,17 @@ export const vendorsListConfig: ListViewConfig<VendorView> = {
     { name: "rating", label: "Rating", getValue: (v) => v.rating },
     { name: "category", label: "Category", getValue: (v) => v.category.toLowerCase() },
   ],
+  groups: [
+    { name: "category", label: "Category", getValue: (v) => v.category || null },
+    {
+      name: "active",
+      label: "Active",
+      getValue: (v) => (v.isActive ? "yes" : "no"),
+      options: [
+        { value: "yes", label: "Active" },
+        { value: "no", label: "Inactive" },
+      ],
+    },
+  ],
   pageSize: 50,
 };

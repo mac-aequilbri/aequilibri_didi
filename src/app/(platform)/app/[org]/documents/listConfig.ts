@@ -35,5 +35,26 @@ export const documentsListConfig: ListViewConfig<DocumentView> = {
     { name: "title", label: "Title", getValue: (d) => d.title.toLowerCase() },
     { name: "status", label: "Status", getValue: (d) => d.status.toLowerCase() },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      getValue: (d) => d.status.toLowerCase(),
+      options: ["uploaded", "captured", "classified", "analyzed", "generated"].map((v) => ({
+        value: v,
+      })),
+    },
+    {
+      name: "kind",
+      label: "Kind",
+      getValue: (d) => d.kind || null,
+      options: [{ value: "file" }, { value: "link" }, { value: "generated" }],
+    },
+    { name: "classification", label: "Classification", getValue: (d) => d.classification || null },
+    { name: "docType", label: "Type", getValue: (d) => d.docType || null },
+    { name: "storageProvider", label: "Storage", getValue: (d) => d.storageProvider || null },
+    { name: "uploadedBy", label: "Uploaded by", getValue: (d) => d.uploadedBy || null },
+    { name: "project", label: "Project", getValue: (d) => d.jobName || null },
+  ],
   pageSize: 50,
 };

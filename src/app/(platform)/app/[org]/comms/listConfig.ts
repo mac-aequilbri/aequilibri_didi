@@ -26,5 +26,21 @@ export const commsListConfig: ListViewConfig<CommView> = {
     { name: "topic", label: "Topic", getValue: (c) => c.topic.toLowerCase() },
     { name: "status", label: "Status", getValue: (c) => c.status.toLowerCase() },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      getValue: (c) => c.status.toLowerCase(),
+      options: [
+        { value: "pending" },
+        { value: "sent" },
+        { value: "acknowledged" },
+        { value: "overdue" },
+      ],
+    },
+    { name: "type", label: "Message type", getValue: (c) => c.messageType || null },
+    { name: "role", label: "Stakeholder role", getValue: (c) => c.stakeholderRole || null },
+    { name: "sentBy", label: "Sent by", getValue: (c) => c.sentBy || null },
+  ],
   pageSize: 50,
 };

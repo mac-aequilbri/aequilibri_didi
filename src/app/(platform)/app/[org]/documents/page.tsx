@@ -1,5 +1,7 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import { loadDocuments } from "@/lib/platform/documentsSource";
@@ -8,6 +10,7 @@ import {
   applyListQuery,
   hasActiveFilters,
   parseListQuery,
+  splitIntoGroups,
   toClientConfig,
 } from "@/lib/platform/listQuery";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -79,7 +82,12 @@ export default async function DocumentsPage({
             </tr>
           </thead>
           <tbody>
-            {docs.map((d) => (
+            {splitIntoGroups(docs, query, documentsListConfig).map((section) => (
+              <Fragment key={section.key}>
+                {query.group && (
+                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
+                )}
+                {section.rows.map((d) => (
               <tr key={d.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                 <td className="py-2 pr-2">
                   {d.kind === "link" ? (
@@ -106,6 +114,8 @@ export default async function DocumentsPage({
                   <StatusBadge status={d.status} />
                 </td>
               </tr>
+                ))}
+              </Fragment>
             ))}
             {docs.length === 0 && (
               <tr>

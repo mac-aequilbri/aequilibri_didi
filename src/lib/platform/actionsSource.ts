@@ -107,6 +107,32 @@ export const actionsListConfig: ListViewConfig<ActionView> = {
       getValue: (a) => (a.priority && a.priority !== "—" ? appPriority(a.priority) : null),
     },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      // Unmapped rows get their own bucket (the filter path hides them via null,
+      // but for grouping a visible "unmapped" section is more useful).
+      getValue: (a) => (a.needsMapping ? "unmapped" : a.status),
+      options: [
+        ...ACTION_STATUSES.map((s) => ({ value: s as string, label: s.replace("_", " ") })),
+        { value: "unmapped", label: "unmapped" },
+      ],
+    },
+    {
+      name: "priority",
+      label: "Priority",
+      getValue: (a) => (a.priority && a.priority !== "—" ? appPriority(a.priority) : null),
+      options: [
+        { value: "P1", label: "P1 · high" },
+        { value: "P2", label: "P2 · medium" },
+        { value: "P3", label: "P3 · low" },
+      ],
+    },
+    { name: "owner", label: "Owner", getValue: (a) => (a.owner && a.owner !== "—" ? a.owner : null) },
+    { name: "issue", label: "Issue type", getValue: (a) => a.issueType || null },
+    { name: "source", label: "Source", getValue: (a) => a.sourceType || null },
+  ],
   pageSize: 50,
 };
 

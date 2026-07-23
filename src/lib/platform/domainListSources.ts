@@ -9,6 +9,7 @@ import type { CoreRow } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { VARIATION_FILTER, variationStatusFromAir } from "./changeLog";
+import { loadJobLabelMap } from "./jobOptionsSource";
 import { MINUTES_DOC_TYPE, parseMinutesModule } from "./minutesDoc";
 import { listOptional } from "./optionalList";
 import { parseReportModule8, REPORT_DOC_TYPE } from "./reportDoc";
@@ -20,6 +21,9 @@ function str(v: unknown): string {
 }
 function num(v: unknown): number {
   return typeof v === "number" ? v : 0;
+}
+function firstLink(v: unknown): string | null {
+  return Array.isArray(v) && v.length > 0 ? String(v[0]) : null;
 }
 
 // ── Variation Orders ───────────────────────────────────────────────────
@@ -53,20 +57,26 @@ export async function loadVariations(ctx: OrgCtx): Promise<VariationView[]> {
     }));
   }
   // Spec 12: variations are CHANGE_LOG rows (Change_Type="Variation").
-  const rows = await core.list(ctx.orgSlug, "CHANGE_LOG", {
-    maxRecords: 500,
-    filterByFormula: VARIATION_FILTER,
+  const [rows, jobLabels] = await Promise.all([
+    core.list(ctx.orgSlug, "CHANGE_LOG", {
+      maxRecords: 500,
+      filterByFormula: VARIATION_FILTER,
+    }),
+    loadJobLabelMap(ctx),
+  ]);
+  return rows.map((r) => {
+    const jobRec = firstLink(r["Job"]);
+    return {
+      id: r.id,
+      refNumber: str(r["Ref_Number"]),
+      title: str(r["Change_Name"]) || "(untitled variation)",
+      jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
+      isAiDrafted: r["Is_AI_Drafted"] === true,
+      costImpact: num(r["Impact_Cost"]),
+      timeImpactDays: num(r["Impact_Schedule_Days"]),
+      status: variationStatusFromAir(r["Status"]),
+    };
   });
-  return rows.map((r) => ({
-    id: r.id,
-    refNumber: str(r["Ref_Number"]),
-    title: str(r["Change_Name"]) || "(untitled variation)",
-    jobCode: null,
-    isAiDrafted: r["Is_AI_Drafted"] === true,
-    costImpact: num(r["Impact_Cost"]),
-    timeImpactDays: num(r["Impact_Schedule_Days"]),
-    status: variationStatusFromAir(r["Status"]),
-  }));
 }
 
 // ── Room Matrix ────────────────────────────────────────────────────────
@@ -166,21 +176,27 @@ export async function loadMeetingMinutes(ctx: OrgCtx): Promise<MinutesView[]> {
   }
   // Spec 12: minutes are DOCUMENTS rows (Document_Type="Meeting Minutes") whose
   // metadata rides in AI_Analysis.minutes — see minutesDoc.ts.
-  const rows = await core.list(ctx.orgSlug, "DOCUMENTS", {
-    maxRecords: 500,
-    filterByFormula: `{Document_Type}='${MINUTES_DOC_TYPE}'`,
-  });
+  const [rows, jobLabels] = await Promise.all([
+    core.list(ctx.orgSlug, "DOCUMENTS", {
+      maxRecords: 500,
+      filterByFormula: `{Document_Type}='${MINUTES_DOC_TYPE}'`,
+    }),
+    loadJobLabelMap(ctx),
+  ]);
   return rows
     .map((r) => ({ r, m: parseMinutesModule(r["AI_Analysis"]) }))
     .filter((x): x is { r: CoreRow; m: NonNullable<typeof x.m> } => x.m != null)
-    .map(({ r, m }) => ({
-      id: r.id,
-      title: str(r["Document_Name"]) || `Meeting ${m.meetingDate}`,
-      meetingDate: m.meetingDate || null,
-      jobCode: null,
-      actionsCount: m.actionsCount,
-      status: m.status,
-    }));
+    .map(({ r, m }) => {
+      const jobRec = firstLink(r["Job"]);
+      return {
+        id: r.id,
+        title: str(r["Document_Name"]) || `Meeting ${m.meetingDate}`,
+        meetingDate: m.meetingDate || null,
+        jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
+        actionsCount: m.actionsCount,
+        status: m.status,
+      };
+    });
 }
 
 // ── Quotes ─────────────────────────────────────────────────────────────
@@ -213,17 +229,23 @@ export async function loadQuotes(ctx: OrgCtx): Promise<QuoteView[]> {
       status: q.status,
     }));
   }
-  const rows = await listOptional(ctx.orgSlug, "QUOTES", { maxRecords: 200 });
-  return rows.map((r) => ({
-    id: r.id,
-    refNumber: str(r["Ref_Number"]),
-    title: str(r["Title"]) || "(untitled quote)",
-    clientName: str(r["Client_Name"]),
-    jobCode: "",
-    validUntil: str(r["Valid_Until"]) || null,
-    total: num(r["Total"]),
-    status: str(r["Status"]) || "draft",
-  }));
+  const [rows, jobLabels] = await Promise.all([
+    listOptional(ctx.orgSlug, "QUOTES", { maxRecords: 200 }),
+    loadJobLabelMap(ctx),
+  ]);
+  return rows.map((r) => {
+    const jobRec = firstLink(r["Job"]);
+    return {
+      id: r.id,
+      refNumber: str(r["Ref_Number"]),
+      title: str(r["Title"]) || "(untitled quote)",
+      clientName: str(r["Client_Name"]),
+      jobCode: (jobRec && jobLabels.get(jobRec)) || "",
+      validUntil: str(r["Valid_Until"]) || null,
+      total: num(r["Total"]),
+      status: str(r["Status"]) || "draft",
+    };
+  });
 }
 
 // ── Weekly Reports ─────────────────────────────────────────────────────

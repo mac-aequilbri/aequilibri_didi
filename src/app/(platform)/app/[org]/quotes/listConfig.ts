@@ -34,5 +34,15 @@ export const quotesListConfig: ListViewConfig<QuoteView> = {
     { name: "client", label: "Client", getValue: (q) => q.clientName.toLowerCase() },
     { name: "status", label: "Status", getValue: (q) => q.status.toLowerCase() },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      getValue: (q) => q.status.toLowerCase(),
+      options: ["draft", "sent", "accepted", "rejected", "expired"].map((v) => ({ value: v })),
+    },
+    { name: "client", label: "Client", getValue: (q) => q.clientName || null },
+    { name: "project", label: "Project", getValue: (q) => q.jobCode || null },
+  ],
   pageSize: 50,
 };

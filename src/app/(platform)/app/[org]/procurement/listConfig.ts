@@ -35,5 +35,23 @@ export const procurementListConfig: ListViewConfig<ProcurementView> = {
     { name: "item", label: "Item", getValue: (o) => o.item.toLowerCase() },
     { name: "status", label: "Status", getValue: (o) => o.status.toLowerCase() },
   ],
+  groups: [
+    {
+      name: "status",
+      label: "Status",
+      getValue: (o) => o.status.toLowerCase(),
+      options: ["pending", "ordered", "delivered", "invoiced", "paid"].map((v) => ({ value: v })),
+    },
+    {
+      name: "late",
+      label: "Delivery",
+      getValue: (o) => (o.isLate ? "late" : "ontime"),
+      options: [
+        { value: "late", label: "Late" },
+        { value: "ontime", label: "On time" },
+      ],
+    },
+    { name: "project", label: "Project", getValue: (o) => o.jobCode || null },
+  ],
   pageSize: 50,
 };
