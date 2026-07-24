@@ -16,8 +16,7 @@ import { listPage } from "@/lib/airtable/client";
 import { resolveBaseId } from "@/lib/airtable/config";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
-import { assignedJobRecIds } from "./rls";
-import { rlsExempt } from "./roles";
+import { resolveJobScope, scopeRows } from "./rls";
 import type { OrgCtx } from "./types";
 
 export interface JobListView {
@@ -221,7 +220,8 @@ export async function loadJobsList(
   viewer?: { email: string; role: string },
 ): Promise<JobListView[]> {
   const jobs = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
-  if (!viewer || rlsExempt(viewer.role)) return jobs;
-  const allowed = await assignedJobRecIds(ctx, viewer.email);
-  return allowed ? jobs.filter((j) => allowed.has(j.id)) : jobs;
+  if (!viewer) return jobs;
+  // Canonical scope: exempt → all; otherwise assigned jobs ∪ the org's General
+  // project, honouring the fail-open/closed enforce gate (see resolveJobScope).
+  return scopeRows(jobs, (j) => j.id, await resolveJobScope(ctx, viewer));
 }

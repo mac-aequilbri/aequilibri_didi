@@ -17,6 +17,7 @@ import {
 } from "@/lib/platform/listQuery";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
+import { currentJobScope } from "@/lib/platform/rls";
 import { projectsListConfig } from "./listConfig";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,9 @@ export default async function ProjectsPage({
   // Decide the pagination strategy from the org's cached matter count.
   const reg = airtableEnabled() ? await getOrgRegistry(ctx.orgSlug) : null;
   const projectCount = reg ? (readMetricsSnapshot(reg.settings)?.projects ?? 0) : 0;
-  const serverPaged = projectCount > SERVER_PAGINATE_ABOVE;
+  // A scoped viewer only has a handful of assigned jobs, so skip server
+  // pagination (which can't scope) and use the scoped client path.
+  const serverPaged = projectCount > SERVER_PAGINATE_ABOVE && (await currentJobScope(ctx)).mode === "all";
 
   let jobs: JobListView[], total: number, matching: number, page: number, pageCount: number;
   let facets: FacetCounts | undefined;

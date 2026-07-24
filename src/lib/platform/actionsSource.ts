@@ -184,8 +184,15 @@ export interface ActionDetail {
 }
 
 async function fromPostgres(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData> {
+  // RLS: scope the list AND the headline metrics to the viewer's assigned jobs
+  // (Postgres path — the Airtable branch scopes via scopeRows). No-op for
+  // whole-tenant viewers.
+  const scope = await currentJobScope(ctx);
+  const ids = scope.mode === "some" ? [...scope.jobIds].map(Number).filter((n) => Number.isFinite(n)) : null;
+  const jobW = ids ? { jobId: { in: ids } } : scope.mode === "none" ? { jobId: -1 } : {};
   const where = {
     orgId: ctx.orgId,
+    ...jobW,
     ...(query ? toPrismaWhere(query, actionsListConfig) : {}),
   };
   const [items, total, open, overdue, fromChat] = await Promise.all([
@@ -195,18 +202,19 @@ async function fromPostgres(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData
       take: 2000, // must exceed any real register size — pagination slices in-memory after this
       include: { job: { select: { code: true } } },
     }),
-    prisma.platActionHub.count({ where: { orgId: ctx.orgId } }),
+    prisma.platActionHub.count({ where: { orgId: ctx.orgId, ...jobW } }),
     prisma.platActionHub.count({
-      where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] } },
+      where: { orgId: ctx.orgId, ...jobW, status: { in: ["open", "in_progress"] } },
     }),
     prisma.platActionHub.count({
       where: {
         orgId: ctx.orgId,
+        ...jobW,
         status: { in: ["open", "in_progress"] },
         dueDate: { lt: new Date() },
       },
     }),
-    prisma.platActionHub.count({ where: { orgId: ctx.orgId, sourceType: "chat" } }),
+    prisma.platActionHub.count({ where: { orgId: ctx.orgId, ...jobW, sourceType: "chat" } }),
   ]);
   return {
     items: items.map((a) => ({

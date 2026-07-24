@@ -8,6 +8,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { currentJobScope, inScope } from "./rls";
 import type { OrgCtx } from "./types";
 
 export interface JobOption {
@@ -37,9 +38,13 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobOption[]> {
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-/** Load the job-picker options from whichever backend is active. */
-export function loadJobOptions(ctx: OrgCtx): Promise<JobOption[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+/** Load the job-picker options from whichever backend is active — RLS-scoped to
+ *  the viewer's assigned jobs (+ their org's General project). A scoped user
+ *  can only file records against, or target, projects they're assigned to. */
+export async function loadJobOptions(ctx: OrgCtx): Promise<JobOption[]> {
+  const all = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  const scope = await currentJobScope(ctx);
+  return scope.mode === "all" ? all : all.filter((o) => inScope(scope, o.id));
 }
 
 /** Airtable JOBS record id → job display name, for resolving the `Job` link on

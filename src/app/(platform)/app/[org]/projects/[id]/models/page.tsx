@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
 import { loadJobBimModels } from "@/lib/platform/bimModelsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { currentJobScope, inScope } from "@/lib/platform/rls";
 import { orgPath } from "@/lib/platform/paths";
 import { deleteBimModel, setBimModelVisibility } from "../../actions";
 
@@ -23,6 +24,8 @@ export default async function ProjectModelsPage({
   const ctx = await requireOrgCtx(org);
   const data = await loadJobBimModels(ctx, id);
   if (!data) notFound();
+  // RLS: can't open the models of a project you're not assigned to.
+  if (!inScope(await currentJobScope(ctx), data.job.id)) notFound();
   const { job, models } = data;
   const jobId = job.id;
   const p = (path: string) => orgPath(ctx.orgSlug, path);

@@ -13,7 +13,13 @@ import { loadActionStatusMap } from "./configSource";
 import { loadJobsList } from "./jobsListSource";
 import { PROPOSED_PENDING_FORMULA } from "./pendingWritesSource";
 import { budgetActuals, loadProcurement } from "./procurementSource";
+import { currentJobScope, inScope } from "./rls";
 import type { OrgCtx } from "./types";
+
+/** First linked-record id of an Airtable link cell, or null. */
+function firstLink(v: unknown): string | null {
+  return Array.isArray(v) && v.length > 0 ? String(v[0]) : null;
+}
 
 export interface DashJob {
   id: string;
@@ -70,12 +76,21 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     loadProcurement(ctx),
     loadActionStatusMap(ctx),
   ]);
-  const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual
+  const actualsByBudget = budgetActuals(procRows); // BUDGET rec id → computed Actual (proc already scoped)
+
+  // RLS: filter every job-scoped read to the viewer's assigned jobs before any
+  // tile/total is computed, so the dashboard reflects only their projects.
+  const scope = await currentJobScope(ctx);
+  const jobs = jobList.filter((j) => inScope(scope, j.id));
+  const actions = actionRows.filter((a) => inScope(scope, firstLink(a["Job"])));
+  const budgets = budgetRows.filter((b) => inScope(scope, firstLink(b["Job"])));
+  const cashflows = cashflowRows.filter((c) => inScope(scope, firstLink(c["Job"])));
+  const pendings = pendingRows.filter((p) => inScope(scope, str(p["Job_Id"]) || null));
 
   // Same status definition as the Action Hub (actionsSource): only cleanly-
   // resolved Open/In Progress rows count; unrecognised values aren't guessed in.
   const now = Date.now();
-  const openActionRows = actionRows.filter((a) => {
+  const openActionRows = actions.filter((a) => {
     const res = resolveActionStatus(str(a["Status"]), statusMap);
     return res.clean && (res.canonical === "open" || res.canonical === "in_progress");
   });
@@ -87,7 +102,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
   // Spec 12 CASHFLOWS is a per-transaction ledger; derive the period
   // projected-vs-actual chart from it — Paid rows are actual, the rest projected.
   const byPeriod = new Map<string, { projected: number; actual: number }>();
-  for (const c of cashflowRows) {
+  for (const c of cashflows) {
     const period = str(c["Period"]);
     if (!period) continue;
     const agg = byPeriod.get(period) ?? { projected: 0, actual: 0 };
@@ -98,7 +113,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
   }
 
   return {
-    jobs: jobList.slice(0, 6).map((j) => ({
+    jobs: jobs.slice(0, 6).map((j) => ({
       id: j.id,
       name: j.name,
       code: j.code,
@@ -108,9 +123,9 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     })),
     openActions: openActionRows.length,
     overdueActions,
-    pendingProposals: pendingRows.length,
-    budget: budgetRows.reduce((s, b) => s + num(b["Estimated"]), 0),
-    actual: budgetRows.reduce((s, b) => s + (actualsByBudget.get(b.id) ?? 0), 0),
+    pendingProposals: pendings.length,
+    budget: budgets.reduce((s, b) => s + num(b["Estimated"]), 0),
+    actual: budgets.reduce((s, b) => s + (actualsByBudget.get(b.id) ?? 0), 0),
     recentLogs: logRows.slice(0, 8).map((l) => ({
       id: l.id,
       operation: str(l["Action_Type"]),
@@ -127,16 +142,23 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
 }
 
 async function fromPostgres(ctx: OrgCtx): Promise<DashboardView> {
+  // RLS: constrain the job-scoped queries to the viewer's assigned jobs. Postgres
+  // orgs currently resolve to "all" (no PG assignment store), so this is a no-op
+  // there today, but it closes the latent gap if PG parity is added.
+  const scope = await currentJobScope(ctx);
+  const ids = scope.mode === "some" ? [...scope.jobIds].map(Number).filter((n) => Number.isFinite(n)) : null;
+  const jobW = ids ? { jobId: { in: ids } } : scope.mode === "none" ? { jobId: -1 } : {};
+  const ownW = ids ? { id: { in: ids } } : scope.mode === "none" ? { id: -1 } : {};
   const [jobs, openActions, overdueActions, pendingProposals, budgetAgg, recentLogs, activeRules] =
     await Promise.all([
-      prisma.platJob.findMany({ where: { orgId: ctx.orgId }, orderBy: { updatedAt: "desc" }, take: 6 }),
-      prisma.platActionHub.count({ where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] } } }),
+      prisma.platJob.findMany({ where: { orgId: ctx.orgId, ...ownW }, orderBy: { updatedAt: "desc" }, take: 6 }),
+      prisma.platActionHub.count({ where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] }, ...jobW } }),
       prisma.platActionHub.count({
-        where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] }, dueDate: { lt: new Date() } },
+        where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] }, dueDate: { lt: new Date() }, ...jobW },
       }),
-      prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed" } }),
+      prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed", ...jobW } }),
       prisma.platConBudgetLine.aggregate({
-        where: { orgId: ctx.orgId },
+        where: { orgId: ctx.orgId, ...jobW },
         _sum: { budgetAmount: true, actualAmount: true },
       }),
       prisma.platExecutionLog.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "desc" }, take: 8 }),
@@ -146,7 +168,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<DashboardView> {
   // Legacy shape: cashflow writes are Airtable-only (Spec 12 ledger), so this
   // only ever renders pre-migration/seeded projected-vs-actual rows.
   const cashflows = await prisma.platConCashflow.findMany({
-    where: { orgId: ctx.orgId },
+    where: { orgId: ctx.orgId, ...jobW },
     select: { period: true, projected: true, actual: true },
   });
   const byPeriod = new Map<string, { projected: number; actual: number }>();

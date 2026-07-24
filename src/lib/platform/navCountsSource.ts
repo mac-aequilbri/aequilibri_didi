@@ -21,6 +21,7 @@ import {
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { loadOrgHighlights } from "./orgHighlightsSource";
+import { currentJobScope } from "./rls";
 import type { OrgCtx } from "./types";
 
 const ZERO_COUNTS: NavCounts = {
@@ -104,6 +105,13 @@ async function fromPostgres(ctx: OrgCtx, f: Record<string, boolean>): Promise<Na
  *  stay reachable to fix the underlying problem. */
 export async function loadNavCounts(ctx: OrgCtx): Promise<NavCounts> {
   try {
+    // RLS: the shared per-org snapshot is whole-tenant, so it's only valid for a
+    // whole-tenant viewer (exempt role, or scoping not enforced). A scoped viewer
+    // gets counts filtered to their jobs, computed fresh (no snapshot write).
+    const scope = await currentJobScope(ctx);
+    if (scope.mode !== "all") {
+      return toCounts({ ...(await loadOrgHighlights(ctx, scope)), at: "" });
+    }
     return await (airtableEnabled()
       ? fromAirtable(ctx)
       : fromPostgres(ctx, ctx.config.features));

@@ -10,7 +10,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { comparePeriods, toNum } from "@/lib/format";
-import { recordInScope } from "./rls";
+import { recordInScope, scopeByJob } from "./rls";
 import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -98,9 +98,11 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobCashflow[]> {
   }));
 }
 
-/** Load cashflow grouped by job from whichever backend is active. */
-export function loadCashflowJobs(ctx: OrgCtx): Promise<JobCashflow[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+/** Load cashflow grouped by job from whichever backend is active — RLS-scoped to
+ *  the viewer's assigned jobs (each entry is one job). */
+export async function loadCashflowJobs(ctx: OrgCtx): Promise<JobCashflow[]> {
+  const jobs = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  return scopeByJob(ctx, jobs, (j) => j.id);
 }
 
 /** Form-ready values for a single cashflow entry's edit page. The per-transaction

@@ -12,6 +12,7 @@ import type { ToolOutcome } from "./executor";
 import { runOrchestrator, type Specialist } from "../agents/orchestrator";
 import { SPECIALISTS } from "../agents/registry";
 import { PROPOSED_PENDING_FORMULA } from "@/lib/platform/pendingWritesSource";
+import { currentJobScope, inScope } from "@/lib/platform/rls";
 
 const HISTORY_LIMIT = 20;
 
@@ -263,21 +264,34 @@ export async function listMessages(ctx: OrgCtx, sessionId: RecordId): Promise<Ch
   }));
 }
 
-/** Compact data context so the model grounds its answers in real records. */
+/** Compact data context so the model grounds its answers in real records —
+ *  RLS-scoped, so a scoped viewer's assistant is grounded only on their jobs
+ *  (and org-global rows), never the whole org's projects/counts. */
 async function dataContext(ctx: OrgCtx): Promise<string> {
+  const scope = await currentJobScope(ctx);
+  const firstLink = (v: unknown): string | null =>
+    Array.isArray(v) && v.length > 0 ? String(v[0]) : null;
   if (airtableEnabled()) {
-    const [jobs, actions, pending] = await Promise.all([
-      core.list(ctx.orgSlug, "JOBS", { maxRecords: 10 }),
+    // Read a wider page when scoping so the viewer's jobs aren't missed by the
+    // grounding snapshot; whole-tenant viewers keep the cheap top-10 read.
+    const [jobsAll, actionsAll, pendingAll] = await Promise.all([
+      core.list(ctx.orgSlug, "JOBS", { maxRecords: scope.mode === "all" ? 10 : 200 }),
       core.list(ctx.orgSlug, "ISSUES", { filterByFormula: OPEN_ISSUES_FORMULA }),
       core.list(ctx.orgSlug, "PENDING_WRITES", { filterByFormula: PROPOSED_PENDING_FORMULA }),
     ]);
+    const jobs = (scope.mode === "all" ? jobsAll : jobsAll.filter((j) => inScope(scope, j.id))).slice(0, 10);
+    const actions = scope.mode === "all" ? actionsAll : actionsAll.filter((a) => inScope(scope, firstLink(a["Job"])));
+    const pending = scope.mode === "all" ? pendingAll : pendingAll.filter((p) => inScope(scope, str(p["Job_Id"]) || null));
     return [
       `Jobs: ${JSON.stringify(jobs.map(compactJob))}`,
       `Open actions: ${actions.length}. Pending write proposals awaiting human approval: ${pending.length}.`,
     ].join("\n");
   }
+  const ids = scope.mode === "some" ? [...scope.jobIds].map(Number).filter((n) => Number.isFinite(n)) : null;
+  const jobW = ids ? { jobId: { in: ids } } : scope.mode === "none" ? { jobId: -1 } : {};
+  const ownW = ids ? { id: { in: ids } } : scope.mode === "none" ? { id: -1 } : {};
   const jobs = await prisma.platJob.findMany({
-    where: { orgId: ctx.orgId },
+    where: { orgId: ctx.orgId, ...ownW },
     select: {
       id: true,
       code: true,
@@ -292,9 +306,9 @@ async function dataContext(ctx: OrgCtx): Promise<string> {
   });
   const [openActions, pendingProposals] = await Promise.all([
     prisma.platActionHub.count({
-      where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] } },
+      where: { orgId: ctx.orgId, ...jobW, status: { in: ["open", "in_progress"] } },
     }),
-    prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed" } }),
+    prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, ...jobW, status: "proposed" } }),
   ]);
   return [
     `Jobs: ${JSON.stringify(jobs, (_k, v) => (typeof v === "bigint" ? Number(v) : v))}`,

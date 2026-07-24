@@ -1,6 +1,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import type { RecordId } from "@/lib/platform/recordWriter";
+import { currentJobScope, inScope } from "./rls";
 import type { OrgCtx } from "./types";
 
 export interface PendingWriteView {
@@ -101,12 +102,18 @@ export const PROPOSED_PENDING_FORMULA = `LOWER({Status})='proposed'`;
 /** Count of proposed (awaiting-approval) pending writes only — cheaper than
  *  loadPendingWrites when the resolved history isn't needed. */
 export async function loadProposedPendingCount(ctx: OrgCtx): Promise<number> {
+  // RLS: count only proposals on the viewer's assigned jobs (org-global rows —
+  // no job — always count). No-op for whole-tenant viewers.
+  const scope = await currentJobScope(ctx);
   if (!airtableEnabled()) {
-    return prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed" } });
+    const ids = scope.mode === "some" ? [...scope.jobIds].map(Number).filter((n) => Number.isFinite(n)) : null;
+    const jobW = ids ? { jobId: { in: ids } } : scope.mode === "none" ? { jobId: -1 } : {};
+    return prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed", ...jobW } });
   }
   const rows = await core.list(ctx.orgSlug, "PENDING_WRITES", {
     maxRecords: 1000,
     filterByFormula: PROPOSED_PENDING_FORMULA,
   });
-  return rows.length;
+  if (scope.mode === "all") return rows.length;
+  return rows.filter((r) => inScope(scope, str(r["Job_Id"]) || jobIdFromPayload(str(r["Payload"])))).length;
 }

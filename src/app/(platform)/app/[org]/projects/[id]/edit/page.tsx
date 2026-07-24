@@ -5,6 +5,7 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { loadJobDetail } from "@/lib/platform/jobDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { currentJobScope, inScope } from "@/lib/platform/rls";
 import { updateJob } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ export default async function EditProjectPage({
   const ctx = await requireOrgCtx(org);
   const detail = await loadJobDetail(ctx, id);
   if (!detail) notFound();
+  // RLS: can't edit a project you're not assigned to (matches the view page).
+  if (!inScope(await currentJobScope(ctx), detail.id)) notFound();
   const pgJob = !airtableEnabled()
     ? await prisma.platJob.findFirst({ where: { id: Number(id), orgId: ctx.orgId } })
     : null;

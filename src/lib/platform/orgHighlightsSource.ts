@@ -19,7 +19,12 @@ import { resolveActionStatus } from "./actionStatus";
 import { loadActionStatusMap } from "./configSource";
 import { listOptional } from "./optionalList";
 import { PROPOSED_PENDING_FORMULA } from "./pendingWritesSource";
+import { inScope, type JobScope } from "./rls";
 import type { OrgCtx } from "./types";
+
+function firstLink(v: unknown): string | null {
+  return Array.isArray(v) && v.length > 0 ? String(v[0]) : null;
+}
 
 export interface OrgHighlights {
   projects: number;
@@ -39,9 +44,9 @@ function str(v: unknown): string {
 // dashboardSource/navCounts history).
 const SUBMITTED_VARIATIONS_FORMULA = `AND({Change_Type}='Variation',OR({Status}='Pending',{Status}=BLANK()))`;
 
-async function fromAirtable(ctx: OrgCtx): Promise<OrgHighlights> {
+async function fromAirtable(ctx: OrgCtx, scope?: JobScope): Promise<OrgHighlights> {
   const f = ctx.config.features;
-  const [jobRows, actionRows, pendingRows, riskRows, variationRows, statusMap] = await Promise.all([
+  const [jobRowsAll, actionRowsAll, pendingRowsAll, riskRowsAll, variationRowsAll, statusMap] = await Promise.all([
     core.list(ctx.orgSlug, "JOBS", { maxRecords: 200 }),
     core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
     core.list(ctx.orgSlug, "PENDING_WRITES", { maxRecords: 1000, filterByFormula: PROPOSED_PENDING_FORMULA }),
@@ -52,6 +57,15 @@ async function fromAirtable(ctx: OrgCtx): Promise<OrgHighlights> {
       : Promise.resolve([]),
     loadActionStatusMap(ctx),
   ]);
+
+  // RLS: when a viewer scope is supplied and not whole-tenant, filter each read
+  // to the viewer's jobs before counting (org-global rows always count).
+  const scoped = scope !== undefined && scope.mode !== "all";
+  const jobRows = scoped ? jobRowsAll.filter((r) => inScope(scope, r.id)) : jobRowsAll;
+  const actionRows = scoped ? actionRowsAll.filter((r) => inScope(scope, firstLink(r["Job"]))) : actionRowsAll;
+  const pendingRows = scoped ? pendingRowsAll.filter((r) => inScope(scope, str(r["Job_Id"]) || null)) : pendingRowsAll;
+  const riskRows = scoped ? riskRowsAll.filter((r) => inScope(scope, firstLink(r["Job"]))) : riskRowsAll;
+  const variationRows = scoped ? variationRowsAll.filter((r) => inScope(scope, firstLink(r["Job"]))) : variationRowsAll;
 
   const now = Date.now();
   const openActionRows = actionRows.filter((a) => {
@@ -73,26 +87,31 @@ async function fromAirtable(ctx: OrgCtx): Promise<OrgHighlights> {
   };
 }
 
-async function fromPostgres(ctx: OrgCtx): Promise<OrgHighlights> {
+async function fromPostgres(ctx: OrgCtx, scope?: JobScope): Promise<OrgHighlights> {
   const f = ctx.config.features;
+  const ids = scope && scope.mode === "some" ? [...scope.jobIds].map(Number).filter((n) => Number.isFinite(n)) : null;
+  const jobW = ids ? { jobId: { in: ids } } : scope && scope.mode === "none" ? { jobId: -1 } : {};
+  const ownW = ids ? { id: { in: ids } } : scope && scope.mode === "none" ? { id: -1 } : {};
   const [projects, openActions, overdueActions, pendingApprovals, openRisks, openVariations] =
     await Promise.all([
-      prisma.platJob.count({ where: { orgId: ctx.orgId } }),
-      prisma.platActionHub.count({ where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] } } }),
+      prisma.platJob.count({ where: { orgId: ctx.orgId, ...ownW } }),
+      prisma.platActionHub.count({ where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] }, ...jobW } }),
       prisma.platActionHub.count({
-        where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] }, dueDate: { lt: new Date() } },
+        where: { orgId: ctx.orgId, status: { in: ["open", "in_progress"] }, dueDate: { lt: new Date() }, ...jobW },
       }),
-      prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed" } }),
+      prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed", ...jobW } }),
       f.risks
-        ? prisma.platConRisk.count({ where: { orgId: ctx.orgId, status: "open" } })
+        ? prisma.platConRisk.count({ where: { orgId: ctx.orgId, status: "open", ...jobW } })
         : Promise.resolve(0),
       f.variations
-        ? prisma.platConVariationOrder.count({ where: { orgId: ctx.orgId, status: "submitted" } })
+        ? prisma.platConVariationOrder.count({ where: { orgId: ctx.orgId, status: "submitted", ...jobW } })
         : Promise.resolve(0),
     ]);
   return { projects, openActions, overdueActions, pendingApprovals, openRisks, openVariations };
 }
 
-export function loadOrgHighlights(ctx: OrgCtx): Promise<OrgHighlights> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+/** Org counts. Pass a viewer `scope` (from resolveJobScope) to filter to that
+ *  viewer's jobs; omit it for the org-wide snapshot (org-picker cards). */
+export function loadOrgHighlights(ctx: OrgCtx, scope?: JobScope): Promise<OrgHighlights> {
+  return airtableEnabled() ? fromAirtable(ctx, scope) : fromPostgres(ctx, scope);
 }

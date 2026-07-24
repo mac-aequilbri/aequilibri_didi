@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { sumMoney } from "./money";
 import { budgetActuals, loadProcurement } from "./procurementSource";
-import { recordInScope } from "./rls";
+import { recordInScope, scopeByJob } from "./rls";
 import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -105,9 +105,11 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobBudget[]> {
   }));
 }
 
-/** Load budget grouped by job from whichever backend is active. */
-export function loadBudgetJobs(ctx: OrgCtx): Promise<JobBudget[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+/** Load budget grouped by job from whichever backend is active — RLS-scoped to
+ *  the viewer's assigned jobs (each entry is one job). */
+export async function loadBudgetJobs(ctx: OrgCtx): Promise<JobBudget[]> {
+  const jobs = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  return scopeByJob(ctx, jobs, (j) => j.id);
 }
 
 /** Form-ready values for a single budget line's edit page. `actualAmount` is a

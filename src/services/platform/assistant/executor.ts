@@ -111,8 +111,15 @@ async function runQuery(ctx: OrgCtx, input: Record<string, unknown>): Promise<st
   if (!def) return `Unknown table "${table}".`;
   const { model, select } = def();
   const where: Record<string, unknown> = { orgId: ctx.orgId };
-  if (typeof input.jobId === "number" && table !== "jobs" && table !== "vendors" && table !== "learning_rules") {
-    where.jobId = input.jobId;
+  const jobScoped = table !== "jobs" && table !== "vendors" && table !== "learning_rules";
+  if (typeof input.jobId === "number" && jobScoped) where.jobId = input.jobId;
+  // RLS: constrain to the viewer's assigned jobs (Postgres path; the Airtable
+  // path above is already scoped). No-op for whole-tenant viewers.
+  const pgScope = await currentJobScope(ctx);
+  if (pgScope.mode !== "all") {
+    const ids = pgScope.mode === "some" ? [...pgScope.jobIds].map(Number).filter((n) => Number.isFinite(n)) : [-1];
+    if (table === "jobs") where.id = { in: ids };
+    else if (jobScoped) where.jobId = { in: ids };
   }
   if (typeof input.status === "string" && input.status) where.status = input.status;
   const limit = Math.min(Math.max(Number(input.limit) || 20, 1), 50);

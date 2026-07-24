@@ -8,6 +8,7 @@ import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
+import { currentJobScope } from "@/lib/platform/rls";
 import { deactivatePortalToken, generatePortalToken } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -25,14 +26,20 @@ export default async function PortalPage({
   const sp = await searchParams;
   const issued = typeof sp.issued === "string" ? sp.issued : "";
   const today = new Date().toISOString().slice(0, 10);
+  // RLS: only the viewer's assigned projects (and their tokens). Postgres path,
+  // so a no-op for whole-tenant viewers; scoped viewers see just their jobs.
+  const scope = await currentJobScope(ctx);
+  const ids = scope.mode === "some" ? [...scope.jobIds].map(Number).filter((n) => Number.isFinite(n)) : null;
+  const jobWhere = ids ? { orgId: ctx.orgId, id: { in: ids } } : scope.mode === "none" ? { orgId: ctx.orgId, id: -1 } : { orgId: ctx.orgId };
+  const tokWhere = ids ? { orgId: ctx.orgId, jobId: { in: ids } } : scope.mode === "none" ? { orgId: ctx.orgId, jobId: -1 } : { orgId: ctx.orgId };
   const [jobs, tokens] = await Promise.all([
     prisma.platJob.findMany({
-      where: { orgId: ctx.orgId },
+      where: jobWhere,
       select: { id: true, code: true, name: true },
       orderBy: { code: "asc" },
     }),
     prisma.platConPortalToken.findMany({
-      where: { orgId: ctx.orgId },
+      where: tokWhere,
       orderBy: { createdAt: "desc" },
       include: { job: { select: { code: true, name: true } } },
     }),

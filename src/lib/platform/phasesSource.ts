@@ -6,7 +6,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
-import { recordInScope } from "./rls";
+import { recordInScope, scopeByJob } from "./rls";
 import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -132,9 +132,11 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobPhases[]> {
   }));
 }
 
-/** Load phases grouped by job from whichever backend is active. */
-export function loadPhaseJobs(ctx: OrgCtx): Promise<JobPhases[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+/** Load phases grouped by job from whichever backend is active — RLS-scoped to
+ *  the viewer's assigned jobs (each entry is one job). */
+export async function loadPhaseJobs(ctx: OrgCtx): Promise<JobPhases[]> {
+  const jobs = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  return scopeByJob(ctx, jobs, (j) => j.id);
 }
 
 /** Form-ready values for a single phase's edit page. Null if not in this org.
