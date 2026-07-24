@@ -1,9 +1,13 @@
 // Vendors data source — Postgres (default) or the Airtable VENDORS table
 // (Domain Extension) when AIRTABLE_MIGRATION is enabled. Org-level list, no job
 // scoping. Same per-page loader pattern as the other migrated pages.
+//
+// VENDORS is an optional table: bases that predate the spec-12 provisioning
+// don't have it, so the list read must tolerate the missing-table 403.
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { listOptional } from "./optionalList";
 import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -38,7 +42,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<VendorView[]> {
 }
 
 async function fromAirtable(ctx: OrgCtx): Promise<VendorView[]> {
-  const rows = await core.list(ctx.orgSlug, "VENDORS", { maxRecords: 200 });
+  const rows = await listOptional(ctx.orgSlug, "VENDORS", { maxRecords: 200 });
   return rows.map((r) => ({
     id: r.id,
     name: str(r["Vendor_Name"]) || "(unnamed vendor)",
