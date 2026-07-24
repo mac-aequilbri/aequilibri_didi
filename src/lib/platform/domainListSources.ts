@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { VARIATION_FILTER, variationStatusFromAir } from "./changeLog";
 import { loadJobLabelMap } from "./jobOptionsSource";
+import { recordInScope, scopeByJob } from "./rls";
 import { MINUTES_DOC_TYPE, parseMinutesModule } from "./minutesDoc";
 import { listOptional } from "./optionalList";
 import { parseReportModule8, REPORT_DOC_TYPE } from "./reportDoc";
@@ -32,6 +33,7 @@ export interface VariationView {
   refNumber: string;
   title: string;
   jobCode: string | null;
+  jobId: string | null;
   isAiDrafted: boolean;
   costImpact: number;
   timeImpactDays: number;
@@ -39,6 +41,9 @@ export interface VariationView {
 }
 
 export async function loadVariations(ctx: OrgCtx): Promise<VariationView[]> {
+  return scopeByJob(ctx, await loadVariationsInner(ctx), (v) => v.jobId);
+}
+async function loadVariationsInner(ctx: OrgCtx): Promise<VariationView[]> {
   if (!airtableEnabled()) {
     const rows = await prisma.platConVariationOrder.findMany({
       where: { orgId: ctx.orgId },
@@ -50,6 +55,7 @@ export async function loadVariations(ctx: OrgCtx): Promise<VariationView[]> {
       refNumber: v.refNumber,
       title: v.title,
       jobCode: v.job?.code ?? null,
+      jobId: v.jobId != null ? String(v.jobId) : null,
       isAiDrafted: v.isAiDrafted,
       costImpact: toNum(v.costImpact),
       timeImpactDays: v.timeImpactDays,
@@ -71,6 +77,7 @@ export async function loadVariations(ctx: OrgCtx): Promise<VariationView[]> {
       refNumber: str(r["Ref_Number"]),
       title: str(r["Change_Name"]) || "(untitled variation)",
       jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
+      jobId: jobRec,
       isAiDrafted: r["Is_AI_Drafted"] === true,
       costImpact: num(r["Impact_Cost"]),
       timeImpactDays: num(r["Impact_Schedule_Days"]),
@@ -85,6 +92,7 @@ export interface RoomView {
   name: string;
   zone: string;
   jobCode: string | null;
+  jobId: string | null;
   areaSqm: number | null;
   ceilingHeight: string;
   /** JSON string of finishes (the page parses it). */
@@ -92,6 +100,9 @@ export interface RoomView {
 }
 
 export async function loadRoomMatrix(ctx: OrgCtx): Promise<RoomView[]> {
+  return scopeByJob(ctx, await loadRoomMatrixInner(ctx), (r) => r.jobId);
+}
+async function loadRoomMatrixInner(ctx: OrgCtx): Promise<RoomView[]> {
   if (!airtableEnabled()) {
     const rows = await prisma.platConRoomMatrix.findMany({
       where: { orgId: ctx.orgId },
@@ -103,6 +114,7 @@ export async function loadRoomMatrix(ctx: OrgCtx): Promise<RoomView[]> {
       name: r.name,
       zone: r.zone,
       jobCode: r.job?.code ?? null,
+      jobId: r.jobId != null ? String(r.jobId) : null,
       areaSqm: r.areaSqm,
       ceilingHeight: r.ceilingHeight,
       finishes: r.finishes,
@@ -114,6 +126,7 @@ export async function loadRoomMatrix(ctx: OrgCtx): Promise<RoomView[]> {
     name: str(r["Room_Name"]) || "(unnamed room)",
     zone: str(r["Zone"]),
     jobCode: null,
+    jobId: firstLink(r["Job"]),
     areaSqm: typeof r["Area_Sqm"] === "number" ? (r["Area_Sqm"] as number) : null,
     ceilingHeight: str(r["Ceiling_Height"]),
     finishes: "{}", // no finishes field in the Airtable table yet
@@ -131,6 +144,7 @@ export async function loadRoomDetail(ctx: OrgCtx, id: string): Promise<EditorVal
       return null;
     }
     if (!r) return null;
+    if (!(await recordInScope(ctx, r))) return null;
     return {
       name: str(r["Room_Name"]),
       zone: str(r["Zone"]),
@@ -140,6 +154,7 @@ export async function loadRoomDetail(ctx: OrgCtx, id: string): Promise<EditorVal
   }
   const r = await prisma.platConRoomMatrix.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!r) return null;
+  if (!(await recordInScope(ctx, r))) return null;
   return {
     name: r.name,
     zone: r.zone,
@@ -154,11 +169,15 @@ export interface MinutesView {
   title: string;
   meetingDate: Date | string | null;
   jobCode: string | null;
+  jobId: string | null;
   actionsCount: number;
   status: string;
 }
 
 export async function loadMeetingMinutes(ctx: OrgCtx): Promise<MinutesView[]> {
+  return scopeByJob(ctx, await loadMeetingMinutesInner(ctx), (m) => m.jobId);
+}
+async function loadMeetingMinutesInner(ctx: OrgCtx): Promise<MinutesView[]> {
   if (!airtableEnabled()) {
     const rows = await prisma.platConMeetingMinutes.findMany({
       where: { orgId: ctx.orgId },
@@ -170,6 +189,7 @@ export async function loadMeetingMinutes(ctx: OrgCtx): Promise<MinutesView[]> {
       title: m.title,
       meetingDate: m.meetingDate,
       jobCode: m.job?.code ?? null,
+      jobId: m.jobId != null ? String(m.jobId) : null,
       actionsCount: m.actionsCount,
       status: m.status,
     }));
@@ -193,6 +213,7 @@ export async function loadMeetingMinutes(ctx: OrgCtx): Promise<MinutesView[]> {
         title: str(r["Document_Name"]) || `Meeting ${m.meetingDate}`,
         meetingDate: m.meetingDate || null,
         jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
+        jobId: jobRec,
         actionsCount: m.actionsCount,
         status: m.status,
       };
@@ -206,12 +227,16 @@ export interface QuoteView {
   title: string;
   clientName: string;
   jobCode: string;
+  jobId: string | null;
   validUntil: Date | string | null;
   total: number;
   status: string;
 }
 
 export async function loadQuotes(ctx: OrgCtx): Promise<QuoteView[]> {
+  return scopeByJob(ctx, await loadQuotesInner(ctx), (q) => q.jobId);
+}
+async function loadQuotesInner(ctx: OrgCtx): Promise<QuoteView[]> {
   if (!airtableEnabled()) {
     const rows = await prisma.platConQuote.findMany({
       where: { orgId: ctx.orgId },
@@ -224,6 +249,7 @@ export async function loadQuotes(ctx: OrgCtx): Promise<QuoteView[]> {
       title: q.title,
       clientName: q.clientName,
       jobCode: q.job?.code ?? "",
+      jobId: q.jobId != null ? String(q.jobId) : null,
       validUntil: q.validUntil,
       total: toNum(q.total),
       status: q.status,
@@ -241,6 +267,7 @@ export async function loadQuotes(ctx: OrgCtx): Promise<QuoteView[]> {
       title: str(r["Title"]) || "(untitled quote)",
       clientName: str(r["Client_Name"]),
       jobCode: (jobRec && jobLabels.get(jobRec)) || "",
+      jobId: jobRec,
       validUntil: str(r["Valid_Until"]) || null,
       total: num(r["Total"]),
       status: str(r["Status"]) || "draft",
@@ -255,11 +282,15 @@ export interface ReportView {
   weekEnding: Date | string | null;
   generatedAt: Date | string | null;
   jobCode: string | null;
+  jobId: string | null;
   isAiGenerated: boolean;
   status: string;
 }
 
 export async function loadWeeklyReports(ctx: OrgCtx): Promise<ReportView[]> {
+  return scopeByJob(ctx, await loadWeeklyReportsInner(ctx), (r) => r.jobId);
+}
+async function loadWeeklyReportsInner(ctx: OrgCtx): Promise<ReportView[]> {
   if (!airtableEnabled()) {
     const rows = await prisma.platConWeeklyReport.findMany({
       where: { orgId: ctx.orgId },
@@ -272,6 +303,7 @@ export async function loadWeeklyReports(ctx: OrgCtx): Promise<ReportView[]> {
       weekEnding: r.weekEnding,
       generatedAt: r.generatedAt,
       jobCode: r.job?.code ?? null,
+      jobId: r.jobId != null ? String(r.jobId) : null,
       isAiGenerated: r.isAiGenerated,
       status: r.status,
     }));
@@ -292,6 +324,7 @@ export async function loadWeeklyReports(ctx: OrgCtx): Promise<ReportView[]> {
       weekEnding: m8.weekEnding || null,
       generatedAt: m8.generatedAt || str(r["Upload_Date"]) || null,
       jobCode: null,
+      jobId: firstLink(r["Job"]),
       isAiGenerated: m8.isAiGenerated,
       status: m8.status,
     }));

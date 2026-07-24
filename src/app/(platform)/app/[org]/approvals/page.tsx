@@ -14,6 +14,7 @@ import { SubmitButton } from "@/components/form/SubmitButton";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { isWritableTable, readRecord } from "@/lib/platform/recordWriter";
 import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
+import { inScope, resolveJobScope } from "@/lib/platform/rls";
 import { canApprove } from "@/lib/platform/roles";
 import { friendlyTableLabel } from "@/lib/platform/tableLabels";
 import { approveProposalAction, rejectProposalAction } from "./actions";
@@ -132,7 +133,12 @@ export default async function ApprovalsPage({
   // Governance §2.2: only show proposals the viewer's role may resolve —
   // financial diffs (amounts, payees) must not render for non-finance roles.
   const viewer = await getCurrentViewer(ctx);
-  const all = (await loadPendingWrites(ctx)).filter((p) => canApprove(viewer.role, p.tableKey));
+  // RLS: a scoped reviewer only sees proposals for jobs they're assigned to
+  // (org-global proposals always show). No-op until TEAM assignments exist.
+  const scope = await resolveJobScope(ctx, viewer);
+  const all = (await loadPendingWrites(ctx)).filter(
+    (p) => canApprove(viewer.role, p.tableKey) && inScope(scope, p.jobId),
+  );
   const pending = all.filter((p) => p.status === "proposed");
   const recent = all
     .filter((p) => ["executed", "rejected", "expired", "failed"].includes(p.status))

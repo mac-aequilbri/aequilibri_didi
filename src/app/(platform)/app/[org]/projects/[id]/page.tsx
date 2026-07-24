@@ -7,6 +7,7 @@ import { currency, formatDate } from "@/lib/format";
 import { loadJobDetail } from "@/lib/platform/jobDetailSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
+import { currentJobScope, inScope } from "@/lib/platform/rls";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export default async function ProjectDetailPage({
   // renders the same JobDetailView either way.
   const job = await loadJobDetail(ctx, id);
   if (!job) notFound();
+  // RLS: a scoped user can't open a project they're not assigned to by URL.
+  if (!inScope(await currentJobScope(ctx), job.id)) notFound();
   const p = (path: string) => orgPath(ctx.orgSlug, path);
 
   const subtitleParts = [

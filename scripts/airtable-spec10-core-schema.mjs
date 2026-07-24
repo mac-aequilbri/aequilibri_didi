@@ -7,9 +7,9 @@
 //   1. COMMS            — new Core coordination table (who gets told what, when).
 //   2. PHASES fields    — Phase_Type, Loop_Permitted, RAG, Sequence,
 //                         Predecessor_Phase (self-link), Season_Year.
-//   3. ISSUES fields    — Issue_Type, Phase (link), Linked_Risk (link) on the
-//                         ACTION_HUB table (the eventual ISSUES rename is a
-//                         separate, deliberate migration).
+//   3. ISSUES fields    — Issue_Type, Phase (link), Linked_Risk (link), Job
+//                         (link) on the ACTION_HUB table (the eventual ISSUES
+//                         rename is a separate, deliberate migration).
 //
 // Idempotent: every create checks for existence first. RUN THIS ON the template
 // base (so new client bases clone it) AND every already-provisioned client base.
@@ -150,7 +150,10 @@ if (!issuesTbl) {
   await refresh();
   let it = byName(issuesTbl.name);
   if (phases) { await addField(it, link("Phase", byName("PHASES").id), "ISSUES"); await refresh(); it = byName(issuesTbl.name); }
-  if (risks) { await addField(it, link("Linked_Risk", byName("RISKS").id), "Linked_Issues"); }
+  if (risks) { await addField(it, link("Linked_Risk", byName("RISKS").id), "Linked_Issues"); await refresh(); it = byName(issuesTbl.name); }
+  // Direct Job link so an action attaches to its project (per-project scoping +
+  // fixes the dropped-job bug on new actions). Reverse "ISSUES" on JOBS.
+  await addField(it, link("Job", jobs.id), "ISSUES");
 }
 
 console.log(`\n✓ ${baseId}: Spec 10 Phase-0 additive schema applied.`);

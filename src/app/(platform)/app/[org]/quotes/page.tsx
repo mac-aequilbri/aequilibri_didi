@@ -73,8 +73,8 @@ export default async function QuotesPage({
               <thead className="text-left text-xs text-neutral-500">
                 <tr>
                   <th scope="col" className="py-1 pr-2">Ref</th>
+                  <th scope="col" className="py-1 pr-2">Project</th>
                   <th scope="col" className="py-1 pr-2">Quote</th>
-                  <th scope="col" className="py-1 pr-2">Job</th>
                   <th scope="col" className="py-1 pr-2">Valid until</th>
                   <th scope="col" className="py-1 pr-2 text-right">Total</th>
                   <th scope="col" className="py-1 pr-2 text-right">Status</th>
@@ -89,6 +89,7 @@ export default async function QuotesPage({
                     {section.rows.map((q) => (
                   <tr key={q.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
                     <td className="py-2 pr-2 font-mono text-xs">{q.refNumber}</td>
+                    <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">{q.jobCode || "—"}</td>
                     <td className="py-2 pr-2">
                       <Link className="font-medium hover:underline before:absolute before:inset-0" href={orgPath(ctx.orgSlug, `/quotes/${q.id}`)}>
                         {q.title}
@@ -97,7 +98,6 @@ export default async function QuotesPage({
                         <span className="block text-xs text-neutral-500">{q.clientName}</span>
                       ) : null}
                     </td>
-                    <td className="py-2 pr-2 text-xs text-neutral-500">{q.jobCode}</td>
                     <td className="py-2 pr-2 text-xs">{formatDate(q.validUntil)}</td>
                     <td className="py-2 pr-2 text-right whitespace-nowrap font-semibold">
                       {currency(q.total)}

@@ -134,6 +134,11 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       // Real ISSUES has no Phase field, and its risk link is named RISKS (not Linked_Risk).
       { air: "Issue_Type", from: "issueType", createDefault: "Open Action", to: S },
       { air: "RISKS", from: "riskId", to: LINK },
+      // Direct Job link (added by airtable-add-issues-job-link.mjs); ISSUES has
+      // no Job field in the canonical schema, so the job chosen on the new-action
+      // form was dropped on write in Airtable mode. LINK no-ops on a non-rec id
+      // (Postgres mode persists jobId via PlatIssue.jobId).
+      { air: "Job", from: "jobId", to: LINK },
       // Editable from the action detail page: an explicit null (sent when the
       // user clears the field) erases the cell; absent/"" leaves it untouched.
       { air: "Due_Date", from: "dueDate", to: (v) => (v == null || S(v) === "" ? null : S(v)) },

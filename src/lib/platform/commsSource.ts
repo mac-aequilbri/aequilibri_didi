@@ -3,6 +3,8 @@
 // from the org's base when AIRTABLE_MIGRATION is on, and an empty list otherwise.
 
 import { airtableEnabled, core } from "@/lib/airtable";
+import { loadJobLabelMap } from "./jobOptionsSource";
+import { recordInScope, scopeByJob } from "./rls";
 import { dateInput, type EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -17,6 +19,7 @@ export interface CommView {
   sentBy: string;
   notes: string;
   jobId: string | null;
+  jobName: string | null;
   stakeholderId: string | null;
   /** Derived: still pending and past its due date. */
   isOverdue: boolean;
@@ -32,12 +35,16 @@ function firstLink(v: unknown): string | null {
 /** Load the coordination schedule from the active backend (Airtable, or []). */
 export async function loadComms(ctx: OrgCtx): Promise<CommView[]> {
   if (!airtableEnabled()) return [];
-  const rows = await core.list(ctx.orgSlug, "COMMS", { maxRecords: 300 });
+  const [rows, jobLabels] = await Promise.all([
+    core.list(ctx.orgSlug, "COMMS", { maxRecords: 300 }),
+    loadJobLabelMap(ctx),
+  ]);
   const now = Date.now();
   const items = rows.map((r) => {
     const dueRaw = str(r["Due_Date"]);
     const dueDate = dueRaw ? new Date(dueRaw) : null;
     const status = (str(r["Status"]) || "pending").toLowerCase();
+    const jobRec = firstLink(r["Job"]);
     return {
       id: r.id,
       topic: str(r["Topic"]) || "(untitled)",
@@ -47,19 +54,21 @@ export async function loadComms(ctx: OrgCtx): Promise<CommView[]> {
       dueDate,
       sentBy: str(r["Sent_By"]),
       notes: str(r["Notes"]),
-      jobId: firstLink(r["Job"]),
+      jobId: jobRec,
+      jobName: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
       stakeholderId: firstLink(r["Stakeholder"]),
       isOverdue: status === "pending" && !!dueDate && dueDate.getTime() < now,
     };
   });
   // Forward-looking schedule: soonest-due pending first, sent/acknowledged last.
-  return items.sort((a, b) => {
+  const sorted = items.sort((a, b) => {
     const done = (s: string) => (s === "sent" || s === "acknowledged" ? 1 : 0);
     if (done(a.status) !== done(b.status)) return done(a.status) - done(b.status);
     const at = a.dueDate?.getTime() ?? Infinity;
     const bt = b.dueDate?.getTime() ?? Infinity;
     return at - bt;
   });
+  return scopeByJob(ctx, sorted, (c) => c.jobId);
 }
 
 /** Form-ready values for a single communication's edit page. COMMS is
@@ -74,6 +83,7 @@ export async function loadCommDetail(ctx: OrgCtx, id: string): Promise<EditorVal
     return null;
   }
   if (!r) return null;
+  if (!(await recordInScope(ctx, r))) return null;
   return {
     topic: str(r["Topic"]),
     messageType: str(r["Message_Type"]) || "Status Update",

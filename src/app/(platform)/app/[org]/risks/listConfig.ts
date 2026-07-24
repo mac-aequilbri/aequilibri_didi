@@ -8,7 +8,7 @@ import type { RiskView } from "@/lib/platform/risksSource";
 const score = (r: RiskView) => r.likelihood * r.impact;
 
 export const risksListConfig: ListViewConfig<RiskView> = {
-  search: [(r) => r.description, (r) => r.mitigation, (r) => r.owner],
+  search: [(r) => r.description, (r) => r.mitigation, (r) => r.owner, (r) => r.jobCode],
   fields: [
     {
       kind: "enum",
@@ -78,6 +78,7 @@ export const risksListConfig: ListViewConfig<RiskView> = {
     },
     { name: "category", label: "Category", getValue: (r) => r.category || null },
     { name: "owner", label: "Owner", getValue: (r) => r.owner || null },
+    { name: "project", label: "Project", getValue: (r) => r.jobCode || null },
   ],
   pageSize: 50,
 };

@@ -12,6 +12,8 @@ import {
   type AppStatus,
 } from "./actionStatus";
 import { loadActionStatusMap } from "./configSource";
+import { loadJobLabelMap } from "./jobOptionsSource";
+import { currentJobScope, recordInScope, scopeRows } from "./rls";
 import {
   countEnumOptions,
   toPredicate,
@@ -27,6 +29,7 @@ export interface ActionView {
   title: string;
   detail: string;
   jobCode: string | null;
+  jobId: string | null;
   owner: string;
   dueDate: Date | null;
   priority: string;
@@ -64,7 +67,7 @@ export interface ActionsData {
  *  status option matching by flag, and clean statuses exclude unmapped rows
  *  (getValue returns null for them), so the two never overlap. */
 export const actionsListConfig: ListViewConfig<ActionView> = {
-  search: [(a) => a.title, (a) => a.detail, (a) => a.owner],
+  search: [(a) => a.title, (a) => a.detail, (a) => a.owner, (a) => a.jobCode],
   prismaSearch: ["title", "detail", "owner"],
   fields: [
     {
@@ -132,12 +135,16 @@ export const actionsListConfig: ListViewConfig<ActionView> = {
     { name: "owner", label: "Owner", getValue: (a) => (a.owner && a.owner !== "—" ? a.owner : null) },
     { name: "issue", label: "Issue type", getValue: (a) => a.issueType || null },
     { name: "source", label: "Source", getValue: (a) => a.sourceType || null },
+    { name: "project", label: "Project", getValue: (a) => a.jobCode || null },
   ],
   pageSize: 50,
 };
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
+}
+function firstLink(v: unknown): string | null {
+  return Array.isArray(v) && v.length > 0 ? String(v[0]) : null;
 }
 
 /** Airtable stores the owner text in Notes as "Owner: <name>" (the Assigned_To
@@ -206,6 +213,7 @@ async function fromPostgres(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData
       title: a.title,
       detail: a.detail,
       jobCode: a.job?.code ?? null,
+      jobId: a.jobId != null ? String(a.jobId) : null,
       owner: a.owner,
       dueDate: a.dueDate,
       priority: a.priority,
@@ -224,22 +232,25 @@ async function fromPostgres(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData
 }
 
 async function fromAirtable(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData> {
-  const [rows, orgMap] = await Promise.all([
+  const [rows, orgMap, jobLabels] = await Promise.all([
     core.list(ctx.orgSlug, "ISSUES", { maxRecords: 1000 }),
     loadActionStatusMap(ctx),
+    loadJobLabelMap(ctx),
   ]);
   const now = Date.now();
-  const all: ActionView[] = rows.map((r) => {
+  const unscoped: ActionView[] = rows.map((r) => {
     const raw = str(r["Status"]);
     const res = resolveActionStatus(raw, orgMap);
     const due = str(r["Due_Date"]);
     const owner = r["Assigned_To"];
     const notesOwner = ownerFromNotes(str(r["Notes"]));
+    const jobRec = firstLink(r["Job"]);
     return {
       id: r.id,
       title: str(r["Action_Name"]) || "(untitled action)",
       detail: str(r["Description"]),
-      jobCode: null,
+      jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
+      jobId: jobRec,
       owner: notesOwner || (Array.isArray(owner) && owner.length > 0 ? "(linked)" : "—"),
       dueDate: due ? new Date(due) : null,
       priority: str(r["Priority"]) || "—",
@@ -250,6 +261,9 @@ async function fromAirtable(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData
       issueType: str(r["Issue_Type"]),
     };
   });
+  // RLS: scope to the viewer's assigned jobs before metrics/facets so counts
+  // reflect only what they can see (no-op `all` until TEAM assignments exist).
+  const all = scopeRows(unscoped, (a) => a.jobId, await currentJobScope(ctx));
   // Only cleanly-resolved rows feed the headline metrics — unmapped values are
   // NOT guessed into "open" (that was the old bug); they surface separately so
   // the user can map them and the count stays trustworthy.
@@ -296,6 +310,7 @@ export async function loadAction(ctx: OrgCtx, id: string): Promise<ActionDetail 
       return null;
     }
     if (!r) return null;
+    if (!(await recordInScope(ctx, r))) return null;
     const orgMap = await loadActionStatusMap(ctx);
     const res = resolveActionStatus(str(r["Status"]), orgMap);
     const due = str(r["Due_Date"]);
@@ -316,6 +331,7 @@ export async function loadAction(ctx: OrgCtx, id: string): Promise<ActionDetail 
     include: { job: { select: { code: true } } },
   });
   if (!a) return null;
+  if (!(await recordInScope(ctx, a))) return null;
   return {
     id: String(a.id),
     title: a.title,

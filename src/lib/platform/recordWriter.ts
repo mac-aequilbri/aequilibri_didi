@@ -699,6 +699,23 @@ async function writeExecutedLog(
   }
 }
 
+/** The job a human write targets: the create payload's jobId, or the existing
+ *  record's job for update/delete (Airtable "Job" link array, else the Postgres
+ *  jobId scalar). null = org-global (no job) — always in scope. */
+async function writeTargetJobId(ctx: OrgCtx, req: WriteRequest): Promise<string | null> {
+  if (req.op === "create") {
+    const j = (req.data as Record<string, unknown> | undefined)?.jobId;
+    return j == null || j === "" ? null : String(j);
+  }
+  if (req.recordId == null) return null;
+  const existing = await readRecord(ctx, req.table, req.recordId);
+  if (!existing) return null;
+  const link = existing["Job"];
+  if (Array.isArray(link) && link.length > 0) return String(link[0]);
+  const jid = existing["jobId"];
+  return jid == null ? null : String(jid);
+}
+
 export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<WriteResult> {
   const def: TableDef = REGISTRY[req.table];
   // Governance §2.2 permission matrix, enforced at the single write choke
@@ -710,6 +727,14 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
     const viewer = await getCurrentViewer(ctx);
     if (!canWrite(viewer.role, req.table, req.op)) {
       throw new Error(`Your role does not permit ${req.op} on ${req.table}.`);
+    }
+    // Project-level RLS (§3/§7): a scoped user may only write records that
+    // belong to a job they're assigned to. No-op (`all`) for exempt roles and
+    // until per-base TEAM assignments exist (fail-open) — see rls.ts.
+    const { resolveJobScope, inScope } = await import("./rls");
+    const scope = await resolveJobScope(ctx, viewer);
+    if (scope.mode !== "all" && !inScope(scope, await writeTargetJobId(ctx, req))) {
+      throw new Error(`Your project assignments do not permit ${req.op} on this ${req.table}.`);
     }
   }
   // Airtable mode skips the Postgres-shaped Zod schema (which would reject the

@@ -5,7 +5,7 @@ import type { DecisionView } from "@/lib/platform/decisionsSource";
 import type { ListViewConfig } from "@/lib/platform/listQuery";
 
 export const decisionsListConfig: ListViewConfig<DecisionView> = {
-  search: [(d) => d.description, (d) => d.rationale, (d) => d.madeBy],
+  search: [(d) => d.description, (d) => d.rationale, (d) => d.madeBy, (d) => d.jobCode],
   fields: [
     {
       kind: "enum",

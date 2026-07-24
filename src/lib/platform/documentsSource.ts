@@ -1,6 +1,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { loadJobLabelMap } from "./jobOptionsSource";
+import { recordInScope, scopeByJob } from "./rls";
 import type { OrgCtx } from "./types";
 
 export interface DocumentView {
@@ -17,6 +18,7 @@ export interface DocumentView {
   aiSummary: string;
   jobCode: string | null;
   jobName: string | null;
+  jobId: string | null;
   version: number;
   lineageKey: string;
 }
@@ -117,6 +119,7 @@ async function fromPostgresList(ctx: OrgCtx): Promise<DocumentView[]> {
     aiSummary: d.aiSummary,
     jobCode: d.job?.code ?? null,
     jobName: d.job?.name ?? null,
+    jobId: d.jobId != null ? String(d.jobId) : null,
     version: d.version,
     lineageKey: module2Meta({ title: d.title, aiAnalysis: d.aiAnalysis, version: d.version }).lineageKey,
   }));
@@ -147,6 +150,7 @@ async function fromAirtableList(ctx: OrgCtx): Promise<DocumentView[]> {
       aiSummary: str(r["AI_Summary"]),
       jobCode: null,
       jobName,
+      jobId: jobRec,
       version: module2.version,
       lineageKey: module2.lineageKey,
     };
@@ -161,6 +165,7 @@ async function fromPostgresDetail(ctx: OrgCtx, id: string): Promise<DocumentDeta
     include: { job: { select: { code: true, name: true } } },
   });
   if (!doc) return null;
+  if (!(await recordInScope(ctx, doc))) return null;
   return {
     id: String(doc.id),
     title: doc.title,
@@ -175,6 +180,7 @@ async function fromPostgresDetail(ctx: OrgCtx, id: string): Promise<DocumentDeta
     aiSummary: doc.aiSummary,
     jobCode: doc.job?.code ?? null,
     jobName: doc.job?.name ?? null,
+    jobId: doc.jobId != null ? String(doc.jobId) : null,
     version: doc.version,
     lineageKey: module2Meta({ title: doc.title, aiAnalysis: doc.aiAnalysis, version: doc.version }).lineageKey,
     confidence: doc.confidence,
@@ -193,6 +199,7 @@ async function fromAirtableDetail(ctx: OrgCtx, id: string): Promise<DocumentDeta
   if (!id.startsWith("rec")) return null;
   const doc = await core.get(ctx.orgSlug, "DOCUMENTS", id).catch(() => null);
   if (!doc) return null;
+  if (!(await recordInScope(ctx, doc))) return null;
 
   const title = str(doc["Document_Name"]) || "(untitled document)";
   const aiAnalysis = str(doc["AI_Analysis"]) || "{}";
@@ -212,6 +219,7 @@ async function fromAirtableDetail(ctx: OrgCtx, id: string): Promise<DocumentDeta
     aiSummary: str(doc["AI_Summary"]),
     jobCode: null,
     jobName: null,
+    jobId: firstLink(doc["Job"]),
     version: module2.version,
     lineageKey: module2.lineageKey,
     confidence: typeof doc["Confidence"] === "number" ? (doc["Confidence"] as number) : null,
@@ -226,8 +234,9 @@ async function fromAirtableDetail(ctx: OrgCtx, id: string): Promise<DocumentDeta
   };
 }
 
-export function loadDocuments(ctx: OrgCtx): Promise<DocumentView[]> {
-  return airtableEnabled() ? fromAirtableList(ctx) : fromPostgresList(ctx);
+export async function loadDocuments(ctx: OrgCtx): Promise<DocumentView[]> {
+  const rows = await (airtableEnabled() ? fromAirtableList(ctx) : fromPostgresList(ctx));
+  return scopeByJob(ctx, rows, (d) => d.jobId);
 }
 
 export function loadDocumentDetail(ctx: OrgCtx, id: string): Promise<DocumentDetailView | null> {
@@ -253,6 +262,7 @@ export async function findAirtableDocumentByJob(ctx: OrgCtx, jobId: string): Pro
       aiSummary: str(r["AI_Summary"]),
       jobCode: null,
       jobName: null,
+      jobId,
       version: module2Meta({ title: str(r["Document_Name"]) || "(untitled document)", aiAnalysis: str(r["AI_Analysis"]) || "{}" }).version,
       lineageKey: module2Meta({ title: str(r["Document_Name"]) || "(untitled document)", aiAnalysis: str(r["AI_Analysis"]) || "{}" }).lineageKey,
     }));

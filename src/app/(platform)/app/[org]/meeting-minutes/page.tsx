@@ -57,6 +57,7 @@ export default async function MeetingMinutesPage({
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th scope="col" className="py-1 pr-2">Meeting</th>
+              <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Date</th>
               <th scope="col" className="py-1 pr-2 text-right">Actions</th>
               <th scope="col" className="py-1">Status</th>
@@ -66,7 +67,7 @@ export default async function MeetingMinutesPage({
             {splitIntoGroups(minutes, query, minutesListConfig).map((section) => (
               <Fragment key={section.key}>
                 {query.group && (
-                  <GroupHeaderRow colSpan={4} label={section.label} count={section.count} />
+                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
                 )}
                 {section.rows.map((m) => (
               <tr key={m.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
@@ -74,8 +75,8 @@ export default async function MeetingMinutesPage({
                   <Link href={orgPath(ctx.orgSlug, `/meeting-minutes/${m.id}`)} className="font-medium hover:underline before:absolute before:inset-0">
                     {m.title || `Meeting ${formatDate(m.meetingDate)}`}
                   </Link>
-                  <span className="ml-1 text-xs text-neutral-400">{m.jobCode}</span>
                 </td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">{m.jobCode || "—"}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{formatDate(m.meetingDate)}</td>
                 <td className="py-2 pr-2 text-right text-xs">{m.actionsCount}</td>
                 <td className="py-2">
@@ -87,7 +88,7 @@ export default async function MeetingMinutesPage({
             ))}
             {minutes.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-6">
+                <td colSpan={5} className="py-6">
                   <EmptyState
                     title={filtered ? "No minutes match these filters" : "No minutes yet"}
                     hint={

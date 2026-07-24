@@ -60,6 +60,7 @@ export default async function CommsPage({
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th scope="col" className="py-1 pr-2">Topic</th>
+              <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Type</th>
               <th scope="col" className="py-1 pr-2">Role</th>
               <th scope="col" className="py-1 pr-2">Due</th>
@@ -70,7 +71,7 @@ export default async function CommsPage({
             {splitIntoGroups(comms, query, commsListConfig).map((section) => (
               <Fragment key={section.key}>
                 {query.group && (
-                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
+                  <GroupHeaderRow colSpan={6} label={section.label} count={section.count} />
                 )}
                 {section.rows.map((c) => (
               <tr key={c.id} className="relative border-t border-neutral-100 align-top hover:bg-neutral-50">
@@ -83,6 +84,7 @@ export default async function CommsPage({
                   </Link>
                   {c.notes && <span className="block text-xs text-neutral-500">{c.notes}</span>}
                 </td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">{c.jobName || "—"}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{c.messageType}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{c.stakeholderRole}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">
@@ -118,7 +120,7 @@ export default async function CommsPage({
             ))}
             {comms.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-6">
+                <td colSpan={6} className="py-6">
                   <EmptyState
                     title={filtered ? "No communications match these filters" : "No communications scheduled"}
                     hint={

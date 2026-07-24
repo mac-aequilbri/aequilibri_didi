@@ -8,6 +8,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { type ExtractedAction, parseMinutesModule } from "./minutesDoc";
+import { recordInScope } from "./rls";
 import type { OrgCtx } from "./types";
 
 export interface MinutesDetailView {
@@ -50,6 +51,7 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<MinutesDetailView 
     include: { job: { select: { code: true } } },
   });
   if (!minutes) return null;
+  if (!(await recordInScope(ctx, minutes))) return null;
   return {
     id: String(minutes.id),
     title: minutes.title,
@@ -74,6 +76,7 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<MinutesDetailView 
   } catch {
     return null; // 404 / deleted / wrong-base → not found
   }
+  if (!(await recordInScope(ctx, doc))) return null;
   const m = parseMinutesModule(doc["AI_Analysis"]);
   if (!m) return null;
   return {

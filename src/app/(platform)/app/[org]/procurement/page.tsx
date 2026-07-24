@@ -60,6 +60,7 @@ export default async function ProcurementPage({
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th scope="col" className="py-1 pr-2">Item</th>
+              <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Vendor</th>
               <th scope="col" className="py-1 pr-2 text-right">Qty</th>
               <th scope="col" className="py-1 pr-2 text-right">Total</th>
@@ -73,7 +74,7 @@ export default async function ProcurementPage({
             {splitIntoGroups(orders, query, procurementListConfig).map((section) => (
               <Fragment key={section.key}>
                 {query.group && (
-                  <GroupHeaderRow colSpan={8} label={section.label} count={section.count} />
+                  <GroupHeaderRow colSpan={9} label={section.label} count={section.count} />
                 )}
                 {section.rows.map((o) => (
               <tr key={o.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
@@ -84,8 +85,8 @@ export default async function ProcurementPage({
                   >
                     {o.item}
                   </Link>
-                  <span className="ml-1 text-xs text-neutral-400">{o.jobCode}</span>
                 </td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">{o.jobCode || "—"}</td>
                 <td className="py-2 pr-2 text-xs">{o.vendorName || "—"}</td>
                 <td className="py-2 pr-2 text-right text-xs">{o.qty}</td>
                 <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(toNum(o.total))}</td>
@@ -130,7 +131,7 @@ export default async function ProcurementPage({
             ))}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-6">
+                <td colSpan={9} className="py-6">
                   <EmptyState
                     title={filtered ? "No orders match these filters" : "No orders yet"}
                     hint={

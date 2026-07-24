@@ -11,6 +11,7 @@ export const documentsListConfig: ListViewConfig<DocumentView> = {
     (d) => d.classification,
     (d) => d.docType,
     (d) => d.uploadedBy,
+    (d) => d.jobName,
   ],
   fields: [
     {

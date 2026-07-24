@@ -16,6 +16,7 @@ import {
   rejectProposal,
   type WriteResult,
 } from "@/lib/platform/recordWriter";
+import { inScope, resolveJobScope } from "@/lib/platform/rls";
 import { canApprove } from "@/lib/platform/roles";
 
 // Approve/reject the same PlatPendingWrite proposals the assistant queues —
@@ -42,6 +43,10 @@ export async function approveProposalAction(formData: FormData): Promise<void> {
   // Finance Manager sub-role; learning rules need the Administrator.
   if (pending && !canApprove(user.role, pending.tableKey)) {
     throw new Error(`Your role cannot approve ${pending.tableKey} proposals.`);
+  }
+  // RLS: the proposal's job must be in the reviewer's scope (no-op until enforced).
+  if (pending && !inScope(await resolveJobScope(ctx, user), pending.jobId)) {
+    throw new Error("Your project assignments do not permit resolving this proposal.");
   }
   let original: Record<string, unknown> = {};
   try {
@@ -137,6 +142,9 @@ export async function rejectProposalAction(formData: FormData): Promise<void> {
     const pending = (await loadPendingWrites(ctx)).find((p) => String(p.id) === String(proposalId));
     if (pending && !canApprove(user.role, pending.tableKey)) {
       throw new Error(`Your role cannot resolve ${pending.tableKey} proposals.`);
+    }
+    if (pending && !inScope(await resolveJobScope(ctx, user), pending.jobId)) {
+      throw new Error("Your project assignments do not permit resolving this proposal.");
     }
     // Optional reviewer-supplied reason (input name="reason" on the card) —
     // stored on the pending row / exec log, mirroring the exec-log variant.

@@ -75,6 +75,7 @@ export default async function DocumentsPage({
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th scope="col" className="py-1 pr-2">Document</th>
+              <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Type</th>
               <th scope="col" className="py-1 pr-2">Kind</th>
               <th scope="col" className="py-1 pr-2">Added</th>
@@ -85,7 +86,7 @@ export default async function DocumentsPage({
             {splitIntoGroups(docs, query, documentsListConfig).map((section) => (
               <Fragment key={section.key}>
                 {query.group && (
-                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
+                  <GroupHeaderRow colSpan={6} label={section.label} count={section.count} />
                 )}
                 {section.rows.map((d) => (
               <tr key={d.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
@@ -99,12 +100,12 @@ export default async function DocumentsPage({
                       {d.title}
                     </Link>
                   )}
-                  <span className="ml-1 text-xs text-neutral-400">{d.jobCode}</span>
                   {d.version > 1 && <span className="ml-2 text-xs text-amber-700">v{d.version}</span>}
                   {d.aiSummary && (
                     <span className="block text-xs text-neutral-500 line-clamp-1">{d.aiSummary}</span>
                   )}
                 </td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">{d.jobName || "—"}</td>
                 <td className="py-2 pr-2 text-xs">{d.classification || d.docType || "—"}</td>
                 <td className="py-2 pr-2 text-xs">{d.kind}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">
@@ -119,7 +120,7 @@ export default async function DocumentsPage({
             ))}
             {docs.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-6">
+                <td colSpan={6} className="py-6">
                   <EmptyState
                     title={filtered ? "No documents match these filters" : "No documents yet"}
                     hint={

@@ -9,6 +9,7 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import type { ToolUse } from "@/lib/claude";
 import { writeRecord, WritableTable, type RecordId } from "@/lib/platform/recordWriter";
 import { Actor, AiAuthority, OrgCtx } from "@/lib/platform/types";
+import { currentJobScope, inScope } from "@/lib/platform/rls";
 import { roleCanQueryTable, roleCanUseTool, type ToolPolicy } from "./tools";
 
 export interface ToolOutcome {
@@ -90,9 +91,20 @@ async function runQuery(ctx: OrgCtx, input: Record<string, unknown>): Promise<st
           const link = r["Job"];
           return !jobId || (Array.isArray(link) && link.map(String).includes(jobId));
         });
+    // RLS: the assistant only reads rows on the viewer's assigned jobs (no-op
+    // until TEAM assignments exist). "jobs" scopes on the record's own id;
+    // vendors/learning_rules are org-global.
+    const scope = await currentJobScope(ctx);
+    const jobOf = (r: Record<string, unknown>): string | null => {
+      if (table === "jobs") return typeof r.id === "string" ? r.id : null;
+      if (table === "vendors" || table === "learning_rules") return null;
+      const link = r["Job"];
+      return Array.isArray(link) && link.length > 0 ? String(link[0]) : null;
+    };
+    const withScope = withJob.filter((r) => inScope(scope, jobOf(r)));
     const withStatus = !status
-      ? withJob
-      : withJob.filter((r) => String(r["Status"] ?? "").toLowerCase() === status.toLowerCase());
+      ? withScope
+      : withScope.filter((r) => String(r["Status"] ?? "").toLowerCase() === status.toLowerCase());
     return JSON.stringify(withStatus.slice(0, limit));
   }
   const def = QUERYABLE[table as keyof typeof QUERYABLE];

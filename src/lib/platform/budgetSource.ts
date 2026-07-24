@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { sumMoney } from "./money";
 import { budgetActuals, loadProcurement } from "./procurementSource";
+import { recordInScope } from "./rls";
 import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -121,6 +122,7 @@ export async function loadBudgetLineDetail(ctx: OrgCtx, id: string): Promise<Edi
       return null;
     }
     if (!b) return null;
+    if (!(await recordInScope(ctx, b))) return null;
     const actuals = budgetActuals(await loadProcurement(ctx));
     return {
       category: str(b["Budget_Category"]),
@@ -133,6 +135,7 @@ export async function loadBudgetLineDetail(ctx: OrgCtx, id: string): Promise<Edi
   }
   const b = await prisma.platConBudgetLine.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!b) return null;
+  if (!(await recordInScope(ctx, b))) return null;
   return {
     category: b.category,
     description: b.description,

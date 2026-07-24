@@ -61,6 +61,7 @@ export default async function DecisionsPage({
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th scope="col" className="py-1 pr-2">Decision</th>
+              <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">By</th>
               <th scope="col" className="py-1 pr-2">Source</th>
               <th scope="col" className="py-1 pr-2">Date</th>
@@ -71,7 +72,7 @@ export default async function DecisionsPage({
             {splitIntoGroups(decisions, query, decisionsListConfig).map((section) => (
               <Fragment key={section.key}>
                 {query.group && (
-                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
+                  <GroupHeaderRow colSpan={6} label={section.label} count={section.count} />
                 )}
                 {section.rows.map((d) => (
               <tr key={d.id} className="relative border-t border-neutral-100 align-top hover:bg-neutral-50">
@@ -82,11 +83,11 @@ export default async function DecisionsPage({
                   >
                     {d.description}
                   </Link>
-                  {d.jobCode && <span className="ml-1 text-xs text-neutral-400">{d.jobCode}</span>}
                   {d.rationale && (
                     <span className="block text-xs text-neutral-500">{d.rationale}</span>
                   )}
                 </td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">{d.jobCode || "—"}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{d.madeBy || "—"}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">
                   {d.sourceType}
@@ -124,7 +125,7 @@ export default async function DecisionsPage({
             ))}
             {decisions.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-6">
+                <td colSpan={6} className="py-6">
                   <EmptyState
                     title={filtered ? "No decisions match these filters" : "No decisions yet"}
                     hint={

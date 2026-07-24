@@ -106,6 +106,7 @@ export const CORE_SCHEMA = {
       { name: "COMMS", id: "fldOvl8lmYhl9B5vM", type: "multipleRecordLinks" },
       { name: "PROCUREMENT", id: "fldtzMThVw2Dl6yc9", type: "multipleRecordLinks" },
       { name: "TRADE_PACKAGES", id: "fldZ3meTVulqR7LYG", type: "multipleRecordLinks" },
+      { name: "Job", id: "fldnhtMe325Zf7OAV", type: "multipleRecordLinks" },
     ],
   },
   EXECUTION_LOG: {

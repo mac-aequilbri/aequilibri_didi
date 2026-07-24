@@ -6,7 +6,7 @@ import type { CommView } from "@/lib/platform/commsSource";
 import type { ListViewConfig } from "@/lib/platform/listQuery";
 
 export const commsListConfig: ListViewConfig<CommView> = {
-  search: [(c) => c.topic, (c) => c.notes, (c) => c.messageType, (c) => c.stakeholderRole],
+  search: [(c) => c.topic, (c) => c.notes, (c) => c.messageType, (c) => c.stakeholderRole, (c) => c.jobName],
   fields: [
     {
       kind: "enum",
@@ -41,6 +41,7 @@ export const commsListConfig: ListViewConfig<CommView> = {
     { name: "type", label: "Message type", getValue: (c) => c.messageType || null },
     { name: "role", label: "Stakeholder role", getValue: (c) => c.stakeholderRole || null },
     { name: "sentBy", label: "Sent by", getValue: (c) => c.sentBy || null },
+    { name: "project", label: "Project", getValue: (c) => c.jobName || null },
   ],
   pageSize: 50,
 };

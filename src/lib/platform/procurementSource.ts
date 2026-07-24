@@ -11,6 +11,7 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { loadJobLabelMap } from "./jobOptionsSource";
+import { recordInScope, scopeByJob } from "./rls";
 import { mulMoney, sumMoney } from "./money";
 import { dateInput, type EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
@@ -19,6 +20,7 @@ export interface ProcurementView {
   id: string;
   item: string;
   jobCode: string | null;
+  jobId: string | null;
   vendorName: string;
   qty: number;
   total: number;
@@ -114,6 +116,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<ProcurementView[]> {
       id: String(o.id),
       item: o.item,
       jobCode: o.job?.code ?? null,
+      jobId: o.jobId != null ? String(o.jobId) : null,
       vendorName: o.vendor?.name || o.vendorName,
       qty: o.qty,
       total: toNum(o.total),
@@ -143,6 +146,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<ProcurementView[]> {
       id: r.id,
       item: str(r["Procurement_Name"]) || "(untitled item)",
       jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
+      jobId: jobRec,
       // Supplier is a link to ORGANISATIONS, not a text field — left blank here
       // (resolving the link to a name is out of scope for this pass).
       vendorName: "",
@@ -159,8 +163,9 @@ async function fromAirtable(ctx: OrgCtx): Promise<ProcurementView[]> {
 }
 
 /** Load procurement orders from whichever backend is active. */
-export function loadProcurement(ctx: OrgCtx): Promise<ProcurementView[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+export async function loadProcurement(ctx: OrgCtx): Promise<ProcurementView[]> {
+  const rows = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  return scopeByJob(ctx, rows, (o) => o.jobId);
 }
 
 /** Form-ready values for a single order's edit page. Status is lower-cased to
@@ -176,6 +181,7 @@ export async function loadProcurementDetail(ctx: OrgCtx, id: string): Promise<Ed
       return null;
     }
     if (!r) return null;
+    if (!(await recordInScope(ctx, r))) return null;
     return {
       item: str(r["Procurement_Name"]),
       qty: num(r["Quantity"]) || 1,
@@ -186,6 +192,7 @@ export async function loadProcurementDetail(ctx: OrgCtx, id: string): Promise<Ed
   }
   const o = await prisma.platConProcurement.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!o) return null;
+  if (!(await recordInScope(ctx, o))) return null;
   return {
     item: o.item,
     qty: o.qty,

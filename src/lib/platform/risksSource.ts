@@ -5,6 +5,8 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { loadJobLabelMap } from "./jobOptionsSource";
+import { recordInScope, scopeByJob } from "./rls";
 import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -12,6 +14,7 @@ export interface RiskView {
   id: string;
   description: string;
   jobCode: string | null;
+  jobId: string | null;
   likelihood: number;
   impact: number;
   mitigation: string;
@@ -42,6 +45,9 @@ function str(v: unknown): string {
 function num(v: unknown): number {
   return typeof v === "number" ? v : 0;
 }
+function firstLink(v: unknown): string | null {
+  return Array.isArray(v) && v.length > 0 ? String(v[0]) : null;
+}
 
 async function fromPostgres(ctx: OrgCtx): Promise<RiskView[]> {
   const risks = await prisma.platConRisk.findMany({
@@ -53,6 +59,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<RiskView[]> {
     id: String(r.id),
     description: r.description,
     jobCode: r.job?.code ?? null,
+    jobId: r.jobId != null ? String(r.jobId) : null,
     likelihood: r.likelihood,
     impact: r.impact,
     mitigation: r.mitigation,
@@ -68,13 +75,18 @@ async function fromPostgres(ctx: OrgCtx): Promise<RiskView[]> {
 
 async function fromAirtable(ctx: OrgCtx): Promise<RiskView[]> {
   // Opts shared with loadJobsList + loadOrgHighlights — one cached read/render.
-  const rows = await core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 });
+  const [rows, jobLabels] = await Promise.all([
+    core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 }),
+    loadJobLabelMap(ctx),
+  ]);
   return rows.map((r) => {
     const esc = str(r["Escalated_At"]);
+    const jobRec = firstLink(r["Job"]);
     return {
       id: r.id,
       description: str(r["Risk"]) || "(untitled risk)",
-      jobCode: null,
+      jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
+      jobId: jobRec,
       likelihood: num(r["Likelihood"]) || 1,
       impact: num(r["Impact"]) || 1,
       mitigation: str(r["Mitigation"]),
@@ -90,8 +102,9 @@ async function fromAirtable(ctx: OrgCtx): Promise<RiskView[]> {
 }
 
 /** Load the risk register from whichever backend is active. */
-export function loadRisks(ctx: OrgCtx): Promise<RiskView[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+export async function loadRisks(ctx: OrgCtx): Promise<RiskView[]> {
+  const rows = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  return scopeByJob(ctx, rows, (r) => r.jobId);
 }
 
 /** Form-ready values for a single risk's edit page. Null if not in this org. */
@@ -104,6 +117,7 @@ export async function loadRiskDetail(ctx: OrgCtx, id: string): Promise<EditorVal
       return null;
     }
     if (!r) return null;
+    if (!(await recordInScope(ctx, r))) return null;
     return {
       description: str(r["Risk"]),
       likelihood: num(r["Likelihood"]) || 3,
@@ -115,6 +129,7 @@ export async function loadRiskDetail(ctx: OrgCtx, id: string): Promise<EditorVal
   }
   const r = await prisma.platConRisk.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!r) return null;
+  if (!(await recordInScope(ctx, r))) return null;
   return {
     description: r.description,
     likelihood: r.likelihood,

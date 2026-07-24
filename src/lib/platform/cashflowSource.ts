@@ -10,6 +10,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { comparePeriods, toNum } from "@/lib/format";
+import { recordInScope } from "./rls";
 import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -115,6 +116,7 @@ export async function loadCashflowDetail(ctx: OrgCtx, id: string): Promise<Edito
     return null;
   }
   if (!c) return null;
+  if (!(await recordInScope(ctx, c))) return null;
   return {
     name: str(c["Cashflow_Name"]),
     period: str(c["Period"]),

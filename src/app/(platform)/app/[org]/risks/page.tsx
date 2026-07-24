@@ -150,6 +150,7 @@ export default async function RisksPage({
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th scope="col" className="py-1 pr-2">Risk</th>
+              <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Score</th>
               <th scope="col" className="py-1 pr-2">Owner</th>
               <th scope="col" className="py-1 pr-2">Escalated</th>
@@ -160,7 +161,7 @@ export default async function RisksPage({
             {splitIntoGroups(risks, query, risksListConfig).map((section) => (
               <Fragment key={section.key}>
                 {query.group && (
-                  <GroupHeaderRow colSpan={5} label={section.label} count={section.count} />
+                  <GroupHeaderRow colSpan={6} label={section.label} count={section.count} />
                 )}
                 {section.rows.map((r) => {
                   const score = r.likelihood * r.impact;
@@ -173,7 +174,6 @@ export default async function RisksPage({
                     >
                       {r.description}
                     </Link>
-                    {r.jobCode && <span className="ml-1 text-xs text-neutral-400">{r.jobCode}</span>}
                     {r.createdByAi && (
                       <span className="ml-1 text-[0.65rem] px-1 rounded bg-violet-100 text-violet-700">AI</span>
                     )}
@@ -193,6 +193,7 @@ export default async function RisksPage({
                       </span>
                     )}
                   </td>
+                  <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">{r.jobCode || "—"}</td>
                   <td className="py-2 pr-2 whitespace-nowrap">
                     <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${scoreClass(score)}`}>
                       {score}
@@ -236,7 +237,7 @@ export default async function RisksPage({
             ))}
             {risks.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-6">
+                <td colSpan={6} className="py-6">
                   <EmptyState
                     title={filtered ? "No risks match these filters" : "No risks recorded"}
                     hint={

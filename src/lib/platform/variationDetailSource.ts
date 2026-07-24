@@ -8,6 +8,7 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
 import { variationStatusFromAir } from "./changeLog";
+import { recordInScope } from "./rls";
 import type { OrgCtx } from "./types";
 
 export interface VariationDetailView {
@@ -47,6 +48,7 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<VariationDetailVie
     include: { job: { select: { code: true } } },
   });
   if (!vo) return null;
+  if (!(await recordInScope(ctx, vo))) return null;
   return {
     id: String(vo.id),
     refNumber: vo.refNumber,
@@ -73,6 +75,7 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<VariationDetailVie
   } catch {
     return null;
   }
+  if (!(await recordInScope(ctx, vo))) return null;
   return {
     id: vo.id,
     refNumber: str(vo["Ref_Number"]),

@@ -6,6 +6,7 @@
 
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { recordInScope } from "./rls";
 import type { EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -147,6 +148,7 @@ export async function loadPhaseDetail(ctx: OrgCtx, id: string): Promise<EditorVa
       return null;
     }
     if (!p) return null;
+    if (!(await recordInScope(ctx, p))) return null;
     return {
       name: str(p["Phase_Name"]),
       status: str(p["Status"]) || "pending",
@@ -156,6 +158,7 @@ export async function loadPhaseDetail(ctx: OrgCtx, id: string): Promise<EditorVa
   }
   const p = await prisma.platConPhase.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!p) return null;
+  if (!(await recordInScope(ctx, p))) return null;
   return {
     name: p.name,
     status: p.status,

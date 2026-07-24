@@ -1,6 +1,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { parseReportModule8, type ReportPromptSpec } from "./reportDoc";
+import { recordInScope } from "./rls";
 import type { OrgCtx } from "./types";
 
 export interface ReportDetailView {
@@ -42,6 +43,7 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<ReportDetailView |
     include: { job: { select: { code: true, name: true } } },
   });
   if (!report) return null;
+  if (!(await recordInScope(ctx, report))) return null;
   return {
     id: String(report.id),
     title: report.title,
@@ -65,6 +67,7 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<ReportDetailView |
   // (no module8 tag) is treated as not-found.
   const doc = await core.get(ctx.orgSlug, "DOCUMENTS", id).catch(() => null);
   if (!doc) return null;
+  if (!(await recordInScope(ctx, doc))) return null;
   const m8 = parseReportModule8(doc["AI_Analysis"]);
   if (!m8) return null;
   const jobId = firstLink(doc["Job"]);

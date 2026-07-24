@@ -5,7 +5,7 @@ import type { ListViewConfig } from "@/lib/platform/listQuery";
 import type { ProcurementView } from "@/lib/platform/procurementSource";
 
 export const procurementListConfig: ListViewConfig<ProcurementView> = {
-  search: [(o) => o.item, (o) => o.vendorName],
+  search: [(o) => o.item, (o) => o.vendorName, (o) => o.jobCode],
   fields: [
     {
       kind: "enum",

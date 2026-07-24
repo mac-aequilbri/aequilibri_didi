@@ -117,6 +117,7 @@ export default async function ActionsPage({
           <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th scope="col" className="py-1 pr-2">Action</th>
+              <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Owner</th>
               <th scope="col" className="py-1 pr-2">Due</th>
               <th scope="col" className="py-1 pr-2">Priority</th>
@@ -128,7 +129,7 @@ export default async function ActionsPage({
             {splitIntoGroups(items, query, actionsListConfig).map((section) => (
               <Fragment key={section.key}>
                 {query.group && (
-                  <GroupHeaderRow colSpan={6} label={section.label} count={section.count} />
+                  <GroupHeaderRow colSpan={7} label={section.label} count={section.count} />
                 )}
                 {section.rows.map((a) => (
               <tr key={a.id} className="relative border-t border-neutral-100 hover:bg-neutral-50">
@@ -146,13 +147,11 @@ export default async function ActionsPage({
                       {a.issueType}
                     </span>
                   )}
-                  {a.jobCode && (
-                    <span className="ml-1 text-xs text-neutral-400">{a.jobCode}</span>
-                  )}
                   {a.detail && (
                     <span className="block text-xs text-neutral-500 line-clamp-1">{a.detail}</span>
                   )}
                 </td>
+                <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">{a.jobCode || "—"}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{a.owner || "—"}</td>
                 <td
                   className={`py-2 pr-2 whitespace-nowrap text-xs ${isOverdue(a) ? "text-red-600 font-semibold" : ""}`}
@@ -200,7 +199,7 @@ export default async function ActionsPage({
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-6">
+                <td colSpan={7} className="py-6">
                   <EmptyState
                     title={filtered ? "No actions match these filters" : "No actions yet"}
                     hint={

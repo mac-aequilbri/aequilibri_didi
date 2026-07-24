@@ -7,6 +7,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { loadJobLabelMap } from "./jobOptionsSource";
+import { recordInScope, scopeByJob } from "./rls";
 import { dateInput, type EditorValues } from "./recordEditor";
 import type { OrgCtx } from "./types";
 
@@ -14,6 +15,7 @@ export interface DecisionView {
   id: string;
   description: string;
   jobCode: string | null;
+  jobId: string | null;
   rationale: string;
   madeBy: string;
   sourceType: string;
@@ -39,6 +41,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<DecisionView[]> {
     id: String(d.id),
     description: d.description,
     jobCode: d.job?.code ?? null,
+    jobId: d.jobId != null ? String(d.jobId) : null,
     rationale: d.rationale,
     madeBy: d.madeBy,
     sourceType: d.sourceType,
@@ -72,6 +75,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<DecisionView[]> {
       description:
         str(r["Decision_Description"]) || str(r["Decision_Name"]) || "(untitled decision)",
       jobCode: jobRec ? (jobLabels.get(jobRec) ?? null) : null,
+      jobId: jobRec,
       rationale: str(r["Rationale"]),
       // Owner is a TEAM linked record; name resolution is a later step.
       madeBy: Array.isArray(owner) && owner.length > 0 ? "(linked)" : "—",
@@ -83,8 +87,9 @@ async function fromAirtable(ctx: OrgCtx): Promise<DecisionView[]> {
 }
 
 /** Load decisions for the page from whichever backend is active. */
-export function loadDecisions(ctx: OrgCtx): Promise<DecisionView[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+export async function loadDecisions(ctx: OrgCtx): Promise<DecisionView[]> {
+  const rows = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  return scopeByJob(ctx, rows, (d) => d.jobId);
 }
 
 /** Form-ready values for a single decision's edit page. Fields are limited to
@@ -99,6 +104,7 @@ export async function loadDecisionDetail(ctx: OrgCtx, id: string): Promise<Edito
       return null;
     }
     if (!r) return null;
+    if (!(await recordInScope(ctx, r))) return null;
     return {
       description: str(r["Decision_Description"]) || str(r["Decision_Name"]),
       rationale: str(r["Rationale"]),
@@ -108,6 +114,7 @@ export async function loadDecisionDetail(ctx: OrgCtx, id: string): Promise<Edito
   }
   const d = await prisma.platDecision.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!d) return null;
+  if (!(await recordInScope(ctx, d))) return null;
   return {
     description: d.description,
     rationale: d.rationale,

@@ -8,6 +8,10 @@ export interface PendingWriteView {
   tableKey: string;
   op: string;
   recordId: string;
+  /** The proposal's target job (rec id / numeric string), for RLS scoping of
+   *  the approval queue. null = org-global. Airtable stores it only in the
+   *  payload, so we fall back to that when the Job_Id column is blank. */
+  jobId: string | null;
   payload: string;
   actorType: string;
   actorName: string;
@@ -21,6 +25,17 @@ export interface PendingWriteView {
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
+}
+
+/** The job id embedded in a proposal payload (Airtable rec id or Postgres
+ *  numeric), or null. The write path always posts jobId on a create. */
+function jobIdFromPayload(payload: string): string | null {
+  try {
+    const j = (JSON.parse(payload) as { jobId?: unknown }).jobId;
+    return j == null || j === "" ? null : String(j);
+  } catch {
+    return null;
+  }
 }
 
 function date(v: unknown): Date | null {
@@ -39,6 +54,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<PendingWriteView[]> {
     tableKey: r.tableKey,
     op: r.op,
     recordId: r.recordId == null ? "" : String(r.recordId),
+    jobId: r.jobId != null ? String(r.jobId) : jobIdFromPayload(r.payload),
     payload: r.payload,
     actorType: r.actorType,
     actorName: r.actorName,
@@ -59,6 +75,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<PendingWriteView[]> {
       tableKey: str(r["Table_Key"]),
       op: str(r["Op"]),
       recordId: str(r["Record_Id"]),
+      jobId: str(r["Job_Id"]) || jobIdFromPayload(str(r["Payload"])),
       payload: str(r["Payload"]),
       actorType: str(r["Actor_Type"]),
       actorName: str(r["Actor_Name"]),

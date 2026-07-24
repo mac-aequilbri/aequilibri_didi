@@ -13,6 +13,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { recordInScope } from "./rls";
 import type { OrgCtx } from "./types";
 
 export interface QuoteLineRow {
@@ -81,6 +82,7 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<QuoteDetailView | 
     },
   });
   if (!quote) return null;
+  if (!(await recordInScope(ctx, quote))) return null;
   // A proposal has no job yet (jobId/assessmentId carry the pre-acceptance state).
   return {
     id: String(quote.id),
@@ -122,6 +124,7 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<QuoteDetailView | 
   } catch {
     return null; // 404 / deleted / wrong-base → not found
   }
+  if (!(await recordInScope(ctx, quote))) return null;
 
   // Lines: read QUOTE_LINES and match on the Quote link in app (no formula
   // filtering on linked records), then sort by Sort_Order — mirrors the quotes
