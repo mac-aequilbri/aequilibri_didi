@@ -142,6 +142,25 @@ export async function saveMetricsSnapshot(slug: string, metrics: OrgMetricsSnaps
   orgRegistryCache.delete(slug);
 }
 
+/** Add a single project assignment (idempotent — skips if the member already
+ *  has that job). Used to auto-assign a job's human creator so they keep access
+ *  under enforcement, without disturbing their other assignments. */
+export async function addControlAssignment(
+  slug: string,
+  email: string,
+  jobRecId: string,
+): Promise<void> {
+  const base = controlBaseId();
+  if (!base || !email || !jobRecId) return;
+  const existing = await listRecords(base, ASSIGNMENTS, {
+    filterByFormula: `AND({Org_Slug}='${formulaSafe(slug)}', LOWER({Email})='${formulaSafe(email.toLowerCase())}', {Job_Rec_Id}='${formulaSafe(jobRecId)}')`,
+    maxRecords: 1,
+  });
+  if (existing.length) return;
+  await createRecords(base, ASSIGNMENTS, [{ Org_Slug: slug, Email: email, Job_Rec_Id: jobRecId }]);
+  assignmentsCache.delete(slug);
+}
+
 /** Flip an org's project-RLS enforcement flag in its Settings JSON
  *  (features.project_rls_enforce), preserving the rest of the config. When true,
  *  a non-exempt member with no PLAT_ASSIGNMENTS sees only org-global rows in
@@ -776,8 +795,14 @@ export async function deleteOrgFromRegistry(slug: string): Promise<OrgDeletionRe
     filterByFormula: `{Org_Slug}='${safe}'`,
     maxRecords: 1000,
   });
+  // Also drop the org's project assignments (tolerant — table may be absent).
+  const asgRecs = await listRecords(base, ASSIGNMENTS, {
+    filterByFormula: `{Org_Slug}='${safe}'`,
+    maxRecords: 5000,
+  }).catch(() => [] as Awaited<ReturnType<typeof listRecords>>);
   if (regRecs.length) await deleteRecords(base, REGISTRY, regRecs.map((r) => r.id));
   if (teamRecs.length) await deleteRecords(base, TEAM, teamRecs.map((r) => r.id));
+  if (asgRecs.length) await deleteRecords(base, ASSIGNMENTS, asgRecs.map((r) => r.id));
   invalidateControlCache(slug);
   return { slug, baseId, removedRegistry: regRecs.length, removedTeam: teamRecs.length };
 }
