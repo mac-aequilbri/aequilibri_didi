@@ -142,6 +142,29 @@ export async function saveMetricsSnapshot(slug: string, metrics: OrgMetricsSnaps
   orgRegistryCache.delete(slug);
 }
 
+/** Record the org's "General" project rec id in its Settings JSON so RLS keeps
+ *  it in scope for everyone (docs/project-general-bucket-plan.md). Preserves the
+ *  rest of the config. Called at provisioning / by the backfill script. */
+export async function setGeneralJobId(slug: string, jobRecId: string): Promise<void> {
+  const base = controlBaseId();
+  if (!base || !jobRecId) return;
+  const recs = await listRecords(base, REGISTRY, {
+    filterByFormula: `{Slug}='${formulaSafe(slug)}'`,
+    maxRecords: 1,
+  });
+  if (!recs.length) return;
+  let settings: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(S(recs[0].fields["Settings"]) || "{}");
+    if (parsed && typeof parsed === "object") settings = parsed as Record<string, unknown>;
+  } catch {
+    /* start from empty on malformed settings */
+  }
+  settings.generalJobId = jobRecId;
+  await updateRecords(base, REGISTRY, [{ id: recs[0].id, fields: { Settings: JSON.stringify(settings) } }]);
+  orgRegistryCache.delete(slug);
+}
+
 /** Add a single project assignment (idempotent — skips if the member already
  *  has that job). Used to auto-assign a job's human creator so they keep access
  *  under enforcement, without disturbing their other assignments. */

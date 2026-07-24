@@ -59,9 +59,18 @@ export async function resolveJobScope(
   viewer: { email: string; role: string },
 ): Promise<JobScope> {
   if (rlsExempt(viewer.role)) return { mode: "all" };
+  // The org's "General" project is the shared bucket — always in scope for every
+  // member, so org-level records are visible without leaking via a null job.
+  const general = ctx.config?.generalJobId;
   const assigned = await assignedJobRecIds(ctx, viewer.email);
-  if (assigned === null) return rlsEnforce(ctx) ? { mode: "none" } : { mode: "all" };
-  return { mode: "some", jobIds: assigned };
+  if (assigned === null) {
+    if (!rlsEnforce(ctx)) return { mode: "all" };
+    // Enforcing with no assignments: the member still sees General, nothing else.
+    return general ? { mode: "some", jobIds: new Set([general]) } : { mode: "none" };
+  }
+  const ids = new Set(assigned);
+  if (general) ids.add(general);
+  return { mode: "some", jobIds: ids };
 }
 
 /** The current request's viewer scope, resolved once (React-cached per request

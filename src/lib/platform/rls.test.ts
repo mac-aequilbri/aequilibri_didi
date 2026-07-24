@@ -73,4 +73,17 @@ describe("resolveJobScope", () => {
     // A different org with no flag (and no global env) stays fail-open.
     expect((await resolveJobScope(ctx, { email: "u@x.io", role: "broker" })).mode).toBe("all");
   });
+
+  it("General bucket: an enforcing viewer with no assignments still sees General", async () => {
+    process.env.PROJECT_RLS_ENFORCE = "true";
+    const withGeneral = { ...ctx, config: { generalJobId: "recGEN" } } as unknown as OrgCtx;
+    const s = await resolveJobScope(withGeneral, { email: "u@x.io", role: "broker" });
+    expect(s.mode).toBe("some");
+    expect(s.mode === "some" && s.jobIds.has("recGEN")).toBe(true);
+  });
+
+  it("General bucket: enforcing viewer, no assignments and no General → none", async () => {
+    process.env.PROJECT_RLS_ENFORCE = "true";
+    expect((await resolveJobScope(ctx, { email: "u@x.io", role: "broker" })).mode).toBe("none");
+  });
 });

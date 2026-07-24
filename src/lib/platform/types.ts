@@ -2,7 +2,7 @@
 // Choice fields are string-literal unions (the DB stores varchar, not enums),
 // matching the convention used across the Uc* schemas.
 
-export type EngagementType = "short_job" | "long_project" | "ongoing" | "seasonal";
+export type EngagementType = "short_job" | "long_project" | "ongoing" | "seasonal" | "general";
 
 /** How much write authority the org grants the AI assistant. */
 export type AiAuthority = "propose_only" | "approve_required" | "auto_low_risk";
@@ -21,6 +21,10 @@ export interface OrgConfig {
   /** Customer branding captured at onboarding. `logo` is a data URL (stored
    *  inline in settings so it works across the Airtable/Postgres stores). */
   branding?: { logo?: string };
+  /** Rec id of the org's "General" project — the shared bucket for org-level
+   *  records. RLS always keeps it in scope so every member sees it. Set at
+   *  provisioning; absent until then (docs/project-general-bucket-plan.md). */
+  generalJobId?: string;
 }
 
 /** Request context every platform service takes as its first argument. */
