@@ -25,12 +25,14 @@ import { TtlCache } from "./ttlCache";
 const CONTROL_TTL_MS = 60_000;
 const orgRegistryCache = new TtlCache<OrgRegistryEntry | null>(CONTROL_TTL_MS);
 const teamCache = new TtlCache<ControlTeamMember[]>(CONTROL_TTL_MS);
+const assignmentsCache = new TtlCache<ControlAssignment[]>(CONTROL_TTL_MS);
 
 /** Drop cached control-plane rows for a slug. Exported for out-of-band writes
  *  (e.g. provisioning scripts) — control.ts's own write paths call it already. */
 export function invalidateControlCache(slug: string): void {
   orgRegistryCache.delete(slug);
   teamCache.delete(slug);
+  assignmentsCache.delete(slug);
 }
 
 const S = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
@@ -38,6 +40,7 @@ const N = (v: unknown): number => (typeof v === "number" ? v : Number(v) || 0);
 
 const REGISTRY = "PLAT_ORG_REGISTRY";
 const TEAM = "PLAT_TEAM";
+const ASSIGNMENTS = "PLAT_ASSIGNMENTS";
 const TEMPLATE_REGISTRY = "PLAT_TEMPLATE_REGISTRY";
 const JOB_CATALOG = "PLAT_JOB_CATALOG";
 const CONNECTIONS = "PLAT_CONNECTIONS";
@@ -610,6 +613,38 @@ async function fetchControlTeam(base: string, slug: string): Promise<ControlTeam
       isActive: f["Is_Active"] !== false,
     };
   });
+}
+
+// ── Project (job) assignments — the RLS store (docs/project-rls-activation.md) ──
+export interface ControlAssignment {
+  /** Lower-cased for case-insensitive matching against the viewer's email. */
+  email: string;
+  /** Airtable JOBS record id the member is assigned to. */
+  jobRecId: string;
+}
+
+/** Every project assignment for an org, from the control base PLAT_ASSIGNMENTS
+ *  table (one row per Org_Slug + Email + Job_Rec_Id). Cached like the team list;
+ *  tolerant — an absent/unreadable table yields [] so RLS stays fail-open until
+ *  the table is provisioned and seeded. */
+export async function listControlAssignments(slug: string): Promise<ControlAssignment[]> {
+  const base = controlBaseId();
+  if (!base) return [];
+  return assignmentsCache.get(slug, () => fetchControlAssignments(base, slug));
+}
+
+async function fetchControlAssignments(base: string, slug: string): Promise<ControlAssignment[]> {
+  try {
+    const recs = await listRecords(base, ASSIGNMENTS, {
+      filterByFormula: `{Org_Slug}='${formulaSafe(slug)}'`,
+      maxRecords: 5000,
+    });
+    return recs
+      .map((r) => ({ email: S(r.fields["Email"]).toLowerCase(), jobRecId: S(r.fields["Job_Rec_Id"]) }))
+      .filter((a) => a.email && a.jobRecId);
+  } catch {
+    return []; // table not yet provisioned — tolerant (RLS stays fail-open)
+  }
 }
 
 /** Next org id: max existing + 1 (the registry replaces the Postgres

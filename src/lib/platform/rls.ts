@@ -1,42 +1,32 @@
 // Governance Phase 3 — row-level security (§3/§7): a user sees only the JOBS
-// their TEAM record links to. The org base's TEAM table (Customer
-// Configuration tier) carries an Email + JOBS multipleRecordLinks per member.
+// they're assigned to. Assignments live centrally in the control base's
+// PLAT_ASSIGNMENTS table (one row per Org_Slug + Email + Job_Rec_Id) — beside
+// the membership/roles that already live in PLAT_TEAM — not in a per-customer
+// base (see docs/project-rls-activation.md, decision B).
 //
-// Tolerant by design: TEAM is unpopulated until D7 lands, and older bases may
-// lack the table entirely. Whenever the user's assignments can't be resolved
-// (table missing, no row for the email, no JOBS links, Postgres mode), scoping
-// is OFF (null = whole tenant) — RLS tightens as TEAM data arrives, and never
-// bricks an org. Administrator, Auditor, and Business Owner bypass via
-// rlsExempt() at the call sites.
+// Tolerant by design: whenever a user's assignments can't be resolved (table
+// absent/unreadable, no rows for the email, or a Postgres-registry org with no
+// central store yet), scoping is OFF (null = whole tenant) — RLS tightens as
+// assignments are seeded and never bricks an org. Administrator, Auditor, and
+// Business Owner bypass via rlsExempt() at the call sites.
 
 import { cache } from "react";
-import { airtableEnabled, core } from "@/lib/airtable";
-import type { CoreTableName } from "@/lib/airtable/schema.generated";
+import { controlEnabled, listControlAssignments } from "@/lib/airtable/control";
 import { getCurrentViewer } from "./org-context";
 import { rlsExempt } from "./roles";
 import type { OrgCtx } from "./types";
 
-// TEAM is Customer Configuration — never cloned from the template, so it's
-// absent from the generated table union; addressed by name, read tolerantly.
-const TEAM = "TEAM" as CoreTableName;
-
-/** Airtable JOBS record ids the user is assigned to, or null = unscoped. */
+/** Job record ids the user is assigned to in this org, or null = unscoped. */
 export async function assignedJobRecIds(
   ctx: OrgCtx,
   email: string,
 ): Promise<ReadonlySet<string> | null> {
-  if (!airtableEnabled() || !email) return null;
-  try {
-    const rows = await core.list(ctx.orgSlug, TEAM, { maxRecords: 500 });
-    const mine = rows.find(
-      (r) => typeof r["Email"] === "string" && r["Email"].toLowerCase() === email.toLowerCase(),
-    );
-    const links = mine?.["JOBS"] ?? mine?.["Jobs"] ?? mine?.["Job"];
-    if (!Array.isArray(links) || links.length === 0) return null;
-    return new Set(links.map(String));
-  } catch {
-    return null; // TEAM table absent/unreadable — no scoping
-  }
+  // Postgres-registry orgs have no central assignment store yet (parity TODO);
+  // every live org runs on the Airtable control plane, so treat them unscoped.
+  if (!email || !controlEnabled()) return null;
+  const rows = await listControlAssignments(ctx.orgSlug);
+  const mine = rows.filter((a) => a.email === email.toLowerCase()).map((a) => a.jobRecId);
+  return mine.length ? new Set(mine) : null;
 }
 
 // ── Job scope (governance §3/§7 RLS enforcement) ──────────────────────────────
