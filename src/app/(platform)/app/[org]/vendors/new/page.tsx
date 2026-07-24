@@ -24,8 +24,8 @@ export default async function NewVendorPage({
       <div className="p-6 max-w-xl">
         <PageHeader title="New vendor" />
         <div className="ae-card p-5 text-sm text-neutral-600">
-          This org&apos;s base doesn&apos;t have a <code>VENDORS</code> table yet, so vendors
-          can&apos;t be added here. Run the provisioning migration to add it.
+          This org&apos;s base doesn&apos;t have a <code>VENDORS</code>{" "}
+          table, so vendors can&apos;t be added here yet.
         </div>
       </div>
     );
