@@ -65,8 +65,8 @@ export default async function NewCommPage({
           </label>
           <label className="block text-sm">
             <span className="text-neutral-600">Job</span>
-            <select name="jobId" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
-              <option value="">— none —</option>
+            <select name="jobId" required defaultValue="" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+              <option value="" disabled>Select a project…</option>
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
                   {j.label}

@@ -40,8 +40,8 @@ export default async function NewActionPage({
         <div className="grid grid-cols-2 gap-4">
           <label className="block text-sm">
             <span className="text-neutral-600">Job</span>
-            <select name="jobId" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
-              <option value="">—</option>
+            <select name="jobId" required defaultValue="" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2">
+              <option value="" disabled>Select a project…</option>
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
                   {j.label}
