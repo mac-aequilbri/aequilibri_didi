@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { setControlAssignments } from "@/lib/airtable/control";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { inviteMember, setMemberActive, setMemberRole } from "@/lib/platform/provisioning";
@@ -44,6 +45,23 @@ export async function setMemberRoleAction(formData: FormData): Promise<void> {
   }
   revalidatePath(orgPath(ctx.orgSlug, "/team"));
   back(ctx.orgSlug, `status=role_updated&who=${encodeURIComponent(email)}`);
+}
+
+/** Replace a member's project (job) assignments — the RLS access list. The
+ *  checklist posts one `jobId` per checked project; an empty set clears access.
+ *  See docs/project-rls-activation.md (P1). */
+export async function setMemberAssignmentsAction(formData: FormData): Promise<void> {
+  const ctx = await guarded(String(formData.get("org") ?? ""));
+  const email = String(formData.get("email") ?? "").trim();
+  const jobIds = formData.getAll("jobId").map((v) => String(v)).filter(Boolean);
+  if (!email) back(ctx.orgSlug, "status=error&msg=Missing+member");
+  try {
+    await setControlAssignments(ctx.orgSlug, email, jobIds);
+  } catch (err) {
+    back(ctx.orgSlug, `status=error&msg=${encodeURIComponent(err instanceof Error ? err.message : "Update failed.")}`);
+  }
+  revalidatePath(orgPath(ctx.orgSlug, "/team"));
+  back(ctx.orgSlug, `status=projects_updated&who=${encodeURIComponent(email)}`);
 }
 
 export async function setMemberActiveAction(formData: FormData): Promise<void> {

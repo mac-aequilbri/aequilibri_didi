@@ -6,11 +6,15 @@
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { controlEnabled, listControlAssignments } from "@/lib/airtable/control";
 import { clerkEnabled } from "@/lib/platform/authConfig";
+import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { listMembers } from "@/lib/platform/provisioning";
 import { rolePriority } from "@/lib/platform/module1Governance";
+import { rlsExempt } from "@/lib/platform/roles";
 import { inviteMemberAction, setMemberActiveAction, setMemberRoleAction } from "./actions";
+import { ProjectAssignments } from "./ProjectAssignments";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +43,7 @@ function StatusBanner({ sp }: { sp: Record<string, string | string[] | undefined
     reactivated: { cls: ok, text: `${who} was previously deactivated — access restored with the new role.` },
     already_member: { cls: warn, text: `${who} is already an active member — nothing changed.` },
     role_updated: { cls: ok, text: `Role updated for ${who}.` },
+    projects_updated: { cls: ok, text: `Project access updated for ${who}.` },
     deactivated: { cls: ok, text: `${who} deactivated — access is revoked (takes up to a minute to apply).` },
     reactivated_member: { cls: ok, text: `${who} reactivated.` },
     invalid: { cls: err, text: "Enter a name and a valid email address." },
@@ -65,6 +70,18 @@ export default async function TeamPage({
     (a, b) => Number(b.isActive) - Number(a.isActive) || rolePriority(a.role) - rolePriority(b.role) || a.name.localeCompare(b.name),
   );
   const authOn = clerkEnabled();
+
+  // Project (job) assignments = the RLS access list. Only meaningful on the
+  // Airtable control plane (where PLAT_ASSIGNMENTS lives); hidden otherwise.
+  const showProjects = controlEnabled();
+  const jobs = showProjects ? await loadJobOptions(ctx) : [];
+  const capped = jobs.length >= 200; // loadJobOptions caps the picker at 200
+  const assignmentsByEmail = new Map<string, string[]>();
+  if (showProjects) {
+    for (const a of await listControlAssignments(ctx.orgSlug)) {
+      (assignmentsByEmail.get(a.email) ?? assignmentsByEmail.set(a.email, []).get(a.email)!).push(a.jobRecId);
+    }
+  }
 
   return (
     <div className="p-6 max-w-4xl">
@@ -133,6 +150,7 @@ export default async function TeamPage({
             <tr>
               <th className="py-1 pr-2">Member</th>
               <th className="py-1 pr-2">Role</th>
+              {showProjects && <th className="py-1 pr-2">Project access</th>}
               <th className="py-1 pr-2 text-center">Status</th>
               <th className="py-1 text-right">Access</th>
             </tr>
@@ -171,6 +189,23 @@ export default async function TeamPage({
                       />
                     </form>
                   </td>
+                  {showProjects && (
+                    <td className="py-2 pr-2 align-top">
+                      {rlsExempt(m.role) ? (
+                        <span className="text-xs text-neutral-400" title="This role sees every project">
+                          Full access
+                        </span>
+                      ) : (
+                        <ProjectAssignments
+                          orgSlug={ctx.orgSlug}
+                          email={m.email}
+                          jobs={jobs}
+                          assigned={assignmentsByEmail.get(m.email.toLowerCase()) ?? []}
+                          capped={capped}
+                        />
+                      )}
+                    </td>
+                  )}
                   <td className="py-2 pr-2 text-center">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -206,7 +241,7 @@ export default async function TeamPage({
             })}
             {members.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-4 text-center text-sm text-neutral-500">
+                <td colSpan={showProjects ? 5 : 4} className="py-4 text-center text-sm text-neutral-500">
                   No members yet — invite the first one above.
                 </td>
               </tr>

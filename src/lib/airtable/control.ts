@@ -647,6 +647,33 @@ async function fetchControlAssignments(base: string, slug: string): Promise<Cont
   }
 }
 
+/** Replace a member's project assignments for an org (delete-then-insert on
+ *  Org_Slug + Email; the client CRUD helpers chunk to Airtable's 10/req cap).
+ *  An empty list clears all of the member's assignments. Invalidates the cache
+ *  so the next resolveJobScope sees the change. */
+export async function setControlAssignments(
+  slug: string,
+  email: string,
+  jobRecIds: string[],
+): Promise<void> {
+  const base = controlBaseId();
+  if (!base) return;
+  const existing = await listRecords(base, ASSIGNMENTS, {
+    filterByFormula: `AND({Org_Slug}='${formulaSafe(slug)}', LOWER({Email})='${formulaSafe(email.toLowerCase())}')`,
+    maxRecords: 5000,
+  });
+  if (existing.length) await deleteRecords(base, ASSIGNMENTS, existing.map((r) => r.id));
+  const unique = [...new Set(jobRecIds.filter(Boolean))];
+  if (unique.length) {
+    await createRecords(
+      base,
+      ASSIGNMENTS,
+      unique.map((jobRecId) => ({ Org_Slug: slug, Email: email, Job_Rec_Id: jobRecId })),
+    );
+  }
+  assignmentsCache.delete(slug);
+}
+
 /** Next org id: max existing + 1 (the registry replaces the Postgres
  *  autoincrement). Count-based numbering can dup after deletes, like the rest
  *  of the Airtable id allocation — tolerated at onboarding volumes. */
