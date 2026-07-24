@@ -142,6 +142,35 @@ export async function saveMetricsSnapshot(slug: string, metrics: OrgMetricsSnaps
   orgRegistryCache.delete(slug);
 }
 
+/** Flip an org's project-RLS enforcement flag in its Settings JSON
+ *  (features.project_rls_enforce), preserving the rest of the config. When true,
+ *  a non-exempt member with no PLAT_ASSIGNMENTS sees only org-global rows in
+ *  that org (fail-closed); when false/absent, scoping stays fail-open. */
+export async function setProjectRlsEnforce(slug: string, enabled: boolean): Promise<void> {
+  const base = controlBaseId();
+  if (!base) return;
+  const recs = await listRecords(base, REGISTRY, {
+    filterByFormula: `{Slug}='${formulaSafe(slug)}'`,
+    maxRecords: 1,
+  });
+  if (!recs.length) return;
+  let settings: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(S(recs[0].fields["Settings"]) || "{}");
+    if (parsed && typeof parsed === "object") settings = parsed as Record<string, unknown>;
+  } catch {
+    /* start from empty on malformed settings */
+  }
+  const features =
+    settings.features && typeof settings.features === "object"
+      ? (settings.features as Record<string, unknown>)
+      : {};
+  features.project_rls_enforce = enabled;
+  settings.features = features;
+  await updateRecords(base, REGISTRY, [{ id: recs[0].id, fields: { Settings: JSON.stringify(settings) } }]);
+  orgRegistryCache.delete(slug);
+}
+
 /** Single-quote is the only char that breaks an Airtable formula string; org
  *  slugs can't contain it (SLUG_RE), but strip it defensively for emails. */
 const formulaSafe = (v: string): string => v.replace(/'/g, "");

@@ -38,12 +38,17 @@ export type JobScope =
   | { mode: "some"; jobIds: ReadonlySet<string> }
   | { mode: "none" }; // explicitly no assignments, only while enforcing
 
-/** Rollout gate. Until per-base TEAM assignments (Email + JOBS) are populated,
- *  scoping stays fail-OPEN: an unresolved viewer sees everything, so enabling
- *  the code path never bricks an org. Set PROJECT_RLS_ENFORCE=true for a base
- *  whose TEAM is populated to flip unresolved → see-nothing (fail-closed). */
-export function rlsEnforce(): boolean {
-  return process.env.PROJECT_RLS_ENFORCE === "true";
+/** Rollout gate, per org. Until an org's assignments are seeded, scoping stays
+ *  fail-OPEN (an unresolved viewer sees everything) so enabling the code path
+ *  never bricks an org. Two ways to flip an org to fail-CLOSED (unresolved →
+ *  see-nothing) once its PLAT_ASSIGNMENTS are populated:
+ *   - per-org: set `features.project_rls_enforce = true` in the org's settings
+ *     (flows into ctx.config.features) — flip one base at a time; or
+ *   - global: PROJECT_RLS_ENFORCE=true env — a staged-rollout/kill-switch that
+ *     forces enforcement on for every org at once. */
+export function rlsEnforce(ctx?: OrgCtx): boolean {
+  if (process.env.PROJECT_RLS_ENFORCE === "true") return true;
+  return ctx?.config?.features?.["project_rls_enforce"] === true;
 }
 
 /** Resolve a viewer to a job scope. Exempt (Administrator/Auditor/Business
@@ -55,7 +60,7 @@ export async function resolveJobScope(
 ): Promise<JobScope> {
   if (rlsExempt(viewer.role)) return { mode: "all" };
   const assigned = await assignedJobRecIds(ctx, viewer.email);
-  if (assigned === null) return rlsEnforce() ? { mode: "none" } : { mode: "all" };
+  if (assigned === null) return rlsEnforce(ctx) ? { mode: "none" } : { mode: "all" };
   return { mode: "some", jobIds: assigned };
 }
 

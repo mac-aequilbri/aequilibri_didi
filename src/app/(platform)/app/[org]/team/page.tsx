@@ -13,7 +13,12 @@ import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { listMembers } from "@/lib/platform/provisioning";
 import { rolePriority } from "@/lib/platform/module1Governance";
 import { rlsExempt } from "@/lib/platform/roles";
-import { inviteMemberAction, setMemberActiveAction, setMemberRoleAction } from "./actions";
+import {
+  inviteMemberAction,
+  setMemberActiveAction,
+  setMemberRoleAction,
+  setProjectRlsEnforceAction,
+} from "./actions";
 import { ProjectAssignments } from "./ProjectAssignments";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +49,8 @@ function StatusBanner({ sp }: { sp: Record<string, string | string[] | undefined
     already_member: { cls: warn, text: `${who} is already an active member — nothing changed.` },
     role_updated: { cls: ok, text: `Role updated for ${who}.` },
     projects_updated: { cls: ok, text: `Project access updated for ${who}.` },
+    rls_enabled: { cls: warn, text: "Project-level access is now ENFORCED — members see only their assigned projects. Owners/Auditors/Business Owners keep full access." },
+    rls_disabled: { cls: ok, text: "Project-level access enforcement turned off — all members see every project again." },
     deactivated: { cls: ok, text: `${who} deactivated — access is revoked (takes up to a minute to apply).` },
     reactivated_member: { cls: ok, text: `${who} reactivated.` },
     invalid: { cls: err, text: "Enter a name and a valid email address." },
@@ -82,6 +89,7 @@ export default async function TeamPage({
       (assignmentsByEmail.get(a.email) ?? assignmentsByEmail.set(a.email, []).get(a.email)!).push(a.jobRecId);
     }
   }
+  const enforcing = ctx.config.features?.["project_rls_enforce"] === true;
 
   return (
     <div className="p-6 max-w-4xl">
@@ -143,6 +151,35 @@ export default async function TeamPage({
           />
         </form>
       </section>
+
+      {showProjects && (
+        <section className="ae-card p-5 mb-6">
+          <h2 className="text-sm font-semibold mb-1">Project-level access (RLS)</h2>
+          <p className="text-xs text-neutral-500 mb-3 max-w-2xl">
+            {enforcing
+              ? "ON — each member sees and edits only the projects assigned to them below. Owners, Auditors and Business Owners always see everything."
+              : "Off — every member sees all projects. Assign members to projects below first, then enable this to restrict them (unassigned members will see nothing)."}
+          </p>
+          <form action={setProjectRlsEnforceAction}>
+            <input type="hidden" name="org" value={ctx.orgSlug} />
+            <input type="hidden" name="enabled" value={enforcing ? "0" : "1"} />
+            {enforcing ? (
+              <SubmitButton
+                label="Disable enforcement"
+                pendingLabel="Saving…"
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50"
+              />
+            ) : (
+              <ConfirmSubmitButton
+                label="Enable enforcement"
+                confirmLabel="Confirm — restrict members to assigned projects"
+                pendingLabel="Saving…"
+                className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
+              />
+            )}
+          </form>
+        </section>
+      )}
 
       <section className="ae-card p-5 mb-6">
         <table className="w-full text-sm">

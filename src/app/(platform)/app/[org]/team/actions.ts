@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { setControlAssignments } from "@/lib/airtable/control";
+import { setControlAssignments, setProjectRlsEnforce } from "@/lib/airtable/control";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { inviteMember, setMemberActive, setMemberRole } from "@/lib/platform/provisioning";
@@ -62,6 +62,21 @@ export async function setMemberAssignmentsAction(formData: FormData): Promise<vo
   }
   revalidatePath(orgPath(ctx.orgSlug, "/team"));
   back(ctx.orgSlug, `status=projects_updated&who=${encodeURIComponent(email)}`);
+}
+
+/** Flip project-level access enforcement for this org (P3). When ON, members
+ *  see only their assigned projects; enable only AFTER assigning members, or
+ *  non-exempt users will see empty lists. Admins always retain full access. */
+export async function setProjectRlsEnforceAction(formData: FormData): Promise<void> {
+  const ctx = await guarded(String(formData.get("org") ?? ""));
+  const enabled = String(formData.get("enabled") ?? "") === "1";
+  try {
+    await setProjectRlsEnforce(ctx.orgSlug, enabled);
+  } catch (err) {
+    back(ctx.orgSlug, `status=error&msg=${encodeURIComponent(err instanceof Error ? err.message : "Update failed.")}`);
+  }
+  revalidatePath(orgPath(ctx.orgSlug, "/team"));
+  back(ctx.orgSlug, `status=${enabled ? "rls_enabled" : "rls_disabled"}`);
 }
 
 export async function setMemberActiveAction(formData: FormData): Promise<void> {

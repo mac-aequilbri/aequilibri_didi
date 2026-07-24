@@ -62,8 +62,15 @@ describe("resolveJobScope", () => {
     expect((await resolveJobScope(ctx, { email: "u@x.io", role: "broker" })).mode).toBe("all");
   });
 
-  it("fail-closed: an unresolved non-exempt viewer sees nothing once enforcing", async () => {
+  it("fail-closed: an unresolved non-exempt viewer sees nothing once enforcing (global env)", async () => {
     process.env.PROJECT_RLS_ENFORCE = "true";
     expect((await resolveJobScope(ctx, { email: "u@x.io", role: "broker" })).mode).toBe("none");
+  });
+
+  it("fail-closed per-org: features.project_rls_enforce flips one org, others stay open", async () => {
+    const enforced = { ...ctx, config: { features: { project_rls_enforce: true } } } as unknown as OrgCtx;
+    expect((await resolveJobScope(enforced, { email: "u@x.io", role: "broker" })).mode).toBe("none");
+    // A different org with no flag (and no global env) stays fail-open.
+    expect((await resolveJobScope(ctx, { email: "u@x.io", role: "broker" })).mode).toBe("all");
   });
 });
