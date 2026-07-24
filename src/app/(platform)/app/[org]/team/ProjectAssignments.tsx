@@ -32,7 +32,12 @@ export function ProjectAssignments({
   return (
     <details className="text-xs">
       <summary className="cursor-pointer select-none text-neutral-600 hover:text-neutral-900">
-        Projects <span className="text-neutral-400">({assigned.length} assigned)</span>
+        Projects{" "}
+        {/* 0 assignments = no access once enforced (this control only renders
+            for non-exempt roles), so flag it amber. */}
+        <span className={assigned.length === 0 ? "text-amber-700" : "text-neutral-400"}>
+          ({assigned.length} assigned)
+        </span>
       </summary>
       <form action={setMemberAssignmentsAction} className="mt-2 w-72 rounded-md border border-neutral-200 p-2">
         <input type="hidden" name="org" value={orgSlug} />

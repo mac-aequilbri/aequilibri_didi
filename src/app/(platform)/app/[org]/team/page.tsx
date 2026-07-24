@@ -90,6 +90,17 @@ export default async function TeamPage({
     }
   }
   const enforcing = ctx.config.features?.["project_rls_enforce"] === true;
+  // P4 scope preview: active, non-exempt members with no assignments resolve to
+  // an empty scope — they'll see nothing once enforcement is on. Surface them so
+  // an admin assigns projects before (or notices after) flipping the toggle.
+  const lockedOut = showProjects
+    ? members.filter(
+        (m) =>
+          m.isActive &&
+          !rlsExempt(m.role) &&
+          (assignmentsByEmail.get(m.email.toLowerCase())?.length ?? 0) === 0,
+      )
+    : [];
 
   return (
     <div className="p-6 max-w-4xl">
@@ -160,6 +171,17 @@ export default async function TeamPage({
               ? "ON — each member sees and edits only the projects assigned to them below. Owners, Auditors and Business Owners always see everything."
               : "Off — every member sees all projects. Assign members to projects below first, then enable this to restrict them (unassigned members will see nothing)."}
           </p>
+          {lockedOut.length > 0 ? (
+            <p className="text-xs mb-3 max-w-2xl rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-amber-800">
+              ⚠ {lockedOut.length} active member{lockedOut.length > 1 ? "s" : ""}{" "}
+              {enforcing ? "currently see no projects" : "will see no projects once enabled"} — assign
+              projects below first: {lockedOut.map((m) => m.name || m.email).join(", ")}.
+            </p>
+          ) : (
+            <p className="text-xs mb-3 text-emerald-700">
+              ✓ Every active member is assigned to a project or has full access.
+            </p>
+          )}
           <form action={setProjectRlsEnforceAction}>
             <input type="hidden" name="org" value={ctx.orgSlug} />
             <input type="hidden" name="enabled" value={enforcing ? "0" : "1"} />
