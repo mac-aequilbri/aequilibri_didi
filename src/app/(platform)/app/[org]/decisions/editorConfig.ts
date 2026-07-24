@@ -5,6 +5,7 @@ import type { RecordEditorConfig } from "@/lib/platform/recordEditor";
 
 export const decisionEditorConfig: RecordEditorConfig = {
   table: "decision",
+  jobScoped: true,
   noun: "decision",
   listPath: "/decisions",
   aiRole:

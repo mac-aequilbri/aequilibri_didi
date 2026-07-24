@@ -404,6 +404,7 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Ceiling_Height", from: "ceilingHeight", to: S },
       { air: "Finishes", from: "finishes", to: S },
       { air: "Notes", from: "notes", to: S },
+      { air: "Job", from: "jobId", to: LINK },
     ],
   },
   meeting_minutes: {

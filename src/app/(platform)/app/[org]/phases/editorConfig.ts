@@ -5,6 +5,7 @@ import type { RecordEditorConfig } from "@/lib/platform/recordEditor";
 
 export const phaseEditorConfig: RecordEditorConfig = {
   table: "phase",
+  jobScoped: true,
   noun: "phase",
   listPath: "/phases",
   aiRole:

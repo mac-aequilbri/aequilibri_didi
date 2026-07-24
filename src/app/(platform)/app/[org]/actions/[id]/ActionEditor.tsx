@@ -52,10 +52,14 @@ export default function ActionEditor({
   orgSlug,
   action,
   backHref,
+  jobOptions,
 }: {
   orgSlug: string;
   action: ActionDetail;
   backHref: string;
+  /** Project picker options: "— none —", then the org's jobs, plus the current
+   *  job if it fell outside the loaded set (so a save can't clear it). */
+  jobOptions: { value: string; label: string }[];
 }) {
   const router = useRouter();
 
@@ -65,6 +69,7 @@ export default function ActionEditor({
   const [dueDate, setDueDate] = useState(toDateInput(action.dueDate));
   const [priority, setPriority] = useState(action.priority || "P2");
   const [status, setStatus] = useState(action.status || "open");
+  const [jobId, setJobId] = useState(action.jobId ?? "");
 
   // Save runs the server action; on success we navigate client-side (a redirect
   // inside the action would route through the [org] loading fallback and blank
@@ -84,7 +89,8 @@ export default function ActionEditor({
       owner !== action.owner ||
       dueDate !== toDateInput(action.dueDate) ||
       priority !== (action.priority || "P2") ||
-      status !== (action.status || "open"));
+      status !== (action.status || "open") ||
+      jobId !== (action.jobId ?? ""));
   useEffect(() => {
     if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => {
@@ -194,6 +200,21 @@ export default function ActionEditor({
           onChange={(e) => setDetail(e.target.value)}
           className={inputCls}
         />
+      </label>
+
+      <label className="block text-sm">
+        <span className="text-neutral-600">Project</span>
+        <select name="jobId" value={jobId} onChange={(e) => setJobId(e.target.value)} className={inputCls}>
+          {jobOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <span className="mt-0.5 block text-xs text-neutral-400">
+          Which project this action belongs to — controls who can see it when project access is
+          enforced.
+        </span>
       </label>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

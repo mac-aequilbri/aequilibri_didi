@@ -180,6 +180,7 @@ export interface ActionDetail {
   status: string;
   issueType: string;
   jobCode: string | null;
+  jobId: string | null;
 }
 
 async function fromPostgres(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData> {
@@ -324,6 +325,7 @@ export async function loadAction(ctx: OrgCtx, id: string): Promise<ActionDetail 
       status: res.canonical ?? "open",
       issueType: str(r["Issue_Type"]),
       jobCode: null,
+      jobId: firstLink(r["Job"]),
     };
   }
   const a = await prisma.platActionHub.findFirst({
@@ -342,5 +344,6 @@ export async function loadAction(ctx: OrgCtx, id: string): Promise<ActionDetail 
     status: a.status,
     issueType: "",
     jobCode: a.job?.code ?? null,
+    jobId: a.jobId != null ? String(a.jobId) : null,
   };
 }

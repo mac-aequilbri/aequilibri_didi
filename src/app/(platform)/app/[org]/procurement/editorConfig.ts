@@ -5,6 +5,7 @@ import type { RecordEditorConfig } from "@/lib/platform/recordEditor";
 
 export const procurementEditorConfig: RecordEditorConfig = {
   table: "procurement",
+  jobScoped: true,
   noun: "order",
   listPath: "/procurement",
   aiRole:

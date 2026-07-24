@@ -5,6 +5,7 @@ import type { RecordEditorConfig } from "@/lib/platform/recordEditor";
 
 export const roomEditorConfig: RecordEditorConfig = {
   table: "room",
+  jobScoped: true,
   noun: "room",
   listPath: "/room-matrix",
   aiRole:

@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 const config: RecordEditorConfig = {
   table: "budget_line",
+  jobScoped: true,
   noun: "budget line",
   listPath: "/budget",
   aiRole:

@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const config: RecordEditorConfig = {
   table: "cashflow",
+  jobScoped: true,
   noun: "cashflow entry",
   listPath: "/cashflow",
   aiRole:

@@ -78,6 +78,7 @@ export async function updateActionDetail(
   const owner = str(formData.get("owner")).trim();
   const detail = str(formData.get("detail"));
   const dueDate = str(formData.get("dueDate")).trim();
+  const jobId = str(formData.get("jobId")).trim();
 
   try {
     await writeRecord(ctx, {
@@ -91,6 +92,9 @@ export async function updateActionDetail(
         detail: detail === "" && air ? null : detail,
         owner: owner === "" ? (air ? null : "") : owner,
         dueDate: dueDate === "" ? (air ? null : undefined) : dueDate,
+        // Project (job) — set/correct the record's job (drives RLS). Blank =
+        // clear on Airtable; skip on Postgres (Zod jobId can't take "").
+        jobId: jobId === "" ? (air ? null : undefined) : jobId,
       },
       actor: { type: "human", name: user.name },
     });

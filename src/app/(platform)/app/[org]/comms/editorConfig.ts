@@ -5,6 +5,7 @@ import type { RecordEditorConfig } from "@/lib/platform/recordEditor";
 
 export const commEditorConfig: RecordEditorConfig = {
   table: "comms",
+  jobScoped: true,
   noun: "communication",
   listPath: "/comms",
   aiRole:

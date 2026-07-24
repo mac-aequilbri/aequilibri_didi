@@ -50,6 +50,11 @@ export interface RecordEditorConfig {
   /** Domain sentence that primes the AI-assist system prompt. */
   aiRole: string;
   fields: EditorField[];
+  /** When true, the shared edit page appends a "Project" (job) picker so the
+   *  record's job can be set/corrected on edit (it drives RLS). Options and the
+   *  current value are resolved centrally in RecordEditPage — no per-window
+   *  loader change needed. Set on job-scoped records; omit for org-level ones. */
+  jobScoped?: boolean;
 }
 
 /** Form-ready values keyed by field name (strings for text/select/date, number

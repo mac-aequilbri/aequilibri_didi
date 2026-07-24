@@ -5,6 +5,7 @@ import type { RecordEditorConfig } from "@/lib/platform/recordEditor";
 
 export const riskEditorConfig: RecordEditorConfig = {
   table: "risk",
+  jobScoped: true,
   noun: "risk",
   listPath: "/risks",
   aiRole:
