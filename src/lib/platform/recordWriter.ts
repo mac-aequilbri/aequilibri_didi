@@ -937,6 +937,23 @@ interface PendingProposal {
   jobId: number | null;
 }
 
+// In-process claim registry: two concurrent resolutions of the same proposal
+// (double-click that defeats the client guard, two tabs) would both read
+// Status="proposed" and both execute — Airtable has no compare-and-set to stop
+// them. Claiming here serializes resolution per proposal within an instance,
+// which is the entire realistic race on a single-instance deployment. The
+// Postgres path additionally does a true CAS claim (see executeProposal).
+const inFlightProposals = new Set<string>();
+
+function claimProposal(ctx: OrgCtx, proposalId: RecordId): () => void {
+  const key = `${ctx.orgId}:${proposalId}`;
+  if (inFlightProposals.has(key)) {
+    throw new Error("Proposal is already being resolved — refresh to see its outcome.");
+  }
+  inFlightProposals.add(key);
+  return () => inFlightProposals.delete(key);
+}
+
 async function resolvePending(ctx: OrgCtx, proposalId: RecordId): Promise<PendingProposal> {
   if (airtableEnabled()) {
     const row = await core.get(ctx.orgSlug, "PENDING_WRITES", String(proposalId));
@@ -977,7 +994,32 @@ export async function executeProposal(
    *  responsible for emitting the matching CORRECTIONS records. */
   edits?: Record<string, unknown>,
 ): Promise<WriteResult> {
+  const release = claimProposal(ctx, proposalId);
+  try {
+    return await executeProposalClaimed(ctx, proposalId, approvedBy, edits);
+  } finally {
+    release();
+  }
+}
+
+async function executeProposalClaimed(
+  ctx: OrgCtx,
+  proposalId: RecordId,
+  approvedBy: string,
+  edits?: Record<string, unknown>,
+): Promise<WriteResult> {
   const pending = await resolvePending(ctx, proposalId);
+
+  if (!airtableEnabled()) {
+    // Atomic claim across instances: only one resolver may move the row out of
+    // "proposed". A second concurrent approval matches zero rows and bails
+    // before performing the write.
+    const claimed = await prisma.platPendingWrite.updateMany({
+      where: { id: Number(pending.id), orgId: ctx.orgId, status: "proposed" },
+      data: { status: "executing" },
+    });
+    if (claimed.count !== 1) throw new Error("Proposal not found (already resolved?)");
+  }
 
   if (pending.expiresAt < new Date()) {
     if (airtableEnabled()) {
@@ -1123,6 +1165,20 @@ export async function rejectProposal(
   rejectedBy: string,
   reason = "",
 ): Promise<void> {
+  const release = claimProposal(ctx, proposalId);
+  try {
+    await rejectProposalClaimed(ctx, proposalId, rejectedBy, reason);
+  } finally {
+    release();
+  }
+}
+
+async function rejectProposalClaimed(
+  ctx: OrgCtx,
+  proposalId: RecordId,
+  rejectedBy: string,
+  reason: string,
+): Promise<void> {
   const pending = await resolvePending(ctx, proposalId);
   if (airtableEnabled()) {
     await core.update(ctx.orgSlug, "PENDING_WRITES", String(pending.id), {
@@ -1144,10 +1200,13 @@ export async function rejectProposal(
       .catch(() => {});
     return;
   }
-  await prisma.platPendingWrite.update({
-    where: { id: Number(pending.id) },
+  // Guarded on status so a reject racing an approval can't clobber an
+  // already-executed proposal's terminal state.
+  const rejected = await prisma.platPendingWrite.updateMany({
+    where: { id: Number(pending.id), orgId: ctx.orgId, status: "proposed" },
     data: { status: "rejected", resolvedBy: rejectedBy, resolvedAt: new Date(), error: reason },
   });
+  if (rejected.count !== 1) throw new Error("Proposal not found (already resolved?)");
   await prisma.platExecutionLog
     .create({
       data: {
