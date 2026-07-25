@@ -14,6 +14,9 @@ import { recordIdParam } from "@/lib/platform/recordWriter";
 import { sendChatMessage } from "@/services/platform/assistant/chat";
 
 export const dynamic = "force-dynamic";
+// Backstop for a hung upstream call — without it a stuck stream holds the
+// connection open indefinitely.
+export const maxDuration = 300;
 
 function idFrom(v: unknown): ReturnType<typeof recordIdParam> {
   return recordIdParam(typeof v === "string" || typeof v === "number" ? String(v) : null);
@@ -39,7 +42,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ org
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+      // A client disconnect makes enqueue throw. Persistence (message rows,
+      // proposals, execution log) happens inside sendChatMessage and Airtable
+      // has no transactions — so a disconnect must NOT abort the turn halfway
+      // through its writes. After the first failed enqueue, delivery becomes a
+      // no-op and the turn completes server-side.
+      let clientGone = false;
+      const send = (obj: unknown) => {
+        if (clientGone) return;
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+        } catch {
+          clientGone = true;
+        }
+      };
       try {
         await sendChatMessage(ctx, user.name, text, {
           sessionId,
@@ -48,10 +64,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ org
           onEvent: (e) => send(e.type === "reset" ? { t: "reset" } : { t: "delta", v: e.text }),
         });
         send({ t: "done" });
-      } catch (err) {
-        send({ t: "error", v: err instanceof Error ? err.message : "send failed" });
+      } catch {
+        // Detail is logged inside the send path; the wire gets a generic
+        // marker so internal error text never reaches the network tab.
+        send({ t: "error", v: "send failed" });
       } finally {
-        controller.close();
+        if (!clientGone) controller.close();
       }
     },
   });
