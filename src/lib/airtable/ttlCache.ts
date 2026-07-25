@@ -17,8 +17,15 @@ interface Entry<V> {
 
 export class TtlCache<V> {
   private readonly map = new Map<string, Entry<V>>();
+  private insertsSinceSweep = 0;
 
-  constructor(private readonly ttlMs: number) {}
+  constructor(
+    private readonly ttlMs: number,
+    /** Hard bound on live entries. Long-lived processes accumulate one-off
+     *  keys (per-record gets, per-filter lists) that are never re-requested,
+     *  so expiry alone never frees them — the sweep + bound below do. */
+    private readonly maxEntries = 5_000,
+  ) {}
 
   /** Return the cached value for `key`, or run `load` and cache its promise.
    *  A rejected load is evicted immediately so errors are never cached. */
@@ -27,10 +34,31 @@ export class TtlCache<V> {
     if (hit && hit.expiresAt > Date.now()) return hit.value;
     const value = load();
     this.map.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+    this.maybeSweep();
     value.catch(() => {
       if (this.map.get(key)?.value === value) this.map.delete(key);
     });
     return value;
+  }
+
+  /** Every 100 inserts, drop expired entries; if still over the bound, drop
+   *  the oldest-inserted entries (Map preserves insertion order). Keeps memory
+   *  flat without a timer, so serverless/short-lived processes pay nothing. */
+  private maybeSweep(): void {
+    if (++this.insertsSinceSweep < 100 && this.map.size <= this.maxEntries) return;
+    this.insertsSinceSweep = 0;
+    const now = Date.now();
+    for (const [key, entry] of this.map) {
+      if (entry.expiresAt <= now) this.map.delete(key);
+    }
+    if (this.map.size > this.maxEntries) {
+      const excess = this.map.size - this.maxEntries;
+      let dropped = 0;
+      for (const key of this.map.keys()) {
+        if (dropped++ >= excess) break;
+        this.map.delete(key);
+      }
+    }
   }
 
   delete(key: string): void {

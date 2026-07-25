@@ -70,6 +70,8 @@ export class AirtableError extends Error {
     readonly status: number,
     readonly body: string,
     readonly context?: AirtableErrorContext,
+    /** Raw Retry-After header on a 429, if Airtable sent one. */
+    readonly retryAfterSeconds?: string,
   ) {
     const ctx = context
       ? ` [${context.method ?? "GET"} ${context.baseId ?? "?"}/${context.resource ?? "?"}]`
@@ -79,30 +81,77 @@ export class AirtableError extends Error {
   }
 }
 
+// Per-attempt fetch timeout: a hung socket would otherwise hold its
+// rate-limiter slot open indefinitely and pin the request until the platform
+// kills it.
+const REQUEST_TIMEOUT_MS = 30_000;
+
+const MAX_ATTEMPTS = 4;
+
+/** Whether a failed attempt is safe + useful to retry. 429 means the request
+ *  was NOT applied, so every method may retry it (honouring Retry-After).
+ *  5xx/network/timeout errors are ambiguous for writes — the request may have
+ *  landed — so only reads (GET/DELETE-free idempotent fetches) retry those. */
+function isRetryable(err: unknown, method: string): boolean {
+  if (err instanceof AirtableError) {
+    if (err.status === 429) return true;
+    return method === "GET" && err.status >= 500;
+  }
+  // TypeError (network) / AbortError (timeout): connection-level, response
+  // never seen. Retrying a write here risks double-apply, so reads only.
+  return method === "GET";
+}
+
+function retryDelayMs(err: unknown, attempt: number): number {
+  if (err instanceof AirtableError && err.status === 429) {
+    const retryAfter = Number(err.retryAfterSeconds);
+    if (Number.isFinite(retryAfter) && retryAfter > 0) return retryAfter * 1000;
+  }
+  // Exponential backoff with full jitter: 0-500ms, 0-1s, 0-2s.
+  return Math.random() * 500 * 2 ** (attempt - 1);
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function request(baseId: string, path: string, init: RequestInit): Promise<unknown> {
-  return throttle(baseId, async () => {
-    const res = await fetch(`${API_ROOT}/${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${airtablePat()}`,
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
-    });
-    if (!res.ok) {
-      // Surface which base + resource failed — a bare "403" is undiagnosable.
-      const afterBase = path.startsWith(`${baseId}/`) ? path.slice(baseId.length + 1) : path;
-      const resource = decodeURIComponent(afterBase.split("?")[0].split("/")[0] || "");
-      throw new AirtableError(res.status, await res.text(), {
-        baseId,
-        method: init.method ?? "GET",
-        resource,
+  const method = init.method ?? "GET";
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      // Each attempt re-enters the throttle so retries stay within the
+      // per-base pacing instead of bursting on top of it.
+      return await throttle(baseId, async () => {
+        const res = await fetch(`${API_ROOT}/${path}`, {
+          ...init,
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          headers: {
+            Authorization: `Bearer ${airtablePat()}`,
+            "Content-Type": "application/json",
+            ...(init.headers ?? {}),
+          },
+        });
+        if (!res.ok) {
+          // Surface which base + resource failed — a bare "403" is undiagnosable.
+          const afterBase = path.startsWith(`${baseId}/`) ? path.slice(baseId.length + 1) : path;
+          const resource = decodeURIComponent(afterBase.split("?")[0].split("/")[0] || "");
+          throw new AirtableError(
+            res.status,
+            await res.text(),
+            { baseId, method, resource },
+            res.headers.get("Retry-After") ?? undefined,
+          );
+        }
+        // DELETE/204 has no JSON body for some endpoints; guard accordingly.
+        const text = await res.text();
+        return text ? JSON.parse(text) : undefined;
       });
+    } catch (err) {
+      lastErr = err;
+      if (attempt === MAX_ATTEMPTS || !isRetryable(err, method)) throw err;
+      await sleep(retryDelayMs(err, attempt));
     }
-    // DELETE/204 has no JSON body for some endpoints; guard accordingly.
-    const text = await res.text();
-    return text ? JSON.parse(text) : undefined;
-  });
+  }
+  throw lastErr; // unreachable; satisfies control-flow analysis
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
