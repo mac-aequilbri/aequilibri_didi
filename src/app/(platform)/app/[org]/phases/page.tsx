@@ -78,7 +78,7 @@ export default async function PhasesPage({
       </form>
 
       {drafts.length > 0 && (
-        <section className="ae-card p-5 mb-6 border-amber-300">
+        <section className="ae-card p-5 mb-6 border-ae-warning/30">
           <h2 className="font-semibold mb-3">AI drafts awaiting approval ({drafts.length})</h2>
           {drafts.map((p) => (
             <div key={p.id} className="flex items-center gap-2 text-sm border-t border-neutral-100 py-2">
@@ -249,7 +249,7 @@ export default async function PhasesPage({
                     suggestion && (
                       <tr key={`${p.id}-suggestion`}>
                         <td colSpan={6} className="pb-3">
-                          <div className="border border-amber-300 bg-amber-50 rounded p-3 text-sm">
+                          <div className="border border-ae-warning/30 bg-ae-warning-bg rounded p-3 text-sm">
                             <p className="font-semibold">
                               Evidence review suggests {suggestion.suggestedPct}%{" "}
                               <span className="font-normal text-xs text-neutral-600">
@@ -271,7 +271,7 @@ export default async function PhasesPage({
                               </ul>
                             )}
                             {suggestion.missingEvidence.length > 0 && (
-                              <p className="text-xs text-amber-800 mt-1">
+                              <p className="text-xs text-ae-warning mt-1">
                                 Would improve confidence: {suggestion.missingEvidence.join("; ")}
                               </p>
                             )}

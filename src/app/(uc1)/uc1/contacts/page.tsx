@@ -18,7 +18,7 @@ export default async function Contacts() {
       <div className="px-8">
         <div className="ae-card overflow-hidden">
           <table className="ae-table">
-            <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th className="text-right">Quotes</th><th>Added</th></tr></thead>
+            <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th scope="col" className="text-right">Quotes</th><th>Added</th></tr></thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-8 text-neutral-500">No contacts.</td></tr>

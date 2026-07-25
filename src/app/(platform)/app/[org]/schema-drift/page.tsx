@@ -117,12 +117,12 @@ export default async function SchemaDriftPage({
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-neutral-500">
               <tr>
-                <th className="py-1 pr-2">Organisation</th>
-                <th className="py-1 pr-2">Base</th>
-                <th className="py-1 pr-2 text-center">Status</th>
-                <th className="py-1 pr-2 text-right">Missing tables</th>
-                <th className="py-1 pr-2 text-right">Missing fields</th>
-                <th className="py-1 text-right">Action</th>
+                <th scope="col" className="py-1 pr-2">Organisation</th>
+                <th scope="col" className="py-1 pr-2">Base</th>
+                <th scope="col" className="py-1 pr-2 text-center">Status</th>
+                <th scope="col" className="py-1 pr-2 text-right">Missing tables</th>
+                <th scope="col" className="py-1 pr-2 text-right">Missing fields</th>
+                <th scope="col" className="py-1 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -132,7 +132,7 @@ export default async function SchemaDriftPage({
                     <div className="font-medium">{o.name || o.slug}</div>
                     <div className="text-xs text-neutral-500">{o.slug}</div>
                     {o.missingTables.length > 0 && (
-                      <div className="mt-1 text-xs text-red-700">
+                      <div className="mt-1 text-xs text-ae-danger">
                         {o.missingTables.join(", ")}
                       </div>
                     )}
@@ -145,7 +145,7 @@ export default async function SchemaDriftPage({
                         ))}
                       </ul>
                     )}
-                    {o.error && <div className="mt-1 text-xs text-amber-700">{o.error}</div>}
+                    {o.error && <div className="mt-1 text-xs text-ae-warning">{o.error}</div>}
                   </td>
                   <td className="py-2 pr-2 font-mono text-xs">{o.baseId ?? "—"}</td>
                   <td className="py-2 pr-2 text-center">

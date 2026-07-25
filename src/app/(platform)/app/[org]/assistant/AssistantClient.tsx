@@ -205,7 +205,7 @@ function ProposalRow({
         </form>
       </div>
       {error && (
-        <p role="alert" className="mt-1.5 rounded border border-red-200 bg-red-50 px-2 py-1 text-[0.7rem] text-red-700">
+        <p role="alert" className="mt-1.5 rounded border border-ae-danger/30 bg-ae-danger-bg px-2 py-1 text-[0.7rem] text-ae-danger">
           Couldn&apos;t apply this change — {error}
         </p>
       )}
@@ -433,15 +433,15 @@ export default function AssistantClient({
       {closedNotice && (
         <div
           role="status"
-          className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+          className="mb-3 flex items-center gap-2 rounded-lg border border-ae-success/30 bg-ae-success-bg px-3 py-2 text-sm text-ae-success"
         >
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ae-success" />
           Session saved and reviewed — started a fresh conversation.
           <button
             type="button"
             onClick={() => setClosedNotice(false)}
             aria-label="Dismiss"
-            className="ml-auto text-emerald-600 hover:text-emerald-800"
+            className="ml-auto text-ae-success hover:text-ae-success"
           >
             ×
           </button>
@@ -456,8 +456,8 @@ export default function AssistantClient({
             <p className="text-sm font-semibold">{assistantName}</p>
             <p className="text-[0.7rem] text-neutral-500">Chat assistant</p>
           </div>
-          <span className="ml-auto flex items-center gap-1.5 text-[0.7rem] text-emerald-600">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span className="ml-auto flex items-center gap-1.5 text-[0.7rem] text-ae-success">
+            <span className="h-1.5 w-1.5 rounded-full bg-ae-success" />
             Online
           </span>
         </div>
@@ -511,12 +511,12 @@ export default function AssistantClient({
                           key={i}
                           className={`text-[0.65rem] px-1.5 py-0.5 rounded ${
                             t.status === "delegated"
-                              ? "text-indigo-700 bg-indigo-50"
+                              ? "text-ae-info bg-ae-info-bg"
                               : t.status === "proposed"
-                                ? "text-amber-700 bg-amber-50"
+                                ? "text-ae-warning bg-ae-warning-bg"
                                 : t.ok
-                                  ? "text-emerald-700 bg-emerald-50"
-                                  : "text-red-700 bg-red-50"
+                                  ? "text-ae-success bg-ae-success-bg"
+                                  : "text-ae-danger bg-ae-danger-bg"
                           }`}
                         >
                           {toolLabel(t.tool)}
@@ -556,8 +556,8 @@ export default function AssistantClient({
       </div>
 
       {pendingProposals.length > 0 && (
-        <div className="mt-3 border border-amber-200 bg-amber-50 rounded-lg p-3">
-          <p className="text-xs font-semibold text-amber-800 mb-2">
+        <div className="mt-3 border border-ae-warning/30 bg-ae-warning-bg rounded-lg p-3">
+          <p className="text-xs font-semibold text-ae-warning mb-2">
             {assistantName} proposed {pendingProposals.length} change
             {pendingProposals.length === 1 ? "" : "s"} awaiting your approval:
           </p>
@@ -572,7 +572,7 @@ export default function AssistantClient({
       {sendError !== null && (
         <div
           role="alert"
-          className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          className="mt-3 flex items-center gap-2 rounded-lg border border-ae-danger/30 bg-ae-danger-bg px-3 py-2 text-sm text-ae-danger"
         >
           <span className="flex-1">Message failed to send — nothing was lost.</span>
           <button

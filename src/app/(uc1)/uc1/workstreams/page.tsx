@@ -6,8 +6,8 @@ import { createWorkstream, toggleSessionLoad, updateStatus, deleteWorkstream } f
 export const dynamic = "force-dynamic";
 
 const STATUS_BADGE: Record<string, string> = {
-  active: "bg-emerald-100 text-emerald-800",
-  paused: "bg-amber-100 text-amber-800",
+  active: "bg-ae-success-bg text-ae-success",
+  paused: "bg-ae-warning-bg text-ae-warning",
   complete: "bg-neutral-100 text-neutral-500",
 };
 
@@ -27,9 +27,9 @@ export default async function WorkstreamsPage() {
       />
       <div className="px-8 space-y-4">
         {sessionLoaded.length > 0 && (
-          <div className="ae-card p-5 bg-amber-50 border border-amber-200">
-            <div className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">Loaded at session init ({sessionLoaded.length})</div>
-            <div className="text-sm text-amber-800">{sessionLoaded.map((w) => w.name).join(" · ")}</div>
+          <div className="ae-card p-5 bg-ae-warning-bg border border-ae-warning/30">
+            <div className="text-xs font-semibold uppercase tracking-wide text-ae-warning mb-1">Loaded at session init ({sessionLoaded.length})</div>
+            <div className="text-sm text-ae-warning">{sessionLoaded.map((w) => w.name).join(" · ")}</div>
           </div>
         )}
 
@@ -77,7 +77,7 @@ export default async function WorkstreamsPage() {
                       </form>
                       <form action={deleteWorkstream} className="inline">
                         <input type="hidden" name="id" value={w.id} />
-                        <button className="text-xs text-red-700">Delete</button>
+                        <button className="text-xs text-ae-danger">Delete</button>
                       </form>
                     </td>
                   </tr>

@@ -189,17 +189,17 @@ export default function ActionEditor({
       </div>
 
       {aiNote && (
-        <p role="status" className="rounded border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-800">
+        <p role="status" className="rounded border border-ae-info/30 bg-ae-info-bg px-2.5 py-1.5 text-xs text-ae-info">
           ✨ {aiNote}
         </p>
       )}
       {aiError && (
-        <p role="alert" className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-700">
+        <p role="alert" className="rounded border border-ae-danger/30 bg-ae-danger-bg px-2.5 py-1.5 text-xs text-ae-danger">
           {aiError}
         </p>
       )}
       {saveState?.error && (
-        <p role="alert" className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-700">
+        <p role="alert" className="rounded border border-ae-danger/30 bg-ae-danger-bg px-2.5 py-1.5 text-xs text-ae-danger">
           Couldn&apos;t save — {saveState.error}
         </p>
       )}

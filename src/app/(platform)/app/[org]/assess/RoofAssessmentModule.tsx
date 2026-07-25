@@ -175,7 +175,7 @@ export function RoofAssessmentModule({
       {/* Validated address */}
       <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-ae-success">
             {geocode.confidence > 0 ? "✓ Validated address" : "Address"}
           </span>
           {geocode.source && (
@@ -207,7 +207,7 @@ export function RoofAssessmentModule({
 
       {loading && <p className="text-sm text-neutral-500 mt-2">Locating building…</p>}
       {error && !loading && (
-        <p className="text-sm text-amber-700 mt-2">{error}</p>
+        <p className="text-sm text-ae-warning mt-2">{error}</p>
       )}
 
       <div className="flex items-center justify-between flex-wrap gap-2 mt-4">

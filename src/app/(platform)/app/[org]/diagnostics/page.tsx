@@ -116,9 +116,9 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Entity</th>
-              <th className="py-1 pr-2 text-right">Airtable (this base)</th>
-              <th className="py-1 text-right">Postgres (this org)</th>
+              <th scope="col" className="py-1 pr-2">Entity</th>
+              <th scope="col" className="py-1 pr-2 text-right">Airtable (this base)</th>
+              <th scope="col" className="py-1 text-right">Postgres (this org)</th>
             </tr>
           </thead>
           <tbody>

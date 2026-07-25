@@ -70,12 +70,12 @@ export default async function ActionsPage({
       </div>
 
       {unmapped.length > 0 && (
-        <details className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4" open>
-          <summary className="cursor-pointer text-sm font-semibold text-amber-800">
+        <details className="mb-6 rounded-lg border border-ae-warning/30 bg-ae-warning-bg p-4" open>
+          <summary className="cursor-pointer text-sm font-semibold text-ae-warning">
             {needsMapping} action{needsMapping === 1 ? "" : "s"} have an unrecognised status ·{" "}
             {unmapped.length} value{unmapped.length === 1 ? "" : "s"} to map
           </summary>
-          <p className="mt-2 text-xs text-amber-700">
+          <p className="mt-2 text-xs text-ae-warning">
             These come from a migrated base whose status vocabulary doesn&apos;t match the platform&apos;s.
             Map each value to a canonical status — the original data is left untouched, and once mapped
             it counts correctly everywhere.
@@ -91,13 +91,13 @@ export default async function ActionsPage({
                 <input type="hidden" name="raw" value={u.raw} />
                 <span className="min-w-[10rem] flex-1 truncate">
                   <span className="font-medium">{u.raw}</span>
-                  <span className="ml-1 text-amber-600">×{u.count}</span>
+                  <span className="ml-1 text-ae-warning">×{u.count}</span>
                 </span>
-                <span className="text-amber-700">map to</span>
+                <span className="text-ae-warning">map to</span>
                 <select
                   name="status"
                   defaultValue={u.suggestion ?? "open"}
-                  className="rounded border border-amber-300 bg-white px-1.5 py-1"
+                  className="rounded border border-ae-warning/30 bg-white px-1.5 py-1"
                 >
                   {ACTION_STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -168,7 +168,7 @@ export default async function ActionsPage({
                 <td className="py-2 pr-2 whitespace-nowrap text-xs text-neutral-500">{a.jobCode || "—"}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{a.owner || "—"}</td>
                 <td
-                  className={`py-2 pr-2 whitespace-nowrap text-xs ${isOverdue(a) ? "text-red-600 font-semibold" : ""}`}
+                  className={`py-2 pr-2 whitespace-nowrap text-xs ${isOverdue(a) ? "text-ae-danger font-semibold" : ""}`}
                 >
                   {a.dueDate ? formatDate(a.dueDate) : "—"}
                 </td>

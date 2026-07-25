@@ -33,7 +33,7 @@ export default async function PoPrint({ params }: { params: Promise<{ po_id: str
       </div>
 
       <table className="w-full mb-6" style={{ borderCollapse: "collapse" }}>
-        <thead><tr style={{ background: "#2c2c2c", color: "#fff" }}><th className="text-left p-2">Description</th><th className="text-right p-2">Qty</th><th className="text-left p-2">Unit</th><th className="text-right p-2">Rate</th><th className="text-right p-2">Amount</th></tr></thead>
+        <thead><tr style={{ background: "#2c2c2c", color: "#fff" }}><th scope="col" className="text-left p-2">Description</th><th scope="col" className="text-right p-2">Qty</th><th scope="col" className="text-left p-2">Unit</th><th scope="col" className="text-right p-2">Rate</th><th scope="col" className="text-right p-2">Amount</th></tr></thead>
         <tbody>
           {po.items.map((i) => (
             <tr key={i.id} style={{ borderBottom: "1px solid #e3ddcd" }}>

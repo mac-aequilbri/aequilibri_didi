@@ -45,7 +45,7 @@ export function DateField({
         className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
       />
       {noPast && isPast && (
-        <span id={`${name}-past-hint`} className="mt-1 block text-xs text-red-600">
+        <span id={`${name}-past-hint`} className="mt-1 block text-xs text-ae-danger">
           {label} can’t be in the past — pick today or later.
         </span>
       )}

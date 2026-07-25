@@ -26,9 +26,9 @@ function SaveButton({ dirty }: { dirty: boolean }) {
 }
 
 const VERDICT_STYLE: Record<BudgetReviewResult["verdict"], { label: string; box: string; chip: string }> = {
-  ok: { label: "Looks reasonable", box: "bg-emerald-50 border-emerald-200 text-emerald-900", chip: "bg-emerald-600" },
-  review: { label: "Worth a look", box: "bg-amber-50 border-amber-200 text-amber-900", chip: "bg-amber-500" },
-  off: { label: "Looks off", box: "bg-red-50 border-red-200 text-red-900", chip: "bg-red-600" },
+  ok: { label: "Looks reasonable", box: "bg-ae-success-bg border-ae-success/30 text-emerald-900", chip: "bg-emerald-600" },
+  review: { label: "Worth a look", box: "bg-ae-warning-bg border-ae-warning/30 text-amber-900", chip: "bg-amber-500" },
+  off: { label: "Looks off", box: "bg-ae-danger-bg border-ae-danger/30 text-red-900", chip: "bg-red-600" },
 };
 
 export function BudgetRefiner({
@@ -111,7 +111,7 @@ export function BudgetRefiner({
               type="button"
               onClick={() => remove(i)}
               aria-label="Remove line"
-              className="px-1.5 py-1 text-neutral-500 hover:text-red-600"
+              className="px-1.5 py-1 text-neutral-500 hover:text-ae-danger"
             >
               ✕
             </button>

@@ -90,7 +90,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
       </div>
 
       {hypotheses.length > 0 && (
-        <section className="ae-card p-5 mb-6 border-amber-300">
+        <section className="ae-card p-5 mb-6 border-ae-warning/30">
           <h2 className="font-semibold mb-3">Hypotheses awaiting review</h2>
           {hypotheses.map((h) => (
             <div key={h.id} className="border-t border-neutral-100 py-3 text-sm">
@@ -162,11 +162,11 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Rule</th>
-              <th className="py-1 pr-2">Kind</th>
-              <th className="py-1 pr-2 text-right">Confidence</th>
-              <th className="py-1 pr-2 text-right">Fired</th>
-              <th className="py-1" />
+              <th scope="col" className="py-1 pr-2">Rule</th>
+              <th scope="col" className="py-1 pr-2">Kind</th>
+              <th scope="col" className="py-1 pr-2 text-right">Confidence</th>
+              <th scope="col" className="py-1 pr-2 text-right">Fired</th>
+              <th scope="col" className="py-1" />
             </tr>
           </thead>
           <tbody>
@@ -190,7 +190,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                       <input type="hidden" name="level" value="standard" />
                       <button
                         type="submit"
-                        className="text-[0.65rem] px-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                        className="text-[0.65rem] px-1 rounded bg-ae-success-bg text-ae-success hover:bg-emerald-200"
                         title="10 applications without an override — the owner may relax this rule to Standard"
                       >
                         10 clean — relax to standard?
@@ -271,11 +271,11 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Captured</th>
-              <th className="py-1 pr-2 text-right">Accuracy</th>
-              <th className="py-1 pr-2 text-right">Active rules</th>
-              <th className="py-1 pr-2 text-right">Avg confidence</th>
-              <th className="py-1">Gaps</th>
+              <th scope="col" className="py-1 pr-2">Captured</th>
+              <th scope="col" className="py-1 pr-2 text-right">Accuracy</th>
+              <th scope="col" className="py-1 pr-2 text-right">Active rules</th>
+              <th scope="col" className="py-1 pr-2 text-right">Avg confidence</th>
+              <th scope="col" className="py-1">Gaps</th>
             </tr>
           </thead>
           <tbody>

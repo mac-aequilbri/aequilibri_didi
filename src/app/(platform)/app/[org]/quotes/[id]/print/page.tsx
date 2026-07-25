@@ -61,11 +61,11 @@ export default async function QuotePrintPage({
         <table className="w-full text-sm mb-6">
           <thead>
             <tr className="border-b border-neutral-300 text-left text-xs text-neutral-500">
-              <th className="py-2">Description</th>
-              <th className="py-2 text-right w-12 pr-3">Qty</th>
-              <th className="py-2 w-16">Unit</th>
-              <th className="py-2 text-right w-28">Unit price</th>
-              <th className="py-2 text-right w-28">Amount</th>
+              <th scope="col" className="py-2">Description</th>
+              <th scope="col" className="py-2 text-right w-12 pr-3">Qty</th>
+              <th scope="col" className="py-2 w-16">Unit</th>
+              <th scope="col" className="py-2 text-right w-28">Unit price</th>
+              <th scope="col" className="py-2 text-right w-28">Amount</th>
             </tr>
           </thead>
           <tbody>

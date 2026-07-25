@@ -122,12 +122,12 @@ export default async function QuoteDetailPage({
           <table className="w-full text-sm min-w-[40rem]">
             <thead className="text-left text-xs text-neutral-500">
               <tr>
-                <th className="py-1 pr-2">Description</th>
-                <th className="py-1 pr-2 w-20 text-right">Qty</th>
-                <th className="py-1 pr-2 w-20">Unit</th>
-                <th className="py-1 pr-2 w-28 text-right">Unit price</th>
-                <th className="py-1 pr-2 w-28 text-right">Line total</th>
-                <th className="py-1 w-16" />
+                <th scope="col" className="py-1 pr-2">Description</th>
+                <th scope="col" className="py-1 pr-2 w-20 text-right">Qty</th>
+                <th scope="col" className="py-1 pr-2 w-20">Unit</th>
+                <th scope="col" className="py-1 pr-2 w-28 text-right">Unit price</th>
+                <th scope="col" className="py-1 pr-2 w-28 text-right">Line total</th>
+                <th scope="col" className="py-1 w-16" />
               </tr>
             </thead>
             <tbody>
@@ -165,7 +165,7 @@ export default async function QuoteDetailPage({
                 <input type="hidden" name="org" value={slug} />
                 <input type="hidden" name="quoteId" value={quote.id} />
                 <input type="hidden" name="lineId" value={l.id} />
-                <button type="submit" className="text-xs text-neutral-500 hover:text-red-600 border border-neutral-200 rounded px-2 py-0.5">
+                <button type="submit" className="text-xs text-neutral-500 hover:text-ae-danger border border-neutral-200 rounded px-2 py-0.5">
                   ✕ {l.description.slice(0, 24)}
                 </button>
               </form>

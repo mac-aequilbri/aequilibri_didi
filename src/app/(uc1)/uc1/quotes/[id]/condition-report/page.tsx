@@ -34,7 +34,7 @@ export default async function ConditionReportCreate({ params }: { params: Promis
       <div className="px-8">
         <div className="ae-card p-5 max-w-2xl">
           {!quote.lidarAnalysis && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+            <p className="text-xs text-ae-warning bg-ae-warning-bg border border-ae-warning/30 rounded-md px-3 py-2 mb-4">
               No LiDAR data on this quote — the AI assessment will rely on roof material/pitch only.
               Run the Roof Inspector first for a richer report.
             </p>

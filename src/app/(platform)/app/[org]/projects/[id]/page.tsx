@@ -11,9 +11,9 @@ import { currentJobScope, inScope } from "@/lib/platform/rls";
 
 // Same palette as the Phase RAG board (phases/page.tsx).
 const RAG_CLASS: Record<string, string> = {
-  Red: "bg-red-100 text-red-800 border-red-300",
-  Amber: "bg-amber-100 text-amber-800 border-amber-300",
-  Green: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  Red: "bg-ae-danger-bg text-ae-danger border-ae-danger/30",
+  Amber: "bg-ae-warning-bg text-ae-warning border-ae-warning/30",
+  Green: "bg-ae-success-bg text-ae-success border-ae-success/30",
 };
 
 export const dynamic = "force-dynamic";

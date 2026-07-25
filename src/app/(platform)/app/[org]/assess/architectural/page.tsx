@@ -138,7 +138,7 @@ export default async function ArchitecturalScopePage({
             Tick the documents to parse for room-by-room scope.
           </p>
           {error === "no_docs" && (
-            <p role="alert" className="mb-2 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="mb-2 rounded border border-ae-danger/30 bg-ae-danger-bg px-3 py-2 text-sm text-ae-danger">
               Select at least one document to run the assessment.
             </p>
           )}
@@ -146,11 +146,11 @@ export default async function ArchitecturalScopePage({
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-neutral-600 text-xs">
                 <tr>
-                  <th className="w-10 px-3 py-2">
+                  <th scope="col" className="w-10 px-3 py-2">
                     <span className="sr-only">Select</span>
                   </th>
-                  <th className="text-left px-3 py-2">Title</th>
-                  <th className="text-left px-3 py-2">Type</th>
+                  <th scope="col" className="text-left px-3 py-2">Title</th>
+                  <th scope="col" className="text-left px-3 py-2">Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,9 +217,9 @@ export default async function ArchitecturalScopePage({
                   <table className="w-full text-sm">
                     <thead className="bg-neutral-50 text-neutral-600 text-xs">
                       <tr>
-                        <th className="text-left px-3 py-2">Room</th>
-                        <th className="text-right px-3 py-2">Area (m²)</th>
-                        <th className="text-left px-3 py-2">Implied trades</th>
+                        <th scope="col" className="text-left px-3 py-2">Room</th>
+                        <th scope="col" className="text-right px-3 py-2">Area (m²)</th>
+                        <th scope="col" className="text-left px-3 py-2">Implied trades</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -230,7 +230,7 @@ export default async function ArchitecturalScopePage({
                             {r.areaSqm != null ? (
                               r.areaSqm.toLocaleString(undefined, { maximumFractionDigits: 2 })
                             ) : (
-                              <span className="text-amber-700 text-xs">missing</span>
+                              <span className="text-ae-warning text-xs">missing</span>
                             )}
                           </td>
                           <td className="px-3 py-2 text-xs text-neutral-600">
@@ -244,7 +244,7 @@ export default async function ArchitecturalScopePage({
               </div>
 
               {scope.missingAreaRooms.length > 0 && (
-                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <div className="rounded border border-ae-warning/30 bg-ae-warning-bg px-3 py-2 text-sm text-ae-warning">
                   <span className="font-semibold">Missing dimensions:</span>{" "}
                   {scope.missingAreaRooms.join(", ")}
                   {scope.followUpActionProposalId && (

@@ -69,7 +69,7 @@ export default async function NewOrganisationPage({
         subtitle="Provisions a configured, ready-to-learn instance: Core tables are shared, so a new customer is configuration — not new infrastructure."
         actions={[{ href: "/app", label: "Back to organisations", variant: "outline" }]}
       />
-      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+      {error && <p className="text-ae-danger text-sm mb-4">{error}</p>}
 
       <form action={provisionOrgAction} className="relative space-y-8">
         <section className="ae-card p-5 space-y-4">

@@ -137,7 +137,7 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
               </form>
             </div>
             <table className="ae-table">
-              <thead><tr><th>Description</th><th className="text-right">Qty</th><th>Unit</th><th className="text-right">Unit Price</th><th className="text-right">Total ex GST</th><th></th></tr></thead>
+              <thead><tr><th>Description</th><th scope="col" className="text-right">Qty</th><th>Unit</th><th scope="col" className="text-right">Unit Price</th><th scope="col" className="text-right">Total ex GST</th><th></th></tr></thead>
               <tbody>
                 {quote.items.length === 0 ? (
                   <tr><td colSpan={6} className="text-center py-8 text-neutral-500">No line items.</td></tr>
@@ -152,7 +152,7 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
                       <td className="text-right">{zero ? "—" : currency(i.unitPriceExGst)}</td>
                       <td className="text-right font-bold">{zero ? "—" : currency(lineTotal)}</td>
                       <td className="text-right">
-                        <form action={deleteLineItem} className="inline"><input type="hidden" name="id" value={quote.id} /><input type="hidden" name="item_id" value={i.id} /><button className="text-red-700 text-sm">✕</button></form>
+                        <form action={deleteLineItem} className="inline"><input type="hidden" name="id" value={quote.id} /><input type="hidden" name="item_id" value={i.id} /><button className="text-ae-danger text-sm">✕</button></form>
                       </td>
                     </tr>
                   );
@@ -210,7 +210,7 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
 
           <form action={deleteQuote} className="text-center">
             <input type="hidden" name="id" value={quote.id} />
-            <button className="text-red-700 text-sm">🗑️ Delete Quote</button>
+            <button className="text-ae-danger text-sm">🗑️ Delete Quote</button>
           </form>
         </div>
       </div>

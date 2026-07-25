@@ -34,17 +34,24 @@ export async function createVariation(_prev: CreateFormState, formData: FormData
   redirect(orgPath(ctx.orgSlug, "/variations"));
 }
 
-export async function aiDraftVariationAction(formData: FormData): Promise<void> {
+export async function aiDraftVariationAction(
+  _prev: CreateFormState,
+  formData: FormData,
+): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const jobId = recordIdParam(formData.get("jobId"));
   const brief = String(formData.get("brief") ?? "").trim();
-  if (jobId == null || !brief) return;
+  if (jobId == null || !brief) {
+    return { error: "Couldn't draft — choose a project and describe the change. Nothing was recorded." };
+  }
   let id;
   try {
     ({ id } = await aiDraftVariation(ctx, ctx.config.assistant.name, jobId, brief));
   } catch (e) {
     console.error("[aiDraftVariationAction] draft rejected:", e);
-    redirect(orgPath(ctx.orgSlug, "/variations/new?error=save_failed"));
+    return {
+      error: "Couldn't draft the variation — nothing was recorded. The org's base rejected the write; check the server log for details.",
+    };
   }
   revalidatePath(orgPath(ctx.orgSlug, "/variations"));
   redirect(orgPath(ctx.orgSlug, id ? `/variations/${id}` : "/variations"));

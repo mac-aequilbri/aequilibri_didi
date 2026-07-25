@@ -67,7 +67,7 @@ export function CopyButton({
       aria-live="polite"
       className={`inline-flex shrink-0 items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
         copied
-          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+          ? "border-ae-success/30 bg-ae-success-bg text-ae-success"
           : "border-neutral-300 bg-white text-neutral-600 hover:border-[var(--ae-space)] hover:text-[var(--ae-space-deep)]"
       } ${className}`}
     >

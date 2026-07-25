@@ -19,7 +19,7 @@ export default async function PurchaseOrders() {
       <div className="px-8">
         <div className="ae-card overflow-hidden">
           <table className="ae-table">
-            <thead><tr><th>PO</th><th>Vendor</th><th>Status</th><th className="text-right">Total inc GST</th><th>Created</th></tr></thead>
+            <thead><tr><th>PO</th><th>Vendor</th><th>Status</th><th scope="col" className="text-right">Total inc GST</th><th>Created</th></tr></thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr><td colSpan={5} className="text-center py-8 text-neutral-500">No purchase orders.</td></tr>

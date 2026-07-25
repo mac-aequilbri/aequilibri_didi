@@ -43,7 +43,7 @@ export default async function ProjectModelsPage({
 
       <div className="px-8 space-y-6">
         {error === "invalid_url" && (
-          <p className="text-red-600 text-sm">
+          <p className="text-ae-danger text-sm">
             That embed link was rejected. Only BIMx (graphisoft.com) share links are allowed.
           </p>
         )}
@@ -80,7 +80,7 @@ export default async function ProjectModelsPage({
                     {m.addedBy ? ` by ${m.addedBy}` : ""}
                     {" · "}
                     {m.clientVisible ? (
-                      <span className="text-emerald-600 font-medium">Visible to client</span>
+                      <span className="text-ae-success font-medium">Visible to client</span>
                     ) : (
                       <span className="text-neutral-500">Internal only</span>
                     )}
@@ -106,7 +106,7 @@ export default async function ProjectModelsPage({
                       label="Delete"
                       confirmLabel="Confirm delete"
                       pendingLabel="Deleting…"
-                      className="btn-ae-outline text-xs text-red-600 border-red-300 hover:bg-red-50"
+                      className="btn-ae-outline text-xs text-ae-danger border-ae-danger/30 hover:bg-ae-danger-bg"
                     />
                   </form>
                 </div>

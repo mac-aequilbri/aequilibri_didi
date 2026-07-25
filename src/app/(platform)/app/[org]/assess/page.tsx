@@ -93,7 +93,7 @@ export default async function AssessPage({
                       {f?.adjustedBy.length ? ` · adjusted by ${f.adjustedBy.join(", ")}` : ""}
                     </p>
                     {f?.assumptions.map((a, i) => (
-                      <p key={i} className="text-xs text-amber-700 mt-1">⚠ {a}</p>
+                      <p key={i} className="text-xs text-ae-warning mt-1">⚠ {a}</p>
                     ))}
                   </div>
                 );
@@ -147,7 +147,7 @@ export default async function AssessPage({
             <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
               <h3 className="text-base font-semibold">Project phases</h3>
               {assessment.phaseSource === "learnings" && assessment.phaseLearning ? (
-                <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="text-xs px-2 py-1 rounded-full bg-ae-success-bg text-ae-success border border-ae-success/30">
                   ✓ Learned from {assessment.phaseLearning.sampleCount} prior{" "}
                   {assessment.categoryLabel ?? assessment.input.engagementType.replace("_", " ")} job
                   {assessment.phaseLearning.sampleCount === 1 ? "" : "s"}
@@ -157,7 +157,7 @@ export default async function AssessPage({
                   {assessment.phasesRefined ? " · refined" : ""}
                 </span>
               ) : assessment.phaseSource === "catalog" ? (
-                <span className="text-xs px-2 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                <span className="text-xs px-2 py-1 rounded-full bg-ae-info-bg text-ae-info border border-ae-info/30">
                   ⌂ Industry standard for {assessment.categoryLabel ?? "this category"} — first of its
                   kind here
                   {assessment.phasesRefined ? " · refined" : ""}

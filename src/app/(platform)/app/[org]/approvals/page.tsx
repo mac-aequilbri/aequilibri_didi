@@ -332,7 +332,7 @@ export default async function ApprovalsPage({
                     <p className="text-xs text-neutral-500 mt-0.5">
                       {prop.actorName || (isAi ? ctx.config.assistant.name : "—")} · {timeAgo(prop.createdAt)}
                       {" · "}
-                      <span className={exp.soon ? "text-red-600 font-medium" : ""}>{exp.text}</span>
+                      <span className={exp.soon ? "text-ae-danger font-medium" : ""}>{exp.text}</span>
                     </p>
                     {rationale && (
                       <p className="mt-1 text-sm text-neutral-600 italic">
@@ -359,7 +359,7 @@ export default async function ApprovalsPage({
                 </div>
 
                 {prop.op === "delete" ? (
-                  <p className="mt-3 pt-3 border-t border-neutral-100 text-sm text-red-700">
+                  <p className="mt-3 pt-3 border-t border-neutral-100 text-sm text-ae-danger">
                     Permanently deletes this {tableLabel(prop.tableKey)} record.
                   </p>
                 ) : (

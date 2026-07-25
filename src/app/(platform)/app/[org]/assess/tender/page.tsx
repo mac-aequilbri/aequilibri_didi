@@ -167,7 +167,7 @@ export default async function TenderComparisonPage({
             Tick the tender documents to compare (one per builder).
           </p>
           {error === "no_docs" && (
-            <p role="alert" className="mb-2 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="mb-2 rounded border border-ae-danger/30 bg-ae-danger-bg px-3 py-2 text-sm text-ae-danger">
               Select at least one document to run the comparison.
             </p>
           )}
@@ -175,11 +175,11 @@ export default async function TenderComparisonPage({
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-neutral-600 text-xs">
                 <tr>
-                  <th className="w-10 px-3 py-2">
+                  <th scope="col" className="w-10 px-3 py-2">
                     <span className="sr-only">Select</span>
                   </th>
-                  <th className="text-left px-3 py-2">Title</th>
-                  <th className="text-left px-3 py-2">Type</th>
+                  <th scope="col" className="text-left px-3 py-2">Title</th>
+                  <th scope="col" className="text-left px-3 py-2">Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,7 +238,7 @@ export default async function TenderComparisonPage({
               </p>
 
               {tender.recommendation && (
-                <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                <div className="rounded border border-ae-success/30 bg-ae-success-bg px-3 py-2 text-sm text-ae-success">
                   <span className="font-semibold">Recommended: {tender.recommendation.builder}</span>
                   {tender.recommendation.reason && <span> — {tender.recommendation.reason}</span>}
                 </div>
@@ -250,11 +250,11 @@ export default async function TenderComparisonPage({
                   <table className="w-full text-sm">
                     <thead className="bg-neutral-50 text-neutral-600 text-xs">
                       <tr>
-                        <th className="text-left px-3 py-2">Builder</th>
-                        <th className="text-right px-3 py-2">Parsed total</th>
-                        <th className="text-right px-3 py-2">Provisional</th>
-                        <th className="text-right px-3 py-2">Line items</th>
-                        <th className="text-left px-3 py-2">Extraction</th>
+                        <th scope="col" className="text-left px-3 py-2">Builder</th>
+                        <th scope="col" className="text-right px-3 py-2">Parsed total</th>
+                        <th scope="col" className="text-right px-3 py-2">Provisional</th>
+                        <th scope="col" className="text-right px-3 py-2">Line items</th>
+                        <th scope="col" className="text-left px-3 py-2">Extraction</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -289,7 +289,7 @@ export default async function TenderComparisonPage({
                             <tr key={i} className="border-t border-neutral-50 first:border-t-0">
                               <td className="px-3 py-1.5">{r.item}</td>
                               <td className="px-3 py-1.5 text-right whitespace-nowrap">{money(r.amount)}</td>
-                              <td className="px-3 py-1.5 text-right text-xs text-amber-700 w-24">
+                              <td className="px-3 py-1.5 text-right text-xs text-ae-warning w-24">
                                 {r.provisional ? "provisional" : ""}
                               </td>
                             </tr>
@@ -320,7 +320,7 @@ export default async function TenderComparisonPage({
               {tender.risks.length > 0 && (
                 <div>
                   <h3 className="text-base font-semibold mb-1.5">Risks</h3>
-                  <ul className="list-disc pl-5 space-y-0.5 text-sm text-amber-800">
+                  <ul className="list-disc pl-5 space-y-0.5 text-sm text-ae-warning">
                     {tender.risks.map((r) => (
                       <li key={r}>{r}</li>
                     ))}

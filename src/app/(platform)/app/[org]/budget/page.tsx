@@ -83,12 +83,12 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
             <table className="w-full text-sm">
               <thead className="text-left text-xs text-neutral-500">
                 <tr>
-                  <th className="py-1 pr-2">Line</th>
-                  <th className="py-1 pr-2 text-right">Estimated</th>
-                  <th className="py-1 pr-2 text-right">Forecast</th>
-                  <th className="py-1 pr-2 text-right">Actual</th>
-                  <th className="py-1 pr-2 text-right">Variance</th>
-                  <th className="py-1 pr-2 text-right">RAG</th>
+                  <th scope="col" className="py-1 pr-2">Line</th>
+                  <th scope="col" className="py-1 pr-2 text-right">Estimated</th>
+                  <th scope="col" className="py-1 pr-2 text-right">Forecast</th>
+                  <th scope="col" className="py-1 pr-2 text-right">Actual</th>
+                  <th scope="col" className="py-1 pr-2 text-right">Variance</th>
+                  <th scope="col" className="py-1 pr-2 text-right">RAG</th>
                 </tr>
               </thead>
               <tbody>

@@ -41,7 +41,7 @@ export default async function PriceCheckLogPage() {
           <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h6 className="font-bold">Scan Runs</h6></div>
           <table className="ae-table">
             <thead>
-              <tr><th>Run</th><th>Status</th><th className="text-right">Checked</th><th className="text-right">Updated</th><th className="text-right">Errors</th><th>Summary</th></tr>
+              <tr><th>Run</th><th>Status</th><th scope="col" className="text-right">Checked</th><th scope="col" className="text-right">Updated</th><th scope="col" className="text-right">Errors</th><th>Summary</th></tr>
             </thead>
             <tbody>
               {logs.length === 0 ? (
@@ -66,7 +66,7 @@ export default async function PriceCheckLogPage() {
           <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h6 className="font-bold">Recent Price Movements</h6></div>
           <table className="ae-table">
             <thead>
-              <tr><th>Vendor</th><th>Item</th><th className="text-right">Previous</th><th className="text-right">Current</th><th className="text-right">Δ</th><th>Updated</th></tr>
+              <tr><th>Vendor</th><th>Item</th><th scope="col" className="text-right">Previous</th><th scope="col" className="text-right">Current</th><th scope="col" className="text-right">Δ</th><th>Updated</th></tr>
             </thead>
             <tbody>
               {recentChanges.length === 0 ? (
@@ -82,7 +82,7 @@ export default async function PriceCheckLogPage() {
                       <td>{c.description}</td>
                       <td className="text-right">{currency(prev)}</td>
                       <td className="text-right">{currency(cur)}</td>
-                      <td className={`text-right ${delta > 0 ? "text-red-600" : delta < 0 ? "text-emerald-600" : ""}`}>
+                      <td className={`text-right ${delta > 0 ? "text-ae-danger" : delta < 0 ? "text-ae-success" : ""}`}>
                         {delta > 0 ? "+" : ""}{currency(delta)}
                       </td>
                       <td>{formatDate(c.updatedAt)}</td>

@@ -21,7 +21,7 @@ export default async function RateCards() {
         <div className="lg:col-span-2 ae-card overflow-hidden">
           <table className="ae-table">
             <thead>
-              <tr><th>Material</th><th>Pitch</th><th>Description</th><th className="text-right">Rate ex GST</th><th>Active</th><th></th></tr>
+              <tr><th>Material</th><th>Pitch</th><th>Description</th><th scope="col" className="text-right">Rate ex GST</th><th>Active</th><th></th></tr>
             </thead>
             <tbody>
               {cards.length === 0 ? (
@@ -36,7 +36,7 @@ export default async function RateCards() {
                     <td>{c.isActive ? "Yes" : "No"}</td>
                     <td className="text-right whitespace-nowrap">
                       <form action={toggleRateCard} className="inline"><input type="hidden" name="id" value={c.id} /><button className="btn-ae-outline text-xs mr-1">{c.isActive ? "Disable" : "Enable"}</button></form>
-                      <form action={deleteRateCard} className="inline"><input type="hidden" name="id" value={c.id} /><button className="text-xs text-red-700">Delete</button></form>
+                      <form action={deleteRateCard} className="inline"><input type="hidden" name="id" value={c.id} /><button className="text-xs text-ae-danger">Delete</button></form>
                     </td>
                   </tr>
                 ))

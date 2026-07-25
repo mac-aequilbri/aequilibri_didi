@@ -63,12 +63,12 @@ export default async function IntegrationsPage({
         <table className="w-full text-sm ae-card">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="p-3">Channel</th>
-              <th className="p-3">Direction</th>
-              <th className="p-3">Enabled</th>
-              <th className="p-3">Last event</th>
-              <th className="p-3">Credential</th>
-              <th className="p-3" />
+              <th scope="col" className="p-3">Channel</th>
+              <th scope="col" className="p-3">Direction</th>
+              <th scope="col" className="p-3">Enabled</th>
+              <th scope="col" className="p-3">Last event</th>
+              <th scope="col" className="p-3">Credential</th>
+              <th scope="col" className="p-3" />
             </tr>
           </thead>
           <tbody>
@@ -216,10 +216,10 @@ export default async function IntegrationsPage({
           <table className="w-full text-sm ae-card">
             <thead className="text-left text-xs text-neutral-500">
               <tr>
-                <th className="p-3">Event</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Created</th>
-                <th className="p-3">Delivered</th>
+                <th scope="col" className="p-3">Event</th>
+                <th scope="col" className="p-3">Status</th>
+                <th scope="col" className="p-3">Created</th>
+                <th scope="col" className="p-3">Delivered</th>
               </tr>
             </thead>
             <tbody>

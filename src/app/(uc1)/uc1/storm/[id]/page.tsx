@@ -58,7 +58,7 @@ export default async function StormDetail({ params }: { params: Promise<{ id: st
           <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h6 className="font-bold">Leads</h6></div>
           <table className="ae-table">
             <thead>
-              <tr><th>Address</th><th>Suburb</th><th className="text-right">Area</th><th className="text-right">Est. Value</th><th>Contact</th><th>Status</th></tr>
+              <tr><th>Address</th><th>Suburb</th><th scope="col" className="text-right">Area</th><th scope="col" className="text-right">Est. Value</th><th>Contact</th><th>Status</th></tr>
             </thead>
             <tbody>
               {leads.length === 0 ? (
@@ -78,7 +78,7 @@ export default async function StormDetail({ params }: { params: Promise<{ id: st
                         <select name="status" defaultValue={l.status} className="border border-[var(--ae-earth)] rounded px-1 py-0.5 text-xs">
                           {LEAD_STATUS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
                         </select>
-                        <button className="text-xs text-blue-600 hover:underline">save</button>
+                        <button className="text-xs text-ae-info hover:underline">save</button>
                       </form>
                     </td>
                   </tr>

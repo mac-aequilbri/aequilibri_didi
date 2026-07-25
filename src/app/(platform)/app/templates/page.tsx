@@ -36,12 +36,12 @@ export default async function TemplateRegistryPage() {
         <table className="w-full min-w-[44rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="p-3">Industry</th>
-              <th className="p-3">Sub-industry</th>
-              <th className="p-3">Vertical key</th>
-              <th className="p-3">Template base</th>
-              <th className="p-3">Active</th>
-              <th className="p-3" />
+              <th scope="col" className="p-3">Industry</th>
+              <th scope="col" className="p-3">Sub-industry</th>
+              <th scope="col" className="p-3">Vertical key</th>
+              <th scope="col" className="p-3">Template base</th>
+              <th scope="col" className="p-3">Active</th>
+              <th scope="col" className="p-3" />
             </tr>
           </thead>
           <tbody>
@@ -58,7 +58,7 @@ export default async function TemplateRegistryPage() {
                     <SubmitButton
                       label={r.isActive ? "Active" : "Inactive"}
                       pendingLabel="Updating…"
-                      className={`text-xs font-semibold ${r.isActive ? "text-emerald-700" : "text-neutral-500"}`}
+                      className={`text-xs font-semibold ${r.isActive ? "text-ae-success" : "text-neutral-500"}`}
                     />
                   </form>
                 </td>

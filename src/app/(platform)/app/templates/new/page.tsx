@@ -30,7 +30,7 @@ export default async function NewTemplateMappingPage({
         title="New industry template mapping"
         actions={[{ href: "/app/templates", label: "Back to templates", variant: "outline" }]}
       />
-      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+      {error && <p className="text-ae-danger text-sm mb-4">{error}</p>}
 
       <form action={createTemplateMapping} className="ae-card p-5 space-y-4">
         <div className="grid grid-cols-2 gap-4">

@@ -91,7 +91,7 @@ export default async function CommsPage({
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{c.stakeholderRole}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">
                   {c.dueDate ? (
-                    <span className={c.isOverdue ? "text-red-600 font-medium" : ""}>
+                    <span className={c.isOverdue ? "text-ae-danger font-medium" : ""}>
                       {formatDate(c.dueDate)}
                       {c.isOverdue && " (overdue)"}
                     </span>

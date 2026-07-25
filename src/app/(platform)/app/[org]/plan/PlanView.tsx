@@ -128,12 +128,12 @@ function Checklist({ tasks }: { tasks: PlanTaskView[] }) {
           <ul className="space-y-1 text-sm">
             {list.map((t) => (
               <li key={t.id} className="flex items-center gap-2">
-                <span aria-hidden className={t.status === "Complete" ? "text-emerald-600" : "text-neutral-400"}>
+                <span aria-hidden className={t.status === "Complete" ? "text-ae-success" : "text-neutral-400"}>
                   {t.status === "Complete" ? "☑" : "☐"}
                 </span>
                 <span className={t.status === "Complete" ? "line-through text-neutral-500" : ""}>{t.name}</span>
                 {t.endDate && (
-                  <span className={`text-xs ${t.isOverdue ? "text-red-600" : "text-neutral-500"}`}>
+                  <span className={`text-xs ${t.isOverdue ? "text-ae-danger" : "text-neutral-500"}`}>
                     {formatDate(t.endDate)}
                   </span>
                 )}

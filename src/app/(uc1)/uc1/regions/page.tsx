@@ -19,8 +19,8 @@ export default async function RegionsPage() {
       />
       <div className="px-8 space-y-4">
         {rows.length === 0 && (
-          <div className="ae-card p-5 bg-amber-50 border border-amber-200 flex items-center justify-between">
-            <span className="text-sm text-amber-800">No regions configured. Seed the Port City defaults to get started.</span>
+          <div className="ae-card p-5 bg-ae-warning-bg border border-ae-warning/30 flex items-center justify-between">
+            <span className="text-sm text-ae-warning">No regions configured. Seed the Port City defaults to get started.</span>
             <form action={seedDefaultRegions}><button className="btn-ae text-sm">Seed defaults</button></form>
           </div>
         )}
@@ -29,8 +29,8 @@ export default async function RegionsPage() {
           <table className="ae-table">
             <thead>
               <tr>
-                <th>Region</th><th>Postcodes</th><th className="text-right">Travel days</th>
-                <th className="text-right">Travel rate/day</th><th className="text-right">Premium %</th>
+                <th>Region</th><th>Postcodes</th><th scope="col" className="text-right">Travel days</th>
+                <th scope="col" className="text-right">Travel rate/day</th><th scope="col" className="text-right">Premium %</th>
                 <th>Active</th><th></th>
               </tr>
             </thead>

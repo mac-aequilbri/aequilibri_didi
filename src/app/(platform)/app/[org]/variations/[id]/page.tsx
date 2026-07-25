@@ -79,7 +79,7 @@ export default async function VariationDetailPage({
                 label="Reject"
                 confirmLabel="Confirm reject"
                 pendingLabel="Rejecting…"
-                className="btn-ae-outline text-red-600 border-red-300"
+                className="btn-ae-outline text-ae-danger border-ae-danger/30"
               />
             </form>
           </div>

@@ -1,5 +1,4 @@
 import { CreateForm } from "@/components/form/CreateForm";
-import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -9,13 +8,10 @@ export const dynamic = "force-dynamic";
 
 export default async function NewVariationPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ org: string }>;
-  searchParams: Promise<{ error?: string }>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const { error } = await searchParams;
   const jobs = await loadJobOptions(ctx);
 
   const jobSelect = (
@@ -38,13 +34,12 @@ export default async function NewVariationPage({
           title="AI-drafted variation"
           subtitle="Describe the change; the assistant drafts scope, cost and time impact for your review."
         />
-        {error === "save_failed" && (
-          <p role="alert" className="text-red-600 text-sm mb-3">
-            The variation couldn&apos;t be saved — the org&apos;s base rejected the write. Check
-            the server log for details.
-          </p>
-        )}
-        <form action={aiDraftVariationAction} className="ae-card p-5 space-y-4">
+        <CreateForm
+          action={aiDraftVariationAction}
+          submitLabel="Draft with AI"
+          pendingLabel="Drafting…"
+          className="ae-card p-5 space-y-4"
+        >
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <label className="block text-sm">
             <span className="text-neutral-600">Job *</span>
@@ -60,8 +55,7 @@ export default async function NewVariationPage({
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
             />
           </label>
-          <SubmitButton label="Draft with AI" pendingLabel="Drafting…" />
-        </form>
+        </CreateForm>
       </div>
 
       <div>

@@ -32,7 +32,7 @@ export default async function QuoteFinance({ params }: { params: Promise<{ id: s
         ) : (
           <div className="ae-card overflow-hidden">
             <table className="ae-table">
-              <thead><tr><th>Provider</th><th>Rate %</th><th className="text-right">Min term pmt</th><th className="text-right">Max term pmt</th><th>Tagline</th></tr></thead>
+              <thead><tr><th>Provider</th><th>Rate %</th><th scope="col" className="text-right">Min term pmt</th><th scope="col" className="text-right">Max term pmt</th><th>Tagline</th></tr></thead>
               <tbody>
                 {providers.map((p) => (
                   <tr key={p.id}>

@@ -23,7 +23,7 @@ export default async function TeamPage() {
         <div className="ae-card overflow-hidden">
           <table className="ae-table">
             <thead>
-              <tr><th>Name</th><th>Role</th><th>Accuracy profile</th><th className="text-right">Corrections</th><th>Joined</th><th></th></tr>
+              <tr><th>Name</th><th>Role</th><th>Accuracy profile</th><th scope="col" className="text-right">Corrections</th><th>Joined</th><th></th></tr>
             </thead>
             <tbody>
               {members.length === 0 ? (

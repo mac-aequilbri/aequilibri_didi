@@ -48,7 +48,7 @@ export default async function MeasurementHistoryPage({
           <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h6 className="font-bold">Measurement Snapshots</h6></div>
           <table className="ae-table">
             <thead>
-              <tr><th>Address</th><th className="text-right">Area m²</th><th className="text-right">Sections</th><th className="text-right">Storeys</th><th>Type</th><th>Quote</th><th>Captured</th></tr>
+              <tr><th>Address</th><th scope="col" className="text-right">Area m²</th><th scope="col" className="text-right">Sections</th><th scope="col" className="text-right">Storeys</th><th>Type</th><th>Quote</th><th>Captured</th></tr>
             </thead>
             <tbody>
               {snapshots.length === 0 ? (
@@ -61,7 +61,7 @@ export default async function MeasurementHistoryPage({
                     <td className="text-right">{s.sectionCount}</td>
                     <td className="text-right">{s.storeys}</td>
                     <td>{s.snapshotType.replace(/_/g, " ")}</td>
-                    <td>{s.quote ? <Link href={`/uc1/quotes/${s.quote.id}`} className="text-blue-600 hover:underline">{s.quote.refNumber}</Link> : "—"}</td>
+                    <td>{s.quote ? <Link href={`/uc1/quotes/${s.quote.id}`} className="text-ae-info hover:underline">{s.quote.refNumber}</Link> : "—"}</td>
                     <td>{formatDate(s.createdAt)}</td>
                   </tr>
                 ))
@@ -74,7 +74,7 @@ export default async function MeasurementHistoryPage({
           <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h6 className="font-bold">Quote Snapshots</h6></div>
           <table className="ae-table">
             <thead>
-              <tr><th>Address</th><th>Roof Type</th><th className="text-right">Total inc GST</th><th>Quote</th><th>Captured</th></tr>
+              <tr><th>Address</th><th>Roof Type</th><th scope="col" className="text-right">Total inc GST</th><th>Quote</th><th>Captured</th></tr>
             </thead>
             <tbody>
               {quoteSnapshots.length === 0 ? (
@@ -85,7 +85,7 @@ export default async function MeasurementHistoryPage({
                     <td className="max-w-xs truncate">{s.address || "—"}</td>
                     <td>{s.roofType || "—"}</td>
                     <td className="text-right">{currency(s.totalIncGst)}</td>
-                    <td>{s.quote ? <Link href={`/uc1/quotes/${s.quote.id}`} className="text-blue-600 hover:underline">{s.quote.refNumber}</Link> : "—"}</td>
+                    <td>{s.quote ? <Link href={`/uc1/quotes/${s.quote.id}`} className="text-ae-info hover:underline">{s.quote.refNumber}</Link> : "—"}</td>
                     <td>{formatDate(s.createdAt)}</td>
                   </tr>
                 ))

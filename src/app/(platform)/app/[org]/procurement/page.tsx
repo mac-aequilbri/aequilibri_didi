@@ -93,7 +93,7 @@ export default async function ProcurementPage({
                 <td className="py-2 pr-2 text-right text-xs">{o.qty}</td>
                 <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(toNum(o.total))}</td>
                 <td
-                  className={`py-2 pr-2 whitespace-nowrap text-xs ${o.isLate ? "text-red-600 font-medium" : ""}`}
+                  className={`py-2 pr-2 whitespace-nowrap text-xs ${o.isLate ? "text-ae-danger font-medium" : ""}`}
                   title={o.isLate ? "Overdue — past expected delivery, not yet received" : undefined}
                 >
                   {o.dueDate ? formatDate(o.dueDate) : "—"}
@@ -104,7 +104,7 @@ export default async function ProcurementPage({
                 </td>
                 <td
                   className={`py-2 pr-2 text-right whitespace-nowrap text-xs tabular-nums ${
-                    o.deltaDays != null && o.deltaDays > 0 ? "text-red-600 font-medium" : o.deltaDays != null && o.deltaDays < 0 ? "text-emerald-700" : "text-neutral-500"
+                    o.deltaDays != null && o.deltaDays > 0 ? "text-ae-danger font-medium" : o.deltaDays != null && o.deltaDays < 0 ? "text-ae-success" : "text-neutral-500"
                   }`}
                   title="Delivery delta: actual − expected (positive = late)"
                 >

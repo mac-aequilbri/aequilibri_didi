@@ -1,6 +1,6 @@
 // Chip — small inline tag for row-level annotations: AI origin, categories,
 // issue types, RAG health. One component instead of scattered
-// `bg-violet-100 text-violet-700`-style literals; colors come from the
+// `bg-ae-ai-bg text-ae-ai`-style literals; colors come from the
 // semantic tokens (globals.css .ae-chip-*).
 //
 // Not for record statuses — those stay on StatusBadge (PageHeader.tsx), which

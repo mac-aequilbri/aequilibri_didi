@@ -131,7 +131,7 @@ export default async function PlanPage({
                     </td>
                     <td className="py-2 pr-2 whitespace-nowrap text-xs">
                       {t.endDate ? (
-                        <span className={t.isOverdue ? "text-red-600 font-medium" : ""}>
+                        <span className={t.isOverdue ? "text-ae-danger font-medium" : ""}>
                           {formatDate(t.endDate)}
                           {t.isOverdue && " (overdue)"}
                         </span>

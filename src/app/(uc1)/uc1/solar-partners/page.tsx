@@ -19,7 +19,7 @@ export default async function SolarPartners() {
       <div className="px-8 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 ae-card overflow-hidden">
           <table className="ae-table">
-            <thead><tr><th>Name</th><th>Contact</th><th>Fee %</th><th className="text-right">Avg install</th><th>Active</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Contact</th><th>Fee %</th><th scope="col" className="text-right">Avg install</th><th>Active</th><th></th></tr></thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-8 text-neutral-500">No solar partners.</td></tr>

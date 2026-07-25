@@ -18,7 +18,7 @@ export default async function ExecLog() {
       <div className="px-8">
         <div className="ae-card overflow-hidden">
           <table className="ae-table">
-            <thead><tr><th>Tool</th><th>Status</th><th className="text-right">Duration</th><th>When</th></tr></thead>
+            <thead><tr><th>Tool</th><th>Status</th><th scope="col" className="text-right">Duration</th><th>When</th></tr></thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr><td colSpan={4} className="text-center py-8 text-neutral-500">No log entries.</td></tr>

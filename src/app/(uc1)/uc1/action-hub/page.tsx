@@ -6,15 +6,15 @@ import { createAction, updateActionStatus, deleteAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 const PRIORITY_COLOR: Record<string, string> = {
-  P1: "bg-red-100 text-red-800",
-  P2: "bg-amber-100 text-amber-800",
+  P1: "bg-ae-danger-bg text-ae-danger",
+  P2: "bg-ae-warning-bg text-ae-warning",
   P3: "bg-neutral-100 text-neutral-600",
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  open: "bg-blue-50 text-blue-700",
-  in_progress: "bg-amber-50 text-amber-700",
-  done: "bg-emerald-50 text-emerald-700",
+  open: "bg-ae-info-bg text-ae-info",
+  in_progress: "bg-ae-warning-bg text-ae-warning",
+  done: "bg-ae-success-bg text-ae-success",
   deferred: "bg-neutral-100 text-neutral-500",
 };
 
@@ -57,7 +57,7 @@ export default async function ActionHubPage() {
                       {a.notes && <div className="text-xs text-neutral-500">{a.notes}</div>}
                     </td>
                     <td className="text-xs text-neutral-500">{a.triggerCondition || "—"}</td>
-                    <td className={`text-sm ${a.dueDate && a.dueDate < new Date() && a.status !== "done" ? "text-red-600 font-medium" : ""}`}>
+                    <td className={`text-sm ${a.dueDate && a.dueDate < new Date() && a.status !== "done" ? "text-ae-danger font-medium" : ""}`}>
                       {a.dueDate ? formatDate(a.dueDate) : "—"}
                     </td>
                     <td>
@@ -76,7 +76,7 @@ export default async function ActionHubPage() {
                       </form>
                       <form action={deleteAction} className="inline">
                         <input type="hidden" name="id" value={a.id} />
-                        <button className="text-xs text-red-700">Delete</button>
+                        <button className="text-xs text-ae-danger">Delete</button>
                       </form>
                     </td>
                   </tr>

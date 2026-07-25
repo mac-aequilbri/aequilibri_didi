@@ -123,8 +123,8 @@ export default function ConversationList({
                 onBlur={() => setArmedDeleteId(null)}
                 className={
                   armedDeleteId === id
-                    ? "shrink-0 px-1 text-xs font-medium text-red-600 whitespace-nowrap"
-                    : "shrink-0 px-1 text-neutral-500 hover:text-red-600 lg:opacity-0 lg:group-hover:opacity-100"
+                    ? "shrink-0 px-1 text-xs font-medium text-ae-danger whitespace-nowrap"
+                    : "shrink-0 px-1 text-neutral-500 hover:text-ae-danger lg:opacity-0 lg:group-hover:opacity-100"
                 }
               >
                 {armedDeleteId === id ? "Delete?" : "🗑"}

@@ -27,7 +27,7 @@ export default async function PoDetail({ params }: { params: Promise<{ po_id: st
       <div className="px-8 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 ae-card overflow-hidden">
           <table className="ae-table">
-            <thead><tr><th>Description</th><th className="text-right">Qty</th><th>Unit</th><th className="text-right">Rate</th><th className="text-right">Amount</th></tr></thead>
+            <thead><tr><th>Description</th><th scope="col" className="text-right">Qty</th><th>Unit</th><th scope="col" className="text-right">Rate</th><th scope="col" className="text-right">Amount</th></tr></thead>
             <tbody>
               {po.items.map((i) => (
                 <tr key={i.id}>

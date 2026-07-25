@@ -21,7 +21,7 @@ export default async function GutteringRates() {
       <div className="px-8 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 ae-card overflow-hidden">
           <table className="ae-table">
-            <thead><tr><th>Type</th><th>Description</th><th className="text-right">Rate ex GST</th><th>Active</th><th></th></tr></thead>
+            <thead><tr><th>Type</th><th>Description</th><th scope="col" className="text-right">Rate ex GST</th><th>Active</th><th></th></tr></thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr><td colSpan={5} className="text-center py-8 text-neutral-500">No guttering rates.</td></tr>
@@ -34,7 +34,7 @@ export default async function GutteringRates() {
                     <td>{c.isActive ? "Yes" : "No"}</td>
                     <td className="text-right whitespace-nowrap">
                       <form action={toggleGutteringRate} className="inline"><input type="hidden" name="id" value={c.id} /><button className="btn-ae-outline text-xs mr-1">{c.isActive ? "Disable" : "Enable"}</button></form>
-                      <form action={deleteGutteringRate} className="inline"><input type="hidden" name="id" value={c.id} /><button className="text-xs text-red-700">Delete</button></form>
+                      <form action={deleteGutteringRate} className="inline"><input type="hidden" name="id" value={c.id} /><button className="text-xs text-ae-danger">Delete</button></form>
                     </td>
                   </tr>
                 ))

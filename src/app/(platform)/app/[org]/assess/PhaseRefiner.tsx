@@ -30,9 +30,9 @@ function SaveButton({ dirty }: { dirty: boolean }) {
 }
 
 const VERDICT_STYLE: Record<FeasibilityResult["verdict"], { label: string; box: string; chip: string }> = {
-  ok: { label: "Looks realistic", box: "bg-emerald-50 border-emerald-200 text-emerald-900", chip: "bg-emerald-600" },
-  tight: { label: "Tight", box: "bg-amber-50 border-amber-200 text-amber-900", chip: "bg-amber-500" },
-  unrealistic: { label: "Unrealistic", box: "bg-red-50 border-red-200 text-red-900", chip: "bg-red-600" },
+  ok: { label: "Looks realistic", box: "bg-ae-success-bg border-ae-success/30 text-emerald-900", chip: "bg-emerald-600" },
+  tight: { label: "Tight", box: "bg-ae-warning-bg border-ae-warning/30 text-amber-900", chip: "bg-amber-500" },
+  unrealistic: { label: "Unrealistic", box: "bg-ae-danger-bg border-ae-danger/30 text-red-900", chip: "bg-red-600" },
 };
 
 export function PhaseRefiner({
@@ -127,7 +127,7 @@ export function PhaseRefiner({
             <div className="flex items-center">
               <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="px-1.5 py-1 text-neutral-500 disabled:opacity-25 hover:text-[var(--ae-space)]">↑</button>
               <button type="button" onClick={() => move(i, 1)} disabled={i === phases.length - 1} aria-label="Move down" className="px-1.5 py-1 text-neutral-500 disabled:opacity-25 hover:text-[var(--ae-space)]">↓</button>
-              <button type="button" onClick={() => remove(i)} aria-label="Remove phase" className="px-1.5 py-1 text-neutral-500 hover:text-red-600">✕</button>
+              <button type="button" onClick={() => remove(i)} aria-label="Remove phase" className="px-1.5 py-1 text-neutral-500 hover:text-ae-danger">✕</button>
             </div>
           </div>
         ))}

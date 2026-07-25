@@ -185,7 +185,7 @@ export default async function TeamPage({
               projects below first: {lockedOut.map((m) => m.name || m.email).join(", ")}.
             </MessageBar>
           ) : (
-            <p className="text-xs mb-3 text-emerald-700">
+            <p className="text-xs mb-3 text-ae-success">
               ✓ Every active member is assigned to a project or has full access.
             </p>
           )}
@@ -214,11 +214,11 @@ export default async function TeamPage({
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Member</th>
-              <th className="py-1 pr-2">Role</th>
-              {showProjects && <th className="py-1 pr-2">Project access</th>}
-              <th className="py-1 pr-2 text-center">Status</th>
-              <th className="py-1 text-right">Access</th>
+              <th scope="col" className="py-1 pr-2">Member</th>
+              <th scope="col" className="py-1 pr-2">Role</th>
+              {showProjects && <th scope="col" className="py-1 pr-2">Project access</th>}
+              <th scope="col" className="py-1 pr-2 text-center">Status</th>
+              <th scope="col" className="py-1 text-right">Access</th>
             </tr>
           </thead>
           <tbody>

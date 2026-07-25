@@ -28,7 +28,7 @@ export default async function PurchaseCompare({ params }: { params: Promise<{ id
         ) : (
           <div className="ae-card overflow-hidden">
             <table className="ae-table">
-              <thead><tr><th>Vendor</th><th>Item</th><th className="text-right">Price ex GST</th><th>Unit</th><th className="text-right">Lead days</th><th></th></tr></thead>
+              <thead><tr><th>Vendor</th><th>Item</th><th scope="col" className="text-right">Price ex GST</th><th>Unit</th><th scope="col" className="text-right">Lead days</th><th></th></tr></thead>
               <tbody>
                 {prices.map((p, i) => (
                   <tr key={p.id}>

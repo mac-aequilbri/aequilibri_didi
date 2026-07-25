@@ -41,12 +41,12 @@ export default async function NewBimModelPage({
         </p>
       </div>
       {error === "invalid_url" && (
-        <p role="alert" className="text-red-600 text-sm mb-3">
+        <p role="alert" className="text-ae-danger text-sm mb-3">
           That embed link was rejected — only HTTPS graphisoft.com share/embed links are allowed.
         </p>
       )}
       {error === "name_required" && (
-        <p role="alert" className="text-red-600 text-sm mb-3">
+        <p role="alert" className="text-ae-danger text-sm mb-3">
           A model name is required.
         </p>
       )}

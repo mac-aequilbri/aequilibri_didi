@@ -36,7 +36,7 @@ export function ProjectAssignments({
         Projects{" "}
         {/* 0 assignments = no access once enforced (this control only renders
             for non-exempt roles), so flag it amber. */}
-        <span className={assigned.length === 0 ? "text-amber-700" : "text-neutral-500"}>
+        <span className={assigned.length === 0 ? "text-ae-warning" : "text-neutral-500"}>
           ({assigned.length} assigned)
         </span>
       </summary>
@@ -65,7 +65,7 @@ export function ProjectAssignments({
           {jobs.length === 0 && <p className="text-neutral-500">No projects in this org yet.</p>}
         </div>
         {capped && (
-          <p className="mt-1 text-amber-700">
+          <p className="mt-1 text-ae-warning">
             Showing the first {jobs.length} projects only — assigning beyond this needs the
             larger-org picker (not yet built).
           </p>

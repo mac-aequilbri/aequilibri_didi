@@ -36,7 +36,7 @@ export default async function Intelligence() {
           <form action={runEngine}><button className="btn-ae-outline text-sm">⚙️ Run hypothesis engine</button></form>
           <form action={takeSnapshot}><button className="btn-ae-outline text-sm">📸 Take intelligence snapshot</button></form>
           <form action={seedDemo}><button className="btn-ae text-sm">🌱 Seed demo data</button></form>
-          <form action={clearDemo} className="ml-auto"><button className="text-sm text-red-700">Clear all</button></form>
+          <form action={clearDemo} className="ml-auto"><button className="text-sm text-ae-danger">Clear all</button></form>
         </div>
 
         {/* Snapshot */}
@@ -59,7 +59,7 @@ export default async function Intelligence() {
           <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h2 className="font-semibold">Learning Rules <span className="text-neutral-500 text-sm">(applied automatically)</span></h2></div>
           {rules.length === 0 ? <p className="px-5 py-8 text-center text-neutral-500">No rules yet — promote a validated hypothesis below.</p> : (
             <table className="ae-table">
-              <thead><tr><th>Code</th><th>Category</th><th>Rule</th><th>Trigger</th><th className="text-right">P</th><th className="text-right">Conf.</th><th className="text-right">Fired</th><th>Auto</th><th></th></tr></thead>
+              <thead><tr><th>Code</th><th>Category</th><th>Rule</th><th>Trigger</th><th scope="col" className="text-right">P</th><th scope="col" className="text-right">Conf.</th><th scope="col" className="text-right">Fired</th><th>Auto</th><th></th></tr></thead>
               <tbody>
                 {rules.map((r) => (
                   <tr key={r.id} className={r.isActive ? "" : "opacity-50"}>
@@ -84,7 +84,7 @@ export default async function Intelligence() {
           <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h2 className="font-semibold">Hypotheses <span className="text-neutral-500 text-sm">(human review gates)</span></h2></div>
           {hypotheses.length === 0 ? <p className="px-5 py-8 text-center text-neutral-500">No hypotheses — run the engine after corrections accumulate.</p> : (
             <table className="ae-table">
-              <thead><tr><th>Pattern</th><th className="text-right">Samples</th><th className="text-right">Avg var.</th><th className="text-right">Conf.</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Pattern</th><th scope="col" className="text-right">Samples</th><th scope="col" className="text-right">Avg var.</th><th scope="col" className="text-right">Conf.</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {hypotheses.map((h) => (
                   <tr key={h.id}>
@@ -96,7 +96,7 @@ export default async function Intelligence() {
                     <td className="text-right whitespace-nowrap">
                       {h.status === "pending" && <>
                         <form action={approveHypothesis} className="inline"><input type="hidden" name="id" value={h.id} /><button className="btn-ae-outline text-xs mr-1">Approve</button></form>
-                        <form action={rejectHypothesis} className="inline"><input type="hidden" name="id" value={h.id} /><button className="text-xs text-red-700">Reject</button></form>
+                        <form action={rejectHypothesis} className="inline"><input type="hidden" name="id" value={h.id} /><button className="text-xs text-ae-danger">Reject</button></form>
                       </>}
                       {h.status === "active" && <form action={promoteRule} className="inline"><input type="hidden" name="id" value={h.id} /><button className="btn-ae text-xs">Promote to rule →</button></form>}
                       {h.status === "promoted" && <span className="text-xs text-[#1b5e20]">✓ promoted</span>}
@@ -113,7 +113,7 @@ export default async function Intelligence() {
           <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h2 className="font-semibold">Recent Corrections <span className="text-neutral-500 text-sm">(episodic)</span></h2></div>
           {corrections.length === 0 ? <p className="px-5 py-8 text-center text-neutral-500">No corrections recorded.</p> : (
             <table className="ae-table">
-              <thead><tr><th>Dimension</th><th>Suburb</th><th className="text-right">AI</th><th className="text-right">Human</th><th className="text-right">Var.</th><th>Root cause</th><th>When</th></tr></thead>
+              <thead><tr><th>Dimension</th><th>Suburb</th><th scope="col" className="text-right">AI</th><th scope="col" className="text-right">Human</th><th scope="col" className="text-right">Var.</th><th>Root cause</th><th>When</th></tr></thead>
               <tbody>
                 {corrections.map((c) => (
                   <tr key={c.id}>

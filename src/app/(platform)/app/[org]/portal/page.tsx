@@ -85,11 +85,11 @@ export default async function PortalPage({
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Job</th>
-              <th className="py-1 pr-2">Link</th>
-              <th className="py-1 pr-2 text-right">Views</th>
-              <th className="py-1 pr-2">Expires</th>
-              <th className="py-1" />
+              <th scope="col" className="py-1 pr-2">Job</th>
+              <th scope="col" className="py-1 pr-2">Link</th>
+              <th scope="col" className="py-1 pr-2 text-right">Views</th>
+              <th scope="col" className="py-1 pr-2">Expires</th>
+              <th scope="col" className="py-1" />
             </tr>
           </thead>
           <tbody>

@@ -80,7 +80,7 @@ export default async function MinutesDetailPage({
           </form>
         )}
         {minutes.status === "confirmed" && (
-          <p className="text-xs text-emerald-700">
+          <p className="text-xs text-ae-success">
             Confirmed {minutes.confirmedAt ? formatDate(minutes.confirmedAt) : ""} — actions created in the Action Hub.
           </p>
         )}

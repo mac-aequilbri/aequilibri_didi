@@ -27,9 +27,9 @@ import { risksListConfig } from "./listConfig";
 export const dynamic = "force-dynamic";
 
 function scoreClass(score: number): string {
-  if (score >= 15) return "bg-red-100 text-red-800";
-  if (score >= 8) return "bg-amber-100 text-amber-800";
-  return "bg-emerald-100 text-emerald-800";
+  if (score >= 15) return "bg-ae-danger-bg text-ae-danger";
+  if (score >= 8) return "bg-ae-warning-bg text-ae-warning";
+  return "bg-ae-success-bg text-ae-success";
 }
 
 /** Cell fill for the L×I heat map — deeper as likelihood×impact rises. */
@@ -202,7 +202,7 @@ export default async function RisksPage({
                   <td className="py-2 pr-2 whitespace-nowrap text-xs">{r.owner || "—"}</td>
                   <td className="py-2 pr-2 text-xs">
                     {r.escalatedAt ? (
-                      <span className="text-red-600" title={r.escalationNote}>
+                      <span className="text-ae-danger" title={r.escalationNote}>
                         {formatDate(r.escalatedAt)}
                       </span>
                     ) : (

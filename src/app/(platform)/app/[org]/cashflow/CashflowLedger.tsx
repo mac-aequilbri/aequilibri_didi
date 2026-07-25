@@ -28,11 +28,11 @@ export function CashflowLedger({ txns, orgSlug }: { txns: CashflowTxn[]; orgSlug
       <table className="w-full text-sm">
         <thead className="text-left text-xs text-neutral-500">
           <tr>
-            <th className="py-1 pr-2">Period</th>
-            <th className="py-1 pr-2">Entry</th>
-            <th className="py-1 pr-2">Type</th>
-            <th className="py-1 pr-2 text-right">Amount</th>
-            <th className="py-1 pr-2 text-right">Status</th>
+            <th scope="col" className="py-1 pr-2">Period</th>
+            <th scope="col" className="py-1 pr-2">Entry</th>
+            <th scope="col" className="py-1 pr-2">Type</th>
+            <th scope="col" className="py-1 pr-2 text-right">Amount</th>
+            <th scope="col" className="py-1 pr-2 text-right">Status</th>
           </tr>
         </thead>
         <tbody>

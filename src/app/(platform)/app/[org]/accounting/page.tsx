@@ -134,10 +134,10 @@ export default async function AccountingPage({
             <table className="w-full text-sm">
               <thead className="text-left text-xs text-neutral-500">
                 <tr>
-                  <th className="py-1 pr-2">Number</th>
-                  <th className="py-1 pr-2">Contact</th>
-                  <th className="py-1 pr-2 text-right">Total</th>
-                  <th className="py-1">Status</th>
+                  <th scope="col" className="py-1 pr-2">Number</th>
+                  <th scope="col" className="py-1 pr-2">Contact</th>
+                  <th scope="col" className="py-1 pr-2 text-right">Total</th>
+                  <th scope="col" className="py-1">Status</th>
                 </tr>
               </thead>
               <tbody>

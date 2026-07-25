@@ -92,21 +92,21 @@ export default async function ExecLogPage({
       />
 
       {sp.error === "approve_failed" && (
-        <div role="alert" className="ae-card p-3 mb-4 border-red-300 text-sm text-red-700">
+        <div role="alert" className="ae-card p-3 mb-4 border-ae-danger/30 text-sm text-ae-danger">
           The approved write could not be executed — no change was made. The proposal is marked
           failed in the trail below.
         </div>
       )}
 
       {proposals.length > 0 && (
-        <section className="ae-card p-5 mb-6 border-amber-300">
+        <section className="ae-card p-5 mb-6 border-ae-warning/30">
           <h2 className="font-semibold mb-3">Pending approval ({proposals.length})</h2>
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-neutral-500">
               <tr>
-                <th className="py-1 pr-2">Proposal</th>
-                <th className="py-1 pr-2">Payload</th>
-                <th className="py-1" />
+                <th scope="col" className="py-1 pr-2">Proposal</th>
+                <th scope="col" className="py-1 pr-2">Payload</th>
+                <th scope="col" className="py-1" />
               </tr>
             </thead>
             <tbody>
@@ -183,7 +183,7 @@ export default async function ExecLogPage({
                 </td>
                 <td className="py-2 pr-2">
                   <Payload raw={log.payload} />
-                  {log.error && <span className="block text-xs text-red-600">{log.error}</span>}
+                  {log.error && <span className="block text-xs text-ae-danger">{log.error}</span>}
                 </td>
                 <td className="py-2 pr-2">
                   <StatusBadge status={log.status} />

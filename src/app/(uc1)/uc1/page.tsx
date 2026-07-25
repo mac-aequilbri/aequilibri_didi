@@ -89,7 +89,7 @@ export default async function Uc1Dashboard() {
                   <th>Property</th>
                   <th>Client</th>
                   <th>Status</th>
-                  <th className="text-right">Total</th>
+                  <th scope="col" className="text-right">Total</th>
                   <th>Created</th>
                 </tr>
               </thead>

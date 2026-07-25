@@ -50,7 +50,7 @@ export default async function QuoteList({
                   <th>Property</th>
                   <th>Client</th>
                   <th>Status</th>
-                  <th className="text-right">Total</th>
+                  <th scope="col" className="text-right">Total</th>
                   <th>Created</th>
                 </tr>
               </thead>

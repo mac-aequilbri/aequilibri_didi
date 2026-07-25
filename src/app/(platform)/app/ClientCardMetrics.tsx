@@ -30,9 +30,9 @@ function isStale(cached: CachedSnapshot | null): boolean {
 function Pill({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "bad" | "warn" }) {
   const cls =
     tone === "bad"
-      ? "bg-red-50 text-red-700"
+      ? "bg-ae-danger-bg text-ae-danger"
       : tone === "warn"
-        ? "bg-amber-50 text-amber-700"
+        ? "bg-ae-warning-bg text-ae-warning"
         : "bg-neutral-100 text-neutral-600";
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
@@ -51,7 +51,7 @@ function Pills({ data }: { data: OrgHighlights }) {
       <Pill>
         {openActions} open
         {overdueActions > 0 ? (
-          <span className="font-semibold text-red-700"> · {overdueActions} overdue</span>
+          <span className="font-semibold text-ae-danger"> · {overdueActions} overdue</span>
         ) : null}
       </Pill>
       {pendingApprovals > 0 ? <Pill tone="warn">{pendingApprovals} awaiting approval</Pill> : null}

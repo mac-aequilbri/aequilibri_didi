@@ -108,10 +108,10 @@ export default async function AgentsPage({
             <table className="w-full text-sm">
               <thead className="text-left text-xs text-neutral-500">
                 <tr>
-                  <th className="py-1 pr-2">Tool</th>
-                  <th className="py-1 pr-2">Table · op</th>
-                  <th className="py-1 pr-2 text-center">Risk</th>
-                  <th className="py-1 text-right">Resolved by</th>
+                  <th scope="col" className="py-1 pr-2">Tool</th>
+                  <th scope="col" className="py-1 pr-2">Table · op</th>
+                  <th scope="col" className="py-1 pr-2 text-center">Risk</th>
+                  <th scope="col" className="py-1 text-right">Resolved by</th>
                 </tr>
               </thead>
               <tbody>

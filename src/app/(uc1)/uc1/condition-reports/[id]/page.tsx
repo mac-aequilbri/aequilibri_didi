@@ -68,7 +68,7 @@ export default async function ConditionReportDetail({ params }: { params: Promis
               <div className="flex justify-between"><dt className="text-neutral-500">Client</dt><dd>{report.clientName || "—"}</dd></div>
               <div className="flex justify-between"><dt className="text-neutral-500">Inspector</dt><dd>{report.inspectorName || "—"}</dd></div>
               <div className="flex justify-between"><dt className="text-neutral-500">Price inc GST</dt><dd>{currency(incGst(Number(report.priceExGst)))}</dd></div>
-              <div className="flex justify-between"><dt className="text-neutral-500">Quote</dt><dd>{report.quote ? <Link href={`/uc1/quotes/${report.quote.id}`} className="text-blue-600 hover:underline">{report.quote.refNumber}</Link> : "—"}</dd></div>
+              <div className="flex justify-between"><dt className="text-neutral-500">Quote</dt><dd>{report.quote ? <Link href={`/uc1/quotes/${report.quote.id}`} className="text-ae-info hover:underline">{report.quote.refNumber}</Link> : "—"}</dd></div>
               <div className="flex justify-between"><dt className="text-neutral-500">Generated</dt><dd>{formatDate(report.generatedAt)}</dd></div>
             </dl>
           </div>

@@ -24,10 +24,10 @@ function ExpiredPage() {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  intake: "bg-blue-100 text-blue-700",
-  assessment: "bg-blue-100 text-blue-700",
-  active: "bg-emerald-100 text-emerald-700",
-  on_hold: "bg-amber-100 text-amber-700",
+  intake: "bg-ae-info-bg text-ae-info",
+  assessment: "bg-ae-info-bg text-ae-info",
+  active: "bg-ae-success-bg text-ae-success",
+  on_hold: "bg-ae-warning-bg text-ae-warning",
   completed: "bg-neutral-100 text-neutral-600",
 };
 
@@ -184,7 +184,7 @@ export default async function PublicPortalPage({
                       aria-label={`${phase.name} progress`}
                     >
                       <div
-                        className="bg-blue-500 h-2 rounded-full transition-all"
+                        className="bg-ae-info h-2 rounded-full transition-all"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -215,15 +215,15 @@ export default async function PublicPortalPage({
           <h2 className="text-base font-semibold text-neutral-700 mb-3">Action Items Summary</h2>
           <div className="grid grid-cols-3 gap-4 text-center text-sm">
             <div>
-              <div className="text-xl font-bold text-amber-600">{counts.open}</div>
+              <div className="text-xl font-bold text-ae-warning">{counts.open}</div>
               <div className="text-xs text-neutral-500 mt-1">Open</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-blue-600">{counts.inProgress}</div>
+              <div className="text-xl font-bold text-ae-info">{counts.inProgress}</div>
               <div className="text-xs text-neutral-500 mt-1">In Progress</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-emerald-600">{counts.done}</div>
+              <div className="text-xl font-bold text-ae-success">{counts.done}</div>
               <div className="text-xs text-neutral-500 mt-1">Complete</div>
             </div>
           </div>

@@ -86,17 +86,17 @@ export default async function DocumentDetailPage({
               </p>
             )}
             {verify === "ok" && (
-              <p className="text-emerald-700">
+              <p className="text-ae-success">
                 ✓ Integrity verified — the stored file matches its registered fingerprint.
               </p>
             )}
             {verify === "fail" && (
-              <p className="text-red-700">
+              <p className="text-ae-danger">
                 ✗ Integrity check FAILED — the stored file no longer matches its fingerprint.
               </p>
             )}
             {verify === "error" && (
-              <p className="text-amber-700">Could not verify — no fingerprint or stored file available.</p>
+              <p className="text-ae-warning">Could not verify — no fingerprint or stored file available.</p>
             )}
             {doc.contentHash && (
               <form action={verifyDocumentAction} className="pt-1">

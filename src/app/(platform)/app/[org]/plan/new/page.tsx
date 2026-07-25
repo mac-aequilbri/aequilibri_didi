@@ -31,7 +31,7 @@ export default async function NewPlanTaskPage({
     <div className="p-6 max-w-xl">
       <PageHeader title="New plan task" subtitle="What happens when — a task on the engagement schedule." />
       {error === "save_failed" && (
-        <p role="alert" className="text-red-600 text-sm mb-3">
+        <p role="alert" className="text-ae-danger text-sm mb-3">
           The task couldn&apos;t be saved — the org&apos;s base rejected the write. Check the
           server log for details.
         </p>

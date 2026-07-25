@@ -11,10 +11,10 @@ import { dismissAdvisoryAction, quickResolveAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 function tone(priority: PriorityBand): string {
-  if (priority === "CRITICAL") return "bg-red-100 text-red-800";
+  if (priority === "CRITICAL") return "bg-ae-danger-bg text-ae-danger";
   if (priority === "URGENT") return "bg-orange-100 text-orange-800";
-  if (priority === "HIGH") return "bg-amber-100 text-amber-800";
-  if (priority === "MED") return "bg-blue-100 text-blue-800";
+  if (priority === "HIGH") return "bg-ae-warning-bg text-ae-warning";
+  if (priority === "MED") return "bg-ae-info-bg text-ae-info";
   return "bg-neutral-100 text-neutral-700";
 }
 
@@ -96,7 +96,7 @@ export default async function CoordinationPage({
                       <input type="hidden" name="mode" value="override" />
                       <button
                         type="submit"
-                        className="btn-ae-outline text-xs text-red-600 border-red-300"
+                        className="btn-ae-outline text-xs text-ae-danger border-ae-danger/30"
                         title="Dismiss as not relevant — the rule's confidence decays and a correction is captured"
                       >
                         Not relevant
