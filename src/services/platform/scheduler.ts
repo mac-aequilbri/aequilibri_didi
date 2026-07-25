@@ -47,7 +47,32 @@ function lastSunday(now: Date): Date {
   return d;
 }
 
+// Overlap guard: an hourly cron retrying into a still-running pass (AI calls
+// make a run minutes-long) would duplicate snapshots/report drafts — the
+// per-org checks are check-then-act, not atomic. One run at a time per
+// instance; a concurrent trigger returns immediately with a marker error.
+let schedulerRunning = false;
+
 export async function runScheduledTasks(now = new Date()): Promise<SchedulerRunResult> {
+  if (schedulerRunning) {
+    return {
+      orgs: 0,
+      hypotheses: { created: 0, updated: 0 },
+      snapshots: 0,
+      reportsDrafted: 0,
+      outbox: { redriven: 0, deadLettered: 0 },
+      errors: ["Scheduler run already in progress — skipped"],
+    };
+  }
+  schedulerRunning = true;
+  try {
+    return await runScheduledTasksInner(now);
+  } finally {
+    schedulerRunning = false;
+  }
+}
+
+async function runScheduledTasksInner(now: Date): Promise<SchedulerRunResult> {
   const result: SchedulerRunResult = {
     orgs: 0,
     hypotheses: { created: 0, updated: 0 },

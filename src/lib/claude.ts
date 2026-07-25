@@ -3,11 +3,24 @@
 // same demo/simulated responses as the Django app (parity for offline dev).
 
 import Anthropic from "@anthropic-ai/sdk";
+import { logger, errMeta } from "@/lib/logger";
 
-const MODEL = "claude-opus-4-7"; // matches the Django client
+// Env-overridable so a model rollover is a config change, not a deploy.
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-4-7"; // matches the Django client
 
 function getApiKey(): string {
   return process.env.ANTHROPIC_API_KEY ?? "";
+}
+
+// Singleton with an explicit timeout: the SDK default is ~10 minutes, longer
+// than any route budget (maxDuration=300), so a hung upstream call would pin
+// the request until the platform killed it. maxRetries made explicit.
+let anthropicClient: Anthropic | null = null;
+function getClient(apiKey: string): Anthropic {
+  if (!anthropicClient) {
+    anthropicClient = new Anthropic({ apiKey, timeout: 180_000, maxRetries: 2 });
+  }
+  return anthropicClient;
 }
 
 export interface VisionResult {
@@ -73,7 +86,7 @@ export async function callClaudeVision(
     };
   }
   try {
-    const client = new Anthropic({ apiKey });
+    const client = getClient(apiKey);
     const params: Anthropic.MessageCreateParamsNonStreaming = {
       model,
       max_tokens: maxTokens,
@@ -99,6 +112,7 @@ export async function callClaudeVision(
     const response = await client.messages.create(params);
     return { content: textFrom(response.content), demo_mode: false };
   } catch (e) {
+    logger.error("Claude vision call failed", errMeta(e));
     return { content: `{"sections":[],"notes":"Claude error: ${e}","confidence":"low"}`, demo_mode: false };
   }
 }
@@ -120,7 +134,7 @@ export async function callClaudeVisionMulti(
     '"storeys":null,"condition":"unknown","other_features":[],"notes":';
   if (!apiKey) return { content: demo + '"Demo mode — no API key"}', demo_mode: true };
   try {
-    const client = new Anthropic({ apiKey });
+    const client = getClient(apiKey);
     const content: Anthropic.ContentBlockParam[] = images.map((img) => ({
       type: "image",
       source: {
@@ -138,6 +152,7 @@ export async function callClaudeVisionMulti(
     });
     return { content: textFrom(response.content), demo_mode: false };
   } catch (e) {
+    logger.error("Claude vision-multi call failed", errMeta(e));
     return { content: demo + `"Claude error: ${e}"}`, demo_mode: false };
   }
 }
@@ -183,7 +198,7 @@ export async function callClaudeConversation(
     return demo;
   }
   try {
-    const client = new Anthropic({ apiKey });
+    const client = getClient(apiKey);
     const params: Anthropic.MessageCreateParamsNonStreaming = {
       model,
       max_tokens: maxTokens,
@@ -204,6 +219,7 @@ export async function callClaudeConversation(
     const response = await client.messages.create(params);
     return { ...parseBlocks(response.content), demo_mode: false };
   } catch (e) {
+    logger.error("Claude conversation call failed", errMeta(e));
     return { content: `[Claude API error: ${e}]`, tool_uses: [], demo_mode: false };
   }
 }
