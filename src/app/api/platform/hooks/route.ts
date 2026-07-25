@@ -54,9 +54,25 @@ interface HookBody {
   attachments?: HookAttachment[];
 }
 
+// Memory-DoS guard: the whole body is buffered for HMAC verification and every
+// attachment is base64-decoded into a Buffer, so an unbounded payload can OOM
+// the instance. 25 MB covers email-sized payloads with attachments.
+const MAX_BODY_BYTES = 25 * 1024 * 1024;
+const MAX_ATTACHMENTS = 20;
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // 0. Reject oversized payloads before buffering. Content-Length is present on
+  // real webhook senders; the raw-byte check below backstops chunked bodies.
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (declared > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  }
+
   // 1. Raw body first — the HMAC is over exact bytes, so we cannot re-serialize.
   const raw = await request.text();
+  if (raw.length > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  }
   let payload: HookBody;
   try {
     payload = JSON.parse(raw) as HookBody;
@@ -105,6 +121,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // 7. Ingest through the shared Module 2 pipeline. Attachments arrive base64.
+  if ((payload.attachments ?? []).length > MAX_ATTACHMENTS) {
+    return NextResponse.json(
+      { error: `Too many attachments (max ${MAX_ATTACHMENTS})` },
+      { status: 413 },
+    );
+  }
   const attachments = (payload.attachments ?? [])
     .filter((a) => a?.contentBase64)
     .map((a) => ({

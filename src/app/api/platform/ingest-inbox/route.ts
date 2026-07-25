@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getOrgCtx } from "@/lib/platform/org-context";
+import { bearerAuthorized } from "@/lib/platform/webhookAuth";
 import { ingestUnreadEmails } from "@/services/platform/documents";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export const maxDuration = 300;
 function authorized(request: NextRequest): boolean | null {
   const secret = process.env.CRON_SECRET ?? "";
   if (!secret) return null; // not configured
-  return (request.headers.get("authorization") ?? "") === `Bearer ${secret}`;
+  return bearerAuthorized(request.headers.get("authorization"), secret);
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

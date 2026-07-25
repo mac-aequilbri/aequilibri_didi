@@ -20,7 +20,19 @@ const nextConfig: NextConfig = {
       key: "Content-Security-Policy",
       value: "frame-src 'self' https://graphisoft.com https://*.graphisoft.com",
     };
+    // Baseline hardening on every route. HSTS is safe because Render serves
+    // HTTPS-only; SAMEORIGIN (not DENY) keeps same-site framing possible while
+    // blocking clickjacking; the Permissions-Policy disables powerful features
+    // nothing in the app uses (verified: no geolocation/camera/mic access).
+    const baseline = [
+      { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+    ];
     return [
+      { source: "/:path*", headers: baseline },
       { source: "/app/:path*", headers: [bimxCsp] },
       { source: "/portal/:path*", headers: [bimxCsp] },
     ];

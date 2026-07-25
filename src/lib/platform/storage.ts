@@ -52,9 +52,14 @@ class LocalFsStorer implements DriveStorer {
   }
 
   async get(ref: string): Promise<Buffer> {
-    const abs = path.join(ROOT, ref);
+    const abs = path.resolve(ROOT, ref);
     // Containment check — refs come from the DB, but never trust path joins.
-    if (!abs.startsWith(ROOT)) throw new Error("Invalid storage ref");
+    // path.relative rejects both `..` escapes and prefix-collision siblings
+    // (a bare startsWith(ROOT) would accept e.g. `var/storage-x`).
+    const rel = path.relative(ROOT, abs);
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+      throw new Error("Invalid storage ref");
+    }
     return readFile(abs);
   }
 }

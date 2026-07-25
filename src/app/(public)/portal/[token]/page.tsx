@@ -8,6 +8,12 @@ import { BimxViewer } from "@/components/BimxViewer";
 
 export const dynamic = "force-dynamic";
 
+// Token-bearing URLs must never be crawlable — an indexed portal link is a
+// leaked credential.
+export const metadata = {
+  robots: { index: false, follow: false },
+};
+
 function ExpiredPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">

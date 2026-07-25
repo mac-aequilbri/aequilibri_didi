@@ -7,6 +7,7 @@
 //   POST /api/platform/scheduler   Authorization: Bearer <CRON_SECRET>
 
 import { NextRequest, NextResponse } from "next/server";
+import { bearerAuthorized } from "@/lib/platform/webhookAuth";
 import { runScheduledTasks } from "@/services/platform/scheduler";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +16,7 @@ export const maxDuration = 300;
 function authorized(request: NextRequest): boolean | null {
   const secret = process.env.CRON_SECRET ?? "";
   if (!secret) return null; // not configured
-  const header = request.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
+  return bearerAuthorized(request.headers.get("authorization"), secret);
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {

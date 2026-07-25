@@ -27,6 +27,15 @@ function safeEqualHex(a: string, b: string): boolean {
   return timingSafeEqual(ba, bb);
 }
 
+/** Constant-time check of an `Authorization: Bearer <secret>` header. Hashing
+ *  both sides first makes the buffers equal-length, so the comparison leaks
+ *  neither content nor secret length. For the CRON_SECRET-guarded endpoints. */
+export function bearerAuthorized(header: string | null, secret: string): boolean {
+  if (!secret) return false;
+  const digest = (s: string) => createHmac("sha256", "bearer-compare").update(s).digest();
+  return timingSafeEqual(digest(header ?? ""), digest(`Bearer ${secret}`));
+}
+
 export function verifyWebhook(args: {
   secret: string;
   rawBody: string;
