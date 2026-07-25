@@ -7,6 +7,7 @@ import { AttentionBanner, MetricCard, PageHeader, StatusBadge } from "@/componen
 import type { AttentionItem } from "@/components/PageHeader";
 import { loadCoordinationQueue } from "@/lib/platform/coordinationSource";
 import { loadDashboard } from "@/lib/platform/dashboardSource";
+import { getEngagementProfile } from "@/lib/platform/engagementProfile";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { reportingCapabilities } from "@/lib/platform/reportingPolicy";
@@ -14,6 +15,13 @@ import { friendlyTableLabel } from "@/lib/platform/tableLabels";
 import { currency } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
+
+// Same palette as the Phase RAG board (phases/page.tsx).
+const RAG_CLASS: Record<string, string> = {
+  Red: "bg-red-100 text-red-800 border-red-300",
+  Amber: "bg-amber-100 text-amber-800 border-amber-300",
+  Green: "bg-emerald-100 text-emerald-800 border-emerald-300",
+};
 
 export default async function OrgDashboard({
   params,
@@ -25,8 +33,11 @@ export default async function OrgDashboard({
   const reportCaps = reportingCapabilities(viewer.role);
   const p = (path: string) => orgPath(ctx.orgSlug, path);
 
-  const [{ jobs, openActions, overdueActions, pendingProposals, budget, actual, recentLogs, activeRules, cashflow }, coordination] =
-    await Promise.all([loadDashboard(ctx), loadCoordinationQueue(ctx)]);
+  const [{ jobs, openActions, overdueActions, pendingProposals, budget, actual, recentLogs, activeRules, cashflow }, coordination, profile] =
+    await Promise.all([loadDashboard(ctx), loadCoordinationQueue(ctx), getEngagementProfile(ctx)]);
+  // Spec 12 M8 Portfolio View: cross-engagement columns activate only via the
+  // explicit ENGAGEMENT_TYPE_CONFIG flag (lock decision D-11), never on job count.
+  const portfolio = profile.portfolioView;
   const periods = cashflow.map((c) => [c.period, { projected: c.projected, actual: c.actual }] as const);
   const variancePct = budget > 0 ? Math.round(((actual - budget) / budget) * 1000) / 10 : 0;
   // Overspend (actual above budget) is the only variance that demands action.
@@ -137,9 +148,31 @@ export default async function OrgDashboard({
                   </span>
                 </span>
                 <span className="flex items-center gap-3 shrink-0">
+                  {portfolio && (
+                    <span className="text-xs text-neutral-500 whitespace-nowrap" title="Open issues">
+                      {job.openIssues} issue{job.openIssues === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {portfolio && reportCaps.showFinancialDetail && job.budgetVariancePct != null && (
+                    <span
+                      className={`text-xs whitespace-nowrap ${job.budgetVariancePct > 0 ? "text-red-600" : "text-neutral-500"}`}
+                      title="Budget variance (actual vs estimated)"
+                    >
+                      {job.budgetVariancePct > 0 ? "+" : ""}
+                      {job.budgetVariancePct}%
+                    </span>
+                  )}
                   <span className="text-xs text-neutral-500 whitespace-nowrap">
                     {job.completionPct}% complete
                   </span>
+                  {job.rag && (
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${RAG_CLASS[job.rag] ?? ""}`}
+                      title="Engagement RAG — derived from phase RAG + open blockers"
+                    >
+                      {job.rag}
+                    </span>
+                  )}
                   <StatusBadge status={job.status} />
                   <span className="text-neutral-300 group-hover:text-[var(--ae-space)]">›</span>
                 </span>

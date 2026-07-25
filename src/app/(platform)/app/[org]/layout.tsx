@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/Sidebar";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { CommandSearch } from "@/components/CommandSearch";
+import { getEngagementProfile } from "@/lib/platform/engagementProfile";
 import { buildNav } from "@/lib/platform/nav";
 import { loadNavCounts } from "@/lib/platform/navCountsSource";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
@@ -14,7 +15,11 @@ export default async function OrgLayout({
 }) {
   const { org } = await params;
   const ctx = await requireOrgCtx(org);
-  const [counts, viewer] = await Promise.all([loadNavCounts(ctx), getCurrentViewer(ctx)]);
+  const [counts, viewer, profile] = await Promise.all([
+    loadNavCounts(ctx),
+    getCurrentViewer(ctx),
+    getEngagementProfile(ctx),
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
@@ -32,6 +37,7 @@ export default async function OrgLayout({
             openVariations: counts.openVariations,
           },
           viewer.role,
+          profile,
         )}
         orgName={ctx.orgName}
         orgLogo={ctx.config.branding?.logo}

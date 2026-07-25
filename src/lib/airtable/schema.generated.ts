@@ -145,6 +145,14 @@ export const CORE_SCHEMA = {
       { name: "Rule_Generated", id: "fldttqS321zeFEbHE", type: "checkbox" },
       { name: "Notes", id: "fldGP71ILWQvF5ASz", type: "multilineText" },
       { name: "Hypothesis", id: "fldWa0mLMiNkoRwTc", type: "multipleRecordLinks" },
+      // Spec 12 Module 6 first-class correction columns (lock plan §6.4).
+      // Additive — reads fall back to the Notes JSON on unmigrated bases and
+      // writes are a separate best-effort update; schema-drift provisions
+      // them by name. Source_Module: module2/module3/module5/module6/manual.
+      // Correction_Direction: Over_Estimate/Under_Estimate/Wrong_Category/
+      // Wrong_Sequence.
+      { name: "Source_Module", id: "fldCorrSrcModS12x", type: "singleSelect" },
+      { name: "Correction_Direction", id: "fldCorrDirS12x", type: "singleSelect" },
     ],
   },
   JOBS: {
@@ -182,6 +190,17 @@ export const CORE_SCHEMA = {
       { name: "ASSESSMENTS", id: "fldGrn4FL8b1BqlgL", type: "multipleRecordLinks" },
       { name: "DECISIONS", id: "fldUquk2e9tuTlbxP", type: "multipleRecordLinks" },
       { name: "COMMS", id: "fldNQW7sqmgVMzhk5", type: "multipleRecordLinks" },
+      // Spec 12 Module 5: Engagement_Type is set on the JOBS record (one
+      // customer runs multiple engagement types simultaneously). Additive —
+      // reads tolerate absence on drifted bases; schema-drift/
+      // migrateBaseToTemplate provisions it by name. Not yet written by the
+      // app (the job field map deliberately omits it until bases carry the
+      // field — see docs/spec12-lock-plan.md §5.3).
+      { name: "Engagement_Type", id: "fldJobEngTypeS12x", type: "singleSelect" },
+      // Spec 12 Module 6 JOBS completion deltas (lock plan §6.2): count of
+      // CHANGE_LOG records at close. Additive; written best-effort by the
+      // job-close hook; schema-drift provisions it by name.
+      { name: "Scope_Changes_Count", id: "fldJobScopeChgS12x", type: "number" },
     ],
   },
   HYPOTHESES: {
@@ -227,6 +246,15 @@ export const CORE_SCHEMA = {
       { name: "Source_Correction", id: "fldVGVSpxJVA0aCfo", type: "singleLineText" },
       { name: "User_Preference_Profile", id: "fldVy33eIDVwOa6fW", type: "multilineText" },
       { name: "_TIER", id: "fldaEHp5Fn0GWiemU", type: "singleLineText" },
+      // Spec 12 Module 6 Override_Permission governance ladder (lock plan
+      // §6.1). Additive — reads are tri-state tolerant (absent falls back to
+      // the legacy Override_Permission checkbox) and ladder writes are
+      // best-effort; schema-drift/migrateBaseToTemplate provisions them by
+      // name. Override_Level: Owner_Only / Standard / Advisory.
+      // Application_Window: JSON array of 0/1 — the rolling last-10
+      // applications (1 = applied without override).
+      { name: "Override_Level", id: "fldRuleOvrLvlS12x", type: "singleSelect" },
+      { name: "Application_Window", id: "fldRuleAppWinS12x", type: "multilineText" },
     ],
   },
   DOCUMENTS: {
@@ -501,6 +529,10 @@ export const CORE_SCHEMA = {
       { name: "Cashflow_Period", id: "fld3s0efcxK04wnXp", type: "singleLineText" },
       { name: "Notes", id: "fld9oRsGlIoPjduGS", type: "multilineText" },
       { name: "_TIER", id: "fld81I5WHUerf6wlg", type: "singleLineText" },
+      // Spec 12 Module 8 lock decision D-11: Portfolio View activates via an
+      // explicit config flag, never automatically. Additive; tolerated absent
+      // (engagementProfile reads it tri-state) until drift provisions it.
+      { name: "Portfolio_View", id: "fldEtcPortfolioS12", type: "checkbox" },
     ],
   },
   PROCUREMENT: {

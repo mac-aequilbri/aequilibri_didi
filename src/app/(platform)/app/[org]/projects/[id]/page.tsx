@@ -9,6 +9,13 @@ import { requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { currentJobScope, inScope } from "@/lib/platform/rls";
 
+// Same palette as the Phase RAG board (phases/page.tsx).
+const RAG_CLASS: Record<string, string> = {
+  Red: "bg-red-100 text-red-800 border-red-300",
+  Amber: "bg-amber-100 text-amber-800 border-amber-300",
+  Green: "bg-emerald-100 text-emerald-800 border-emerald-300",
+};
+
 export const dynamic = "force-dynamic";
 
 export default async function ProjectDetailPage({
@@ -45,7 +52,13 @@ export default async function ProjectDetailPage({
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         <MetricCard value={`${job.completionPct}%`} label="Complete" />
-        <MetricCard value={`${job.healthScore}/100`} label="Health score" />
+        {/* Engagement RAG (Spec 12 M5 §7): derived worst-of-phases; falls back
+            to the Postgres health score when no phase carries a RAG signal. */}
+        {job.rag ? (
+          <MetricCard value={job.rag} label="Engagement RAG" />
+        ) : (
+          <MetricCard value={`${job.healthScore}/100`} label="Health score" />
+        )}
         <MetricCard value={currency(job.budget)} label="Budget (lines)" />
         <MetricCard value={currency(job.actual)} label="Actual to date" />
       </div>
@@ -64,6 +77,11 @@ export default async function ProjectDetailPage({
               <div className="w-32 h-2 rounded bg-neutral-100 overflow-hidden">
                 <div className="h-full bg-[var(--ae-space,#1f2937)]" style={{ width: `${ph.completionPct}%` }} />
               </div>
+              {ph.rag && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${RAG_CLASS[ph.rag] ?? ""}`}>
+                  {ph.rag}
+                </span>
+              )}
               <StatusBadge status={ph.status} />
             </div>
           ))}

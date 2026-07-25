@@ -24,6 +24,14 @@ export default async function AssistantPage({ params }: { params: Promise<{ org:
   const proposals = pending.filter((p) => p.status === "proposed").slice(0, 10);
   const topJob = jobs[0];
 
+  // Spec 12 session-close protocol (lock plan §6.3): rules that fired today
+  // are offered on the close form with an "applied incorrectly?" flag — a
+  // ticked rule becomes a rule-linked correction (confidence decay + ladder).
+  const today = new Date().toISOString().slice(0, 10);
+  const sessionRules = rules
+    .filter((r) => r.lastTriggered === today)
+    .map((r) => ({ ruleCode: r.ruleCode, description: r.description }));
+
   // Starter prompts, grounded in this org's features and live data, to lower
   // the blank-canvas barrier on the assistant's headline screen.
   const f = ctx.config.features;
@@ -70,6 +78,7 @@ export default async function AssistantPage({ params }: { params: Promise<{ org:
           }))}
           suggestions={suggestions}
           defaultJobId={topJob?.id}
+          sessionRules={sessionRules}
         />
       </div>
       <aside className="hidden lg:block pt-16">

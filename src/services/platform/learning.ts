@@ -80,6 +80,77 @@ export const RULE_OVERRIDE_DECAY = 5;
 export const RULE_REVIEW_FLAG_AT = 60; // flagged for review
 export const RULE_UNDER_REVIEW_AT = 50; // auto Status = Under Review
 
+// ── Spec 12 Override_Permission governance ladder (lock plan §6.1) ──────────
+// Three levels: Owner_Only (only owner/admin may override) · Standard (any
+// write role) · Advisory (surfaced as a suggestion, never enforced — a
+// cascade write-effect rule at Advisory degrades to a review prompt).
+// New rules start Owner_Only. After 10 clean applications the owner MAY relax
+// to Standard (suggested in the UI, never automatic). A rule overridden more
+// than 3 times in its last 10 applications is demoted one level — not deleted.
+//
+// Storage: Override_Level (singleSelect) + Application_Window (JSON array of
+// 0/1, most recent last, capped at 10) — both additive schema.generated
+// hand-patches provisioned by schema-drift migration. Reads are tri-state
+// tolerant: absent Override_Level falls back to the legacy checkbox
+// (Override_Permission=false → owner_only, else standard); ladder writes are
+// best-effort so an unmigrated base keeps today's behaviour exactly.
+
+export type OverrideLevel = "owner_only" | "standard" | "advisory";
+
+export const RULE_LADDER_WINDOW = 10;
+export const RULE_DEMOTE_OVERRIDES = 3; // demote when overrides in window exceed this
+
+export function parseApplicationWindow(raw: unknown): boolean[] {
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.slice(-RULE_LADDER_WINDOW).map((v) => v === 1 || v === true);
+  } catch {
+    return [];
+  }
+}
+
+export function serializeApplicationWindow(window: readonly boolean[]): string {
+  return JSON.stringify(window.slice(-RULE_LADDER_WINDOW).map((v) => (v ? 1 : 0)));
+}
+
+export function parseOverrideLevel(raw: unknown, cannotOverride: boolean): OverrideLevel {
+  const s = (typeof raw === "string" ? raw : "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (s === "owner_only" || s === "standard" || s === "advisory") return s;
+  return cannotOverride ? "owner_only" : "standard";
+}
+
+/** Airtable option name for a level ("owner_only" → "Owner_Only"). */
+export function overrideLevelOption(level: OverrideLevel): string {
+  return level === "owner_only" ? "Owner_Only" : level === "standard" ? "Standard" : "Advisory";
+}
+
+/** One step down the ladder (Spec 12: Standard → Owner_Only → Advisory; a rule
+ *  is demoted, never deleted — historical intelligence retains value). */
+export function demotedLevel(level: OverrideLevel): OverrideLevel {
+  return level === "standard" ? "owner_only" : "advisory";
+}
+
+/** Push an application (clean=true) / override (clean=false) onto the rolling
+ *  window and decide whether the rule demotes. Pure — unit-testable. */
+export function ladderAfterEvent(
+  level: OverrideLevel,
+  window: readonly boolean[],
+  clean: boolean,
+): { window: boolean[]; level: OverrideLevel; demoted: boolean } {
+  const next = [...window, clean].slice(-RULE_LADDER_WINDOW);
+  const overrides = next.filter((v) => !v).length;
+  const demote = !clean && overrides > RULE_DEMOTE_OVERRIDES && level !== "advisory";
+  return { window: next, level: demote ? demotedLevel(level) : level, demoted: demote };
+}
+
+/** Owner MAY relax an Owner_Only rule to Standard after 10 applications
+ *  without an override (suggested in the learning UI, never automatic). */
+export function relaxEligible(level: OverrideLevel, window: readonly boolean[]): boolean {
+  return level === "owner_only" && window.length >= RULE_LADDER_WINDOW && window.every(Boolean);
+}
+
 const SETTING_KEYS: Record<keyof LearningSettings, string> = {
   hypothesisMinSamples: "learning.hypothesis_min_samples",
   ruleMinSamples: "learning.rule_min_samples",
@@ -301,8 +372,10 @@ function airCorrection(r: Record<string, unknown> & { id: string }): LoopCorrect
     id: r.id,
     dimension: S(r["Field_Corrected"]),
     rootCause: S(r["Root_Cause"]),
-    sourceModule: notesModule || sourceModule,
-    direction: notesDirection || direction,
+    // First-class columns (Spec 12 §6.4, schema-drift-provisioned) win;
+    // legacy rows fall back to the Notes JSON / context metadata.
+    sourceModule: S(r["Source_Module"]) || notesModule || sourceModule,
+    direction: S(r["Correction_Direction"]) || notesDirection || direction,
     variancePct: typeof v === "number" ? v : null,
     context: triggers,
     clustered: Array.isArray(r["Hypothesis"]) && (r["Hypothesis"] as unknown[]).length > 0,
@@ -713,6 +786,9 @@ export async function promoteHypothesisToRule(
       dateIssued: new Date(),
       sourceHypothesisAirId: String(id),
     });
+    // Spec 12 governance: new rules start Owner_Only (best-effort — the column
+    // lands via schema-drift migration).
+    await setRuleOverrideLevel(ctx, rule.id, "owner_only");
     await core.update(ctx.orgSlug, "HYPOTHESES", String(id), {
       Status: "promoted",
       Promote_to_Rule: true,
@@ -791,6 +867,14 @@ export interface RuleRow {
   autoApply: boolean;
   cannotOverride: boolean;
   timesTriggered: number;
+  /** Spec 12 governance ladder (Owner_Only/Standard/Advisory) — legacy rows
+   *  fall back from the Override_Permission checkbox. */
+  overrideLevel: OverrideLevel;
+  /** Rolling last-10 applications (true = applied without override). */
+  applicationWindow: boolean[];
+  /** Last_Triggered date ("YYYY-MM-DD", "" when never) — the session-close
+   *  form uses it to list rules applied today. */
+  lastTriggered: string;
 }
 
 const RULE_ACTIVE_STATUSES = new Set(["Published", "Updated"]);
@@ -820,6 +904,9 @@ function ruleFromAirtable(r: Record<string, unknown> & { id: string }): RuleRow 
     autoApply: S(r["Applies_To"]) === "AI Layer Only",
     cannotOverride: r["Override_Permission"] === false,
     timesTriggered: N(r["Times_Triggered"]),
+    overrideLevel: parseOverrideLevel(r["Override_Level"], r["Override_Permission"] === false),
+    applicationWindow: parseApplicationWindow(r["Application_Window"]),
+    lastTriggered: S(r["Last_Triggered"]).slice(0, 10),
   };
 }
 
@@ -850,6 +937,10 @@ export async function getActiveRules(ctx: OrgCtx): Promise<RuleRow[]> {
     autoApply: r.autoApply,
     cannotOverride: r.cannotOverride,
     timesTriggered: r.timesTriggered,
+    // Postgres has no ladder columns — legacy fallback semantics.
+    overrideLevel: (r.cannotOverride ? "owner_only" : "standard") as OverrideLevel,
+    applicationWindow: [],
+    lastTriggered: "",
   }));
 }
 
@@ -915,6 +1006,10 @@ export async function applyRules(
         Confidence_Level: newConfidence,
         Applies_To: newAutoApply ? "AI Layer Only" : "Owner Review",
       });
+      // Governance ladder bookkeeping (separate best-effort update — the
+      // Application_Window column lands via schema-drift migration; an
+      // unmigrated base must not fail the firing above).
+      await writeRuleLadder(ctx, r.id, ladderAfterEvent(r.overrideLevel, r.applicationWindow, true));
     } else {
       await prisma.platLearningRule.update({
         where: { id: Number(r.id) },
@@ -950,6 +1045,13 @@ export async function recordRuleOverride(
       Confidence_Level: confidence,
       ...(underReview ? { Rule_Status: "Under Review" } : {}),
     });
+    // Governance ladder: an override pushes onto the rolling window; >3
+    // overrides in the last 10 demote the rule one level (never deleted).
+    await writeRuleLadder(
+      ctx,
+      rule.id,
+      ladderAfterEvent(rule.overrideLevel, rule.applicationWindow, false),
+    );
     return { confidence, underReview };
   }
   const rule = await prisma.platLearningRule.findFirst({
@@ -966,6 +1068,56 @@ export async function recordRuleOverride(
     },
   });
   return { confidence, underReview };
+}
+
+/** Best-effort ladder persistence (Override_Level + Application_Window are
+ *  schema-drift-provisioned columns) — an unmigrated base silently keeps
+ *  legacy behaviour; a failed ladder write never fails the triggering event. */
+async function writeRuleLadder(
+  ctx: OrgCtx,
+  ruleId: string,
+  state: { window: boolean[]; level: OverrideLevel; demoted: boolean },
+): Promise<void> {
+  try {
+    await core.update(ctx.orgSlug, "LEARNING_RULES", ruleId, {
+      Application_Window: serializeApplicationWindow(state.window),
+      ...(state.demoted ? { Override_Level: overrideLevelOption(state.level) } : {}),
+    });
+  } catch {
+    /* ladder columns absent (pre-migration base) — legacy behaviour stands */
+  }
+}
+
+/** Set a rule's governance level explicitly (owner action in the learning UI,
+ *  or the Owner_Only stamp on newly created rules). Best-effort, like the
+ *  ladder writes. */
+export async function setRuleOverrideLevel(
+  ctx: OrgCtx,
+  ruleId: string,
+  level: OverrideLevel,
+): Promise<void> {
+  if (!airtableEnabled()) return;
+  try {
+    await core.update(ctx.orgSlug, "LEARNING_RULES", ruleId, {
+      Override_Level: overrideLevelOption(level),
+    });
+  } catch {
+    /* column absent (pre-migration base) */
+  }
+}
+
+/** Targeted rule-firing bookkeeping for the cascade engine: bump exactly ONE
+ *  rule by code (Times_Triggered/Last_Triggered/confidence+1/ladder), without
+ *  applyRules' context matching — an empty Trigger_Context matches everything
+ *  there, which would fire unrelated rules. Airtable-only (cascades are). */
+export async function markRuleApplied(ctx: OrgCtx, rule: RuleRow): Promise<void> {
+  if (!airtableEnabled()) return;
+  await core.update(ctx.orgSlug, "LEARNING_RULES", rule.id, {
+    Times_Triggered: rule.timesTriggered + 1,
+    Last_Triggered: new Date().toISOString().slice(0, 10),
+    Confidence_Level: Math.min(RULE_CONFIDENCE_MAX, rule.confidence + 1),
+  });
+  await writeRuleLadder(ctx, rule.id, ladderAfterEvent(rule.overrideLevel, rule.applicationWindow, true));
 }
 
 /** Working-memory hydration: the org's rules as a prompt block for the

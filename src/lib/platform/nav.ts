@@ -3,6 +3,7 @@
 // decide which entries appear for a given organisation.
 
 import type { NavSection } from "@/components/Sidebar";
+import type { EngagementProfile } from "./engagementProfile";
 import { orgPath } from "./paths";
 import { financeVisible } from "./roles";
 import { OrgCtx } from "./types";
@@ -23,6 +24,10 @@ export function buildNav(
   /** Viewer's normalized team role. Financial entries render for owner only
    *  (Spec 12 Module 8) — the routes themselves are also server-gated. */
   role: string = "owner",
+  /** Engagement profile (Spec 12 Module 5 §"Engagement type configuration") —
+   *  calibrates construct depth: a Short Job org carries risk flags inline on
+   *  ISSUES, so the full Risk Register entry is hidden. Absent = full depth. */
+  profile?: Pick<EngagementProfile, "fullRiskRegister">,
 ): NavSection[] {
   const f = ctx.config.features;
   // CLS (governance §3): Owner, Finance Manager and Auditor sub-roles.
@@ -50,9 +55,12 @@ export function buildNav(
         { href: p("/assess"), label: "New Assessment" },
         ...(multiJob ? [{ href: p("/projects"), label: "Projects" }] : []),
         { href: p("/phases"), label: "Phases" },
+        { href: p("/plan"), label: "Plan" },
         { href: p("/actions"), label: "Actions", count: counts.openActions || undefined },
         { href: p("/decisions"), label: "Decisions" },
-        ...(f.risks ? [{ href: p("/risks"), label: "Risks", count: counts.openRisks || undefined }] : []),
+        ...(f.risks && (profile?.fullRiskRegister ?? true)
+          ? [{ href: p("/risks"), label: "Risks", count: counts.openRisks || undefined }]
+          : []),
         ...(f.variations
           ? [{ href: p("/variations"), label: "Variations", count: counts.openVariations || undefined }]
           : []),

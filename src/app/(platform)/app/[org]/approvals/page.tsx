@@ -16,17 +16,28 @@ import { isWritableTable, readRecord } from "@/lib/platform/recordWriter";
 import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
 import { inScope, resolveJobScope } from "@/lib/platform/rls";
 import { canApprove } from "@/lib/platform/roles";
+import { getDomainLabels, labelForAppField, tableLabelFor } from "@/lib/platform/domainLabels";
 import { friendlyTableLabel } from "@/lib/platform/tableLabels";
 import { approveProposalAction, rejectProposalAction } from "./actions";
 import { ProposalFields } from "./ProposalFields";
 
 export const dynamic = "force-dynamic";
 
-const tableLabel = friendlyTableLabel;
 const opLabel = (op: string) => ({ create: "Create", update: "Update", delete: "Delete" })[op] ?? op;
 
-// Storage/plumbing fields that are noise in a human review.
-const SKIP_FIELDS = new Set(["context", "meta", "aiDraft", "aiAnalysis", "extractedActions", "jobId"]);
+// Storage/plumbing fields that are noise in a human review. __rationale is the
+// proposer's reason — rendered as its own line, not as a field diff.
+const SKIP_FIELDS = new Set(["context", "meta", "aiDraft", "aiAnalysis", "extractedActions", "jobId", "__rationale"]);
+
+/** Proposer's rationale from the stored payload (Spec 12 Module 7 card). */
+function rationaleOf(payload: string): string {
+  try {
+    const p = JSON.parse(payload) as { __rationale?: unknown };
+    return typeof p.__rationale === "string" ? p.__rationale : "";
+  } catch {
+    return "";
+  }
+}
 
 function timeAgo(d: Date): string {
   const mins = Math.round((Date.now() - d.getTime()) / 60000);
@@ -145,6 +156,13 @@ export default async function ApprovalsPage({
     .sort((a, b) => (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0))
     .slice(0, 8);
 
+  // Spec 12 Module 7: the card shows the table's domain-labelled name and the
+  // proposer's rationale. Labels are TTL-cached per org; empty until the org's
+  // DOMAIN_LABELS is populated — hardcoded labels apply meanwhile.
+  const labels = await getDomainLabels(ctx);
+  const tableLabel = (tableKey: string) =>
+    tableLabelFor(labels, tableKey) ?? friendlyTableLabel(tableKey);
+
   // Resolve each proposal into a concrete diff (fetching the current row for
   // updates/deletes so we can show what actually changes).
   const proposals = await Promise.all(
@@ -153,7 +171,11 @@ export default async function ApprovalsPage({
         prop.op !== "create" && prop.recordId && isWritableTable(prop.tableKey)
           ? await readRecord(ctx, prop.tableKey, prop.recordId)
           : null;
-      return { prop, changes: buildChanges(prop.op, prop.payload, current) };
+      const changes = buildChanges(prop.op, prop.payload, current).map((c) => ({
+        ...c,
+        label: labelForAppField(labels, prop.tableKey, c.key),
+      }));
+      return { prop, changes, rationale: rationaleOf(prop.payload) };
     }),
   );
 
@@ -201,7 +223,7 @@ export default async function ApprovalsPage({
         </div>
       ) : (
         <div className="space-y-3">
-          {proposals.map(({ prop, changes }) => {
+          {proposals.map(({ prop, changes, rationale }) => {
             const exp = expiryNote(prop.expiresAt);
             const isAi = prop.actorType === "ai";
             const editable = prop.op !== "delete" && changes.some((c) => c.raw !== null);
@@ -237,6 +259,11 @@ export default async function ApprovalsPage({
                       {" · "}
                       <span className={exp.soon ? "text-red-600 font-medium" : ""}>{exp.text}</span>
                     </p>
+                    {rationale && (
+                      <p className="mt-1 text-sm text-neutral-600 italic">
+                        &ldquo;{rationale}&rdquo;
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <SubmitButton label="Approve" pendingLabel="Approving…" className="btn-ae text-sm" />

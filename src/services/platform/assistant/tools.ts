@@ -88,6 +88,11 @@ export const TOOL_POLICY: Record<string, ToolPolicy> = {
   update_budget_line: { table: "budget_line", op: "update", risk: "high_write" },
   create_variation_draft: { table: "variation_order", op: "create", risk: "high_write" },
   create_risk: { table: "risk", op: "create", risk: "low_write" },
+  // Outward-facing communication (Spec 12 send_email via the COMMS lifecycle,
+  // lock plan §7.2): high_write so it is ALWAYS approval-gated, even under
+  // auto_low_risk. On approval, recordWriter emits the comms.create outbound
+  // event; the n8n integration layer owns delivery and marks the record Sent.
+  draft_comm: { table: "comms", op: "create", risk: "high_write" },
   log_workstream_update: { table: "workstream", op: "update", risk: "low_write" },
   generate_weekly_report: { risk: "low_write", kind: "service" },
   run_construction_intake: { risk: "low_write", kind: "service" },
@@ -104,6 +109,18 @@ const jobIdProp = {
 
 const recordIdProp = {
   oneOf: [{ type: "number" as const }, { type: "string" as const }],
+};
+
+// Spec 12 Module 7: the confirmation card shows the proposer's rationale.
+// Meta-only — the executor lifts it off the payload before the write; it is
+// never stored on the record. (Named proposalReason, not "rationale", because
+// save_decision has a real `rationale` record field.)
+const proposalReasonProp = {
+  proposalReason: {
+    type: "string" as const,
+    description:
+      "One sentence explaining WHY this change is proposed — shown to the human on the approval card. Always provide it.",
+  },
 };
 
 export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
@@ -158,6 +175,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
+        ...proposalReasonProp,
         ...jobIdProp,
         title: { type: "string" },
         detail: { type: "string" },
@@ -174,6 +192,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
+        ...proposalReasonProp,
         recordId: { ...recordIdProp, description: "Action id." },
         status: { type: "string", enum: ["open", "in_progress", "done", "deferred"] },
         owner: { type: "string" },
@@ -190,6 +209,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
+        ...proposalReasonProp,
         ...jobIdProp,
         description: { type: "string" },
         rationale: { type: "string" },
@@ -206,6 +226,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
+        ...proposalReasonProp,
         description: { type: "string" },
         category: { type: "string" },
       },
@@ -218,6 +239,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
+        ...proposalReasonProp,
         recordId: { ...recordIdProp, description: "Budget line id (from query_records)." },
         budgetAmount: { type: "number" },
         committedAmount: { type: "number" },
@@ -232,6 +254,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
+        ...proposalReasonProp,
         ...jobIdProp,
         title: { type: "string" },
         description: { type: "string" },
@@ -248,6 +271,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
+        ...proposalReasonProp,
         ...jobIdProp,
         description: { type: "string" },
         likelihood: { type: "number", description: "1–5" },
@@ -259,11 +283,36 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "draft_comm",
+    description:
+      "Draft a stakeholder communication (who needs to be told what, by when). Creates a Pending COMMS record that ALWAYS requires human approval; once approved, the outbound integration delivers it and marks it Sent. Use this instead of promising to send anything yourself.",
+    input_schema: {
+      type: "object",
+      properties: {
+        ...proposalReasonProp,
+        ...jobIdProp,
+        topic: { type: "string", description: "What needs to be communicated." },
+        messageType: {
+          type: "string",
+          enum: ["Decision Notification", "Status Update", "Action Required", "Approval Request", "Escalation"],
+        },
+        stakeholderRole: {
+          type: "string",
+          enum: ["Owner", "Builder", "Architect", "Broker", "Supplier", "Regulatory", "Other"],
+        },
+        dueDate: { type: "string", description: "YYYY-MM-DD — when this must be communicated by." },
+        notes: { type: "string", description: "Message body / talking points for the sender." },
+      },
+      required: ["topic"],
+    },
+  },
+  {
     name: "log_workstream_update",
     description: "Update a workstream's status/notes at session close.",
     input_schema: {
       type: "object",
       properties: {
+        ...proposalReasonProp,
         recordId: { ...recordIdProp, description: "Workstream id." },
         status: { type: "string" },
         notes: { type: "string" },

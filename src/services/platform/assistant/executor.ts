@@ -137,6 +137,9 @@ async function toWriteData(
 ): Promise<Record<string, unknown>> {
   const data = { ...input };
   delete data.recordId;
+  // Reviewer-facing metadata (Spec 12 Module 7 confirmation-card rationale) —
+  // threaded through WriteRequest.rationale, never part of the record payload.
+  delete data.proposalReason;
   switch (toolName) {
     case "create_action":
       data.sourceType = "chat";
@@ -368,6 +371,7 @@ export async function executeToolUse(
       data,
       actor,
       requireApproval: requiresApproval(ctx.aiAuthority, policy.risk),
+      rationale: typeof input.proposalReason === "string" ? input.proposalReason : undefined,
     });
     const summary =
       result.status === "proposed"

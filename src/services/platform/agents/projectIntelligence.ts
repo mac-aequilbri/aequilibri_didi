@@ -15,6 +15,9 @@ const TOOLS = [
   "create_risk",
   "update_budget_line",
   "create_variation_draft",
+  // Spec 12 Module 5 COMMS / Module 7 send_email path (lock plan §7.2):
+  // always approval-gated; n8n delivers on approval.
+  "draft_comm",
   "log_workstream_update",
 ] as const;
 

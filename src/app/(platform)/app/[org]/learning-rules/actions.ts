@@ -1,14 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
+import { seedCascadeRules } from "@/lib/platform/cascade";
+import { getCurrentUser, requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { recordIdParam, writeRecord } from "@/lib/platform/recordWriter";
 import {
   promoteHypothesisToRule,
   runHypothesisEngine,
   setHypothesisStatus,
+  setRuleOverrideLevel,
   snapshotIntelligence,
+  type OverrideLevel,
 } from "@/services/platform/learning";
 
 export async function runEngineAction(formData: FormData): Promise<void> {
@@ -48,6 +51,28 @@ export async function toggleRuleAction(formData: FormData): Promise<void> {
     data: { isActive },
     actor: { type: "human", name: user.name },
   });
+  revalidatePath(orgPath(ctx.orgSlug, "/learning-rules"));
+}
+
+/** Owner-set governance level (Spec 12 Override_Permission ladder) — e.g.
+ *  relaxing an Owner_Only rule to Standard after 10 clean applications. */
+export async function setOverrideLevelAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  await requireAdmin(ctx); // governance changes are owner-only
+  const recordId = String(formData.get("recordId") ?? "");
+  const level = String(formData.get("level") ?? "");
+  if (!recordId || !["owner_only", "standard", "advisory"].includes(level)) return;
+  await setRuleOverrideLevel(ctx, recordId, level as OverrideLevel);
+  revalidatePath(orgPath(ctx.orgSlug, "/learning-rules"));
+}
+
+/** Idempotently seed the 7 Spec 12 cascade rules (existing orgs predate the
+ *  onboarding seed). Advisory rules land Active; write-effect rules land as
+ *  Drafts for the owner to activate (lock decision D-4). */
+export async function seedCascadeRulesAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
+  await requireAdmin(ctx);
+  await seedCascadeRules(ctx);
   revalidatePath(orgPath(ctx.orgSlug, "/learning-rules"));
 }
 

@@ -13,9 +13,18 @@ import {
   promoteHypothesisAction,
   rejectHypothesisAction,
   runEngineAction,
+  seedCascadeRulesAction,
+  setOverrideLevelAction,
   snapshotAction,
   toggleRuleAction,
 } from "./actions";
+
+// Spec 12 Override_Permission ladder chip colours.
+const LEVEL_CHIP: Record<string, { label: string; cls: string }> = {
+  owner_only: { label: "owner-only", cls: "bg-red-100 text-red-700" },
+  standard: { label: "standard", cls: "bg-neutral-100 text-neutral-600" },
+  advisory: { label: "advisory", cls: "bg-sky-100 text-sky-700" },
+};
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +74,17 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
             className="btn-ae-outline"
           />
         </form>
+        {!rules.some((r) => r.ruleCode.startsWith("CASCADE-")) && (
+          <form action={seedCascadeRulesAction}>
+            <input type="hidden" name="org" value={ctx.orgSlug} />
+            <SubmitButton
+              label="Seed cascade rules (Spec 12 M5)"
+              pendingLabel="Seeding…"
+              className="btn-ae-outline"
+              title="Creates the 7 cascading-update rules: advisories active, write-effects as drafts you activate"
+            />
+          </form>
+        )}
       </div>
 
       {hypotheses.length > 0 && (
@@ -155,6 +175,26 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                   <span className="font-medium">{r.description}</span>
                   {r.cannotOverride && (
                     <span className="ml-1 text-[0.65rem] px-1 rounded bg-red-100 text-red-700">locked</span>
+                  )}
+                  <span
+                    className={`ml-1 text-[0.65rem] px-1 rounded ${LEVEL_CHIP[r.overrideLevel]?.cls ?? ""}`}
+                    title="Override governance (Spec 12): who may override this rule"
+                  >
+                    {LEVEL_CHIP[r.overrideLevel]?.label ?? r.overrideLevel}
+                  </span>
+                  {r.relaxEligible && (
+                    <form action={setOverrideLevelAction} className="inline ml-1">
+                      <input type="hidden" name="org" value={ctx.orgSlug} />
+                      <input type="hidden" name="recordId" value={r.id} />
+                      <input type="hidden" name="level" value="standard" />
+                      <button
+                        type="submit"
+                        className="text-[0.65rem] px-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                        title="10 applications without an override — the owner may relax this rule to Standard"
+                      >
+                        10 clean — relax to standard?
+                      </button>
+                    </form>
                   )}
                   {r.autoApply && (
                     <span className="ml-1 text-[0.65rem] px-1 rounded bg-emerald-100 text-emerald-700">auto-apply</span>

@@ -10,6 +10,7 @@ import { getActiveRules } from "@/services/platform/learning";
 import { toNum } from "@/lib/format";
 import { resolveActionStatus } from "./actionStatus";
 import { loadActionStatusMap } from "./configSource";
+import { computeJobRag } from "./jobRag";
 import { loadJobsList } from "./jobsListSource";
 import { PROPOSED_PENDING_FORMULA } from "./pendingWritesSource";
 import { budgetActuals, loadProcurement } from "./procurementSource";
@@ -28,6 +29,14 @@ export interface DashJob {
   engagementType: string;
   completionPct: number;
   status: string;
+  /** Derived engagement RAG (Spec 12 Module 5 §7) — worst-of-phases escalated
+   *  by open Blocker issues (jobRag.ts); "" = no signal, render nothing. */
+  rag: string;
+  /** Portfolio View columns (Spec 12 Module 8, lock plan §8.3) — rendered only
+   *  when ENGAGEMENT_TYPE_CONFIG activates the portfolio (decision D-11). */
+  openIssues: number;
+  /** Budget variance % per engagement (actual vs estimated); null = no signal. */
+  budgetVariancePct: number | null;
 }
 export interface DashLog {
   id: string;
@@ -99,6 +108,36 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
     return d && new Date(d).getTime() < now;
   }).length;
 
+  // Open Blocker-type issues per job (Spec 12 Module 5 §7): they escalate the
+  // derived engagement RAG — reusing the ISSUES rows already loaded above.
+  const blockersByJob = new Map<string, number>();
+  const openIssuesByJob = new Map<string, number>();
+  for (const a of openActionRows) {
+    const jobId = firstLink(a["Job"]);
+    if (!jobId) continue;
+    openIssuesByJob.set(jobId, (openIssuesByJob.get(jobId) ?? 0) + 1);
+    if (str(a["Issue_Type"]) === "Blocker") {
+      blockersByJob.set(jobId, (blockersByJob.get(jobId) ?? 0) + 1);
+    }
+  }
+
+  // Portfolio View (Spec 12 M8): budget variance per engagement — estimated vs
+  // derived actuals, grouped on the BUDGET rows already loaded above.
+  const budgetByJob = new Map<string, { est: number; act: number }>();
+  for (const b of budgets) {
+    const jobId = firstLink(b["Job"]);
+    if (!jobId) continue;
+    const agg = budgetByJob.get(jobId) ?? { est: 0, act: 0 };
+    agg.est += num(b["Estimated"]);
+    agg.act += actualsByBudget.get(b.id) ?? 0;
+    budgetByJob.set(jobId, agg);
+  }
+  const varianceOf = (jobId: string): number | null => {
+    const agg = budgetByJob.get(jobId);
+    if (!agg || agg.est === 0) return null;
+    return Math.round(((agg.act - agg.est) / agg.est) * 1000) / 10;
+  };
+
   // Spec 12 CASHFLOWS is a per-transaction ledger; derive the period
   // projected-vs-actual chart from it — Paid rows are actual, the rest projected.
   const byPeriod = new Map<string, { projected: number; actual: number }>();
@@ -120,6 +159,9 @@ async function fromAirtable(ctx: OrgCtx): Promise<DashboardView> {
       engagementType: j.engagementType,
       completionPct: j.completionPct,
       status: j.status,
+      rag: computeJobRag(j.phaseRags, blockersByJob.get(j.id) ?? 0),
+      openIssues: openIssuesByJob.get(j.id) ?? 0,
+      budgetVariancePct: varianceOf(j.id),
     })),
     openActions: openActionRows.length,
     overdueActions,
@@ -187,6 +229,9 @@ async function fromPostgres(ctx: OrgCtx): Promise<DashboardView> {
       engagementType: j.engagementType,
       completionPct: j.completionPct,
       status: j.status,
+      rag: "", // Postgres phases carry no RAG (Airtable is system of record)
+      openIssues: 0,
+      budgetVariancePct: null,
     })),
     openActions,
     overdueActions,

@@ -422,6 +422,24 @@ export async function approveReport(ctx: OrgCtx, userName: string, id: RecordId)
       },
       actor: { type: "human", name: userName },
     });
+    // Spec 12 live-vs-snapshot rule (lock plan §8.6): the APPROVED report also
+    // renders as an immutable, hashed PDF DOCUMENTS snapshot — parity with the
+    // Postgres path and the tender report. Draft iterations stay cheap
+    // markdown; best-effort so a render failure never blocks the approval.
+    const title = typeof doc?.["Document_Name"] === "string" ? (doc["Document_Name"] as string) : "Report";
+    const body = typeof doc?.["Text_Content"] === "string" ? (doc["Text_Content"] as string) : "";
+    const jobLink = Array.isArray(doc?.["Job"]) && doc["Job"].length > 0 ? String(doc["Job"][0]) : undefined;
+    if (body.trim()) {
+      await generateManagedDocument(ctx, userName, {
+        jobId: jobLink,
+        title: `${title} — approved snapshot`,
+        body,
+        docType: "report",
+        outputType: "report_snapshot",
+        format: "pdf",
+        traceability: { sourceModule: "module8", sourceRecordId: String(id) },
+      }).catch(() => {});
+    }
     return;
   }
   await writeRecord(ctx, {

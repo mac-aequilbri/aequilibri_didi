@@ -15,6 +15,9 @@ import { airtableEnabled, core } from "@/lib/airtable";
 import type { CoreRow } from "@/lib/airtable";
 import type { CoreTableName } from "@/lib/airtable/schema.generated";
 import { prisma } from "@/lib/db";
+import { normalizeEngagementType } from "./engagementProfile";
+import { computeJobRag } from "./jobRag";
+import { normalizeRag } from "./phasesSource";
 import { budgetActuals, loadProcurement } from "./procurementSource";
 import { toNum } from "@/lib/format";
 import type { OrgCtx } from "./types";
@@ -24,6 +27,8 @@ export interface JobPhaseRow {
   name: string;
   status: string;
   completionPct: number;
+  /** Stored phase RAG ("" when unset / Postgres mode). */
+  rag: string;
 }
 export interface JobRiskRow {
   id: string;
@@ -47,6 +52,9 @@ export interface JobDetailView {
   suburb: string;
   completionPct: number;
   healthScore: number;
+  /** Derived engagement RAG (Spec 12 Module 5 §7, jobRag.ts) — worst-of-phases;
+   *  "" = no phase carries a RAG signal. */
+  rag: string;
   summary: string;
   budget: number;
   actual: number;
@@ -116,6 +124,7 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<JobDetailView | nu
     suburb: job.suburb ?? "",
     completionPct: job.completionPct,
     healthScore: job.healthScore,
+    rag: "", // Postgres phases carry no RAG (Airtable is system of record)
     summary: job.summary ?? "",
     budget: job.conBudgets.reduce((s, b) => s + toNum(b.budgetAmount), 0),
     actual: job.conBudgets.reduce((s, b) => s + toNum(b.actualAmount), 0),
@@ -124,6 +133,7 @@ async function fromPostgres(ctx: OrgCtx, id: string): Promise<JobDetailView | nu
       name: p.name,
       status: p.status,
       completionPct: p.completionPct,
+      rag: "",
     })),
     risks: job.conRisks.map((r) => ({
       id: String(r.id),
@@ -174,6 +184,7 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<JobDetailView | nu
       name: str(p["Phase_Name"]) || "(phase)",
       status: str(p["Status"]) || "pending",
       completionPct: num(p["Completion_Pct"]),
+      rag: normalizeRag(p["RAG"]),
     }));
 
   const risks: JobRiskRow[] = riskRows
@@ -199,11 +210,15 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<JobDetailView | nu
     id: job.id,
     name: str(job["Job_Name"]) || "(job)",
     code: "", // Airtable JOBS has no code field (see plan P4)
-    engagementType: "",
+    // Tolerant read — the field lands via schema-drift migration (Spec 12 M5)
+    engagementType: normalizeEngagementType(job["Engagement_Type"]) || "",
     address: "",
     suburb: "",
     completionPct,
     healthScore: 0, // not tracked in Airtable JOBS
+    // Engagement RAG derived from this job's phases (blocker escalation needs
+    // an ISSUES read this page doesn't do — the dashboard variant includes it).
+    rag: computeJobRag(phases.map((p) => p.rag)),
     summary: str(job["Estimated_Summary"]) || str(job["Description"]),
     budget,
     actual,

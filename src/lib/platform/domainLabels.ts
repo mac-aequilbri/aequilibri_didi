@@ -85,6 +85,45 @@ export function applyDomainLabels(
   };
 }
 
+/** Domain label for one app-key field of a writable table ("budgetAmount" on
+ *  "budget_line" → "Cost Line" when a BUDGET.Estimated row exists). Returns
+ *  undefined when no override applies — callers keep their hardcoded label. */
+export function labelForAppField(
+  labels: ReadonlyMap<string, DomainLabel>,
+  tableKey: string,
+  appKey: string,
+): string | undefined {
+  if (!labels.size) return undefined;
+  const map = airtableMapFor(tableKey);
+  const air = map?.specs.find((s) => s.from === appKey)?.air;
+  return air ? labels.get(`${map!.table}.${air}`)?.label : undefined;
+}
+
+/** Domain label for a whole table, by convention a DOMAIN_LABELS row with
+ *  Core_Field_Label "_TABLE" (e.g. "ISSUES._TABLE" → "Matter tasks"). Falls
+ *  back to undefined — callers keep friendlyTableLabel. */
+export function tableLabelFor(
+  labels: ReadonlyMap<string, DomainLabel>,
+  tableKey: string,
+): string | undefined {
+  if (!labels.size) return undefined;
+  const air = airtableMapFor(tableKey)?.table;
+  return air ? labels.get(`${air}._TABLE`)?.label : undefined;
+}
+
+/** Assistant-prompt vocabulary block (Spec 12 Module 7: confirmation cards and
+ *  assistant language use the org's domain terminology). "" when the org has
+ *  no labels — the common case until D8 population. Capped to keep the prompt
+ *  bounded. */
+export async function domainVocabBlock(ctx: OrgCtx): Promise<string> {
+  const labels = await getDomainLabels(ctx);
+  if (!labels.size) return "";
+  const lines = [...labels.entries()]
+    .slice(0, 30)
+    .map(([key, l]) => `${key.replace("._TABLE", " (table)")} is called "${l.label}"${l.contextNote ? ` — ${l.contextNote}` : ""}`);
+  return `DOMAIN TERMINOLOGY (use these names with the user):\n- ${lines.join("\n- ")}`;
+}
+
 /** Invalidate after DOMAIN_LABELS writes (onboarding, admin edits). */
 export function invalidateDomainLabels(orgSlug: string): void {
   cache.delete(orgSlug);

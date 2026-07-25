@@ -16,6 +16,9 @@ export interface ProposalChange {
   after: string;
   /** Raw string form of the proposed value when the field is editable. */
   raw: string | null;
+  /** Domain-labelled display name (DOMAIN_LABELS); the key stays the input
+   *  name so approve-with-edits is unaffected. */
+  label?: string;
 }
 
 export function ProposalFields({
@@ -35,7 +38,7 @@ export function ProposalFields({
         {changes.map((c) => (
           <div key={c.key} className="flex flex-wrap items-baseline gap-x-2">
             <dt className="text-[0.7rem] uppercase tracking-wide text-neutral-400 w-32 shrink-0">
-              {c.key}
+              {c.label ?? c.key}
             </dt>
             <dd className="min-w-0 text-neutral-700 flex-1">
               {c.raw !== null ? (

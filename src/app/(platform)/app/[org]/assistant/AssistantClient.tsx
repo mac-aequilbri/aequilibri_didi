@@ -72,6 +72,8 @@ const SKIP_PAYLOAD_FIELDS = new Set([
   "extractedActions",
   "jobId",
   "sourceType",
+  "__rationale", // reviewer-facing metadata, not record content
+  "__recId",
 ]);
 
 const readableScalar = (v: unknown): string | null =>
@@ -280,6 +282,7 @@ export default function AssistantClient({
   defaultJobId,
   basePath = "/assistant",
   showSessionReview = true,
+  sessionRules = [],
 }: {
   orgSlug: string;
   assistantName: string;
@@ -296,6 +299,9 @@ export default function AssistantClient({
    *  learning loop). Off for the standalone chat, which manages conversations
    *  via its own history list / "New chat" instead. */
   showSessionReview?: boolean;
+  /** Rules that fired today — offered on the close form with an "applied
+   *  incorrectly?" flag (Spec 12 session-close protocol). */
+  sessionRules?: { ruleCode: string; description: string }[];
 }) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -668,6 +674,24 @@ export default function AssistantClient({
               className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
+          {sessionRules.length > 0 && (
+            <fieldset className="rounded-lg border border-neutral-200 px-3 py-2">
+              <legend className="px-1 text-xs text-neutral-600">
+                Rules applied today — tick any that applied incorrectly (each flag decays the
+                rule&apos;s confidence and captures a correction)
+              </legend>
+              <div className="space-y-1">
+                {sessionRules.map((r) => (
+                  <label key={r.ruleCode} className="flex items-start gap-2 text-xs text-neutral-700">
+                    <input type="checkbox" name="misappliedRules" value={r.ruleCode} className="mt-0.5" />
+                    <span>
+                      <span className="font-mono text-neutral-400">{r.ruleCode}</span> {r.description}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <CloseSessionButton />
         </form>
       </details>

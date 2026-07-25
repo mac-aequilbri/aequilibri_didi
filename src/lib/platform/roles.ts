@@ -62,6 +62,9 @@ const WRITE_MATRIX: Record<string, ReadonlySet<TeamRole>> = {
   risk: new Set(["owner", "builder", "architect"]),
   decision: new Set(["owner", "builder", "architect"]),
   procurement: new Set(["owner", "builder", "architect"]),
+  // Spec 12 M7 role matrix: Builder confirms writes to PLAN and ISSUES;
+  // Architect writes PLAN for design-phase tasks (lock plan §5.2).
+  plan: new Set(["owner", "builder", "architect"]),
   document: new Set(["owner", "builder", "architect"]),
   variation_order: new Set(["owner", "builder", "architect"]),
   budget_line: new Set(["owner"]),

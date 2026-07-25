@@ -28,7 +28,7 @@ export const CORRECTION_ROOT_CAUSES = [
 ] as const;
 export type CorrectionRootCause = (typeof CORRECTION_ROOT_CAUSES)[number];
 
-export type CorrectionSourceModule = "module2" | "module3" | "module5" | "manual";
+export type CorrectionSourceModule = "module2" | "module3" | "module5" | "module6" | "manual";
 
 export type CorrectionDirection =
   | "Over_Estimate"
@@ -114,6 +114,9 @@ export async function emitCorrection(
         input.humanValueText || (input.humanValue != null ? String(input.humanValue) : ""),
       Corrected_By: actor.name,
       Rule_Generated: false,
+      // Session-protocol anchor: "corrections since the last session" counts on
+      // this date (the canonical column pre-exists; createdTime isn't exposed).
+      Date_Found: new Date().toISOString().slice(0, 10),
       Notes: JSON.stringify({
         jobId: input.jobId,
         entityType: input.entityType,
@@ -125,6 +128,16 @@ export async function emitCorrection(
       }),
     });
     correctionId = rec.id;
+    // Spec 12 first-class columns (lock plan §6.4): Source_Module and
+    // Correction_Direction are schema-drift-provisioned — written as a
+    // separate best-effort update so an unmigrated base still gets the
+    // correction (the values also ride in Notes JSON for legacy reads).
+    await core
+      .update(ctx.orgSlug, "CORRECTIONS", rec.id, {
+        Source_Module: input.sourceModule,
+        ...(direction ? { Correction_Direction: direction } : {}),
+      })
+      .catch(() => {});
   } else {
     const correction = await prisma.platCorrection.create({
       data: {

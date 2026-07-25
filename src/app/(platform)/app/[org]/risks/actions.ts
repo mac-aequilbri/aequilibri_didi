@@ -36,7 +36,9 @@ export async function setRiskStatus(formData: FormData): Promise<void> {
   const user = await getCurrentUser(ctx);
   const recordIdRaw = String(formData.get("recordId") ?? "");
   const status = String(formData.get("status") ?? "");
-  if (!recordIdRaw || !["open", "accepted", "mitigated", "closed"].includes(status)) return;
+  // "materialised" fires cascade rule G — the linked ISSUES record is created
+  // automatically (Spec 12 Module 5) when the CASCADE-G rule is active.
+  if (!recordIdRaw || !["open", "accepted", "mitigated", "closed", "materialised"].includes(status)) return;
 
   // recordWriter routes to Airtable (rec…) or Postgres (numeric) by id shape.
   await writeRecord(ctx, {

@@ -219,7 +219,7 @@ export default async function RisksPage({
                       <input type="hidden" name="recordId" value={r.id} />
                       <StatusBadge status={r.status} />
                       <select name="status" defaultValue={r.status} aria-label={`Status for ${r.description}`} className="text-xs border border-neutral-200 rounded px-1 py-0.5">
-                        {["open", "accepted", "mitigated", "closed"].map((s) => (
+                        {["open", "accepted", "mitigated", "closed", "materialised"].map((s) => (
                           <option key={s} value={s}>
                             {s}
                           </option>

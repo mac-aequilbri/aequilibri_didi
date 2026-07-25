@@ -20,6 +20,7 @@ import { airtableMapFor, toFields } from "@/lib/airtable/fieldMaps";
 import { ensureAppRuntimeTables, probeBaseDataAccess, provisionClientBase } from "@/lib/airtable/provision";
 import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
+import { CASCADE_RULE_SEEDS } from "@/lib/platform/cascade";
 import { defaultModule1Governance, normalizeTeamRole, type TeamRole } from "@/lib/platform/module1Governance";
 import { DEFAULT_FEATURES, EngagementType, AiAuthority } from "@/lib/platform/types";
 import { ensureJobCatalog } from "@/services/platform/jobCatalogGenerator";
@@ -145,6 +146,33 @@ async function mirrorConfigToBase(
       "create",
     );
     await core.create(orgSlug, "LEARNING_RULES", fields);
+  }
+  // Spec 12 Module 5 cascade rules (lock plan §5.1 / decision D-4): advisory
+  // rules (A/B/C/E) seed Active; write-effect rules (D/F/G) seed as Drafts the
+  // owner activates in the learning UI. The Owner_Only governance stamp is
+  // best-effort (the Override_Level column lands via schema-drift migration).
+  for (const seed of CASCADE_RULE_SEEDS) {
+    const rec = await core.create(
+      orgSlug,
+      "LEARNING_RULES",
+      toFields(
+        ruleMap,
+        {
+          ruleCode: seed.ruleCode,
+          kind: "guidance",
+          description: seed.description,
+          triggerCondition: seed.triggerCondition,
+          confidence: 80,
+          isActive: seed.isActive,
+          autoApply: false,
+          cannotOverride: false,
+        },
+        "create",
+      ),
+    );
+    await core
+      .update(orgSlug, "LEARNING_RULES", rec.id, { Override_Level: "Owner_Only" })
+      .catch(() => {});
   }
 }
 

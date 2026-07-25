@@ -164,6 +164,27 @@ export const FIELD_MAPS: Record<string, AirtableMap> = {
       { air: "Linked_Decision", from: "linkedDecisionId", to: LINK },
     ],
   },
+  plan: {
+    // PLAN (Spec 12 Core) — the Module 5 task-level schedule. Airtable-only,
+    // like comms. Status/RAG post as canonical option names (vocab.ts governs
+    // PLAN.Status at the write choke point); Predecessor is a link the app
+    // reads but does not yet write (second-pass linking per the onboarding
+    // playbook, until the L5 Gantt lands).
+    table: "PLAN",
+    specs: [
+      { air: "Task_Name", from: "name", to: (v) => S(v).slice(0, 300) || "Untitled task" },
+      { air: "Status", from: "status", createDefault: "Not Started", to: S },
+      { air: "RAG", from: "rag", to: S },
+      { air: "Start_Date", from: "startDate", to: DATE },
+      { air: "End_Date", from: "endDate", to: DATE },
+      { air: "Duration_Days", from: "durationDays", to: (v) => NUM(v) },
+      { air: "Notes", from: "notes", to: S },
+      { air: "Job", from: "jobId", to: LINK },
+      { air: "Phase", from: "phaseId", to: LINK },
+      { air: "Assigned_To", from: "assignedToId", to: LINK },
+      { air: "Predecessor", from: "predecessorId", to: LINK },
+    ],
+  },
   decision: {
     table: "DECISIONS",
     specs: [

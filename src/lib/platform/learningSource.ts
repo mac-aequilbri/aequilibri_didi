@@ -15,9 +15,13 @@ import { prisma } from "@/lib/db";
 import {
   deriveHypothesisType,
   HYPOTHESIS_TYPES,
+  parseApplicationWindow,
+  parseOverrideLevel,
+  relaxEligible,
   RULE_REVIEW_FLAG_AT,
   VALIDATION_THRESHOLDS,
   type HypothesisType,
+  type OverrideLevel,
 } from "@/services/platform/learning";
 import type { OrgCtx } from "./types";
 
@@ -35,6 +39,10 @@ export interface RuleView {
   status: "draft" | "active" | "under_review";
   /** Spec 12: confidence at 60 or below flags the rule for owner review. */
   needsReview: boolean;
+  /** Spec 12 governance ladder (Owner_Only / Standard / Advisory). */
+  overrideLevel: OverrideLevel;
+  /** Owner_Only rule with 10 clean applications — suggest relaxing to Standard. */
+  relaxEligible: boolean;
 }
 
 export interface HypothesisView {
@@ -106,6 +114,9 @@ async function rulesFromPostgres(ctx: OrgCtx): Promise<RuleView[]> {
       cannotOverride: r.cannotOverride,
       status: (r.isActive ? "active" : underReview ? "under_review" : "draft") as RuleView["status"],
       needsReview: r.isActive && r.confidence <= RULE_REVIEW_FLAG_AT,
+      // Postgres carries no ladder columns — legacy fallback semantics.
+      overrideLevel: (r.cannotOverride ? "owner_only" : "standard") as OverrideLevel,
+      relaxEligible: false,
     };
   });
 }
@@ -117,6 +128,8 @@ async function rulesFromAirtable(ctx: OrgCtx): Promise<RuleView[]> {
       const ruleStatus = str(r["Rule_Status"]);
       const isActive = RULE_ACTIVE_STATUSES.has(ruleStatus);
       const confidence = num(r["Confidence_Level"]);
+      const overrideLevel = parseOverrideLevel(r["Override_Level"], r["Override_Permission"] === false);
+      const window = parseApplicationWindow(r["Application_Window"]);
       return {
         id: r.id,
         ruleCode: str(r["Instance"]),
@@ -133,6 +146,8 @@ async function rulesFromAirtable(ctx: OrgCtx): Promise<RuleView[]> {
             ? "under_review"
             : "draft") as RuleView["status"],
         needsReview: isActive && confidence <= RULE_REVIEW_FLAG_AT,
+        overrideLevel,
+        relaxEligible: relaxEligible(overrideLevel, window),
       };
     })
     .sort((a, b) => Number(b.isActive) - Number(a.isActive) || b.confidence - a.confidence);

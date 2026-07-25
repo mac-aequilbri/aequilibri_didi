@@ -7,7 +7,9 @@ import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { getPrompt } from "@/lib/platform/prompts";
 import { Actor, OrgCtx } from "@/lib/platform/types";
 import type { RecordId } from "@/lib/platform/recordWriter";
+import { domainVocabBlock } from "@/lib/platform/domainLabels";
 import { learningPromptText } from "../learning";
+import { jobContextBlock } from "./context";
 import type { ToolOutcome } from "./executor";
 import { runOrchestrator, type Specialist } from "../agents/orchestrator";
 import { SPECIALISTS } from "../agents/registry";
@@ -234,11 +236,40 @@ export async function resolveChatSession(ctx: OrgCtx, requestedId?: RecordId): P
   return sessions.length ? sessions[0].id : createChatSession(ctx);
 }
 
-export async function endSession(ctx: OrgCtx, sessionId: RecordId): Promise<void> {
+export async function endSession(
+  ctx: OrgCtx,
+  sessionId: RecordId,
+  /** Spec 12 session protocol (lock plan §6.3): the close review's outcome —
+   *  when provided, the session summary is stamped on CHAT_SESSIONS and a
+   *  distinct session-close EXECUTION_LOG entry is written (the cross-session
+   *  persistence record; per-turn logs cover the turns, not the close). */
+  close?: { summary?: string; rulesFlagged?: string[]; correctionCaptured?: boolean },
+): Promise<void> {
   if (airtableEnabled()) {
     await core.update(ctx.orgSlug, "CHAT_SESSIONS", String(sessionId), {
       Ended_At: new Date().toISOString(),
+      ...(close?.summary ? { Summary: close.summary } : {}),
     });
+    if (close) {
+      await core
+        .create(ctx.orgSlug, "EXECUTION_LOG", {
+          Log_Entry: "session close",
+          Action_Type: "Chat",
+          Tables_Affected: "CHAT_SESSIONS",
+          Summary: JSON.stringify({
+            sessionClose: {
+              sessionId: String(sessionId),
+              summary: close.summary ?? "",
+              rulesFlagged: close.rulesFlagged ?? [],
+              correctionCaptured: close.correctionCaptured ?? false,
+            },
+          }),
+          Initiated_By: "Owner",
+          Status: "Done",
+          Date_Time: new Date().toISOString(),
+        })
+        .catch(() => {});
+    }
     return;
   }
   await prisma.platChatSession.updateMany({
@@ -316,6 +347,34 @@ async function dataContext(ctx: OrgCtx): Promise<string> {
   ].join("\n");
 }
 
+/** Spec 12 session-start protocol (lock plan §6.3): when 3 or more CORRECTIONS
+ *  landed since the last ended session, surface them at session start before
+ *  other work — they may prompt immediate pattern detection. Counted on
+ *  CORRECTIONS.Date_Found (stamped by emitCorrection) against the most recent
+ *  CHAT_SESSIONS.Ended_At. Airtable mode only; "" when below threshold. */
+async function recentCorrectionsBlock(ctx: OrgCtx): Promise<string> {
+  if (!airtableEnabled()) return "";
+  try {
+    const sessions = await core.list(ctx.orgSlug, "CHAT_SESSIONS", { maxRecords: 200 });
+    const lastEnded = sessions
+      .map((s) => str(s["Ended_At"]))
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+    if (!lastEnded) return ""; // first session — nothing to compare against
+    const cutoff = lastEnded.slice(0, 10);
+    const corrections = await core.list(ctx.orgSlug, "CORRECTIONS", { maxRecords: 1000 });
+    const recent = corrections.filter((c) => {
+      const d = str(c["Date_Found"]);
+      return d !== "" && d >= cutoff;
+    }).length;
+    if (recent < 3) return "";
+    return `SESSION-START PROTOCOL: ${recent} corrections were captured since the last session. Surface them to the user before other work — suggest reviewing the Automation rules page; they may prompt immediate pattern detection (run the hypothesis engine).`;
+  } catch {
+    return "";
+  }
+}
+
 export interface SendResult {
   sessionId: RecordId;
   reply: string;
@@ -356,9 +415,15 @@ export async function sendChatMessage(
   }
 
   const readsAt = Date.now();
-  const [rulesBlock, context, historyRows] = await Promise.all([
+  const [rulesBlock, context, correctionsBlock, sessionContext, vocabBlock, historyRows] = await Promise.all([
     learningPromptText(ctx),
     dataContext(ctx),
+    recentCorrectionsBlock(ctx),
+    // Spec 12 Module 7 context loading (lock plan §7.1): phases+RAG, budget
+    // summary (finance-visible roles), issue counts, recent decisions and
+    // activity — TTL-cached, invalidated by every write through recordWriter.
+    jobContextBlock(ctx, { jobId: opts.jobId, role: opts.userRole }),
+    domainVocabBlock(ctx),
     airtableEnabled()
       ? listSessionMessagesAirtable(ctx, sessionId).then((rows) =>
           rows.filter((m) => String(m.id) !== String(userMsgRecordId)).slice(-HISTORY_LIMIT).reverse(),
@@ -377,6 +442,9 @@ export async function sendChatMessage(
     jobLine: opts.jobId ? ` (current job id ${opts.jobId})` : "",
     rulesBlock: [
       rulesBlock,
+      correctionsBlock,
+      sessionContext,
+      vocabBlock,
       `Current user role: ${normalizeTeamRole(opts.userRole ?? "broker")}.`,
       `Role access is enforced server-side: owner has full access; builder writes actions/workstreams only (no budget, risks, decisions, or rules); architect additionally drafts variations but has no financial access; broker is read-only except raising an action to flag a decision needed. Financial tables (budget, cashflow) and learning rules are readable by the owner only — for other roles, answer without that data and note it is owner-restricted.`,
       `Current data snapshot:\n${context}`,

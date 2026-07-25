@@ -36,6 +36,7 @@ const LABELS: Record<string, string> = {
   comms: "communication",
   commslog: "communication",
   comms_log: "communication",
+  plan: "plan task",
   // Construction
   phase: "phase",
   phaseevidence: "phase evidence",

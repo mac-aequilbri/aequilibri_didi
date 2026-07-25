@@ -83,10 +83,42 @@ export async function closeSessionReviewAction(formData: FormData): Promise<void
     emittedCorrection = true;
   }
 
+  // Spec 12 session-close protocol (lock plan §6.3): each rule flagged as
+  // "applied incorrectly" becomes a rule-linked correction — the
+  // overriddenRuleCodes hook decays its confidence and works the governance
+  // ladder, exactly like any other override.
+  const misapplied = formData
+    .getAll("misappliedRules")
+    .map(String)
+    .filter((c) => /^[\w-]{1,40}$/.test(c));
+  for (const code of misapplied) {
+    await emitCorrection(ctx, { type: "human", name: user.name }, {
+      entityType: "learning_rule",
+      dimension: `rule.${code}`,
+      aiValueText: "rule applied this session",
+      humanValueText: "flagged as applied incorrectly at session close",
+      sourceModule: "manual",
+      rootCauseCategory: "Model Error",
+      rootCause: `Rule ${code} applied incorrectly this session (flagged at session close).`,
+      context: {
+        phase: "session_close",
+        sessionId: sessionId == null ? "" : String(sessionId),
+      },
+      overriddenRuleCodes: [code],
+    });
+    emittedCorrection = true;
+  }
+
   if (emittedCorrection) {
     await runHypothesisEngine(ctx);
   }
-  if (sessionId) await endSession(ctx, sessionId);
+  if (sessionId) {
+    await endSession(ctx, sessionId, {
+      summary: reviewSummary,
+      rulesFlagged: misapplied,
+      correctionCaptured: emittedCorrection,
+    });
+  }
 
   revalidatePath(orgPath(ctx.orgSlug, "/assistant"));
   revalidatePath(orgPath(ctx.orgSlug, "/learning-rules"));

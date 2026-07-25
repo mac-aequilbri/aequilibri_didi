@@ -29,8 +29,16 @@ export default async function ActionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const query = parseListQuery(await searchParams, actionsListConfig);
+  const sp = await searchParams;
+  const query = parseListQuery(sp, actionsListConfig);
   const filtered = hasActiveFilters(query);
+  // Register export (Spec 12 M8): same filters as the current view.
+  const spQs = new URLSearchParams(
+    Object.entries(sp).flatMap(([k, v]) =>
+      v == null ? [] : Array.isArray(v) ? v.map((x) => [k, x] as [string, string]) : [[k, v] as [string, string]],
+    ),
+  ).toString();
+  const exportHref = orgPath(ctx.orgSlug, `/actions/export${spQs ? `?${spQs}` : ""}`);
 
   const { items: matching, metrics, unmapped, total, facets } = await loadActions(ctx, query);
   const { items, page, pageCount } = sortAndPaginate(matching, query, actionsListConfig);
@@ -46,7 +54,10 @@ export default async function ActionsPage({
       <PageHeader
         title="Action Hub"
         subtitle="One queue for actions from every source — manual, assistant, meeting minutes."
-        actions={[{ href: orgPath(ctx.orgSlug, "/actions/new"), label: "+ New action" }]}
+        actions={[
+          { href: exportHref, label: "Export CSV", variant: "outline" },
+          { href: orgPath(ctx.orgSlug, "/actions/new"), label: "+ New action" },
+        ]}
       />
       <div className="grid gap-4 sm:grid-cols-4 mb-6">
         <MetricCard value={openCount} label="Open / in progress" />

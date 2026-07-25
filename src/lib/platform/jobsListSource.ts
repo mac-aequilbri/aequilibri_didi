@@ -16,6 +16,9 @@ import { listPage } from "@/lib/airtable/client";
 import { resolveBaseId } from "@/lib/airtable/config";
 import { prisma } from "@/lib/db";
 import { toNum } from "@/lib/format";
+import { normalizeEngagementType } from "./engagementProfile";
+import { computeJobRag } from "./jobRag";
+import { normalizeRag } from "./phasesSource";
 import { resolveJobScope, scopeRows } from "./rls";
 import type { OrgCtx } from "./types";
 
@@ -30,6 +33,12 @@ export interface JobListView {
   completionPct: number;
   healthScore: number;
   budgetTotal: number;
+  /** Derived engagement RAG from the job's phases (jobRag.ts); "" = no signal.
+   *  Consumers with an ISSUES read (dashboard) recompute with blocker counts. */
+  rag: string;
+  /** The phase RAG cells behind `rag`, so consumers can re-aggregate with more
+   *  context (open Blockers) without another PHASES read. */
+  phaseRags: string[];
   counts: { phases: number; actions: number; risks: number };
 }
 
@@ -61,6 +70,8 @@ async function fromPostgres(ctx: OrgCtx): Promise<JobListView[]> {
     completionPct: job.completionPct,
     healthScore: job.healthScore,
     budgetTotal: toNum(job.budgetTotal),
+    rag: "", // Postgres phases carry no RAG (Airtable is system of record)
+    phaseRags: [],
     counts: {
       phases: job._count.conPhases,
       actions: job._count.actions,
@@ -106,6 +117,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobListView[]> {
     let phaseCount: number;
     let riskCount: number;
     let completionPct: number;
+    let phaseRags: string[] = [];
     if (big) {
       phaseCount = Array.isArray(job["PHASES"]) ? job["PHASES"].length : 0;
       riskCount = Array.isArray(job["RISKS"]) ? job["RISKS"].length : 0;
@@ -120,18 +132,22 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobListView[]> {
       completionPct = phases.length
         ? Math.round(phases.reduce((s, p) => s + num(p["Completion_Pct"]), 0) / phases.length)
         : 0;
+      phaseRags = phases.map((p) => normalizeRag(p["RAG"])).filter(Boolean);
     }
     return {
       id: job.id,
       name: str(job["Job_Name"]) || "(job)",
       code: "", // Airtable JOBS has no code field (see plan P4)
-      engagementType: "",
+      // Tolerant read — the field lands via schema-drift migration (Spec 12 M5)
+      engagementType: normalizeEngagementType(job["Engagement_Type"]) || "",
       address: "",
       suburb: "",
       status,
       completionPct,
       healthScore: 0, // not tracked in Airtable JOBS
       budgetTotal: num(job["Estimated_Value"]),
+      rag: computeJobRag(phaseRags),
+      phaseRags,
       counts: { phases: phaseCount, actions: 0, risks: riskCount },
     };
   });
@@ -159,13 +175,15 @@ function rawJobToView(rec: { id: string; fields: Record<string, unknown> }): Job
     id: rec.id,
     name: str(f["Job_Name"]) || "(job)",
     code: "",
-    engagementType: "",
+    engagementType: normalizeEngagementType(f["Engagement_Type"]) || "",
     address: "",
     suburb: "",
     status,
     completionPct: completionFromStatus(status),
     healthScore: 0,
     budgetTotal: num(f["Estimated_Value"]),
+    rag: "", // paged path reads no PHASES rows — no signal
+    phaseRags: [],
     counts: {
       phases: Array.isArray(f["PHASES"]) ? f["PHASES"].length : 0,
       actions: 0,

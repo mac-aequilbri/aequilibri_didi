@@ -127,6 +127,26 @@ const commsSchema = z.object({
   notes: z.string().default(""),
 });
 
+// PLAN (Spec 12 Core) — the Module 5 task-level schedule. Airtable-only (no
+// Postgres model); routed through the field-map branch like COMMS. Status uses
+// the canonical PLAN.Status vocabulary (vocab.ts) directly — string, not enum,
+// so vocab enforcement (not validation) owns canonicalisation.
+const planSchema = z.object({
+  jobId: optId,
+  name: str(300).min(1),
+  phaseId: optId,
+  status: str(30).default("Not Started"),
+  rag: str(10).default(""),
+  startDate: optDate,
+  endDate: optDate,
+  durationDays: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.number().int().min(0).optional(),
+  ),
+  assignedToId: optId,
+  notes: z.string().default(""),
+});
+
 const decisionSchema = z.object({
   jobId: optId,
   description: z.string().trim().min(1),
@@ -280,7 +300,8 @@ const riskSchema = z.object({
   likelihood: int.min(1).max(5).default(3),
   impact: int.min(1).max(5).default(3),
   mitigation: z.string().default(""),
-  status: z.enum(["open", "accepted", "mitigated", "closed"]).default("open"),
+  // "materialised" triggers cascade rule G (auto-create the linked ISSUES row).
+  status: z.enum(["open", "accepted", "mitigated", "closed", "materialised"]).default("open"),
   owner: str(200).default(""),
   escalatedAt: optDate,
   escalationNote: z.string().default(""),
@@ -420,6 +441,7 @@ const REGISTRY = {
   action: { physical: "plat_core_actionhub", delegate: d(prisma.platActionHub), pgOmit: ["issueType", "phaseId", "riskId"], create: actionSchema, update: upd(actionSchema) },
   decision: { physical: "plat_core_decision", delegate: d(prisma.platDecision), create: decisionSchema, update: upd(decisionSchema) },
   comms: { physical: "COMMS", create: commsSchema, update: upd(commsSchema) },
+  plan: { physical: "PLAN", create: planSchema, update: upd(planSchema) },
   learning_rule: { physical: "plat_core_learningrule", delegate: d(prisma.platLearningRule), create: learningRuleSchema, update: upd(learningRuleSchema) },
   document: { physical: "plat_core_document", delegate: d(prisma.platDocument), create: documentSchema, update: upd(documentSchema) },
   phase: { physical: "plat_con_phase", delegate: d(prisma.platConPhase), pgOmit: ["rag"], create: phaseSchema, update: upd(phaseSchema) },
@@ -498,6 +520,10 @@ export interface WriteRequest {
   actor: Actor;
   /** Persist a proposal instead of writing; executeProposal() completes it. */
   requireApproval?: boolean;
+  /** One-line reason for the change (Spec 12 Module 7: the confirmation card
+   *  shows the proposer's rationale). Stored as __rationale in the proposal
+   *  payload and stripped before the write executes. */
+  rationale?: string;
 }
 
 export interface WriteResult {
@@ -774,6 +800,9 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
     }
   }
 
+  // The reviewer-facing rationale rides in the payload (like __recId) so both
+  // stores carry it without a column; executeProposal strips it pre-write.
+  const rationaleMeta = req.rationale?.trim() ? { __rationale: req.rationale.trim() } : {};
   if (req.requireApproval) {
     if (airtableEnabled()) {
       const expiresAt = new Date(Date.now() + PROPOSAL_TTL_DAYS * 86_400_000).toISOString();
@@ -781,7 +810,9 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
         Table_Key: req.table,
         Op: req.op,
         Record_Id: req.recordId == null ? "" : String(req.recordId),
-        Payload: JSON.stringify(airRecordId ? { __recId: airRecordId, ...data } : data),
+        Payload: JSON.stringify(
+          airRecordId ? { __recId: airRecordId, ...rationaleMeta, ...data } : { ...rationaleMeta, ...data },
+        ),
         Actor_Type: req.actor.type,
         Actor_Name: req.actor.name,
         Status: "proposed",
@@ -798,7 +829,9 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
         tableKey: req.table,
         op: req.op,
         recordId: numRecordId,
-        payload: JSON.stringify(airRecordId ? { __recId: airRecordId, ...data } : data),
+        payload: JSON.stringify(
+          airRecordId ? { __recId: airRecordId, ...rationaleMeta, ...data } : { ...rationaleMeta, ...data },
+        ),
         actorType: req.actor.type,
         actorName: req.actor.name,
         sourceMessageId: req.actor.sourceMessageId,
@@ -840,6 +873,25 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
     // fails the write). Human form writes are their own confirmation.
     if (req.actor.type !== "human" && (req.op === "create" || req.op === "update")) {
       await reconcileAirtableWrite(ctx, req.table, req.op, data, recordId, req.actor);
+    }
+    // Spec 12 Module 5 cascading update rules — third post-write hook (lock
+    // plan §5.1). Dynamic import breaks the module cycle (the engine's write
+    // effects call back into writeRecord); runCascades never throws and skips
+    // system-actor writes, so cascade-on-cascade recursion is impossible.
+    {
+      const write = { table: req.table, op: req.op, data, actor: req.actor, recordId };
+      const { runCascades } = await import("./cascade");
+      await runCascades(ctx, write);
+      // Spec 12 Module 6 job-close deltas (lock plan §6.2) — not owner-
+      // toggleable like cascades; fires whenever a job closes. Never throws.
+      if (req.table === "job") {
+        const { handleJobCompletion } = await import("@/services/platform/closeJob");
+        await handleJobCompletion(ctx, write);
+      }
+      // Spec 12 Module 7: the assistant's session context refreshes only when
+      // the data may have changed — i.e. after any write (lock plan §7.1).
+      const { invalidateAssistantContext } = await import("@/services/platform/assistant/context");
+      invalidateAssistantContext(ctx.orgSlug);
     }
     return { status: "executed", recordId, execLogId };
   } catch (err) {
@@ -955,6 +1007,8 @@ export async function executeProposal(
       ...(JSON.parse(pending.payload) as Record<string, unknown>),
       ...(edits ?? {}),
     };
+    // Reviewer-facing metadata only — never written to the record.
+    delete payloadObj.__rationale;
     // Airtable update/delete proposals stash their "rec…" target in the payload
     // (the Postgres recordId column is integer-only). Strip it before writing.
     let target: number | string | undefined = pending.recordId ?? undefined;
@@ -1013,6 +1067,28 @@ export async function executeProposal(
       jobId: pending.jobId ?? undefined,
       data: { approvedBy },
     });
+    // Spec 12 Module 5 cascades fire on EXECUTION, not proposal — an approved
+    // AI write is a confirmed domain change (same hook as the direct path).
+    {
+      const write = {
+        table: pending.tableKey,
+        op,
+        data,
+        actor: {
+          type: (pending.actorType as Actor["type"]) ?? "system",
+          name: pending.actorName,
+        } as Actor,
+        recordId,
+      };
+      const { runCascades } = await import("./cascade");
+      await runCascades(ctx, write);
+      if (pending.tableKey === "job") {
+        const { handleJobCompletion } = await import("@/services/platform/closeJob");
+        await handleJobCompletion(ctx, write);
+      }
+      const { invalidateAssistantContext } = await import("@/services/platform/assistant/context");
+      invalidateAssistantContext(ctx.orgSlug);
+    }
     return { status: "executed", recordId, execLogId, proposalId: pending.id };
   } catch (err) {
     const message = String(err instanceof Error ? err.message : err).slice(0, 1000);
