@@ -29,8 +29,6 @@ export function StatusMenu({
   label: string;
   /** What the badge shows when it differs from the stored value (e.g. "overdue"). */
   badgeStatus?: string;
-  /** Option-label formatter (e.g. underscores → spaces). */
-  display?: (s: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -56,7 +54,9 @@ export function StatusMenu({
     };
   }, [open]);
 
-  const fmt = display ?? ((s: string) => s);
+  // Humanise option labels locally (a formatter prop would be a function
+  // crossing the server→client boundary, which RSC serialization rejects).
+  const fmt = (s: string) => s.replace(/_/g, " ");
   const choose = (s: string) => {
     setOpen(false);
     btnRef.current?.focus();

@@ -215,7 +215,6 @@ export default async function ActionsPage({
                       badgeStatus={isOverdue(a) ? "overdue" : a.status}
                       options={ACTION_STATUSES}
                       label={`Status for ${a.title}`}
-                      display={(s) => s.replace("_", " ")}
                     />
                   )}
                 </td>
