@@ -9,7 +9,9 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
 import { formatDate } from "@/lib/format";
+import { ragClass } from "@/lib/platform/ragStyles";
 import { getDomainLabels, labelForAppField } from "@/lib/platform/domainLabels";
 import { getEngagementProfile } from "@/lib/platform/engagementProfile";
 import { loadPlanTasks } from "@/lib/platform/planSource";
@@ -29,13 +31,6 @@ import { planListConfig } from "./listConfig";
 export const dynamic = "force-dynamic";
 
 const STATUSES = ["Not Started", "In Progress", "Complete", "Blocked", "Deferred"];
-
-// Same palette as the Phase RAG board (phases/page.tsx).
-const RAG_CLASS: Record<string, string> = {
-  Red: "bg-red-100 text-red-800 border-red-300",
-  Amber: "bg-amber-100 text-amber-800 border-amber-300",
-  Green: "bg-emerald-100 text-emerald-800 border-emerald-300",
-};
 
 const MODE_LABEL: Record<string, string> = {
   gantt: "Gantt",
@@ -101,14 +96,14 @@ export default async function PlanPage({
         <table className="w-full min-w-[52rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">{th("name", "Task")}</th>
+              <SortableTh name="name">{th("name", "Task")}</SortableTh>
               <th scope="col" className="py-1 pr-2">{th("jobId", "Project")}</th>
               <th scope="col" className="py-1 pr-2">{th("phaseId", "Phase")}</th>
               <th scope="col" className="py-1 pr-2">{th("assignedToId", "Assigned")}</th>
-              <th scope="col" className="py-1 pr-2">{th("startDate", "Start")}</th>
-              <th scope="col" className="py-1 pr-2">{th("endDate", "End")}</th>
+              <SortableTh name="start">{th("startDate", "Start")}</SortableTh>
+              <SortableTh name="end">{th("endDate", "End")}</SortableTh>
               <th scope="col" className="py-1 pr-2">{th("rag", "RAG")}</th>
-              <th scope="col" className="py-1">{th("status", "Status")}</th>
+              <SortableTh name="status" className="py-1">{th("status", "Status")}</SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -146,7 +141,7 @@ export default async function PlanPage({
                     </td>
                     <td className="py-2 pr-2 whitespace-nowrap">
                       {t.rag ? (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${RAG_CLASS[t.rag] ?? ""}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ragClass(t.rag)}`}>
                           {t.rag}
                         </span>
                       ) : (

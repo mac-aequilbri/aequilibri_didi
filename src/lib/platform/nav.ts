@@ -5,6 +5,7 @@
 import type { NavSection } from "@/components/Sidebar";
 import type { EngagementProfile } from "./engagementProfile";
 import { orgPath } from "./paths";
+import { ROUTE_LABELS } from "./routeLabels";
 import { financeVisible } from "./roles";
 import { OrgCtx } from "./types";
 
@@ -16,6 +17,10 @@ export interface NavCounts {
   openRisks?: number;
   openVariations?: number;
 }
+
+// Canonical labels come from the shared registry so the nav and the
+// breadcrumbs always agree on what a window is called.
+const L = (segment: string) => ROUTE_LABELS[segment];
 
 export function buildNav(
   ctx: OrgCtx,
@@ -43,33 +48,33 @@ export function buildNav(
   const sections: NavSection[] = [
     {
       items: [
-        { href: p(""), label: "Dashboard", exact: true },
-        { href: p("/assistant"), label: ctx.config.assistant.name },
-        ...(f.chat ? [{ href: p("/chat"), label: "Chat" }] : []),
-        { href: p("/approvals"), label: "Approvals", badge: counts.pending || undefined },
+        { href: p(""), label: "Dashboard", exact: true, icon: "layout-dashboard" },
+        { href: p("/assistant"), label: ctx.config.assistant.name, icon: "message-circle" },
+        ...(f.chat ? [{ href: p("/chat"), label: L("chat"), icon: "messages-square" }] : []),
+        { href: p("/approvals"), label: L("approvals"), badge: counts.pending || undefined, icon: "check-check" },
       ],
     },
     {
       heading: "Delivery",
       items: [
-        { href: p("/assess"), label: "New Assessment" },
-        ...(multiJob ? [{ href: p("/projects"), label: "Projects" }] : []),
-        { href: p("/phases"), label: "Phases" },
-        { href: p("/plan"), label: "Plan" },
-        { href: p("/actions"), label: "Actions", count: counts.openActions || undefined },
-        { href: p("/decisions"), label: "Decisions" },
+        { href: p("/assess"), label: L("assess"), icon: "clipboard-list" },
+        ...(multiJob ? [{ href: p("/projects"), label: L("projects"), icon: "folder-kanban" }] : []),
+        { href: p("/phases"), label: L("phases"), icon: "layers" },
+        { href: p("/plan"), label: L("plan"), icon: "calendar-range" },
+        { href: p("/actions"), label: L("actions"), count: counts.openActions || undefined, icon: "list-todo" },
+        { href: p("/decisions"), label: L("decisions"), icon: "scale" },
         ...(f.risks && (profile?.fullRiskRegister ?? true)
-          ? [{ href: p("/risks"), label: "Risks", count: counts.openRisks || undefined }]
+          ? [{ href: p("/risks"), label: L("risks"), count: counts.openRisks || undefined, icon: "shield-alert" }]
           : []),
         ...(f.variations
-          ? [{ href: p("/variations"), label: "Variations", count: counts.openVariations || undefined }]
+          ? [{ href: p("/variations"), label: L("variations"), count: counts.openVariations || undefined, icon: "git-branch" }]
           : []),
-        ...(f.procurement ? [{ href: p("/procurement"), label: "Procurement" }] : []),
-        ...(f.project_plan ? [{ href: p("/project-plan"), label: "Project Plan" }] : []),
-        { href: p("/coordination"), label: "Coordination" },
-        { href: p("/comms"), label: "Comms" },
-        ...(f.room_matrix ? [{ href: p("/room-matrix"), label: "Room Matrix" }] : []),
-        ...(f.delay_cascade ? [{ href: p("/delay-cascade"), label: "Schedule impact" }] : []),
+        ...(f.procurement ? [{ href: p("/procurement"), label: L("procurement"), icon: "package" }] : []),
+        ...(f.project_plan ? [{ href: p("/project-plan"), label: L("project-plan"), icon: "chart-gantt" }] : []),
+        { href: p("/coordination"), label: L("coordination"), icon: "users" },
+        { href: p("/comms"), label: L("comms"), icon: "mail" },
+        ...(f.room_matrix ? [{ href: p("/room-matrix"), label: L("room-matrix"), icon: "grid-3x3" }] : []),
+        ...(f.delay_cascade ? [{ href: p("/delay-cascade"), label: L("delay-cascade"), icon: "clock-alert" }] : []),
       ],
     },
     ...(financial
@@ -77,9 +82,9 @@ export function buildNav(
           {
             heading: "Finance",
             items: [
-              ...(f.quotes ? [{ href: p("/quotes"), label: "Quotes" }] : []),
-              { href: p("/budget"), label: "Budget" },
-              { href: p("/cashflow"), label: "Cashflow" },
+              ...(f.quotes ? [{ href: p("/quotes"), label: L("quotes"), icon: "file-text" }] : []),
+              { href: p("/budget"), label: L("budget"), icon: "wallet" },
+              { href: p("/cashflow"), label: L("cashflow"), icon: "trending-up" },
             ],
           },
         ]
@@ -87,17 +92,17 @@ export function buildNav(
     {
       heading: "Records",
       items: [
-        ...(f.documents ? [{ href: p("/documents"), label: "Documents" }] : []),
-        ...(f.meeting_minutes ? [{ href: p("/meeting-minutes"), label: "Meeting Minutes" }] : []),
-        ...(f.reports ? [{ href: p("/reports"), label: "Reports" }] : []),
-        ...(f.vendors ? [{ href: p("/vendors"), label: "Vendors" }] : []),
+        ...(f.documents ? [{ href: p("/documents"), label: L("documents"), icon: "files" }] : []),
+        ...(f.meeting_minutes ? [{ href: p("/meeting-minutes"), label: L("meeting-minutes"), icon: "notebook-pen" }] : []),
+        ...(f.reports ? [{ href: p("/reports"), label: L("reports"), icon: "chart-column" }] : []),
+        ...(f.vendors ? [{ href: p("/vendors"), label: L("vendors"), icon: "store" }] : []),
       ],
     },
     {
       heading: "Automation",
       items: [
-        ...(f.learning_rules ? [{ href: p("/learning-rules"), label: "Automation rules" }] : []),
-        { href: p("/exec-log"), label: "Activity" },
+        ...(f.learning_rules ? [{ href: p("/learning-rules"), label: L("learning-rules"), icon: "brain" }] : []),
+        { href: p("/exec-log"), label: L("exec-log"), icon: "history" },
       ],
     },
   ];
@@ -108,13 +113,13 @@ export function buildNav(
       // Team + agent management are owner-only (requireAdmin on the routes too).
       ...(role.startsWith("owner")
         ? [
-            { href: p("/team"), label: "Team & access" },
-            { href: p("/agents"), label: "AI agents" },
+            { href: p("/team"), label: L("team"), icon: "users" },
+            { href: p("/agents"), label: L("agents"), icon: "bot" },
           ]
         : []),
-      ...(f.portal ? [{ href: p("/portal"), label: "Client Portal" }] : []),
-      ...(f.accounting ? [{ href: p("/accounting"), label: "Accounting" }] : []),
-      { href: p("/integrations"), label: "Integrations" },
+      ...(f.portal ? [{ href: p("/portal"), label: L("portal"), icon: "globe" }] : []),
+      ...(f.accounting ? [{ href: p("/accounting"), label: L("accounting"), icon: "landmark" }] : []),
+      { href: p("/integrations"), label: L("integrations"), icon: "plug" },
     ],
   };
   if (admin.items.length) sections.push(admin);

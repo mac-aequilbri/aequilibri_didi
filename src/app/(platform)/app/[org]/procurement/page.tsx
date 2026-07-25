@@ -3,6 +3,8 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
+import { Button } from "@/components/ui/Button";
 import { currency, formatDate, toNum } from "@/lib/format";
 import {
   applyListQuery,
@@ -59,15 +61,15 @@ export default async function ProcurementPage({
         <table className="w-full min-w-[48rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">Item</th>
+              <SortableTh name="item" className="py-1 pr-2">Item</SortableTh>
               <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Vendor</th>
               <th scope="col" className="py-1 pr-2 text-right">Qty</th>
-              <th scope="col" className="py-1 pr-2 text-right">Total</th>
-              <th scope="col" className="py-1 pr-2">Expected</th>
+              <SortableTh name="total" className="py-1 pr-2 text-right">Total</SortableTh>
+              <SortableTh name="due" className="py-1 pr-2">Expected</SortableTh>
               <th scope="col" className="py-1 pr-2">Actual</th>
-              <th scope="col" className="py-1 pr-2 text-right">Δ days</th>
-              <th scope="col" className="py-1">Status</th>
+              <SortableTh name="delta" className="py-1 pr-2 text-right">Δ days</SortableTh>
+              <SortableTh name="status" className="py-1">Status</SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -120,9 +122,9 @@ export default async function ProcurementPage({
                         </option>
                       ))}
                     </select>
-                    <button type="submit" className="btn-ae-outline text-xs">
+                    <Button type="submit" variant="outline" size="sm">
                       Set
-                    </button>
+                    </Button>
                   </form>
                 </td>
               </tr>

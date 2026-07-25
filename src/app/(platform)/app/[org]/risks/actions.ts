@@ -8,14 +8,15 @@ import { formToObject } from "@/lib/platform/forms";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { writeRecord } from "@/lib/platform/recordWriter";
+import type { CreateFormState } from "@/components/form/CreateForm";
 
-export async function createRisk(formData: FormData): Promise<void> {
+export async function createRisk(_prev: CreateFormState, formData: FormData): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx); // also enforces the write gate
 
   // A base whose RISKS schema has drifted from the field map (e.g. a supplied
-  // base predating the app shape) rejects the create — send the user back to
-  // the form with a message instead of crashing the render.
+  // base predating the app shape) rejects the create — return the error so the
+  // form re-renders inline with the typed values intact.
   try {
     await writeRecord(ctx, {
       table: "risk",
@@ -25,7 +26,7 @@ export async function createRisk(formData: FormData): Promise<void> {
     });
   } catch (e) {
     console.error("[createRisk] write rejected:", e);
-    redirect(orgPath(ctx.orgSlug, "/risks/new?error=save_failed"));
+    return { error: "Couldn't save the risk — nothing was recorded. The org's base rejected the write; check the server log for details." };
   }
   revalidatePath(orgPath(ctx.orgSlug, "/risks"));
   redirect(orgPath(ctx.orgSlug, "/risks"));

@@ -6,10 +6,11 @@ import { formToObject } from "@/lib/platform/forms";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { writeRecord } from "@/lib/platform/recordWriter";
+import type { CreateFormState } from "@/components/form/CreateForm";
 
 const COMM_STATUSES = ["pending", "sent", "acknowledged", "overdue"];
 
-export async function createComm(formData: FormData): Promise<void> {
+export async function createComm(_prev: CreateFormState, formData: FormData): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx); // also enforces the write gate
 
@@ -22,7 +23,7 @@ export async function createComm(formData: FormData): Promise<void> {
     });
   } catch (e) {
     console.error("[createComm] write rejected:", e);
-    redirect(orgPath(ctx.orgSlug, "/comms/new?error=save_failed"));
+    return { error: "Couldn't save the communication — nothing was recorded. The org's base rejected the write; check the server log for details." };
   }
   revalidatePath(orgPath(ctx.orgSlug, "/comms"));
   redirect(orgPath(ctx.orgSlug, "/comms"));

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
 import { currency, formatDate } from "@/lib/format";
 import {
   applyListQuery,
@@ -74,10 +75,10 @@ export default async function QuotesPage({
                 <tr>
                   <th scope="col" className="py-1 pr-2">Ref</th>
                   <th scope="col" className="py-1 pr-2">Project</th>
-                  <th scope="col" className="py-1 pr-2">Quote</th>
-                  <th scope="col" className="py-1 pr-2">Valid until</th>
-                  <th scope="col" className="py-1 pr-2 text-right">Total</th>
-                  <th scope="col" className="py-1 pr-2 text-right">Status</th>
+                  <SortableTh name="title">Quote</SortableTh>
+                  <SortableTh name="valid">Valid until</SortableTh>
+                  <SortableTh name="total" className="py-1 pr-2 text-right">Total</SortableTh>
+                  <SortableTh name="status" className="py-1 pr-2 text-right">Status</SortableTh>
                 </tr>
               </thead>
               <tbody>

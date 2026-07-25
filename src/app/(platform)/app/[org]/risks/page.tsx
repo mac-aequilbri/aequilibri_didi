@@ -5,7 +5,11 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
+import { Button } from "@/components/ui/Button";
+import { AiChip, Chip } from "@/components/ui/Chip";
 import { formatDate } from "@/lib/format";
+import { ragClass } from "@/lib/platform/ragStyles";
 import {
   applyListQuery,
   hasActiveFilters,
@@ -27,12 +31,6 @@ function scoreClass(score: number): string {
   if (score >= 8) return "bg-amber-100 text-amber-800";
   return "bg-emerald-100 text-emerald-800";
 }
-
-const RAG_CLASS: Record<string, string> = {
-  Red: "bg-red-100 text-red-800",
-  Amber: "bg-amber-100 text-amber-800",
-  Green: "bg-emerald-100 text-emerald-800",
-};
 
 /** Cell fill for the L×I heat map — deeper as likelihood×impact rises. */
 function heatCellClass(score: number): string {
@@ -149,12 +147,12 @@ export default async function RisksPage({
         <table className="w-full min-w-[42rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">Risk</th>
+              <SortableTh name="description" className="py-1 pr-2">Risk</SortableTh>
               <th scope="col" className="py-1 pr-2">Project</th>
-              <th scope="col" className="py-1 pr-2">Score</th>
-              <th scope="col" className="py-1 pr-2">Owner</th>
+              <SortableTh name="severity" className="py-1 pr-2">Score</SortableTh>
+              <SortableTh name="owner" className="py-1 pr-2">Owner</SortableTh>
               <th scope="col" className="py-1 pr-2">Escalated</th>
-              <th scope="col" className="py-1">Status</th>
+              <SortableTh name="status" className="py-1">Status</SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -174,18 +172,16 @@ export default async function RisksPage({
                     >
                       {r.description}
                     </Link>
-                    {r.createdByAi && (
-                      <span className="ml-1 text-[0.65rem] px-1 rounded bg-violet-100 text-violet-700">AI</span>
-                    )}
+                    {r.createdByAi && <AiChip className="ml-1" />}
                     {r.rag && (
-                      <span className={`ml-1 text-[0.65rem] px-1 rounded font-semibold ${RAG_CLASS[r.rag] ?? ""}`}>
+                      <span className={`ml-1 text-[0.65rem] px-1 rounded font-semibold ${ragClass(r.rag)}`}>
                         {r.rag}
                       </span>
                     )}
                     {r.category && (
-                      <span className="ml-1 text-[0.65rem] px-1 rounded bg-neutral-100 text-neutral-600">
+                      <Chip variant="neutral" className="ml-1">
                         {r.category}
-                      </span>
+                      </Chip>
                     )}
                     {r.mitigation && (
                       <span className="block text-xs text-neutral-500">
@@ -225,9 +221,9 @@ export default async function RisksPage({
                           </option>
                         ))}
                       </select>
-                      <button type="submit" className="btn-ae-outline text-xs">
+                      <Button type="submit" variant="outline" size="sm">
                         Set
-                      </button>
+                      </Button>
                     </form>
                   </td>
                 </tr>

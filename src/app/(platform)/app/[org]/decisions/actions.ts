@@ -6,8 +6,9 @@ import { formToObject } from "@/lib/platform/forms";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { writeRecord } from "@/lib/platform/recordWriter";
+import type { CreateFormState } from "@/components/form/CreateForm";
 
-export async function createDecision(formData: FormData): Promise<void> {
+export async function createDecision(_prev: CreateFormState, formData: FormData): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx); // also enforces the write gate
   const data = formToObject(formData);
@@ -22,7 +23,7 @@ export async function createDecision(formData: FormData): Promise<void> {
     });
   } catch (e) {
     console.error("[createDecision] write rejected:", e);
-    redirect(orgPath(ctx.orgSlug, "/decisions/new?error=save_failed"));
+    return { error: "Couldn't save the decision — nothing was recorded. The org's base rejected the write; check the server log for details." };
   }
   revalidatePath(orgPath(ctx.orgSlug, "/decisions"));
   redirect(orgPath(ctx.orgSlug, "/decisions"));

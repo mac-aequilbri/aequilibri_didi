@@ -117,7 +117,7 @@ export default async function BudgetPage({ params }: { params: Promise<{ org: st
                       <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(toNum(b.forecast))}</td>
                       <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(actual)}</td>
                       <td
-                        className={`py-2 pr-2 text-right whitespace-nowrap text-xs font-semibold ${over ? "text-red-600" : "text-emerald-700"}`}
+                        className={`py-2 pr-2 text-right whitespace-nowrap text-xs font-semibold ${over ? "text-ae-danger" : "text-ae-success"}`}
                       >
                         {variance === 0 ? "—" : `${variance > 0 ? "+" : ""}${currency(variance)}`}
                       </td>

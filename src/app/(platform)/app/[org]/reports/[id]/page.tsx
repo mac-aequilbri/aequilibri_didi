@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { AiChip } from "@/components/ui/Chip";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { formatDate } from "@/lib/format";
@@ -46,6 +47,7 @@ export default async function ReportDetailPage({
       <div className="ae-card p-5">
         <div className="flex items-center gap-3 mb-4">
           <StatusBadge status={report.status} />
+          {report.promptSpec && <AiChip />}
           {report.approvedBy && (
             <span className="text-xs text-neutral-500">
               approved by {report.approvedBy}

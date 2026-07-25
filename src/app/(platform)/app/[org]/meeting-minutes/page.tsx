@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
 import { formatDate } from "@/lib/format";
 import {
   applyListQuery,
@@ -56,11 +57,11 @@ export default async function MeetingMinutesPage({
         <table className="w-full min-w-[36rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">Meeting</th>
+              <SortableTh name="title">Meeting</SortableTh>
               <th scope="col" className="py-1 pr-2">Project</th>
-              <th scope="col" className="py-1 pr-2">Date</th>
-              <th scope="col" className="py-1 pr-2 text-right">Actions</th>
-              <th scope="col" className="py-1">Status</th>
+              <SortableTh name="meeting">Date</SortableTh>
+              <SortableTh name="actions" className="py-1 pr-2 text-right">Actions</SortableTh>
+              <SortableTh name="status" className="py-1">Status</SortableTh>
             </tr>
           </thead>
           <tbody>

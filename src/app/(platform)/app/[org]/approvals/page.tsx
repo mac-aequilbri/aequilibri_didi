@@ -8,12 +8,22 @@
 // not an opaque payload.
 
 import Link from "next/link";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { FilterBar } from "@/components/FilterBar";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { Chip, AiChip } from "@/components/ui/Chip";
+import { MessageBar } from "@/components/ui/MessageBar";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import {
+  applyListQuery,
+  parseListQuery,
+  toClientConfig,
+  type ListViewConfig,
+} from "@/lib/platform/listQuery";
 import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
+import { orgPath } from "@/lib/platform/paths";
 import { isWritableTable, readRecord } from "@/lib/platform/recordWriter";
-import { loadPendingWrites } from "@/lib/platform/pendingWritesSource";
+import { loadPendingWrites, type PendingWriteView } from "@/lib/platform/pendingWritesSource";
 import { inScope, resolveJobScope } from "@/lib/platform/rls";
 import { canApprove } from "@/lib/platform/roles";
 import { getDomainLabels, labelForAppField, tableLabelFor } from "@/lib/platform/domainLabels";
@@ -131,6 +141,56 @@ function buildChanges(op: string, payload: string, current: Record<string, unkno
   return changes;
 }
 
+/** A pending proposal resolved into its rendered view (diff + rationale). */
+interface ProposalView {
+  prop: PendingWriteView;
+  changes: Array<Change & { label: string }>;
+  rationale: string;
+}
+
+// Filter/search/sort config for the pending queue. NO pageSize: approvers must
+// always see every pending proposal — filtering narrows, paging would hide.
+// tableLabel is per-org (domain labels), so the config is built per request.
+function buildListConfig(tableLabel: (tableKey: string) => string): ListViewConfig<ProposalView> {
+  return {
+    search: [
+      (v) => tableLabel(v.prop.tableKey),
+      (v) => v.prop.actorName,
+      (v) => v.rationale,
+      (v) => v.prop.payload,
+    ],
+    fields: [
+      {
+        kind: "enum",
+        name: "origin",
+        label: "Origin",
+        // Same flag the AI/Manual chip renders from: actorType === "ai".
+        getValue: (v) => (v.prop.actorType === "ai" ? "ai" : "manual"),
+        options: [
+          { value: "ai", label: "AI" },
+          { value: "manual", label: "Manual" },
+        ],
+      },
+      {
+        kind: "enum",
+        name: "op",
+        label: "Operation",
+        getValue: (v) => v.prop.op,
+        options: [
+          { value: "create", label: "Create" },
+          { value: "update", label: "Update" },
+          { value: "delete", label: "Delete" },
+        ],
+      },
+    ],
+    sort: [
+      // No ?sort= keeps the source order (newest proposal first) untouched.
+      { name: "created", label: "Proposed", getValue: (v) => v.prop.createdAt },
+      { name: "expiry", label: "Expiry", getValue: (v) => v.prop.expiresAt },
+    ],
+  };
+}
+
 export default async function ApprovalsPage({
   params,
   searchParams,
@@ -173,10 +233,20 @@ export default async function ApprovalsPage({
           : null;
       const changes = buildChanges(prop.op, prop.payload, current).map((c) => ({
         ...c,
-        label: labelForAppField(labels, prop.tableKey, c.key),
+        label: labelForAppField(labels, prop.tableKey, c.key) ?? c.key,
       }));
       return { prop, changes, rationale: rationaleOf(prop.payload) };
     }),
+  );
+
+  // Filter/sort the resolved queue per the URL. Unfiltered order is the
+  // source's (newest first); no pagination — every match renders.
+  const listConfig = buildListConfig(tableLabel);
+  const query = parseListQuery(sp, listConfig);
+  const { items, total, matching, page, pageCount, facets } = applyListQuery(
+    proposals,
+    query,
+    listConfig,
   );
 
   return (
@@ -187,7 +257,7 @@ export default async function ApprovalsPage({
       />
 
       {typeof sp.approved === "string" && sp.approved !== "" && (
-        <div role="status" className="ae-card p-3 mb-4 border-emerald-300 text-sm text-emerald-700">
+        <MessageBar variant="success" className="mb-4">
           Change approved and written.
           {(() => {
             const href =
@@ -203,14 +273,14 @@ export default async function ApprovalsPage({
               </>
             ) : null;
           })()}
-        </div>
+        </MessageBar>
       )}
 
       {sp.error === "approve_failed" && (
-        <div role="alert" className="ae-card p-3 mb-4 border-red-300 text-sm text-red-700">
+        <MessageBar variant="danger" className="mb-4">
           The approved write could not be executed — no change was made. The proposal is marked
           failed below; it may have expired or the record may have changed.
-        </div>
+        </MessageBar>
       )}
 
       {proposals.length === 0 ? (
@@ -222,8 +292,19 @@ export default async function ApprovalsPage({
           </p>
         </div>
       ) : (
+        <FilterBar
+          basePath={orgPath(ctx.orgSlug, "/approvals")}
+          config={toClientConfig(listConfig)}
+          query={query}
+          shown={matching}
+          total={total}
+          counts={facets}
+          page={page}
+          pageCount={pageCount}
+          searchPlaceholder="Search proposals…"
+        >
         <div className="space-y-3">
-          {proposals.map(({ prop, changes, rationale }) => {
+          {items.map(({ prop, changes, rationale }) => {
             const exp = expiryNote(prop.expiresAt);
             const isAi = prop.actorType === "ai";
             const editable = prop.op !== "delete" && changes.some((c) => c.raw !== null);
@@ -242,13 +323,7 @@ export default async function ApprovalsPage({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full ${
-                          isAi ? "bg-amber-100 text-amber-800" : "bg-neutral-100 text-neutral-600"
-                        }`}
-                      >
-                        {isAi ? "AI" : "Manual"}
-                      </span>
+                      {isAi ? <AiChip /> : <Chip variant="neutral">Manual</Chip>}
                       <span className="font-semibold">
                         {opLabel(prop.op)} {tableLabel(prop.tableKey)}
                         {prop.recordId ? <span className="text-neutral-500"> #{prop.recordId}</span> : null}
@@ -296,7 +371,16 @@ export default async function ApprovalsPage({
               </form>
             );
           })}
+          {items.length === 0 && (
+            <div className="ae-card p-8">
+              <EmptyState
+                title="No proposals match these filters"
+                hint="Try widening or clearing the filters above."
+              />
+            </div>
+          )}
         </div>
+        </FilterBar>
       )}
 
       {recent.length > 0 && (

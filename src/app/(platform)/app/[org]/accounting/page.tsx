@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { buttonClass } from "@/components/ui/Button";
+import { MessageBar } from "@/components/ui/MessageBar";
 import { currency, formatDate } from "@/lib/format";
 import { xeroEnabled, type AccountingSummary } from "@/lib/platform/accounting";
 import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
@@ -62,7 +64,11 @@ export default async function AccountingPage({
             : "No Xero credentials configured — the demo ledger stands in. Set XERO_CLIENT_ID/SECRET to go live."
         }
       />
-      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+      {error && (
+        <MessageBar variant="danger" className="mb-4">
+          {error}
+        </MessageBar>
+      )}
 
       <section className="ae-card p-5 mb-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -98,6 +104,7 @@ export default async function AccountingPage({
                     label="Disconnect"
                     confirmLabel="Confirm disconnect"
                     pendingLabel="Disconnecting…"
+                    className={buttonClass("danger")}
                   />
                 </form>
               </>

@@ -6,14 +6,25 @@ import { CopyButton } from "@/components/CopyButton";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { buttonClass } from "@/components/ui/Button";
+import { Chip, type ChipVariant } from "@/components/ui/Chip";
+import { MessageBar } from "@/components/ui/MessageBar";
 import { getOrgWebhookSecret, listConnections, listOutbox } from "@/lib/airtable/control";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
-import { orgPath } from "@/lib/platform/paths";
 import { addConnection, removeConnection, toggleConnection } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const CHANNELS = ["email", "slack", "form", "drive", "webhook"];
+
+/** Outbound-event delivery status → chip tone (delivered good, failed retrying,
+ *  dead needs attention). Presentational only. */
+function outboxVariant(status: string): ChipVariant {
+  if (/delivered|ok/i.test(status)) return "success";
+  if (/dead/i.test(status)) return "danger";
+  if (/failed|error/i.test(status)) return "warning";
+  return "neutral";
+}
 
 export default async function IntegrationsPage({
   params,
@@ -45,16 +56,10 @@ export default async function IntegrationsPage({
         <p className="text-sm text-neutral-600">No channels wired yet. Add one below.</p>
       ) : (
         <>
-        <p
-          className={`mb-3 rounded-md border px-3 py-2 text-xs font-medium ${
-            unhealthy > 0
-              ? "border-[var(--ae-warning)] bg-[var(--ae-warning-bg)] text-[var(--ae-warning)]"
-              : "border-[var(--ae-success)] bg-[var(--ae-success-bg)] text-[var(--ae-success)]"
-          }`}
-        >
+        <MessageBar variant={unhealthy > 0 ? "warning" : "success"} className="mb-3">
           {rows.length} channel{rows.length === 1 ? "" : "s"} ·{" "}
           {unhealthy > 0 ? `${unhealthy} with failures` : "all healthy"}
-        </p>
+        </MessageBar>
         <table className="w-full text-sm ae-card">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
@@ -79,7 +84,7 @@ export default async function IntegrationsPage({
                     <SubmitButton
                       label={r.isActive ? "Enabled" : "Disabled"}
                       pendingLabel="Updating…"
-                      className={`text-xs font-semibold ${r.isActive ? "text-emerald-700" : "text-neutral-500"}`}
+                      className={buttonClass("ghost", "sm", r.isActive ? "" : "opacity-60")}
                     />
                   </form>
                 </td>
@@ -102,7 +107,7 @@ export default async function IntegrationsPage({
                       label="🗑 Delete"
                       confirmLabel="Confirm delete"
                       pendingLabel="Deleting…"
-                      className="btn-ae-danger-outline"
+                      className={buttonClass("danger", "sm")}
                     />
                   </form>
                 </td>
@@ -224,7 +229,9 @@ export default async function IntegrationsPage({
                     {e.event}
                     {e.summary ? <span className="block text-neutral-500 font-sans">{e.summary}</span> : null}
                   </td>
-                  <td className="p-3 text-xs">{e.status}</td>
+                  <td className="p-3 text-xs">
+                    <Chip variant={outboxVariant(e.status)}>{e.status}</Chip>
+                  </td>
                   <td className="p-3 text-xs">{e.createdAt.slice(0, 19).replace("T", " ") || "—"}</td>
                   <td className="p-3 text-xs">{e.deliveredAt ? e.deliveredAt.slice(0, 19).replace("T", " ") : "—"}</td>
                 </tr>

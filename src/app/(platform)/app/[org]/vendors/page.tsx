@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
 import {
   applyListQuery,
   hasActiveFilters,
@@ -55,10 +56,10 @@ export default async function VendorsPage({
         <table className="w-full min-w-[38rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">Vendor</th>
-              <th scope="col" className="py-1 pr-2">Category</th>
+              <SortableTh name="name" className="py-1 pr-2">Vendor</SortableTh>
+              <SortableTh name="category" className="py-1 pr-2">Category</SortableTh>
               <th scope="col" className="py-1 pr-2">Contact</th>
-              <th scope="col" className="py-1 pr-2">Rating</th>
+              <SortableTh name="rating" className="py-1 pr-2">Rating</SortableTh>
               <th scope="col" className="py-1">Active</th>
             </tr>
           </thead>

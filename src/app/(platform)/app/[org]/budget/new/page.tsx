@@ -1,4 +1,4 @@
-import { SubmitButton } from "@/components/form/SubmitButton";
+import { CreateForm } from "@/components/form/CreateForm";
 import { PageHeader } from "@/components/PageHeader";
 import { loadReferenceOptions } from "@/lib/platform/configSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
@@ -9,14 +9,11 @@ export const dynamic = "force-dynamic";
 
 export default async function NewBudgetLinePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ org: string }>;
-  searchParams: Promise<{ error?: string }>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
   await requireFinancialAccess(ctx);
-  const { error } = await searchParams;
   const [jobs, categories] = await Promise.all([
     loadJobOptions(ctx),
     loadReferenceOptions(ctx, "budget_category"),
@@ -25,13 +22,7 @@ export default async function NewBudgetLinePage({
   return (
     <div className="p-6 max-w-xl">
       <PageHeader title="New budget line" />
-      {error === "save_failed" && (
-        <p role="alert" className="text-red-600 text-sm mb-3">
-          The budget line couldn&apos;t be saved — the org&apos;s base rejected the write. Check
-          the server log for details.
-        </p>
-      )}
-      <form action={createBudgetLine} className="ae-card p-5 space-y-4">
+      <CreateForm action={createBudgetLine} submitLabel="Add budget line" pendingLabel="Adding…" className="ae-card p-5 space-y-4">
         <input type="hidden" name="org" value={ctx.orgSlug} />
         <div className="grid grid-cols-2 gap-4">
           <label className="block text-sm">
@@ -75,8 +66,7 @@ export default async function NewBudgetLinePage({
             <input type="number" step="0.01" min={0} inputMode="decimal" name="actualAmount" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
         </div>
-        <SubmitButton label="Add budget line" pendingLabel="Adding…" />
-      </form>
+      </CreateForm>
     </div>
   );
 }

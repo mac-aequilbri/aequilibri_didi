@@ -3,6 +3,9 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
+import { Chip } from "@/components/ui/Chip";
+import { MessageBar } from "@/components/ui/MessageBar";
 import { formatDate } from "@/lib/format";
 import { loadDocuments } from "@/lib/platform/documentsSource";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
@@ -41,10 +44,10 @@ export default async function DocumentsPage({
         actions={[{ href: orgPath(ctx.orgSlug, "/documents/new"), label: "+ Add document" }]}
       />
       {(sync.processed || sync.documents || sync.proposals) && (
-        <div className="mb-4 ae-card p-5 text-sm text-neutral-700">
+        <MessageBar variant="success" className="mb-4">
           Inbox sync processed {sync.processed || "0"} email(s), created {sync.documents || "0"} document(s),
           and queued {sync.proposals || "0"} proposal(s).
-        </div>
+        </MessageBar>
       )}
       <form action={ingestInboxAction} className="ae-card p-5 mb-4 flex flex-wrap items-end gap-3 text-sm">
         <input type="hidden" name="org" value={ctx.orgSlug} />
@@ -74,12 +77,12 @@ export default async function DocumentsPage({
         <table className="w-full min-w-[40rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">Document</th>
+              <SortableTh name="title">Document</SortableTh>
               <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Type</th>
               <th scope="col" className="py-1 pr-2">Kind</th>
-              <th scope="col" className="py-1 pr-2">Added</th>
-              <th scope="col" className="py-1">Status</th>
+              <SortableTh name="added">Added</SortableTh>
+              <SortableTh name="status" className="py-1">Status</SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -100,7 +103,7 @@ export default async function DocumentsPage({
                       {d.title}
                     </Link>
                   )}
-                  {d.version > 1 && <span className="ml-2 text-xs text-amber-700">v{d.version}</span>}
+                  {d.version > 1 && <Chip variant="warning" className="ml-2">v{d.version}</Chip>}
                   {d.aiSummary && (
                     <span className="block text-xs text-neutral-500 line-clamp-1">{d.aiSummary}</span>
                   )}

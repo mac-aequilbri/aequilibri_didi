@@ -6,6 +6,7 @@
 // column and leave the Postgres column at its legacy/zero count).
 
 import { PageHeader } from "@/components/PageHeader";
+import { Chip } from "@/components/ui/Chip";
 import { airtableEnabled, core, resolveBaseId, type CoreTableName } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
@@ -79,9 +80,9 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
       <section className="ae-card p-5 mb-6 space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-neutral-600">AIRTABLE_MIGRATION</span>
-          <span className={`font-mono font-semibold ${on ? "text-emerald-700" : "text-neutral-500"}`}>
+          <Chip variant={on ? "success" : "neutral"} className="font-mono">
             {on ? "true — reads & writes use Airtable" : "off — everything uses Postgres"}
-          </span>
+          </Chip>
         </div>
         <div className="flex justify-between">
           <span className="text-neutral-600">Resolved base</span>
@@ -124,8 +125,16 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
             {counts.map((c) => (
               <tr key={c.label} className="border-t border-neutral-100">
                 <td className="py-1.5 pr-2">{c.label}</td>
-                <td className="py-1.5 pr-2 text-right font-mono">{String(c.air)}</td>
-                <td className="py-1.5 text-right font-mono text-neutral-500">{String(c.pg)}</td>
+                <td className="py-1.5 pr-2 text-right font-mono">
+                  {typeof c.air === "string" && c.air.startsWith("err") ? (
+                    <Chip variant="danger" className="font-mono">{c.air}</Chip>
+                  ) : (
+                    String(c.air)
+                  )}
+                </td>
+                <td className="py-1.5 text-right font-mono text-neutral-500">
+                  {c.pg === "err" ? <Chip variant="danger" className="font-mono">err</Chip> : String(c.pg)}
+                </td>
               </tr>
             ))}
           </tbody>

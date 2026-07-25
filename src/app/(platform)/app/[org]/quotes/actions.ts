@@ -16,13 +16,16 @@ import {
   updateQuoteMeta,
   type QuoteStatus,
 } from "@/services/platform/construction/quotes";
+import type { CreateFormState } from "@/components/form/CreateForm";
 
-export async function createQuoteAction(formData: FormData): Promise<void> {
+export async function createQuoteAction(_prev: CreateFormState, formData: FormData): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
   const jobId = recordIdParam(formData.get("jobId"));
   const title = String(formData.get("title") ?? "").trim();
-  if (jobId == null || !title) return;
+  if (jobId == null || !title) {
+    return { error: "Couldn't create the quote — choose a project and enter a quote title. Nothing was recorded." };
+  }
   const fromBudget = formData.get("fromBudget") === "on";
   let quoteId;
   try {
@@ -37,7 +40,7 @@ export async function createQuoteAction(formData: FormData): Promise<void> {
         });
   } catch (e) {
     console.error("[createQuoteAction] write rejected:", e);
-    redirect(orgPath(ctx.orgSlug, "/quotes/new?error=save_failed"));
+    return { error: "Couldn't save the quote — nothing was recorded. The org's base rejected the write; check the server log for details." };
   }
   redirect(orgPath(ctx.orgSlug, `/quotes/${quoteId}`));
 }

@@ -6,6 +6,8 @@ import { TrendChart } from "@/components/charts";
 import { MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { buttonClass } from "@/components/ui/Button";
+import { Chip, type ChipVariant } from "@/components/ui/Chip";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadLearning } from "@/lib/platform/learningSource";
@@ -19,11 +21,11 @@ import {
   toggleRuleAction,
 } from "./actions";
 
-// Spec 12 Override_Permission ladder chip colours.
-const LEVEL_CHIP: Record<string, { label: string; cls: string }> = {
-  owner_only: { label: "owner-only", cls: "bg-red-100 text-red-700" },
-  standard: { label: "standard", cls: "bg-neutral-100 text-neutral-600" },
-  advisory: { label: "advisory", cls: "bg-sky-100 text-sky-700" },
+// Spec 12 Override_Permission ladder chip tones.
+const LEVEL_CHIP: Record<string, { label: string; variant: ChipVariant }> = {
+  owner_only: { label: "owner-only", variant: "danger" },
+  standard: { label: "standard", variant: "neutral" },
+  advisory: { label: "advisory", variant: "info" },
 };
 
 export const dynamic = "force-dynamic";
@@ -94,13 +96,13 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
             <div key={h.id} className="border-t border-neutral-100 py-3 text-sm">
               <p className="font-medium">
                 {h.description}
-                <span className="ml-1 text-[0.65rem] px-1 rounded bg-neutral-100 text-neutral-600">
+                <Chip variant="neutral" className="ml-1">
                   {h.hypothesisType}
-                </span>
+                </Chip>
                 {h.validated && (
-                  <span className="ml-1 text-[0.65rem] px-1 rounded bg-emerald-100 text-emerald-700">
+                  <Chip variant="success" className="ml-1">
                     validated
-                  </span>
+                  </Chip>
                 )}
               </p>
               <p className="text-xs text-neutral-500 mt-0.5">
@@ -146,7 +148,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                     label="Reject"
                     confirmLabel="Confirm reject"
                     pendingLabel="Rejecting…"
-                    className="btn-ae-outline text-xs text-red-600 border-red-300"
+                    className={buttonClass("danger", "sm")}
                   />
                 </form>
               </div>
@@ -173,15 +175,14 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                 <td className="py-2 pr-2">
                   <span className="font-mono text-xs text-neutral-500">{r.ruleCode}</span>{" "}
                   <span className="font-medium">{r.description}</span>
-                  {r.cannotOverride && (
-                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-red-100 text-red-700">locked</span>
-                  )}
-                  <span
-                    className={`ml-1 text-[0.65rem] px-1 rounded ${LEVEL_CHIP[r.overrideLevel]?.cls ?? ""}`}
+                  {r.cannotOverride && <Chip variant="danger" className="ml-1">locked</Chip>}
+                  <Chip
+                    variant={LEVEL_CHIP[r.overrideLevel]?.variant ?? "neutral"}
+                    className="ml-1"
                     title="Override governance (Spec 12): who may override this rule"
                   >
                     {LEVEL_CHIP[r.overrideLevel]?.label ?? r.overrideLevel}
-                  </span>
+                  </Chip>
                   {r.relaxEligible && (
                     <form action={setOverrideLevelAction} className="inline ml-1">
                       <input type="hidden" name="org" value={ctx.orgSlug} />
@@ -196,17 +197,15 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                       </button>
                     </form>
                   )}
-                  {r.autoApply && (
-                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-emerald-100 text-emerald-700">auto-apply</span>
-                  )}
+                  {r.autoApply && <Chip variant="success" className="ml-1">auto-apply</Chip>}
                   {r.status === "draft" && (
-                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-sky-100 text-sky-700">draft — activate to apply</span>
+                    <Chip variant="info" className="ml-1">draft — activate to apply</Chip>
                   )}
                   {r.status === "under_review" && (
-                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-amber-100 text-amber-700">under review — confidence ≤ 50</span>
+                    <Chip variant="warning" className="ml-1">under review — confidence ≤ 50</Chip>
                   )}
                   {r.needsReview && (
-                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-amber-100 text-amber-700">review — confidence ≤ 60</span>
+                    <Chip variant="warning" className="ml-1">review — confidence ≤ 60</Chip>
                   )}
                 </td>
                 <td className="py-2 pr-2 text-xs">{r.kind}</td>

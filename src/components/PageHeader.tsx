@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { OrgLogo } from "./OrgLogo";
 
 export interface HeaderAction {
@@ -134,11 +135,12 @@ export function StatusBadge({ status }: { status: string }) {
 /** Guided empty state — an icon, what-this-is line, and an optional first action.
  *  Renders fine inside a spanning table cell or a card. */
 export function EmptyState({
-  icon = "✶",
+  icon,
   title,
   hint,
   action,
 }: {
+  /** Optional glyph override; when absent a Sparkles icon renders. */
   icon?: string;
   title: string;
   hint?: string;
@@ -147,7 +149,7 @@ export function EmptyState({
   return (
     <div className="ae-empty">
       <div className="ae-empty-icon" aria-hidden="true">
-        {icon}
+        {icon ?? <Sparkles className="mx-auto h-7 w-7" />}
       </div>
       <p className="ae-empty-title">{title}</p>
       {hint && <p className="ae-empty-hint">{hint}</p>}

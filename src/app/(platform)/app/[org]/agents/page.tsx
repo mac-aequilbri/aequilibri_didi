@@ -7,6 +7,9 @@
 
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { buttonClass } from "@/components/ui/Button";
+import { Chip, type ChipVariant } from "@/components/ui/Chip";
+import { MessageBar } from "@/components/ui/MessageBar";
 import { requireAdmin, requireOrgCtx } from "@/lib/platform/org-context";
 import { canApprove } from "@/lib/platform/roles";
 import { SPECIALISTS } from "@/services/platform/agents/registry";
@@ -30,13 +33,8 @@ function approverLabel(table: string | undefined): string {
 }
 
 function RiskBadge({ risk }: { risk: string }) {
-  const cls =
-    risk === "read"
-      ? "bg-neutral-100 text-neutral-600"
-      : risk === "low_write"
-        ? "bg-amber-100 text-amber-800"
-        : "bg-red-100 text-red-800";
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{risk}</span>;
+  const variant: ChipVariant = risk === "read" ? "neutral" : risk === "low_write" ? "warning" : "danger";
+  return <Chip variant={variant}>{risk}</Chip>;
 }
 
 export default async function AgentsPage({
@@ -65,9 +63,9 @@ export default async function AgentsPage({
       </p>
 
       {status === "saved" && (
-        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <MessageBar variant="success" className="mb-4">
           AI write-authority updated.
-        </div>
+        </MessageBar>
       )}
 
       <section className="ae-card p-5 mb-6">
@@ -93,10 +91,7 @@ export default async function AgentsPage({
               ))}
             </select>
           </label>
-          <SubmitButton
-            label="Save"
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
-          />
+          <SubmitButton label="Save" className={buttonClass("primary")} />
         </form>
       </section>
 

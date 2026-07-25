@@ -15,10 +15,11 @@ import {
 } from "@/services/platform/documents";
 import { loadDocumentDetail } from "@/lib/platform/documentsSource";
 import { prisma } from "@/lib/db";
+import type { CreateFormState } from "@/components/form/CreateForm";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
-export async function uploadDocument(formData: FormData): Promise<void> {
+export async function uploadDocument(_prev: CreateFormState, formData: FormData): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
   const jobId = recordIdParam(formData.get("jobId")) ?? undefined;
@@ -32,7 +33,7 @@ export async function uploadDocument(formData: FormData): Promise<void> {
 
   if (file instanceof File && file.size > 0) {
     if (file.size > MAX_UPLOAD_BYTES) {
-      redirect(orgPath(ctx.orgSlug, "/documents/new?error=too_large"));
+      return { error: "Couldn't save — the file is too large (max 5 MB). Nothing was recorded." };
     }
     const jobCode = !airtableEnabled() && typeof jobId === "number"
       ? (await prisma.platJob.findFirst({ where: { id: jobId, orgId: ctx.orgId }, select: { code: true } }))?.code
@@ -52,7 +53,7 @@ export async function uploadDocument(formData: FormData): Promise<void> {
       });
     } catch (e) {
       console.error("[uploadDocument] file ingest rejected:", e);
-      redirect(orgPath(ctx.orgSlug, "/documents/new?error=save_failed"));
+      return { error: "Couldn't save the document — nothing was recorded. The org's base rejected the write; check the server log for details." };
     }
   } else if (url) {
     try {
@@ -67,10 +68,10 @@ export async function uploadDocument(formData: FormData): Promise<void> {
       });
     } catch (e) {
       console.error("[uploadDocument] link ingest rejected:", e);
-      redirect(orgPath(ctx.orgSlug, "/documents/new?error=save_failed"));
+      return { error: "Couldn't save the link — nothing was recorded. The org's base rejected the write; check the server log for details." };
     }
   } else {
-    redirect(orgPath(ctx.orgSlug, "/documents/new?error=nothing_to_save"));
+    return { error: "Nothing to save — choose a file or enter a link." };
   }
 
   revalidatePath(orgPath(ctx.orgSlug, "/documents"));

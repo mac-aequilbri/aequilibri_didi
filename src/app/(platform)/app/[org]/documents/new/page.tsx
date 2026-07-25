@@ -1,4 +1,4 @@
-import { SubmitButton } from "@/components/form/SubmitButton";
+import { CreateForm } from "@/components/form/CreateForm";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -8,13 +8,10 @@ export const dynamic = "force-dynamic";
 
 export default async function NewDocumentPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ org: string }>;
-  searchParams: Promise<{ error?: string }>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const { error } = await searchParams;
   const jobs = await loadJobOptions(ctx);
 
   return (
@@ -23,23 +20,7 @@ export default async function NewDocumentPage({
         title="Add document"
         subtitle="Upload a file (classified + parsed automatically) or save an external link."
       />
-      {error === "too_large" && (
-        <p role="alert" className="text-red-600 text-sm mb-3">
-          File too large (max 5 MB).
-        </p>
-      )}
-      {error === "nothing_to_save" && (
-        <p role="alert" className="text-red-600 text-sm mb-3">
-          Choose a file or enter a link.
-        </p>
-      )}
-      {error === "save_failed" && (
-        <p role="alert" className="text-red-600 text-sm mb-3">
-          The document couldn&apos;t be saved — the org&apos;s base rejected the write. Check the
-          server log for details.
-        </p>
-      )}
-      <form action={uploadDocument} className="ae-card p-5 space-y-4">
+      <CreateForm action={uploadDocument} submitLabel="Save document" pendingLabel="Uploading…" className="ae-card p-5 space-y-4">
         <input type="hidden" name="org" value={ctx.orgSlug} />
         <div className="grid grid-cols-2 gap-4">
           <label className="block text-sm">
@@ -81,8 +62,7 @@ export default async function NewDocumentPage({
           <span className="text-neutral-600">External link (Drive, Dropbox…)</span>
           <input name="url" type="url" placeholder="https://…" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </label>
-        <SubmitButton label="Save document" pendingLabel="Uploading…" />
-      </form>
+      </CreateForm>
     </div>
   );
 }

@@ -12,7 +12,7 @@
 // AI-proposed writes for the approvals inbox.
 
 import { pathToFileURL } from "node:url";
-import { listAll, createAll, loadState, saveState, log } from "./_lib.mjs";
+import { createAll, loadState, saveState, log } from "./_lib.mjs";
 import {
   FIRM, LAWYERS, MATTER_CATALOG, MATTER_WEIGHTS, SUBURBS, RISK_POOL, DISBURSEMENTS,
   disbursementBucket, DECISIONS_POOL, personName, companyName, matterTitleSubject,

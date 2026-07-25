@@ -3,43 +3,15 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ChevronRight } from "lucide-react";
+import { ROUTE_LABELS } from "@/lib/platform/routeLabels";
 import { OrgLogo } from "./OrgLogo";
 
-// Friendly labels for path segments — kept in sync with the nav. Anything not
-// listed falls back to a humanised slug, and numeric ids render as "#<id>".
-const LABELS: Record<string, string> = {
-  assistant: "Assistant",
-  approvals: "Approvals",
-  assess: "New Assessment",
-  projects: "Projects",
-  phases: "Phases",
-  actions: "Actions",
-  decisions: "Decisions",
-  risks: "Risks",
-  variations: "Variations",
-  procurement: "Procurement",
-  "project-plan": "Project Plan",
-  "room-matrix": "Room Matrix",
-  "delay-cascade": "Schedule impact",
-  quotes: "Quotes",
-  budget: "Budget",
-  cashflow: "Cashflow",
-  documents: "Documents",
-  "meeting-minutes": "Meeting Minutes",
-  reports: "Reports",
-  vendors: "Vendors",
-  "learning-rules": "Automation rules",
-  "exec-log": "Activity",
-  portal: "Client Portal",
-  accounting: "Accounting",
-  models: "Models",
-  new: "New",
-  escalation: "Escalation",
-  print: "Print",
-};
-
+// Friendly labels come from the shared registry (kept in sync with the nav).
+// Anything not listed falls back to a humanised slug, and numeric ids render
+// as "#<id>".
 const labelFor = (seg: string) =>
-  LABELS[seg] ?? (/^\d+$/.test(seg) ? `#${seg}` : seg.replace(/-/g, " "));
+  ROUTE_LABELS[seg] ?? (/^\d+$/.test(seg) ? `#${seg}` : seg.replace(/-/g, " "));
 
 export function Breadcrumbs({
   orgName,
@@ -71,9 +43,7 @@ export function Breadcrumbs({
       </Link>
       {crumbs.map((c, i) => (
         <Fragment key={c.href}>
-          <span className="ae-crumb-sep" aria-hidden="true">
-            ›
-          </span>
+          <ChevronRight className="ae-crumb-sep h-3 w-3 shrink-0" aria-hidden="true" />
           {i === crumbs.length - 1 ? (
             <span className="ae-crumb-current" aria-current="page">
               {c.label}

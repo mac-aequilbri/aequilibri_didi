@@ -134,7 +134,7 @@ async function seedClientConfig(baseId) {
   if (existingLabels.length) {
     log(`  = domain labels exist (${existingLabels.length})`);
   } else {
-    const rows = DOMAIN_LABELS.map(([table, field, label, note], i) => ({
+    const rows = DOMAIN_LABELS.map(([table, field, label, note]) => ({
       Label_ID: `legal-${table}-${field}`.toLowerCase(), Core_Table: table, Core_Field_Label: field,
       Domain_Label: label, Domain: "Legal", Context_Note: note, Active: true,
     }));

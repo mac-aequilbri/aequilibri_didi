@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
 
 // Hydration-safe client-only read: the server snapshot is null, so SSR and the
 // first client render agree; the real value appears right after hydration.
@@ -120,6 +121,7 @@ export function CommandSearch({ orgSlug }: { orgSlug: string }) {
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className="cmdk-trigger" aria-label="Search">
+        <Search className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span className="cmdk-trigger-text">Search…</span>
         {kbdHint && <kbd className="cmdk-kbd">{kbdHint}</kbd>}
       </button>
@@ -127,19 +129,24 @@ export function CommandSearch({ orgSlug }: { orgSlug: string }) {
       {open && (
         <div className="cmdk-overlay" onClick={close} role="dialog" aria-modal="true" aria-label="Search">
           <div className="cmdk-panel" onClick={(e) => e.stopPropagation()}>
-            <input
-              ref={inputRef}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={onInputKey}
-              placeholder="Search projects, actions, risks, documents…"
-              className="cmdk-input"
-              autoComplete="off"
-              role="combobox"
-              aria-expanded={results.length > 0}
-              aria-controls="cmdk-listbox"
-              aria-activedescendant={results.length > 0 ? `cmdk-option-${active}` : undefined}
-            />
+            <div className="flex items-center border-b border-[var(--ae-earth)]">
+              <Search className="h-4 w-4 shrink-0 ml-4 text-[var(--ae-quiet)]" aria-hidden="true" />
+              <input
+                ref={inputRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={onInputKey}
+                placeholder="Search projects, actions, risks, documents…"
+                className="cmdk-input"
+                // The row carries the divider so the icon sits inside it.
+                style={{ borderBottom: "none" }}
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={results.length > 0}
+                aria-controls="cmdk-listbox"
+                aria-activedescendant={results.length > 0 ? `cmdk-option-${active}` : undefined}
+              />
+            </div>
             <div className="cmdk-results" id="cmdk-listbox" role="listbox" aria-label="Search results">
               {error && q.trim().length >= 2 ? (
                 <p className="cmdk-hint">Search is unavailable — try again.</p>

@@ -7,6 +7,8 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
+import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/format";
 import { loadComms } from "@/lib/platform/commsSource";
 import {
@@ -59,12 +61,12 @@ export default async function CommsPage({
         <table className="w-full min-w-[40rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">Topic</th>
+              <SortableTh name="topic" className="py-1 pr-2">Topic</SortableTh>
               <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Type</th>
               <th scope="col" className="py-1 pr-2">Role</th>
-              <th scope="col" className="py-1 pr-2">Due</th>
-              <th scope="col" className="py-1">Status</th>
+              <SortableTh name="due" className="py-1 pr-2">Due</SortableTh>
+              <SortableTh name="status" className="py-1">Status</SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -109,9 +111,9 @@ export default async function CommsPage({
                         </option>
                       ))}
                     </select>
-                    <button type="submit" className="btn-ae-outline text-xs">
+                    <Button type="submit" variant="outline" size="sm">
                       Set
-                    </button>
+                    </Button>
                   </form>
                 </td>
               </tr>

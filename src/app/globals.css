@@ -26,6 +26,8 @@
   --ae-danger-bg: #f2dcd7;
   --ae-info: #3a6b8c;
   --ae-info-bg: #dde8f0;
+  --ae-ai: #5d4e85; /* AI/automation accent — violet, distinct from every status hue */
+  --ae-ai-bg: #eae5f3;
   --ae-muted: #6b6b6b; /* secondary text on white — WCAG AA (4.7:1) */
   --ae-muted-bg: #ececec;
   --ae-muted-strong: #595959; /* secondary text on tinted/cream fills — AA-safe */
@@ -55,8 +57,24 @@
   --color-ae-air: var(--ae-air);
   --color-ae-fire: var(--ae-fire);
   --color-ae-space: var(--ae-space);
+  --color-ae-space-deep: var(--ae-space-deep);
   --color-ae-cream: var(--ae-cream);
   --color-ae-ink: var(--ae-ink);
+  /* Semantic colours as Tailwind utilities (text-ae-danger, bg-ae-success-bg…)
+     so page markup can use the token system instead of stock palette classes. */
+  --color-ae-success: var(--ae-success);
+  --color-ae-success-bg: var(--ae-success-bg);
+  --color-ae-warning: var(--ae-warning);
+  --color-ae-warning-bg: var(--ae-warning-bg);
+  --color-ae-danger: var(--ae-danger);
+  --color-ae-danger-bg: var(--ae-danger-bg);
+  --color-ae-info: var(--ae-info);
+  --color-ae-info-bg: var(--ae-info-bg);
+  --color-ae-ai: var(--ae-ai);
+  --color-ae-ai-bg: var(--ae-ai-bg);
+  --color-ae-muted: var(--ae-muted);
+  --color-ae-muted-bg: var(--ae-muted-bg);
+  --color-ae-muted-strong: var(--ae-muted-strong);
   --font-heading: "Montserrat", sans-serif;
 }
 
@@ -92,6 +110,26 @@ h1, h2, h3, h4, h5 {
 .btn-ae-outline:hover { background: var(--ae-space); color: #fff; }
 .btn-ae-danger-outline { border: 1.5px solid var(--ae-danger); color: var(--ae-danger); background: transparent; font-weight: 600; font-size: 0.8125rem; padding: 5px 12px; border-radius: var(--ae-radius-sm); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .btn-ae-danger-outline:hover { background: var(--ae-danger); color: #fff; }
+/* Tertiary/ghost button — borderless, for low-emphasis actions in table rows
+   and card corners. Pairs with .btn-ae (primary) and .btn-ae-outline (secondary). */
+.btn-ae-ghost { background: transparent; border: none; color: var(--ae-muted-strong); font-weight: 600; padding: 6px 10px; border-radius: var(--ae-radius-sm); display: inline-block; cursor: pointer; }
+.btn-ae-ghost:hover { background: var(--ae-cream); color: var(--ae-ink); }
+
+/* ── Chip (ui/Chip.tsx) — small inline tag for AI-origin, categories, RAG. ── */
+.ae-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: var(--ae-radius-pill); font-size: 0.68rem; font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.ae-chip-ai { background: var(--ae-ai-bg); color: var(--ae-ai); }
+.ae-chip-info { background: var(--ae-info-bg); color: var(--ae-info); }
+.ae-chip-success { background: var(--ae-success-bg); color: var(--ae-success); }
+.ae-chip-warning { background: var(--ae-warning-bg); color: var(--ae-warning); }
+.ae-chip-danger { background: var(--ae-danger-bg); color: var(--ae-danger); }
+.ae-chip-neutral { background: var(--ae-muted-bg); color: var(--ae-muted-strong); }
+
+/* ── Message bar (ui/MessageBar.tsx) — one banner style for feedback. ── */
+.ae-msg { display: flex; align-items: flex-start; gap: 8px; border: 1px solid; border-radius: var(--ae-radius-lg); padding: 10px 14px; font-size: 0.875rem; }
+.ae-msg-info { background: var(--ae-info-bg); color: var(--ae-info); border-color: color-mix(in srgb, var(--ae-info) 30%, transparent); }
+.ae-msg-success { background: var(--ae-success-bg); color: var(--ae-success); border-color: color-mix(in srgb, var(--ae-success) 30%, transparent); }
+.ae-msg-warning { background: var(--ae-warning-bg); color: var(--ae-warning); border-color: color-mix(in srgb, var(--ae-warning) 30%, transparent); }
+.ae-msg-danger { background: var(--ae-danger-bg); color: var(--ae-danger); border-color: color-mix(in srgb, var(--ae-danger) 30%, transparent); }
 
 /* Interactive org/entity card: lifts on hover to read as clickable. */
 .ae-card-link { transition: box-shadow 0.15s ease, transform 0.15s ease; }

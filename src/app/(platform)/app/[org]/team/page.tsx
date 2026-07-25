@@ -6,6 +6,9 @@
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { buttonClass } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
+import { MessageBar, type MessageVariant } from "@/components/ui/MessageBar";
 import { controlEnabled, listControlAssignments } from "@/lib/airtable/control";
 import { clerkEnabled } from "@/lib/platform/authConfig";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
@@ -39,26 +42,30 @@ function StatusBanner({ sp }: { sp: Record<string, string | string[] | undefined
   if (!status) return null;
   const who = typeof sp.who === "string" ? sp.who : "";
   const msg = typeof sp.msg === "string" ? sp.msg : "";
-  const ok = "bg-emerald-50 text-emerald-800 border-emerald-200";
-  const warn = "bg-amber-50 text-amber-800 border-amber-200";
-  const err = "bg-red-50 text-red-800 border-red-200";
-  const map: Record<string, { cls: string; text: string }> = {
-    invited: { cls: ok, text: `Invitation email sent to ${who}. They'll appear as signed-in once they create their account.` },
-    added: { cls: ok, text: `${who} added. No invitation email sent — they either already have an account or auth is not active.` },
-    reactivated: { cls: ok, text: `${who} was previously deactivated — access restored with the new role.` },
-    already_member: { cls: warn, text: `${who} is already an active member — nothing changed.` },
-    role_updated: { cls: ok, text: `Role updated for ${who}.` },
-    projects_updated: { cls: ok, text: `Project access updated for ${who}.` },
-    rls_enabled: { cls: warn, text: "Project-level access is now ENFORCED — members see only their assigned projects. Owners/Auditors/Business Owners keep full access." },
-    rls_disabled: { cls: ok, text: "Project-level access enforcement turned off — all members see every project again." },
-    deactivated: { cls: ok, text: `${who} deactivated — access is revoked (takes up to a minute to apply).` },
-    reactivated_member: { cls: ok, text: `${who} reactivated.` },
-    invalid: { cls: err, text: "Enter a name and a valid email address." },
-    error: { cls: err, text: msg || "The change was not applied." },
+  const ok: MessageVariant = "success";
+  const warn: MessageVariant = "warning";
+  const err: MessageVariant = "danger";
+  const map: Record<string, { variant: MessageVariant; text: string }> = {
+    invited: { variant: ok, text: `Invitation email sent to ${who}. They'll appear as signed-in once they create their account.` },
+    added: { variant: ok, text: `${who} added. No invitation email sent — they either already have an account or auth is not active.` },
+    reactivated: { variant: ok, text: `${who} was previously deactivated — access restored with the new role.` },
+    already_member: { variant: warn, text: `${who} is already an active member — nothing changed.` },
+    role_updated: { variant: ok, text: `Role updated for ${who}.` },
+    projects_updated: { variant: ok, text: `Project access updated for ${who}.` },
+    rls_enabled: { variant: warn, text: "Project-level access is now ENFORCED — members see only their assigned projects. Owners/Auditors/Business Owners keep full access." },
+    rls_disabled: { variant: ok, text: "Project-level access enforcement turned off — all members see every project again." },
+    deactivated: { variant: ok, text: `${who} deactivated — access is revoked (takes up to a minute to apply).` },
+    reactivated_member: { variant: ok, text: `${who} reactivated.` },
+    invalid: { variant: err, text: "Enter a name and a valid email address." },
+    error: { variant: err, text: msg || "The change was not applied." },
   };
   const m = map[status];
   if (!m) return null;
-  return <div className={`mb-4 rounded-md border px-3 py-2 text-sm ${m.cls}`}>{m.text}</div>;
+  return (
+    <MessageBar variant={m.variant} className="mb-4">
+      {m.text}
+    </MessageBar>
+  );
 }
 
 export default async function TeamPage({
@@ -112,10 +119,10 @@ export default async function TeamPage({
       <StatusBanner sp={sp} />
 
       {!authOn && (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <MessageBar variant="warning" className="mb-4">
           Authentication is not active (demo mode) — roles below still govern permissions, but no
           sign-in is required and no invitation emails are sent.
-        </div>
+        </MessageBar>
       )}
 
       <section className="ae-card p-5 mb-6">
@@ -158,7 +165,7 @@ export default async function TeamPage({
           <SubmitButton
             label={authOn ? "Send invitation" : "Add member"}
             pendingLabel={authOn ? "Sending…" : "Adding…"}
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
+            className={buttonClass("primary")}
           />
         </form>
       </section>
@@ -172,11 +179,11 @@ export default async function TeamPage({
               : "Off — every member sees all projects. Assign members to projects below first, then enable this to restrict them (unassigned members will see nothing)."}
           </p>
           {lockedOut.length > 0 ? (
-            <p className="text-xs mb-3 max-w-2xl rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-amber-800">
+            <MessageBar variant="warning" className="mb-3 max-w-2xl">
               ⚠ {lockedOut.length} active member{lockedOut.length > 1 ? "s" : ""}{" "}
               {enforcing ? "currently see no projects" : "will see no projects once enabled"} — assign
               projects below first: {lockedOut.map((m) => m.name || m.email).join(", ")}.
-            </p>
+            </MessageBar>
           ) : (
             <p className="text-xs mb-3 text-emerald-700">
               ✓ Every active member is assigned to a project or has full access.
@@ -189,14 +196,14 @@ export default async function TeamPage({
               <SubmitButton
                 label="Disable enforcement"
                 pendingLabel="Saving…"
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50"
+                className={buttonClass("outline")}
               />
             ) : (
               <ConfirmSubmitButton
                 label="Enable enforcement"
                 confirmLabel="Confirm — restrict members to assigned projects"
                 pendingLabel="Saving…"
-                className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
+                className={buttonClass("primary")}
               />
             )}
           </form>
@@ -244,7 +251,7 @@ export default async function TeamPage({
                       <SubmitButton
                         label="Set"
                         pendingLabel="Saving…"
-                        className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50"
+                        className={buttonClass("outline", "sm")}
                       />
                     </form>
                   </td>
@@ -266,13 +273,9 @@ export default async function TeamPage({
                     </td>
                   )}
                   <td className="py-2 pr-2 text-center">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        m.isActive ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-500"
-                      }`}
-                    >
+                    <Chip variant={m.isActive ? "success" : "neutral"}>
                       {m.isActive ? "active" : "deactivated"}
-                    </span>
+                    </Chip>
                   </td>
                   <td className="py-2 text-right">
                     <form action={setMemberActiveAction}>
@@ -284,13 +287,13 @@ export default async function TeamPage({
                           label="Deactivate"
                           confirmLabel="Confirm deactivate"
                           pendingLabel="Deactivating…"
-                          className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50"
+                          className={buttonClass("outline", "sm")}
                         />
                       ) : (
                         <SubmitButton
                           label="Reactivate"
                           pendingLabel="Reactivating…"
-                          className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50"
+                          className={buttonClass("outline", "sm")}
                         />
                       )}
                     </form>

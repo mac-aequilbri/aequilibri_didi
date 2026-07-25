@@ -9,13 +9,16 @@ import {
   confirmMeetingMinutes,
   processMeetingMinutes,
 } from "@/services/platform/construction/minutes";
+import type { CreateFormState } from "@/components/form/CreateForm";
 
-export async function processMinutesAction(formData: FormData): Promise<void> {
+export async function processMinutesAction(_prev: CreateFormState, formData: FormData): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
   const jobId = recordIdParam(formData.get("jobId"));
   const rawMinutes = String(formData.get("rawMinutes") ?? "").trim();
-  if (jobId == null || !rawMinutes) return;
+  if (jobId == null || !rawMinutes) {
+    return { error: "Couldn't process the minutes — choose a project and paste the raw minutes. Nothing was recorded." };
+  }
   let id;
   try {
     ({ id } = await processMeetingMinutes(ctx, user.name, {
@@ -27,7 +30,7 @@ export async function processMinutesAction(formData: FormData): Promise<void> {
     }));
   } catch (e) {
     console.error("[processMinutesAction] write rejected:", e);
-    redirect(orgPath(ctx.orgSlug, "/meeting-minutes/new?error=save_failed"));
+    return { error: "Couldn't process the minutes — nothing was recorded. The org's base rejected the write; check the server log for details." };
   }
   revalidatePath(orgPath(ctx.orgSlug, "/meeting-minutes"));
   redirect(orgPath(ctx.orgSlug, id ? `/meeting-minutes/${id}` : "/meeting-minutes"));

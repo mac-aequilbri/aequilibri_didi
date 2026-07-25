@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { SortableTh } from "@/components/SortableTh";
+import { AiChip, Chip } from "@/components/ui/Chip";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import {
@@ -75,6 +77,8 @@ export default async function ReportsPage({
     listReportTemplates(ctx.orgSlug), // saved templates (Phase 4)
   ]);
   const filtered = hasActiveFilters(query);
+  // Finance-only reports are hidden entirely from viewers without financial detail.
+  const catalog = REPORT_CATALOG.filter((d) => !d.financeOnly || reportCaps.showFinancialDetail);
   const { items: reports, total, matching, facets, page, pageCount } = applyListQuery(
     allReports,
     query,
@@ -89,42 +93,65 @@ export default async function ReportsPage({
       />
 
       {reportCaps.canGenerateReports ? (
-        <form action={generateReportAction} className="ae-card p-5 mb-6 flex flex-wrap items-end gap-4">
+        <form action={generateReportAction} className="ae-card p-5 mb-6">
           <input type="hidden" name="org" value={ctx.orgSlug} />
-          <label className="block text-sm">
-            <span className="text-neutral-600">Report</span>
-            <select name="reportId" className="mt-1 block rounded border border-neutral-300 px-3 py-2">
-              {REPORT_CATALOG.filter((d) => !d.financeOnly || reportCaps.showFinancialDetail).map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.title}
-                </option>
-              ))}
-              {templates.length > 0 && (
-                <optgroup label="Saved templates">
-                  {templates.map((t) => (
-                    <option key={t.key} value={t.key}>
-                      {t.title}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="text-neutral-600">Job</span>
-            <select name="jobId" className="mt-1 block rounded border border-neutral-300 px-3 py-2">
-              {jobs.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="text-neutral-600">Period ending</span>
-            <input type="date" name="weekEnding" className="mt-1 block rounded border border-neutral-300 px-3 py-2" />
-          </label>
-          <SubmitButton label="Generate with AI" pendingLabel="Generating report…" />
+          <div className="text-sm font-medium mb-3">Pick a report</div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {catalog.map((d, i) => (
+              <label key={d.id} className="cursor-pointer">
+                <input
+                  type="radio"
+                  name="reportId"
+                  value={d.id}
+                  defaultChecked={i === 0}
+                  className="sr-only peer"
+                />
+                <div className="h-full rounded-lg border border-neutral-200 p-3 transition-colors hover:border-neutral-300 peer-checked:border-ae-space peer-checked:bg-[#fffaf7]">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-medium text-sm">{d.title}</span>
+                    <Chip variant="neutral">{d.kind === "narrative" ? "Narrative" : "Data"}</Chip>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500">{d.description}</p>
+                </div>
+              </label>
+            ))}
+            {templates.length > 0 && (
+              <>
+                <div className="col-span-full mt-1 text-xs font-medium text-neutral-500">
+                  Saved templates
+                </div>
+                {templates.map((t) => (
+                  <label key={t.key} className="cursor-pointer">
+                    <input type="radio" name="reportId" value={t.key} className="sr-only peer" />
+                    <div className="h-full rounded-lg border border-neutral-200 p-3 transition-colors hover:border-neutral-300 peer-checked:border-ae-space peer-checked:bg-[#fffaf7]">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-medium text-sm">{t.title}</span>
+                        <Chip variant="neutral">Template</Chip>
+                      </div>
+                      <p className="mt-1 text-xs text-neutral-500 line-clamp-2">{t.prompt}</p>
+                    </div>
+                  </label>
+                ))}
+              </>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap items-end gap-4 border-t border-neutral-100 pt-4">
+            <label className="block text-sm">
+              <span className="text-neutral-600">Job</span>
+              <select name="jobId" className="mt-1 block rounded border border-neutral-300 px-3 py-2">
+                {jobs.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    {j.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600">Period ending</span>
+              <input type="date" name="weekEnding" className="mt-1 block rounded border border-neutral-300 px-3 py-2" />
+            </label>
+            <SubmitButton label="Generate with AI" pendingLabel="Generating report…" />
+          </div>
         </form>
       ) : null}
 
@@ -187,10 +214,12 @@ export default async function ReportsPage({
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Report</th>
-              <th className="py-1 pr-2">Week ending</th>
-              <th className="py-1 pr-2">Generated</th>
-              <th className="py-1">Status</th>
+              <SortableTh name="title">Report</SortableTh>
+              <SortableTh name="week">Week ending</SortableTh>
+              <SortableTh name="generated">Generated</SortableTh>
+              <SortableTh name="status" className="py-1">
+                Status
+              </SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -201,9 +230,7 @@ export default async function ReportsPage({
                     {r.title || `Week ending ${formatDate(r.weekEnding)}`}
                   </Link>
                   <span className="ml-1 text-xs text-neutral-500">{r.jobCode}</span>
-                  {r.isAiGenerated && (
-                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-violet-100 text-violet-700">AI</span>
-                  )}
+                  {r.isAiGenerated && <AiChip className="ml-1" />}
                 </td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{formatDate(r.weekEnding)}</td>
                 <td className="py-2 pr-2 whitespace-nowrap text-xs">{formatDate(r.generatedAt)}</td>

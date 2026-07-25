@@ -6,6 +6,8 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
+import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadDecisions } from "@/lib/platform/decisionsSource";
@@ -60,12 +62,12 @@ export default async function DecisionsPage({
         <table className="w-full min-w-[40rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">Decision</th>
+              <SortableTh name="description" className="py-1 pr-2">Decision</SortableTh>
               <th scope="col" className="py-1 pr-2">Project</th>
-              <th scope="col" className="py-1 pr-2">By</th>
+              <SortableTh name="madeBy" className="py-1 pr-2">By</SortableTh>
               <th scope="col" className="py-1 pr-2">Source</th>
-              <th scope="col" className="py-1 pr-2">Date</th>
-              <th scope="col" className="py-1">Status</th>
+              <SortableTh name="date" className="py-1 pr-2">Date</SortableTh>
+              <SortableTh name="status" className="py-1">Status</SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -101,21 +103,21 @@ export default async function DecisionsPage({
                     <form action={setDecisionStatus} className="inline-flex gap-1 ml-2">
                       <input type="hidden" name="org" value={ctx.orgSlug} />
                       <input type="hidden" name="recordId" value={d.id} />
-                      <button name="status" value="confirmed" className="btn-ae text-xs">
+                      <Button type="submit" name="status" value="confirmed" variant="primary" size="sm">
                         Confirm
-                      </button>
-                      <button name="status" value="superseded" className="btn-ae-outline text-xs">
+                      </Button>
+                      <Button type="submit" name="status" value="superseded" variant="outline" size="sm">
                         Supersede
-                      </button>
+                      </Button>
                     </form>
                   )}
                   {d.status === "confirmed" && (
                     <form action={setDecisionStatus} className="inline ml-2">
                       <input type="hidden" name="org" value={ctx.orgSlug} />
                       <input type="hidden" name="recordId" value={d.id} />
-                      <button name="status" value="superseded" className="btn-ae-outline text-xs">
+                      <Button type="submit" name="status" value="superseded" variant="outline" size="sm">
                         Supersede
-                      </button>
+                      </Button>
                     </form>
                   )}
                 </td>

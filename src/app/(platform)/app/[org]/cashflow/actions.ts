@@ -6,8 +6,9 @@ import { formToObject } from "@/lib/platform/forms";
 import { requireFinancialAccess, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { writeRecord } from "@/lib/platform/recordWriter";
+import type { CreateFormState } from "@/components/form/CreateForm";
 
-export async function createCashflowEntry(formData: FormData): Promise<void> {
+export async function createCashflowEntry(_prev: CreateFormState, formData: FormData): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await requireFinancialAccess(ctx);
   try {
@@ -19,7 +20,7 @@ export async function createCashflowEntry(formData: FormData): Promise<void> {
     });
   } catch (e) {
     console.error("[createCashflowEntry] write rejected:", e);
-    redirect(orgPath(ctx.orgSlug, "/cashflow/new?error=save_failed"));
+    return { error: "Couldn't save the entry — nothing was recorded. The org's base rejected the write; check the server log for details." };
   }
   revalidatePath(orgPath(ctx.orgSlug, "/cashflow"));
   redirect(orgPath(ctx.orgSlug, "/cashflow"));

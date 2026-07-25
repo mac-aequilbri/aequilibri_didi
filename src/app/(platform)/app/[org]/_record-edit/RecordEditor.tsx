@@ -198,12 +198,13 @@ export default function RecordEditor({
   const [aiState, runAi, aiPending] = useActionState(suggestRecordEdits, null);
 
   // Fill only the fields the model actually proposed; leave the rest as the user
-  // has them. They review, then Save.
-  useEffect(() => {
-    const s = aiState?.suggestion;
-    if (!s) return;
-    setState((prev) => ({ ...prev, ...s }));
-  }, [aiState]);
+  // has them. They review, then Save. Applied during render (not in an effect)
+  // so the merge happens in the same pass the new suggestion arrives.
+  const [appliedSuggestion, setAppliedSuggestion] = useState<EditorValues | null>(null);
+  if (aiState?.suggestion && aiState.suggestion !== appliedSuggestion) {
+    setAppliedSuggestion(aiState.suggestion);
+    setState((prev) => ({ ...prev, ...aiState.suggestion }));
+  }
 
   const setField = (name: string, v: string | boolean) =>
     setState((prev) => ({ ...prev, [name]: v }));

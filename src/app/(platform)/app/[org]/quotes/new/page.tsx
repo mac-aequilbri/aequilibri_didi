@@ -1,8 +1,8 @@
 // New quote — pick the job, then either start blank or pre-fill the lines
 // from that job's assessment budget breakdown.
 
+import { CreateForm } from "@/components/form/CreateForm";
 import { DateField } from "@/components/form/DateField";
-import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -13,13 +13,10 @@ export const dynamic = "force-dynamic";
 
 export default async function NewQuotePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ org: string }>;
-  searchParams: Promise<{ error?: string }>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const { error } = await searchParams;
   const jobs = await loadJobOptions(ctx);
 
   return (
@@ -30,16 +27,10 @@ export default async function NewQuotePage({
         actions={[{ href: orgPath(ctx.orgSlug, "/quotes"), label: "Back to quotes", variant: "outline" }]}
       />
 
-      {error === "save_failed" && (
-        <p role="alert" className="text-red-600 text-sm mb-3">
-          The quote couldn&apos;t be saved — the org&apos;s base rejected the write. Check the
-          server log for details.
-        </p>
-      )}
       {jobs.length === 0 ? (
         <p className="text-sm text-neutral-500">Create a job first — run a New Assessment.</p>
       ) : (
-        <form action={createQuoteAction} className="ae-card p-5 space-y-4">
+        <CreateForm action={createQuoteAction} submitLabel="Create quote" pendingLabel="Creating…" className="ae-card p-5 space-y-4">
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <label className="block text-sm">
             <span className="text-neutral-600">Job *</span>
@@ -83,8 +74,7 @@ export default async function NewQuotePage({
             <input type="checkbox" name="fromBudget" defaultChecked />
             <span>Pre-fill lines from the job&apos;s budget breakdown</span>
           </label>
-          <SubmitButton label="Create quote" pendingLabel="Creating…" />
-        </form>
+        </CreateForm>
       )}
     </div>
   );

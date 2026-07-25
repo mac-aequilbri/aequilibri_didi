@@ -4,7 +4,9 @@
 
 import Link from "next/link";
 import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { MessageBar } from "@/components/ui/MessageBar";
 import { formatDate } from "@/lib/format";
+import { ragClass } from "@/lib/platform/ragStyles";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { loadPhaseJobs } from "@/lib/platform/phasesSource";
 import { orgPath } from "@/lib/platform/paths";
@@ -22,12 +24,6 @@ import {
 import { PendingButton } from "./PendingButton";
 
 export const dynamic = "force-dynamic";
-
-const RAG_CLASS: Record<string, string> = {
-  Red: "bg-red-100 text-red-800 border-red-300",
-  Amber: "bg-amber-100 text-amber-800 border-amber-300",
-  Green: "bg-emerald-100 text-emerald-800 border-emerald-300",
-};
 
 function fmtDate(d: string | null): string {
   return d ? formatDate(d) : "";
@@ -54,9 +50,9 @@ export default async function PhasesPage({
       />
 
       {err && (
-        <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <MessageBar variant="danger" className="mb-4">
           {err}
-        </p>
+        </MessageBar>
       )}
 
       <form method="get" action={orgPath(ctx.orgSlug, "/phases")} className="mb-4 flex items-center gap-2 text-sm">
@@ -158,7 +154,7 @@ export default async function PhasesPage({
                           <input type="hidden" name="recordId" value={p.id} />
                           {p.rag ? (
                             <span
-                              className={`px-1.5 py-0.5 rounded border text-xs font-semibold ${RAG_CLASS[p.rag] ?? "bg-neutral-100 text-neutral-600 border-neutral-300"}`}
+                              className={`px-1.5 py-0.5 rounded text-xs font-semibold ${ragClass(p.rag, { border: true })}`}
                             >
                               {p.rag}
                             </span>

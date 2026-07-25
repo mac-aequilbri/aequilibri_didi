@@ -25,7 +25,7 @@ try {
   const open = matters.find((m) => !m.isClosed);
 
   log("CONTACTS…");
-  const c = track("CONTACTS", await createAll(baseId, "CONTACTS", [{ Contact_Name: clients[0].name, Email: clients[0].email, Phone: clients[0].phone, Role: clients[0].role, Notes: clients[0].notes }]));
+  track("CONTACTS", await createAll(baseId, "CONTACTS", [{ Contact_Name: clients[0].name, Email: clients[0].email, Phone: clients[0].phone, Role: clients[0].role, Notes: clients[0].notes }]));
 
   log("JOBS (closed + open)…");
   const jobs = track("JOBS", await createAll(baseId, "JOBS", [jobFields(closed), jobFields(open)]));

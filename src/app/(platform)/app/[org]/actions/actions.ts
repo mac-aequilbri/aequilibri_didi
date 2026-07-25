@@ -9,12 +9,13 @@ import { formToObject } from "@/lib/platform/forms";
 import { getCurrentUser, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { writeRecord } from "@/lib/platform/recordWriter";
+import type { CreateFormState } from "@/components/form/CreateForm";
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
-export async function createActionItem(formData: FormData): Promise<void> {
+export async function createActionItem(_prev: CreateFormState, formData: FormData): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx); // also enforces the write gate
 
@@ -27,7 +28,7 @@ export async function createActionItem(formData: FormData): Promise<void> {
     });
   } catch (e) {
     console.error("[createActionItem] write rejected:", e);
-    redirect(orgPath(ctx.orgSlug, "/actions/new?error=save_failed"));
+    return { error: "Couldn't save the action — nothing was recorded. The org's base rejected the write; check the server log for details." };
   }
   revalidatePath(orgPath(ctx.orgSlug, "/actions"));
   redirect(orgPath(ctx.orgSlug, "/actions"));

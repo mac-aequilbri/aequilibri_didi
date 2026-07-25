@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     // Scratch/output dir: a standalone CommonJS slide-build script and its own
     // node_modules, plus uploaded storage — not application source.
     "var/**",
+    // Claude Code session worktrees — full checkouts of this repo made by
+    // other sessions; linting them duplicates (stale copies of) every finding.
+    ".claude/**",
   ]),
 ]);
 

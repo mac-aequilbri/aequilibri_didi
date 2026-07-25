@@ -1,3 +1,4 @@
+import { CreateForm } from "@/components/form/CreateForm";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { PageHeader } from "@/components/PageHeader";
 import { loadJobOptions } from "@/lib/platform/jobOptionsSource";
@@ -65,7 +66,7 @@ export default async function NewVariationPage({
 
       <div>
         <h2 className="text-lg font-semibold mb-3">…or create manually</h2>
-        <form action={createVariation} className="ae-card p-5 space-y-4">
+        <CreateForm action={createVariation} submitLabel="Submit variation" pendingLabel="Submitting…" className="ae-card p-5 space-y-4">
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <label className="block text-sm">
             <span className="text-neutral-600">Job *</span>
@@ -89,8 +90,7 @@ export default async function NewVariationPage({
               <input type="number" name="timeImpactDays" defaultValue={0} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
             </label>
           </div>
-          <SubmitButton label="Submit variation" pendingLabel="Submitting…" />
-        </form>
+        </CreateForm>
       </div>
     </div>
   );

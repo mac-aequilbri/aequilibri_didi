@@ -3,6 +3,8 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
+import { AiChip } from "@/components/ui/Chip";
 import { currency, toNum } from "@/lib/format";
 import {
   applyListQuery,
@@ -56,12 +58,12 @@ export default async function VariationsPage({
         <table className="w-full min-w-[38rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">Ref</th>
+              <SortableTh name="ref">Ref</SortableTh>
               <th scope="col" className="py-1 pr-2">Project</th>
-              <th scope="col" className="py-1 pr-2">Title</th>
-              <th scope="col" className="py-1 pr-2 text-right">Cost impact</th>
-              <th scope="col" className="py-1 pr-2 text-right">Time</th>
-              <th scope="col" className="py-1">Status</th>
+              <SortableTh name="title">Title</SortableTh>
+              <SortableTh name="cost" className="py-1 pr-2 text-right">Cost impact</SortableTh>
+              <SortableTh name="time" className="py-1 pr-2 text-right">Time</SortableTh>
+              <SortableTh name="status" className="py-1">Status</SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -82,9 +84,7 @@ export default async function VariationsPage({
                   <Link href={orgPath(ctx.orgSlug, `/variations/${v.id}`)} className="font-medium hover:underline before:absolute before:inset-0">
                     {v.title}
                   </Link>
-                  {v.isAiDrafted && (
-                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-violet-100 text-violet-700">AI</span>
-                  )}
+                  {v.isAiDrafted && <AiChip className="ml-1" />}
                 </td>
                 <td className="py-2 pr-2 text-right whitespace-nowrap">{currency(toNum(v.costImpact))}</td>
                 <td className="py-2 pr-2 text-right whitespace-nowrap text-xs">

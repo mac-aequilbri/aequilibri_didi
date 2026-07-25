@@ -5,6 +5,9 @@ import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
 import { EmptyState, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { SortableTh } from "@/components/SortableTh";
+import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { formatDate } from "@/lib/format";
 import { ACTION_STATUSES } from "@/lib/platform/actionStatus";
 import { requireOrgCtx } from "@/lib/platform/org-context";
@@ -102,9 +105,9 @@ export default async function ActionsPage({
                     </option>
                   ))}
                 </select>
-                <button type="submit" className="btn-ae text-xs">
+                <Button type="submit" variant="primary" size="sm">
                   Map
-                </button>
+                </Button>
                 {u.suggestion && <span className="text-amber-500">suggested: {u.suggestion.replace("_", " ")}</span>}
               </form>
             ))}
@@ -127,11 +130,11 @@ export default async function ActionsPage({
         <table className="w-full min-w-[42rem] text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th scope="col" className="py-1 pr-2">Action</th>
+              <SortableTh name="title" className="py-1 pr-2">Action</SortableTh>
               <th scope="col" className="py-1 pr-2">Project</th>
               <th scope="col" className="py-1 pr-2">Owner</th>
-              <th scope="col" className="py-1 pr-2">Due</th>
-              <th scope="col" className="py-1 pr-2">Priority</th>
+              <SortableTh name="due" className="py-1 pr-2">Due</SortableTh>
+              <SortableTh name="priority" className="py-1 pr-2">Priority</SortableTh>
               <th scope="col" className="py-1 pr-2">Source</th>
               <th scope="col" className="py-1">Status</th>
             </tr>
@@ -154,9 +157,9 @@ export default async function ActionsPage({
                     </span>
                   </Link>
                   {a.issueType && a.issueType !== "Open Action" && (
-                    <span className="ml-1 text-[0.65rem] px-1 rounded bg-amber-100 text-amber-800">
+                    <Chip variant="warning" className="ml-1">
                       {a.issueType}
-                    </span>
+                    </Chip>
                   )}
                   {a.detail && (
                     <span className="block text-xs text-neutral-500 line-clamp-1">{a.detail}</span>
@@ -199,9 +202,9 @@ export default async function ActionsPage({
                         </option>
                       ))}
                     </select>
-                    <button type="submit" className="btn-ae-outline text-xs">
+                    <Button type="submit" variant="outline" size="sm">
                       Set
-                    </button>
+                    </Button>
                   </form>
                 </td>
               </tr>

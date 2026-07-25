@@ -2,6 +2,7 @@
 // Pending proposals can be approved (the deferred write executes) or rejected.
 
 import { FilterBar } from "@/components/FilterBar";
+import { SortableTh } from "@/components/SortableTh";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
@@ -162,11 +163,11 @@ export default async function ExecLogPage({
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="py-1 pr-2">Operation</th>
-              <th className="py-1 pr-2">Actor</th>
-              <th className="py-1 pr-2">Payload</th>
-              <th className="py-1 pr-2">Status</th>
-              <th className="py-1">When</th>
+              <SortableTh name="operation">Operation</SortableTh>
+              <th scope="col" className="py-1 pr-2">Actor</th>
+              <th scope="col" className="py-1 pr-2">Payload</th>
+              <SortableTh name="status">Status</SortableTh>
+              <SortableTh name="created" className="py-1">When</SortableTh>
             </tr>
           </thead>
           <tbody>

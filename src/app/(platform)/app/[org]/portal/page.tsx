@@ -6,6 +6,8 @@ import { CopyButton } from "@/components/CopyButton";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { buttonClass } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { formatDate } from "@/lib/format";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { currentJobScope } from "@/lib/platform/rls";
@@ -119,7 +121,7 @@ export default async function PortalPage({
                       />
                     </span>
                   ) : (
-                    <span className="font-mono text-xs">revoked</span>
+                    <Chip variant="neutral">revoked</Chip>
                   )}
                 </td>
                 <td className="py-2 pr-2 text-right text-xs">{t.viewsCount}</td>
@@ -135,7 +137,7 @@ export default async function PortalPage({
                         label="Revoke"
                         confirmLabel="Confirm revoke"
                         pendingLabel="Revoking…"
-                        className="btn-ae-outline text-xs text-red-600 border-red-300"
+                        className={buttonClass("danger", "sm")}
                       />
                     </form>
                   )}

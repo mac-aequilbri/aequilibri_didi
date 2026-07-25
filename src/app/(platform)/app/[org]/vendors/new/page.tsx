@@ -1,5 +1,5 @@
 import { airtableEnabled } from "@/lib/airtable";
-import { SubmitButton } from "@/components/form/SubmitButton";
+import { CreateForm } from "@/components/form/CreateForm";
 import { PageHeader } from "@/components/PageHeader";
 import { requireOrgCtx } from "@/lib/platform/org-context";
 import { tableExists } from "@/lib/platform/optionalList";
@@ -9,13 +9,10 @@ export const dynamic = "force-dynamic";
 
 export default async function NewVendorPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ org: string }>;
-  searchParams: Promise<{ error?: string }>;
 }) {
   const ctx = await requireOrgCtx((await params).org);
-  const { error } = await searchParams;
 
   // VENDORS is optional on older bases — a create can't fall back to [], so
   // explain instead of offering a form whose save is doomed.
@@ -34,13 +31,7 @@ export default async function NewVendorPage({
   return (
     <div className="p-6 max-w-xl">
       <PageHeader title="New vendor" />
-      {error === "save_failed" && (
-        <p role="alert" className="text-red-600 text-sm mb-3">
-          The vendor couldn&apos;t be saved — the org&apos;s base rejected the write. Check the
-          server log for details.
-        </p>
-      )}
-      <form action={createVendor} className="ae-card p-5 space-y-4">
+      <CreateForm action={createVendor} submitLabel="Add vendor" pendingLabel="Adding…" className="ae-card p-5 space-y-4">
         <input type="hidden" name="org" value={ctx.orgSlug} />
         <div className="grid grid-cols-2 gap-4">
           <label className="block text-sm">
@@ -68,8 +59,7 @@ export default async function NewVendorPage({
             <input type="number" name="rating" min={1} max={10} defaultValue={5} className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
           </label>
         </div>
-        <SubmitButton label="Add vendor" pendingLabel="Adding…" />
-      </form>
+      </CreateForm>
     </div>
   );
 }

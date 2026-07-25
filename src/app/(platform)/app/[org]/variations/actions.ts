@@ -11,8 +11,9 @@ import {
   approveVariation,
   rejectVariation,
 } from "@/services/platform/construction/variations";
+import type { CreateFormState } from "@/components/form/CreateForm";
 
-export async function createVariation(formData: FormData): Promise<void> {
+export async function createVariation(_prev: CreateFormState, formData: FormData): Promise<CreateFormState> {
   const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
   const user = await getCurrentUser(ctx);
   const data = formToObject(formData);
@@ -27,7 +28,7 @@ export async function createVariation(formData: FormData): Promise<void> {
     });
   } catch (e) {
     console.error("[createVariation] write rejected:", e);
-    redirect(orgPath(ctx.orgSlug, "/variations/new?error=save_failed"));
+    return { error: "Couldn't save the variation — nothing was recorded. The org's base rejected the write; check the server log for details." };
   }
   revalidatePath(orgPath(ctx.orgSlug, "/variations"));
   redirect(orgPath(ctx.orgSlug, "/variations"));

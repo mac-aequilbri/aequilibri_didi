@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { buttonClass } from "@/components/ui/Button";
 import { setMemberAssignmentsAction } from "./actions";
 
 export function ProjectAssignments({
@@ -74,7 +75,7 @@ export function ProjectAssignments({
           <SubmitButton
             label="Save"
             pendingLabel="Saving…"
-            className="rounded-md border border-neutral-300 px-2 py-1 font-medium hover:bg-neutral-50"
+            className={buttonClass("outline", "sm")}
           />
         </div>
       </form>
