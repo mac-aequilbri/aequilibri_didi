@@ -138,7 +138,7 @@ export function Sidebar({
                     type="button"
                     onClick={() => toggleSection(section.heading!)}
                     aria-expanded={!isCollapsed}
-                    className="sidebar-section-toggle text-[0.68rem] font-semibold uppercase tracking-wider text-neutral-400"
+                    className="sidebar-section-toggle text-[0.68rem] font-semibold uppercase tracking-wider text-neutral-500"
                   >
                     <span>{section.heading}</span>
                     <span className={`sidebar-section-chevron ${isCollapsed ? "collapsed" : ""}`}>

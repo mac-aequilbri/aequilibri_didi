@@ -67,7 +67,7 @@ export default async function CoordinationPage({
         {sections.map((section) => (
           <div key={section.label || "_all"}>
             {section.label && (
-              <p className="mt-3 first:mt-0 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+              <p className="mt-3 first:mt-0 text-xs font-semibold uppercase tracking-wide text-neutral-500">
                 {section.label} <span className="font-normal">({section.rows.length})</span>
               </p>
             )}

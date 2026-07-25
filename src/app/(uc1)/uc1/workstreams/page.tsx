@@ -6,8 +6,8 @@ import { createWorkstream, toggleSessionLoad, updateStatus, deleteWorkstream } f
 export const dynamic = "force-dynamic";
 
 const STATUS_BADGE: Record<string, string> = {
-  active: "bg-green-100 text-green-800",
-  paused: "bg-yellow-100 text-yellow-800",
+  active: "bg-emerald-100 text-emerald-800",
+  paused: "bg-amber-100 text-amber-800",
   complete: "bg-neutral-100 text-neutral-500",
 };
 
@@ -27,7 +27,7 @@ export default async function WorkstreamsPage() {
       />
       <div className="px-8 space-y-4">
         {sessionLoaded.length > 0 && (
-          <div className="ae-card p-4 bg-amber-50 border border-amber-200">
+          <div className="ae-card p-5 bg-amber-50 border border-amber-200">
             <div className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">Loaded at session init ({sessionLoaded.length})</div>
             <div className="text-sm text-amber-800">{sessionLoaded.map((w) => w.name).join(" · ")}</div>
           </div>
@@ -48,7 +48,7 @@ export default async function WorkstreamsPage() {
                   <tr key={w.id}>
                     <td>
                       <div className="font-medium">{w.name}</div>
-                      {w.description && <div className="text-xs text-neutral-400">{w.description}</div>}
+                      {w.description && <div className="text-xs text-neutral-500">{w.description}</div>}
                     </td>
                     <td className="text-sm">{w.milestone || "—"}</td>
                     <td>
@@ -59,12 +59,12 @@ export default async function WorkstreamsPage() {
                     <td>
                       <form action={toggleSessionLoad}>
                         <input type="hidden" name="id" value={w.id} />
-                        <button className={`text-xs px-2 py-0.5 rounded border ${w.loadAtSessionStart ? "bg-[var(--ae-khaki)] border-[var(--ae-earth)] text-[var(--ae-charcoal)]" : "border-neutral-200 text-neutral-400"}`}>
+                        <button className={`text-xs px-2 py-0.5 rounded border ${w.loadAtSessionStart ? "bg-[var(--ae-khaki)] border-[var(--ae-earth)] text-[var(--ae-charcoal)]" : "border-neutral-200 text-neutral-500"}`}>
                           {w.loadAtSessionStart ? "✓ Load" : "Skip"}
                         </button>
                       </form>
                     </td>
-                    <td className="text-xs text-neutral-400">{formatDate(w.lastUpdated)}</td>
+                    <td className="text-xs text-neutral-500">{formatDate(w.lastUpdated)}</td>
                     <td className="text-right whitespace-nowrap">
                       <form action={updateStatus} className="inline mr-1">
                         <input type="hidden" name="id" value={w.id} />

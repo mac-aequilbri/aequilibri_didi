@@ -134,7 +134,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                     </form>
                   </>
                 ) : (
-                  <span className="text-xs text-neutral-400 self-center">
+                  <span className="text-xs text-neutral-500 self-center">
                     Needs {Math.max(0, h.validationThreshold - h.sampleCount)} more consistent
                     correction{h.validationThreshold - h.sampleCount === 1 ? "" : "s"} to validate
                   </span>
@@ -171,7 +171,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
             {rules.map((r) => (
               <tr key={r.id} className={`border-t border-neutral-100 ${r.isActive ? "" : "opacity-50"}`}>
                 <td className="py-2 pr-2">
-                  <span className="font-mono text-xs text-neutral-400">{r.ruleCode}</span>{" "}
+                  <span className="font-mono text-xs text-neutral-500">{r.ruleCode}</span>{" "}
                   <span className="font-medium">{r.description}</span>
                   {r.cannotOverride && (
                     <span className="ml-1 text-[0.65rem] px-1 rounded bg-red-100 text-red-700">locked</span>
@@ -289,7 +289,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
                     {s.accuracyRatePct != null ? `${s.accuracyRatePct}%` : "—"}
                   </td>
                   <td className="py-2 pr-2 text-right text-xs">
-                    {s.activeRules} <span className="text-neutral-400">({s.autoApplyRules} auto)</span>
+                    {s.activeRules} <span className="text-neutral-500">({s.autoApplyRules} auto)</span>
                   </td>
                   <td className="py-2 pr-2 text-right text-xs">{s.avgConfidence}</td>
                   <td className="py-2 text-xs text-neutral-500">{gaps.join(" · ") || "—"}</td>
@@ -306,7 +306,7 @@ export default async function LearningRulesPage({ params }: { params: Promise<{ 
           </tbody>
         </table>
       </section>
-      <p className="mt-4 text-xs text-neutral-400">
+      <p className="mt-4 text-xs text-neutral-500">
         Status legend: hypotheses come from clustered corrections; <StatusBadge status="pending" />{" "}
         means awaiting your review. Promotion creates a <em>draft</em> rule — no rule applies until
         you activate it. Overrides decay confidence by 5; a rule at 50 or below is automatically

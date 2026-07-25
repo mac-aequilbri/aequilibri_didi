@@ -80,7 +80,7 @@ export default async function QuoteDetailPage({
 
       {/* Meta */}
       <section className="ae-card p-5 mb-6">
-        <h2 className="font-semibold text-sm mb-3">Details</h2>
+        <h2 className="text-base font-semibold mb-3">Details</h2>
         <form action={updateMetaAction} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <input type="hidden" name="org" value={slug} />
           <input type="hidden" name="quoteId" value={quote.id} />
@@ -117,7 +117,7 @@ export default async function QuoteDetailPage({
 
       {/* Lines */}
       <section className="ae-card p-5 mb-6">
-        <h2 className="font-semibold text-sm mb-3">Line items</h2>
+        <h2 className="text-base font-semibold mb-3">Line items</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[40rem]">
             <thead className="text-left text-xs text-neutral-500">
@@ -165,7 +165,7 @@ export default async function QuoteDetailPage({
                 <input type="hidden" name="org" value={slug} />
                 <input type="hidden" name="quoteId" value={quote.id} />
                 <input type="hidden" name="lineId" value={l.id} />
-                <button type="submit" className="text-xs text-neutral-400 hover:text-red-600 border border-neutral-200 rounded px-2 py-0.5">
+                <button type="submit" className="text-xs text-neutral-500 hover:text-red-600 border border-neutral-200 rounded px-2 py-0.5">
                   ✕ {l.description.slice(0, 24)}
                 </button>
               </form>

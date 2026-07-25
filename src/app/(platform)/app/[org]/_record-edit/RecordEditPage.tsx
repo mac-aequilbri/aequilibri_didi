@@ -82,12 +82,11 @@ export default async function RecordEditPage({
 
   const listHref = orgPath(orgSlug, config.listPath);
   const backHref = orgPath(orgSlug, returnPath ?? config.listPath);
-  const backAction = { href: backHref, label: `← Back`, variant: "outline" as const };
 
   if (!values) {
     return (
       <div className="p-6 max-w-xl">
-        <PageHeader title={`Edit ${config.noun}`} actions={[backAction]} />
+        <PageHeader title={`Edit ${config.noun}`} />
         <div className="ae-card p-5">
           <EmptyState
             title={`${config.noun[0].toUpperCase()}${config.noun.slice(1)} not found`}
@@ -101,7 +100,7 @@ export default async function RecordEditPage({
 
   return (
     <div className="p-6 max-w-2xl">
-      <PageHeader title={`Edit ${config.noun}`} subtitle={subtitle} actions={[backAction]} />
+      <PageHeader title={`Edit ${config.noun}`} subtitle={subtitle} />
       <RecordEditor orgSlug={orgSlug} config={config} values={editorValues ?? values} recordId={recordId} backHref={backHref} />
     </div>
   );

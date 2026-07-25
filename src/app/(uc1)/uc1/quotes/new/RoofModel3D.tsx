@@ -65,7 +65,7 @@ function RoofMesh({ outline, W, H, mpp, avgPitch, storeys }: { outline: Pt[]; W:
 }
 
 export default function RoofModel3D({ outline, W, H, mpp, avgPitch, storeys = 1 }: { outline: Pt[]; W: number; H: number; mpp: number; avgPitch: number; storeys?: number }) {
-  if (outline.length < 3) return <div className="text-neutral-400 text-sm p-8">No roof outline to model.</div>;
+  if (outline.length < 3) return <div className="text-neutral-500 text-sm p-8">No roof outline to model.</div>;
   const span = 16;
   return (
     <div className="w-full h-full">

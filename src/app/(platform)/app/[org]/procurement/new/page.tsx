@@ -62,7 +62,7 @@ export default async function NewProcurementPage({
           <label className="block text-sm">
             <span className="text-neutral-600">Or add a new vendor</span>
             <input name="vendorName" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
-            <span className="mt-0.5 block text-xs text-neutral-400">
+            <span className="mt-0.5 block text-xs text-neutral-500">
               Used only if no vendor is selected above.
             </span>
           </label>

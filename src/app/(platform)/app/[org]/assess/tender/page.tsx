@@ -162,7 +162,7 @@ export default async function TenderComparisonPage({
         </div>
 
         <div>
-          <h2 className="font-semibold text-sm mb-1">Tender documents</h2>
+          <h2 className="text-base font-semibold mb-1">Tender documents</h2>
           <p className="text-xs text-neutral-500 mb-2">
             Tick the tender documents to compare (one per builder).
           </p>
@@ -196,7 +196,7 @@ export default async function TenderComparisonPage({
                     </td>
                     <td className="px-3 py-2">
                       {d.title}
-                      <span className="block font-mono text-[0.65rem] text-neutral-400">{String(d.id)}</span>
+                      <span className="block font-mono text-[0.65rem] text-neutral-500">{String(d.id)}</span>
                     </td>
                     <td className="px-3 py-2 text-xs text-neutral-500">{d.docType || d.classification}</td>
                   </tr>
@@ -238,14 +238,14 @@ export default async function TenderComparisonPage({
               </p>
 
               {tender.recommendation && (
-                <div className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
                   <span className="font-semibold">Recommended: {tender.recommendation.builder}</span>
                   {tender.recommendation.reason && <span> — {tender.recommendation.reason}</span>}
                 </div>
               )}
 
               <div>
-                <h3 className="text-sm font-semibold mb-1.5">Tender totals</h3>
+                <h3 className="text-base font-semibold mb-1.5">Tender totals</h3>
                 <div className="overflow-auto border border-neutral-100 rounded">
                   <table className="w-full text-sm">
                     <thead className="bg-neutral-50 text-neutral-600 text-xs">
@@ -277,7 +277,7 @@ export default async function TenderComparisonPage({
 
               {tender.builders.some((b) => b.rows.length > 0) && (
                 <div className="space-y-1.5">
-                  <h3 className="text-sm font-semibold">Line items by builder</h3>
+                  <h3 className="text-base font-semibold">Line items by builder</h3>
                   {tender.builders.map((b) => (
                     <details key={`rows-${b.builder}-${b.sourceDocumentId}`} className="border border-neutral-100 rounded">
                       <summary className="cursor-pointer px-3 py-2 text-sm text-neutral-700">
@@ -303,7 +303,7 @@ export default async function TenderComparisonPage({
 
               {tender.gaps.some((g) => g.missingItems.length > 0) && (
                 <div>
-                  <h3 className="text-sm font-semibold mb-1.5">Scope gaps</h3>
+                  <h3 className="text-base font-semibold mb-1.5">Scope gaps</h3>
                   <ul className="space-y-1 text-sm text-neutral-700">
                     {tender.gaps
                       .filter((g) => g.missingItems.length > 0)
@@ -319,7 +319,7 @@ export default async function TenderComparisonPage({
 
               {tender.risks.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold mb-1.5">Risks</h3>
+                  <h3 className="text-base font-semibold mb-1.5">Risks</h3>
                   <ul className="list-disc pl-5 space-y-0.5 text-sm text-amber-800">
                     {tender.risks.map((r) => (
                       <li key={r}>{r}</li>

@@ -89,7 +89,7 @@ export default async function DelayCascadePage({ params }: { params: Promise<{ o
         if (!result) return null;
         return (
           <section key={log.id} className="ae-card p-5 mb-4">
-            <h2 className="font-semibold text-sm mb-1">
+            <h2 className="text-base font-semibold mb-1">
               “{input?.trigger}” — {input?.delayDays}d initial
               <span className="ml-2 font-normal text-xs text-neutral-500">
                 total impact {result.totalDelayDays}d

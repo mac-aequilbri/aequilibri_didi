@@ -33,7 +33,7 @@ export default async function ReportPrintPage({
       <header className="mb-8 border-b border-neutral-300 pb-4">
         <div className="flex items-center gap-2">
           <OrgLogo logo={ctx.config.branding?.logo} name={ctx.orgName} size={22} />
-          <p className="text-xs uppercase tracking-widest text-neutral-400">{ctx.orgName}</p>
+          <p className="text-xs uppercase tracking-widest text-neutral-500">{ctx.orgName}</p>
         </div>
         <h1 className="text-2xl font-bold mt-1">
           {report.title || `Weekly report — ${formatDate(report.weekEnding)}`}
@@ -41,14 +41,14 @@ export default async function ReportPrintPage({
         <p className="text-sm text-neutral-500 mt-1">
           {report.jobCode} — {report.jobName} · week ending {formatDate(report.weekEnding)}
         </p>
-        <p className="text-xs text-neutral-400 mt-1">
+        <p className="text-xs text-neutral-500 mt-1">
           {reportModeFor("weekly_report")} output · {reportCaps.audienceLabel}
         </p>
       </header>
       <main className="prose prose-sm max-w-none">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{report.content}</ReactMarkdown>
       </main>
-      <footer className="mt-10 border-t border-neutral-200 pt-3 text-xs text-neutral-400">
+      <footer className="mt-10 border-t border-neutral-200 pt-3 text-xs text-neutral-500">
         {report.approvedBy ? `Approved by ${report.approvedBy}` : "Draft — not yet approved"} ·
         generated {formatDate(report.generatedAt)} · æquilibri
       </footer>

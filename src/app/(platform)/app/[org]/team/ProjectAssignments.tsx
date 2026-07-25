@@ -35,7 +35,7 @@ export function ProjectAssignments({
         Projects{" "}
         {/* 0 assignments = no access once enforced (this control only renders
             for non-exempt roles), so flag it amber. */}
-        <span className={assigned.length === 0 ? "text-amber-700" : "text-neutral-400"}>
+        <span className={assigned.length === 0 ? "text-amber-700" : "text-neutral-500"}>
           ({assigned.length} assigned)
         </span>
       </summary>
@@ -61,7 +61,7 @@ export function ProjectAssignments({
               </label>
             );
           })}
-          {jobs.length === 0 && <p className="text-neutral-400">No projects in this org yet.</p>}
+          {jobs.length === 0 && <p className="text-neutral-500">No projects in this org yet.</p>}
         </div>
         {capped && (
           <p className="mt-1 text-amber-700">
@@ -70,7 +70,7 @@ export function ProjectAssignments({
           </p>
         )}
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-neutral-400">Unassigned = no access to that project.</span>
+          <span className="text-neutral-500">Unassigned = no access to that project.</span>
           <SubmitButton
             label="Save"
             pendingLabel="Saving…"

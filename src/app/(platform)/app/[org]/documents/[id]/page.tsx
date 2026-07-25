@@ -91,7 +91,7 @@ export default async function DocumentDetailPage({
               </p>
             )}
             {verify === "fail" && (
-              <p className="text-rose-700">
+              <p className="text-red-700">
                 ✗ Integrity check FAILED — the stored file no longer matches its fingerprint.
               </p>
             )}

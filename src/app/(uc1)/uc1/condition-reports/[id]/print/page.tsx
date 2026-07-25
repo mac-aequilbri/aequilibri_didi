@@ -58,7 +58,7 @@ export default async function ConditionReportPrint({ params }: { params: Promise
         <div className="text-lg font-bold">Report fee (inc GST): {currency(incGst(Number(report.priceExGst)))}</div>
       </div>
 
-      <p className="text-xs text-neutral-400 mt-10">Use your browser&apos;s Print function (Ctrl/Cmd+P) to produce a PDF.</p>
+      <p className="text-xs text-neutral-500 mt-10">Use your browser&apos;s Print function (Ctrl/Cmd+P) to produce a PDF.</p>
     </main>
   );
 }

@@ -2,12 +2,13 @@
 // Pending proposals can be approved (the deferred write executes) or rejected.
 
 import { FilterBar } from "@/components/FilterBar";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { ConfirmSubmitButton } from "@/components/form/ConfirmSubmitButton";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import {
+  applyListQuery,
+  hasActiveFilters,
   parseListQuery,
-  sortAndPaginate,
   toClientConfig,
   type ListViewConfig,
 } from "@/lib/platform/listQuery";
@@ -20,9 +21,19 @@ import { approveProposalAction, rejectProposalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-// Sort + pager config for the history table (the pending queue stays unpaged —
-// approvals must always all be visible). Filters can be added here later.
+// Search + sort + pager config for the history table (the pending queue stays
+// unpaged — approvals must always all be visible). Status/operation values vary
+// by backend, so narrowing is free-text search rather than fixed enum filters.
 const execLogListConfig: ListViewConfig<LogView> = {
+  search: [
+    (l) => l.operation,
+    (l) => l.targetTable,
+    (l) => l.actorType,
+    (l) => l.actorName,
+    (l) => l.approvedBy,
+    (l) => l.status,
+    (l) => l.payload,
+  ],
   fields: [],
   sort: [
     { name: "created", label: "Date", getValue: (l) => l.createdAt },
@@ -67,7 +78,8 @@ export default async function ExecLogPage({
 
   const [pending, allLogs] = await Promise.all([loadPendingWrites(ctx), loadExecLogHistory(ctx)]);
   const proposals = pending.filter((p) => p.status === "proposed");
-  const { items: logs, page, pageCount } = sortAndPaginate(allLogs, query, execLogListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: logs, total, matching, page, pageCount } = applyListQuery(allLogs, query, execLogListConfig);
 
   const tableLabel = friendlyTableLabel;
 
@@ -139,10 +151,11 @@ export default async function ExecLogPage({
         basePath={orgPath(ctx.orgSlug, "/exec-log")}
         config={toClientConfig(execLogListConfig)}
         query={query}
-        shown={allLogs.length}
-        total={allLogs.length}
+        shown={matching}
+        total={total}
         page={page}
         pageCount={pageCount}
+        searchPlaceholder="Search activity…"
       >
       <section className="ae-card p-5">
         <h2 className="font-semibold mb-3">History</h2>
@@ -181,8 +194,15 @@ export default async function ExecLogPage({
             ))}
             {logs.length === 0 && (
               <tr>
-                <td className="py-4 text-sm text-neutral-500" colSpan={5}>
-                  No activity yet.
+                <td colSpan={5} className="py-6">
+                  <EmptyState
+                    title={filtered ? "No activity matches this search" : "No activity yet"}
+                    hint={
+                      filtered
+                        ? "Try a broader search term, or clear it above."
+                        : "Every create, update, and approval is recorded here as it happens."
+                    }
+                  />
                 </td>
               </tr>
             )}

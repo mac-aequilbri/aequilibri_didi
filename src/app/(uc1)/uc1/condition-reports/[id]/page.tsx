@@ -30,7 +30,7 @@ export default async function ConditionReportDetail({ params }: { params: Promis
 
       <div className="px-8 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <div className="ae-card p-6">
+          <div className="ae-card p-5">
             <div className="flex items-center gap-4">
               <div
                 className="flex items-center justify-center w-16 h-16 rounded-lg text-white text-3xl font-bold"
@@ -48,12 +48,12 @@ export default async function ConditionReportDetail({ params }: { params: Promis
             </div>
           </div>
 
-          <div className="ae-card p-6">
+          <div className="ae-card p-5">
             <h3 className="font-semibold mb-2">AI Assessment</h3>
             <p className="text-sm text-neutral-700 whitespace-pre-wrap">{report.aiAssessment || "—"}</p>
           </div>
 
-          <div className="ae-card p-6">
+          <div className="ae-card p-5">
             <h3 className="font-semibold mb-2">Recommended Works</h3>
             <p className="text-sm text-neutral-700 whitespace-pre-wrap">{report.recommendedWorks || "—"}</p>
           </div>

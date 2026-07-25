@@ -36,7 +36,7 @@ export default async function QuoteList({
         </div>
 
         {!connected && (
-          <div className="ae-card p-4 mb-4 text-sm text-neutral-600">Database not connected.</div>
+          <div className="ae-card p-5 mb-4 text-sm text-neutral-600">Database not connected.</div>
         )}
 
         <div className="ae-card overflow-hidden">

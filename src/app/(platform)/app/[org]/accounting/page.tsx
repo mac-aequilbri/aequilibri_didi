@@ -121,7 +121,7 @@ export default async function AccountingPage({
             <MetricCard value={currency(summary.bills.outstanding)} label="Bills outstanding" />
           </div>
           <section className="ae-card p-5">
-            <h2 className="font-semibold text-sm mb-3">
+            <h2 className="text-base font-semibold mb-3">
               Recent invoices{summary.demoMode ? " (demo data)" : ""}
             </h2>
             <table className="w-full text-sm">

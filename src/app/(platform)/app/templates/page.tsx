@@ -58,7 +58,7 @@ export default async function TemplateRegistryPage() {
                     <SubmitButton
                       label={r.isActive ? "Active" : "Inactive"}
                       pendingLabel="Updating…"
-                      className={`text-xs font-semibold ${r.isActive ? "text-emerald-700" : "text-neutral-400"}`}
+                      className={`text-xs font-semibold ${r.isActive ? "text-emerald-700" : "text-neutral-500"}`}
                     />
                   </form>
                 </td>

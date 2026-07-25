@@ -46,12 +46,11 @@ export default async function RecordDetailPage({
   const ctx = await getOrgCtx(orgSlug);
   const config = ctx ? await localizeEditorConfig(ctx, rawConfig) : rawConfig;
   const listHref = orgPath(orgSlug, config.listPath);
-  const backAction = { href: listHref, label: "← Back", variant: "outline" as const };
 
   if (!values) {
     return (
       <div className="p-6 max-w-xl">
-        <PageHeader title={cap(config.noun)} actions={[backAction]} />
+        <PageHeader title={cap(config.noun)} />
         <div className="ae-card p-5">
           <EmptyState
             title={`${cap(config.noun)} not found`}
@@ -76,10 +75,7 @@ export default async function RecordDetailPage({
       <PageHeader
         title={primary || cap(config.noun)}
         subtitle={cap(config.noun)}
-        actions={[
-          { href: orgPath(orgSlug, `${config.listPath}/${recordId}/edit`), label: "Edit" },
-          backAction,
-        ]}
+        actions={[{ href: orgPath(orgSlug, `${config.listPath}/${recordId}/edit`), label: "Edit" }]}
       />
       <dl className="ae-card p-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {jobName && (

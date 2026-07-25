@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { deleteChatAction, renameChatAction } from "./actions";
 
@@ -25,8 +25,18 @@ export default function ConversationList({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Two-step delete (same arm/confirm idiom as ConfirmSubmitButton): the first
+  // click arms the row's delete button, the second submits. Auto-disarms so a
+  // stale armed button can't delete later.
+  const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
+  useEffect(() => {
+    if (armedDeleteId === null) return;
+    const t = setTimeout(() => setArmedDeleteId(null), 5000);
+    return () => clearTimeout(t);
+  }, [armedDeleteId]);
+
   if (sessions.length === 0) {
-    return <p className="px-2.5 text-xs text-neutral-400">No conversations yet.</p>;
+    return <p className="px-2.5 text-xs text-neutral-500">No conversations yet.</p>;
   }
 
   return (
@@ -61,7 +71,7 @@ export default function ConversationList({
                 <button
                   type="button"
                   onClick={() => setEditingId(null)}
-                  className="shrink-0 text-xs text-neutral-400 hover:text-neutral-600"
+                  className="shrink-0 text-xs text-neutral-500 hover:text-neutral-600"
                 >
                   Cancel
                 </button>
@@ -87,25 +97,37 @@ export default function ConversationList({
               onClick={() => setEditingId(id)}
               aria-label={`Rename ${s.title}`}
               title="Rename"
-              className="shrink-0 px-1 text-neutral-300 hover:text-neutral-600 lg:opacity-0 lg:group-hover:opacity-100"
+              className="shrink-0 px-1 text-neutral-500 hover:text-neutral-700 lg:opacity-0 lg:group-hover:opacity-100"
             >
               ✎
             </button>
             <form
               action={deleteChatAction}
               onSubmit={(e) => {
-                if (!window.confirm(`Delete "${s.title}"? This can't be undone.`)) e.preventDefault();
+                if (armedDeleteId !== id) {
+                  e.preventDefault();
+                  setArmedDeleteId(id);
+                }
               }}
             >
               <input type="hidden" name="org" value={orgSlug} />
               <input type="hidden" name="sessionId" value={id} />
               <button
                 type="submit"
-                aria-label={`Delete ${s.title}`}
-                title="Delete"
-                className="shrink-0 px-1 text-neutral-300 hover:text-red-600 lg:opacity-0 lg:group-hover:opacity-100"
+                aria-label={
+                  armedDeleteId === id
+                    ? `Confirm delete ${s.title} — this can't be undone`
+                    : `Delete ${s.title}`
+                }
+                title={armedDeleteId === id ? "Click again to confirm — can't be undone" : "Delete"}
+                onBlur={() => setArmedDeleteId(null)}
+                className={
+                  armedDeleteId === id
+                    ? "shrink-0 px-1 text-xs font-medium text-red-600 whitespace-nowrap"
+                    : "shrink-0 px-1 text-neutral-500 hover:text-red-600 lg:opacity-0 lg:group-hover:opacity-100"
+                }
               >
-                🗑
+                {armedDeleteId === id ? "Delete?" : "🗑"}
               </button>
             </form>
           </li>

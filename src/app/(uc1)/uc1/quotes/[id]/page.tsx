@@ -124,7 +124,7 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
               <Link href={`/uc1/quotes/new?address=${encodeURIComponent(quote.propertyAddress)}`} className="btn-ae-outline text-sm">🗺️ Open on Map</Link>
             </div>
             <p className="text-sm text-neutral-500">Captured at quote creation. Use “Open on Map” to verify or re-draw with the AI tool.</p>
-            {quote.roofPolygonJson ? <RoofPlanSvg json={quote.roofPolygonJson} /> : <div className="mt-3 h-40 grid place-items-center bg-[var(--ae-cream)] rounded text-neutral-400 text-sm">No saved roof outline</div>}
+            {quote.roofPolygonJson ? <RoofPlanSvg json={quote.roofPolygonJson} /> : <div className="mt-3 h-40 grid place-items-center bg-[var(--ae-cream)] rounded text-neutral-500 text-sm">No saved roof outline</div>}
           </div>
 
           {/* Line items */}
@@ -146,7 +146,7 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
                   const zero = lineTotal === 0;
                   return (
                     <tr key={i.id}>
-                      <td>{i.description}{zero && <div className="text-neutral-400 text-xs">Included in roof replacement above</div>}</td>
+                      <td>{i.description}{zero && <div className="text-neutral-500 text-xs">Included in roof replacement above</div>}</td>
                       <td className="text-right">{zero ? "—" : toNum(i.quantity)}</td>
                       <td>{zero ? "—" : i.unit}</td>
                       <td className="text-right">{zero ? "—" : currency(i.unitPriceExGst)}</td>
@@ -230,7 +230,7 @@ function RevTool({ href, icon, title, note }: { href: string; icon: string; titl
 function RoofPlanSvg({ json }: { json: string }) {
   let coords: number[][] = [];
   try { coords = JSON.parse(json); } catch { coords = []; }
-  if (coords.length < 3) return <div className="mt-3 h-40 grid place-items-center bg-[var(--ae-cream)] rounded text-neutral-400 text-sm">No saved roof outline</div>;
+  if (coords.length < 3) return <div className="mt-3 h-40 grid place-items-center bg-[var(--ae-cream)] rounded text-neutral-500 text-sm">No saved roof outline</div>;
   const lats = coords.map((c) => c[0]);
   const lngs = coords.map((c) => c[1]);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);

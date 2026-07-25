@@ -43,7 +43,7 @@ export default async function ReportDetailPage({
         ]}
       />
 
-      <div className="ae-card p-6">
+      <div className="ae-card p-5">
         <div className="flex items-center gap-3 mb-4">
           <StatusBadge status={report.status} />
           {report.approvedBy && (

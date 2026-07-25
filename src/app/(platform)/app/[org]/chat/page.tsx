@@ -77,7 +77,7 @@ export default async function ChatPage({
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <button type="submit" className="btn-ae w-full">+ New chat</button>
         </form>
-        <h2 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">
+        <h2 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
           Conversations
         </h2>
         <ConversationList

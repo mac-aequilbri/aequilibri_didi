@@ -39,7 +39,6 @@ export default async function IntegrationsPage({
       <PageHeader
         title="Integrations"
         subtitle="External channels wired to this organisation via n8n. Enable a channel here before pointing an n8n workflow at the inbound webhook."
-        actions={[{ href: orgPath(ctx.orgSlug), label: "Back to dashboard", variant: "outline" }]}
       />
 
       {rows.length === 0 ? (
@@ -80,7 +79,7 @@ export default async function IntegrationsPage({
                     <SubmitButton
                       label={r.isActive ? "Enabled" : "Disabled"}
                       pendingLabel="Updating…"
-                      className={`text-xs font-semibold ${r.isActive ? "text-emerald-700" : "text-neutral-400"}`}
+                      className={`text-xs font-semibold ${r.isActive ? "text-emerald-700" : "text-neutral-500"}`}
                     />
                   </form>
                 </td>
@@ -91,7 +90,7 @@ export default async function IntegrationsPage({
                       <span className="block text-neutral-500">{r.lastStatus || "—"}</span>
                     </span>
                   ) : (
-                    <span className="text-neutral-400">never</span>
+                    <span className="text-neutral-500">never</span>
                   )}
                 </td>
                 <td className="p-3 font-mono text-xs">{r.credentialRef || "—"}</td>
@@ -114,8 +113,8 @@ export default async function IntegrationsPage({
         </>
       )}
 
-      <section className="mt-8 ae-card p-4">
-        <h2 className="text-sm font-semibold mb-3">Add a channel</h2>
+      <section className="mt-8 ae-card p-5">
+        <h2 className="text-base font-semibold mb-3">Add a channel</h2>
         <form action={addConnection} className="flex flex-wrap items-end gap-3 text-sm">
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <label className="flex flex-col gap-1">
@@ -147,7 +146,7 @@ export default async function IntegrationsPage({
         </form>
       </section>
 
-      <section className="mt-8 ae-card p-4 text-sm">
+      <section className="mt-8 ae-card p-5 text-sm">
         <h2 className="font-semibold mb-2">Connect via n8n</h2>
         <p className="text-neutral-600 mb-3">
           Point an n8n workflow (Gmail trigger, Slack event, Drive change, web form) at the inbound webhook.
@@ -179,7 +178,7 @@ export default async function IntegrationsPage({
               <span className="break-all">{exampleBody}</span>
               <CopyButton value={exampleBody} label="Copy body" title="Copy the example request body" />
             </dd>
-            <dd className="text-neutral-400 mt-0.5">
+            <dd className="text-neutral-500 mt-0.5">
               from / subject / body / attachments are optional.
             </dd>
           </div>
@@ -202,7 +201,7 @@ export default async function IntegrationsPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="text-sm font-semibold mb-3">Recent outbound events</h2>
+        <h2 className="text-base font-semibold mb-3">Recent outbound events</h2>
         {outbox.length === 0 ? (
           <p className="text-sm text-neutral-600">
             No outbound events yet. Events are enqueued (a proposal is approved, a report is sent, an assessment is

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { SubmitButton } from "@/components/form/SubmitButton";
-import { PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
 import { formatDate } from "@/lib/format";
 import {
+  applyListQuery,
+  hasActiveFilters,
   parseListQuery,
-  sortAndPaginate,
   toClientConfig,
   type ListViewConfig,
 } from "@/lib/platform/listQuery";
@@ -19,10 +20,19 @@ import { generateCustomReportAction, generateReportAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-// Sort + pager config — reports accumulate weekly per job, so the table grows
-// without bound. Filters can be added here later.
+// Search + filter + sort + pager config — reports accumulate weekly per job,
+// so the table grows without bound.
 const reportsListConfig: ListViewConfig<ReportView> = {
-  fields: [],
+  search: [(r) => r.title, (r) => r.jobCode],
+  fields: [
+    {
+      kind: "enum",
+      name: "status",
+      label: "Status",
+      getValue: (r) => r.status.toLowerCase(),
+      options: ["draft", "approved", "sent"].map((v) => ({ value: v })),
+    },
+  ],
   sort: [
     {
       name: "week",
@@ -64,7 +74,12 @@ export default async function ReportsPage({
     loadJobOptions(ctx), // jobs feed the AI-generate dropdown
     listReportTemplates(ctx.orgSlug), // saved templates (Phase 4)
   ]);
-  const { items: reports, page, pageCount } = sortAndPaginate(allReports, query, reportsListConfig);
+  const filtered = hasActiveFilters(query);
+  const { items: reports, total, matching, facets, page, pageCount } = applyListQuery(
+    allReports,
+    query,
+    reportsListConfig,
+  );
 
   return (
     <div className="p-6">
@@ -161,10 +176,12 @@ export default async function ReportsPage({
         basePath={orgPath(ctx.orgSlug, "/reports")}
         config={toClientConfig(reportsListConfig)}
         query={query}
-        shown={allReports.length}
-        total={allReports.length}
+        shown={matching}
+        total={total}
+        counts={facets}
         page={page}
         pageCount={pageCount}
+        searchPlaceholder="Search reports…"
       >
       <div className="ae-card p-5">
         <table className="w-full text-sm">
@@ -183,7 +200,7 @@ export default async function ReportsPage({
                   <Link href={orgPath(ctx.orgSlug, `/reports/${r.id}`)} className="font-medium hover:underline">
                     {r.title || `Week ending ${formatDate(r.weekEnding)}`}
                   </Link>
-                  <span className="ml-1 text-xs text-neutral-400">{r.jobCode}</span>
+                  <span className="ml-1 text-xs text-neutral-500">{r.jobCode}</span>
                   {r.isAiGenerated && (
                     <span className="ml-1 text-[0.65rem] px-1 rounded bg-violet-100 text-violet-700">AI</span>
                   )}
@@ -197,8 +214,15 @@ export default async function ReportsPage({
             ))}
             {reports.length === 0 && (
               <tr>
-                <td className="py-4 text-neutral-500" colSpan={4}>
-                  No reports yet — generate one above.
+                <td colSpan={4} className="py-6">
+                  <EmptyState
+                    title={filtered ? "No reports match these filters" : "No reports yet"}
+                    hint={
+                      filtered
+                        ? "Try widening or clearing the filters above."
+                        : "Generate one above — pick a catalog report, or describe a custom one for the AI to build."
+                    }
+                  />
                 </td>
               </tr>
             )}

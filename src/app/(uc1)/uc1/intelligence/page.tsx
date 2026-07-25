@@ -31,7 +31,7 @@ export default async function Intelligence() {
       />
       <div className="px-8 space-y-6">
         {/* Loop controls */}
-        <div className="ae-card p-4 flex flex-wrap gap-2 items-center">
+        <div className="ae-card p-5 flex flex-wrap gap-2 items-center">
           <span className="text-sm text-neutral-500 mr-2">Learning loop:</span>
           <form action={runEngine}><button className="btn-ae-outline text-sm">⚙️ Run hypothesis engine</button></form>
           <form action={takeSnapshot}><button className="btn-ae-outline text-sm">📸 Take intelligence snapshot</button></form>
@@ -48,7 +48,7 @@ export default async function Intelligence() {
           <MetricCard value={snapshot ? `${snapshot.avgConfidence} (${snapshot.confidenceTrajectory === "improving" ? "↑" : snapshot.confidenceTrajectory === "degrading" ? "↓" : "→"})` : "—"} label="Avg confidence" />
         </div>
         {gaps.length > 0 && (
-          <div className="ae-card p-4">
+          <div className="ae-card p-5">
             <div className="text-xs font-bold uppercase tracking-wide text-neutral-500 mb-2">Known gaps</div>
             <ul className="text-sm list-disc pl-5 text-neutral-600">{gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
           </div>
@@ -56,7 +56,7 @@ export default async function Intelligence() {
 
         {/* Learning rules (Semantic / Contextual Intelligence) */}
         <div className="ae-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h2 className="font-semibold">Learning Rules <span className="text-neutral-400 text-sm">(applied automatically)</span></h2></div>
+          <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h2 className="font-semibold">Learning Rules <span className="text-neutral-500 text-sm">(applied automatically)</span></h2></div>
           {rules.length === 0 ? <p className="px-5 py-8 text-center text-neutral-500">No rules yet — promote a validated hypothesis below.</p> : (
             <table className="ae-table">
               <thead><tr><th>Code</th><th>Category</th><th>Rule</th><th>Trigger</th><th className="text-right">P</th><th className="text-right">Conf.</th><th className="text-right">Fired</th><th>Auto</th><th></th></tr></thead>
@@ -81,7 +81,7 @@ export default async function Intelligence() {
 
         {/* Hypotheses (awaiting human gates) */}
         <div className="ae-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h2 className="font-semibold">Hypotheses <span className="text-neutral-400 text-sm">(human review gates)</span></h2></div>
+          <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h2 className="font-semibold">Hypotheses <span className="text-neutral-500 text-sm">(human review gates)</span></h2></div>
           {hypotheses.length === 0 ? <p className="px-5 py-8 text-center text-neutral-500">No hypotheses — run the engine after corrections accumulate.</p> : (
             <table className="ae-table">
               <thead><tr><th>Pattern</th><th className="text-right">Samples</th><th className="text-right">Avg var.</th><th className="text-right">Conf.</th><th>Status</th><th></th></tr></thead>
@@ -110,7 +110,7 @@ export default async function Intelligence() {
 
         {/* Corrections (Episodic raw material) */}
         <div className="ae-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h2 className="font-semibold">Recent Corrections <span className="text-neutral-400 text-sm">(episodic)</span></h2></div>
+          <div className="px-5 py-3 border-b border-[var(--ae-earth)]"><h2 className="font-semibold">Recent Corrections <span className="text-neutral-500 text-sm">(episodic)</span></h2></div>
           {corrections.length === 0 ? <p className="px-5 py-8 text-center text-neutral-500">No corrections recorded.</p> : (
             <table className="ae-table">
               <thead><tr><th>Dimension</th><th>Suburb</th><th className="text-right">AI</th><th className="text-right">Human</th><th className="text-right">Var.</th><th>Root cause</th><th>When</th></tr></thead>

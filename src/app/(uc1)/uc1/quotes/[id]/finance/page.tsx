@@ -28,7 +28,7 @@ export default async function QuoteFinance({ params }: { params: Promise<{ id: s
       <PageHeader title="Finance Options" subtitle={`${quote.refNumber} · ${currency(total)} inc GST`} actions={[{ href: `/uc1/quotes/${quote.id}`, label: "Back to Quote", variant: "outline" }]} />
       <div className="px-8">
         {providers.length === 0 ? (
-          <div className="ae-card p-6 text-neutral-600">No active finance providers. Add some under <strong>Finance</strong>.</div>
+          <div className="ae-card p-5 text-neutral-600">No active finance providers. Add some under <strong>Finance</strong>.</div>
         ) : (
           <div className="ae-card overflow-hidden">
             <table className="ae-table">
@@ -38,8 +38,8 @@ export default async function QuoteFinance({ params }: { params: Promise<{ id: s
                   <tr key={p.id}>
                     <td className="font-medium">{p.name}</td>
                     <td>{String(p.interestRatePct)}</td>
-                    <td className="text-right">{currency(monthlyPayment(total, toNum(p.interestRatePct), p.minTermMonths))}/mo <span className="text-neutral-400">({p.minTermMonths}mo)</span></td>
-                    <td className="text-right">{currency(monthlyPayment(total, toNum(p.interestRatePct), p.maxTermMonths))}/mo <span className="text-neutral-400">({p.maxTermMonths}mo)</span></td>
+                    <td className="text-right">{currency(monthlyPayment(total, toNum(p.interestRatePct), p.minTermMonths))}/mo <span className="text-neutral-500">({p.minTermMonths}mo)</span></td>
+                    <td className="text-right">{currency(monthlyPayment(total, toNum(p.interestRatePct), p.maxTermMonths))}/mo <span className="text-neutral-500">({p.maxTermMonths}mo)</span></td>
                     <td>{p.tagline}</td>
                   </tr>
                 ))}

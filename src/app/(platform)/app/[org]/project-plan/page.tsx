@@ -31,7 +31,7 @@ export default async function ProjectPlanPage({ params }: { params: Promise<{ or
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
               <h2 className="font-semibold">
-                {ws.name} <span className="text-xs font-normal text-neutral-400">{ws.jobCode}</span>
+                {ws.name} <span className="text-xs font-normal text-neutral-500">{ws.jobCode}</span>
               </h2>
               {ws.milestone && (
                 <p className="text-xs text-neutral-500">Milestone: {ws.milestone}</p>
@@ -66,7 +66,7 @@ export default async function ProjectPlanPage({ params }: { params: Promise<{ or
               </tbody>
             </table>
           )}
-          <p className="mt-2 text-xs text-neutral-400">Updated {formatDate(ws.lastUpdated)}</p>
+          <p className="mt-2 text-xs text-neutral-500">Updated {formatDate(ws.lastUpdated)}</p>
         </section>
       ))}
       {workstreams.length === 0 && <p className="text-sm text-neutral-500">No workstreams yet.</p>}

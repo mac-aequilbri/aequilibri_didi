@@ -61,7 +61,7 @@ export default async function Uc1Dashboard() {
       />
       <div className="px-8">
         {!connected && (
-          <div className="ae-card p-4 mb-6 text-sm text-neutral-600">
+          <div className="ae-card p-5 mb-6 text-sm text-neutral-600">
             Database not connected. Set <code>DATABASE_URL</code> to the existing Postgres to see live data.
           </div>
         )}

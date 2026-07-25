@@ -249,7 +249,7 @@ function ThinkingBubble({ avatar }: { avatar: string }) {
           <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce [animation-delay:-0.15s]" />
           <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" />
           {elapsed >= 5 && (
-            <span className="ml-1.5 text-[0.7rem] text-neutral-400">Still working… {elapsed}s</span>
+            <span className="ml-1.5 text-[0.7rem] text-neutral-500">Still working… {elapsed}s</span>
           )}
         </div>
       </div>
@@ -454,7 +454,7 @@ export default function AssistantClient({
           <Avatar label={avatarLabel} kind="assistant" />
           <div className="leading-tight">
             <p className="text-sm font-semibold">{assistantName}</p>
-            <p className="text-[0.7rem] text-neutral-400">Chat assistant</p>
+            <p className="text-[0.7rem] text-neutral-500">Chat assistant</p>
           </div>
           <span className="ml-auto flex items-center gap-1.5 text-[0.7rem] text-emerald-600">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -504,7 +504,7 @@ export default function AssistantClient({
                     <p className="whitespace-pre-wrap">{m.content}</p>
                   )}
                   {m.toolCalls.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-neutral-100 flex flex-wrap items-center gap-1 text-neutral-400">
+                    <div className="mt-2 pt-2 border-t border-neutral-100 flex flex-wrap items-center gap-1 text-neutral-500">
                       <span className="text-[0.65rem]">used</span>
                       {summariseToolCalls(m.toolCalls).map((t, i) => (
                         <span
@@ -616,11 +616,11 @@ export default function AssistantClient({
         />
         <SendButton pending={inFlight !== null} />
       </form>
-      <p className="mt-1.5 text-center text-[0.7rem] text-neutral-400">
+      <p className="mt-1.5 text-center text-[0.7rem] text-neutral-500">
         AI can make mistakes — verify important figures.
       </p>
       {showSessionReview && (
-      <details ref={reviewDetailsRef} className="mt-2 ae-card p-4">
+      <details ref={reviewDetailsRef} className="mt-2 ae-card p-5">
         <summary className="cursor-pointer text-sm font-medium">End session with review</summary>
         <form ref={reviewFormRef} action={closeSessionReviewAction} className="mt-3 space-y-3">
           <input type="hidden" name="org" value={orgSlug} />
@@ -685,7 +685,7 @@ export default function AssistantClient({
                   <label key={r.ruleCode} className="flex items-start gap-2 text-xs text-neutral-700">
                     <input type="checkbox" name="misappliedRules" value={r.ruleCode} className="mt-0.5" />
                     <span>
-                      <span className="font-mono text-neutral-400">{r.ruleCode}</span> {r.description}
+                      <span className="font-mono text-neutral-500">{r.ruleCode}</span> {r.description}
                     </span>
                   </label>
                 ))}
@@ -696,7 +696,7 @@ export default function AssistantClient({
         </form>
       </details>
       )}
-      <details className="mt-3 ae-card p-4">
+      <details className="mt-3 ae-card p-5">
         <summary className="cursor-pointer text-sm font-medium">Capture a source note</summary>
         <form action={saveConversationNoteFromChatAction} className="mt-3 space-y-3">
           <input type="hidden" name="org" value={orgSlug} />

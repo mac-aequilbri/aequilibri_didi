@@ -187,7 +187,7 @@ export default async function ApprovalsPage({
       />
 
       {typeof sp.approved === "string" && sp.approved !== "" && (
-        <div role="status" className="ae-card p-3 mb-4 border-green-300 text-sm text-green-700">
+        <div role="status" className="ae-card p-3 mb-4 border-emerald-300 text-sm text-emerald-700">
           Change approved and written.
           {(() => {
             const href =
@@ -232,7 +232,7 @@ export default async function ApprovalsPage({
               // field values); Reject overrides via formAction. Correcting a
               // value before approving emits a CORRECTIONS record (Spec 12
               // Module 2 — propose, review/correct, confirm).
-              <form key={prop.id} action={approveProposalAction} className="ae-card p-4">
+              <form key={prop.id} action={approveProposalAction} className="ae-card p-5">
                 {/* Disabled default button: blocks implicit (Enter-key) submission,
                     which would otherwise fire Approve while typing a corrected
                     value or a reject reason. Approve/Reject require a click. */}
@@ -251,7 +251,7 @@ export default async function ApprovalsPage({
                       </span>
                       <span className="font-semibold">
                         {opLabel(prop.op)} {tableLabel(prop.tableKey)}
-                        {prop.recordId ? <span className="text-neutral-400"> #{prop.recordId}</span> : null}
+                        {prop.recordId ? <span className="text-neutral-500"> #{prop.recordId}</span> : null}
                       </span>
                     </div>
                     <p className="text-xs text-neutral-500 mt-0.5">

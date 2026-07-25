@@ -159,7 +159,7 @@ export function RoofAssessmentModule({
     <section className="ae-card p-5">
       <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
         <div>
-          <h3 className="font-semibold text-sm">Roof check</h3>
+          <h3 className="text-base font-semibold">Roof check</h3>
           <p className="text-xs text-neutral-500">
             Confirm the building before accepting. If the pin is on the wrong building,
             click the correct roof on the map.

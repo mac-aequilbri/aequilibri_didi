@@ -26,7 +26,7 @@ export function BimxViewer({
   }
 
   return (
-    <div className="relative rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800">
+    <div className="relative rounded-lg overflow-hidden border border-neutral-200 bg-neutral-100">
       {!loaded && (
         <div className="absolute inset-0 flex items-center justify-center text-sm text-neutral-500">
           Loading 3D model…

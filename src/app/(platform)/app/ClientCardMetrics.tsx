@@ -98,5 +98,5 @@ export function ClientCardMetrics({ slug, cached }: { slug: string; cached: Cach
     );
   }
 
-  return <p className="mt-2 text-xs text-neutral-400">Open workspace</p>;
+  return <p className="mt-2 text-xs text-neutral-500">Open workspace</p>;
 }

@@ -101,10 +101,25 @@ export default function ActionEditor({
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
+  // Two-step Back/Cancel while dirty (same arm/confirm idiom as
+  // ConfirmSubmitButton): first click arms, second navigates. Auto-disarms so a
+  // stale armed button can't discard later.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  useEffect(() => {
+    if (!confirmDiscard) return;
+    const t = setTimeout(() => setConfirmDiscard(false), 5000);
+    return () => clearTimeout(t);
+  }, [confirmDiscard]);
   const goBack = () => {
-    if (dirty && !window.confirm("Discard unsaved changes?")) return;
+    if (dirty && !confirmDiscard) {
+      setConfirmDiscard(true);
+      return;
+    }
     startNav(() => router.push(backHref));
   };
+  const discardStyle = confirmDiscard
+    ? { borderColor: "var(--ae-danger)", color: "var(--ae-danger)" }
+    : undefined;
 
   // AI assist over fetch (not a server action) so the editor stays mounted while
   // it runs — a server action would refresh this force-dynamic route.
@@ -155,10 +170,13 @@ export default function ActionEditor({
         <button
           type="button"
           onClick={goBack}
+          onBlur={() => setConfirmDiscard(false)}
           disabled={navigating}
           className="btn-ae-outline text-xs inline-flex items-center gap-1.5 disabled:opacity-60"
+          style={discardStyle}
         >
-          {navigating ? <Spinner /> : "←"} {navigating ? "Loading…" : "Back to actions"}
+          {navigating ? <Spinner /> : "←"}{" "}
+          {navigating ? "Loading…" : confirmDiscard ? "Discard changes?" : "Back to actions"}
         </button>
         <button
           type="button"
@@ -211,7 +229,7 @@ export default function ActionEditor({
             </option>
           ))}
         </select>
-        <span className="mt-0.5 block text-xs text-neutral-400">
+        <span className="mt-0.5 block text-xs text-neutral-500">
           Which project this action belongs to — controls who can see it when project access is
           enforced.
         </span>
@@ -262,11 +280,13 @@ export default function ActionEditor({
         <button
           type="button"
           onClick={goBack}
+          onBlur={() => setConfirmDiscard(false)}
           disabled={busy}
           className="btn-ae-outline inline-flex items-center gap-1.5 disabled:opacity-60"
+          style={discardStyle}
         >
           {navigating && <Spinner />}
-          Cancel
+          {confirmDiscard ? "Discard changes?" : "Cancel"}
         </button>
       </div>
     </form>

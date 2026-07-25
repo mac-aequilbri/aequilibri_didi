@@ -23,7 +23,7 @@ function MigrateResultBanner({ sp }: { sp: Record<string, string | string[] | un
     partial: { cls: "bg-amber-50 text-amber-800 border-amber-200", text: `Migrated ${migrated} with errors — applied ${applied} change(s). See the row for remaining drift.` },
     noop: { cls: "bg-neutral-50 text-neutral-700 border-neutral-200", text: `${migrated} was already in sync — nothing to apply.` },
     unavailable: { cls: "bg-neutral-50 text-neutral-700 border-neutral-200", text: "Migration unavailable (Airtable mode off or no base id)." },
-    unknown_base: { cls: "bg-rose-50 text-rose-800 border-rose-200", text: "Refused: that base id is not managed by this platform." },
+    unknown_base: { cls: "bg-red-50 text-red-800 border-red-200", text: "Refused: that base id is not managed by this platform." },
   };
   const m = map[status];
   if (!m) return null;
@@ -46,7 +46,7 @@ function StatusBadge({ org }: { org: OrgDrift }) {
     );
   }
   return (
-    <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800">
+    <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
       drift
     </span>
   );
@@ -139,9 +139,9 @@ export default async function SchemaDriftPage({
                 <tr key={o.slug} className="border-t border-neutral-100 align-top">
                   <td className="py-2 pr-2">
                     <div className="font-medium">{o.name || o.slug}</div>
-                    <div className="text-xs text-neutral-400">{o.slug}</div>
+                    <div className="text-xs text-neutral-500">{o.slug}</div>
                     {o.missingTables.length > 0 && (
-                      <div className="mt-1 text-xs text-rose-700">
+                      <div className="mt-1 text-xs text-red-700">
                         {o.missingTables.join(", ")}
                       </div>
                     )}
@@ -180,14 +180,14 @@ export default async function SchemaDriftPage({
                         />
                       </form>
                     ) : (
-                      <span className="text-xs text-neutral-300">—</span>
+                      <span className="text-xs text-neutral-400">—</span>
                     )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="text-xs text-neutral-400 mt-3">
+          <p className="text-xs text-neutral-500 mt-3">
             Drift is measured against the template&apos;s <em>provisionable</em> schema — the tables and
             fields a fresh clone receives. Computed fields and TEAM/PRICING links (never cloned) are
             excluded, so a correctly-provisioned base reads as in sync. Extra customer-added fields are
@@ -196,7 +196,7 @@ export default async function SchemaDriftPage({
         </section>
       )}
 
-      <p className="text-xs text-neutral-400">
+      <p className="text-xs text-neutral-500">
         <a className="underline" href={orgPath(ctx.orgSlug, "/diagnostics")}>
           ← Backend diagnostics
         </a>

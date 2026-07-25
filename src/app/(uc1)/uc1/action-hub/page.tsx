@@ -14,8 +14,8 @@ const PRIORITY_COLOR: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   open: "bg-blue-50 text-blue-700",
   in_progress: "bg-amber-50 text-amber-700",
-  done: "bg-green-50 text-green-700",
-  deferred: "bg-neutral-100 text-neutral-400",
+  done: "bg-emerald-50 text-emerald-700",
+  deferred: "bg-neutral-100 text-neutral-500",
 };
 
 export default async function ActionHubPage() {
@@ -54,7 +54,7 @@ export default async function ActionHubPage() {
                     </td>
                     <td className="max-w-md">
                       <div>{a.action}</div>
-                      {a.notes && <div className="text-xs text-neutral-400">{a.notes}</div>}
+                      {a.notes && <div className="text-xs text-neutral-500">{a.notes}</div>}
                     </td>
                     <td className="text-xs text-neutral-500">{a.triggerCondition || "—"}</td>
                     <td className={`text-sm ${a.dueDate && a.dueDate < new Date() && a.status !== "done" ? "text-red-600 font-medium" : ""}`}>

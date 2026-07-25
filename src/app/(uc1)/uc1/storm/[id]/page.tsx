@@ -49,7 +49,7 @@ export default async function StormDetail({ params }: { params: Promise<{ id: st
           <MetricCard value={currency(stats.pipeline)} label="Open Pipeline" />
         </div>
 
-        <div className="ae-card p-4 text-sm text-neutral-600">
+        <div className="ae-card p-5 text-sm text-neutral-600">
           <strong>Affected suburbs:</strong> {event.affectedSuburbs || "—"}
         </div>
 

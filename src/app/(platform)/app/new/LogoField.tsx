@@ -47,7 +47,7 @@ export function LogoField() {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="Logo preview" className="h-full w-full object-contain" />
           ) : (
-            <span className="text-lg text-neutral-300" aria-hidden>
+            <span className="text-lg text-neutral-400" aria-hidden>
               ▦
             </span>
           )}
@@ -61,7 +61,7 @@ export function LogoField() {
           className="block w-full text-xs text-neutral-600 file:mr-3 file:rounded file:border-0 file:bg-[var(--ae-space,#dc9f82)] file:px-3 file:py-1.5 file:text-white file:cursor-pointer"
         />
         {preview && (
-          <button type="button" onClick={clear} className="text-xs text-rose-600 hover:underline shrink-0">
+          <button type="button" onClick={clear} className="text-xs text-red-600 hover:underline shrink-0">
             Remove
           </button>
         )}

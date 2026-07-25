@@ -49,8 +49,8 @@ export default async function ProjectModelsPage({
         )}
 
         {models.length === 0 ? (
-          <div className="ae-card p-8 text-sm text-neutral-600 dark:text-neutral-300 max-w-2xl mx-auto">
-            <p className="font-medium text-neutral-800 dark:text-neutral-100 mb-3">
+          <div className="ae-card p-8 text-sm text-neutral-600 max-w-2xl mx-auto">
+            <p className="font-medium text-neutral-800 mb-3">
               No 3D model attached yet
             </p>
             <p className="mb-3">
@@ -72,15 +72,15 @@ export default async function ProjectModelsPage({
         ) : (
           models.map((m) => (
             <div key={m.id} className="ae-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between gap-3 flex-wrap">
+              <div className="px-5 py-3 border-b border-neutral-200 flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <h2 className="font-semibold text-sm">{m.name}</h2>
+                  <h2 className="text-base font-semibold">{m.name}</h2>
                   <p className="text-xs text-neutral-500">
                     Added {formatDate(m.createdAt)}
                     {m.addedBy ? ` by ${m.addedBy}` : ""}
                     {" · "}
                     {m.clientVisible ? (
-                      <span className="text-green-600 font-medium">Visible to client</span>
+                      <span className="text-emerald-600 font-medium">Visible to client</span>
                     ) : (
                       <span className="text-neutral-500">Internal only</span>
                     )}

@@ -29,8 +29,8 @@ export default async function NewBimModelPage({
         subtitle={`Attach an interactive 3D model & interior walkthrough to ${job.name}`}
         actions={[{ href: orgPath(ctx.orgSlug, `/projects/${jobId}/models`), label: "Back", variant: "outline" }]}
       />
-      <div className="mb-5 ae-card p-4 text-xs text-neutral-600 dark:text-neutral-300">
-        <p className="font-medium text-neutral-800 dark:text-neutral-100 mb-1">
+      <div className="mb-5 ae-card p-5 text-xs text-neutral-600">
+        <p className="font-medium text-neutral-800 mb-1">
           From Archicad to a browser walkthrough
         </p>
         <p>

@@ -145,7 +145,7 @@ export default async function AssessPage({
 
           <section className="ae-card p-5">
             <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
-              <h3 className="font-semibold text-sm">Project phases</h3>
+              <h3 className="text-base font-semibold">Project phases</h3>
               {assessment.phaseSource === "learnings" && assessment.phaseLearning ? (
                 <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   ✓ Learned from {assessment.phaseLearning.sampleCount} prior{" "}
@@ -190,7 +190,7 @@ export default async function AssessPage({
           <section className="ae-card p-5 grid gap-6 sm:grid-cols-2">
             <div>
               <div className="flex items-baseline justify-between mb-2">
-                <h3 className="font-semibold text-sm">Budget breakdown</h3>
+                <h3 className="text-base font-semibold">Budget breakdown</h3>
                 {assessment.category === "reroof" && (
                   <span className="text-[11px] text-neutral-500">
                     seeded from the roofing rate library{assessment.budgetRefined ? " · edited" : ""}
@@ -207,7 +207,7 @@ export default async function AssessPage({
               />
             </div>
             <div>
-              <h3 className="font-semibold text-sm mb-2">Risks identified</h3>
+              <h3 className="text-base font-semibold mb-2">Risks identified</h3>
               {assessment.detail.risks.map((r, i) => (
                 <p key={i} className="text-sm border-t border-neutral-100 py-1.5">
                   {r.description}{" "}

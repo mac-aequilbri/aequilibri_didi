@@ -24,7 +24,7 @@ export default async function PurchaseCompare({ params }: { params: Promise<{ id
       <PageHeader title="Compare Vendors" subtitle={`${quote.refNumber} · ${materialDisplay(quote.material)}`} actions={[{ href: `/uc1/quotes/${quoteId}`, label: "Back to Quote", variant: "outline" }]} />
       <div className="px-8">
         {prices.length === 0 ? (
-          <div className="ae-card p-6 text-neutral-600">No active vendor prices for {materialDisplay(quote.material)}.</div>
+          <div className="ae-card p-5 text-neutral-600">No active vendor prices for {materialDisplay(quote.material)}.</div>
         ) : (
           <div className="ae-card overflow-hidden">
             <table className="ae-table">

@@ -102,7 +102,7 @@ export default async function RisksPage({
       >
       {risks.length > 0 && (
         <div className="ae-card p-5 mb-4">
-          <h2 className="text-sm font-semibold mb-1">Probability × Impact</h2>
+          <h2 className="text-base font-semibold mb-1">Probability × Impact</h2>
           <p className="text-xs text-neutral-500 mb-3">
             Count of shown risks by likelihood (→) and impact (↑). Cell shade reflects the
             likelihood × impact score.
@@ -112,13 +112,13 @@ export default async function RisksPage({
               <tbody>
                 {heat.map((row, ri) => (
                   <tr key={ri}>
-                    <td className="pr-1 text-right text-neutral-400 whitespace-nowrap">
+                    <td className="pr-1 text-right text-neutral-500 whitespace-nowrap">
                       {ri === 0 && <span className="mr-1 font-medium text-neutral-500">Impact</span>}I{5 - ri}
                     </td>
                     {row.map((cell, ci) => (
                       <td
                         key={ci}
-                        className={`w-10 h-10 text-center align-middle rounded ${cell.count > 0 ? heatCellClass(cell.score) : "bg-neutral-50 text-neutral-300"}`}
+                        className={`w-10 h-10 text-center align-middle rounded ${cell.count > 0 ? heatCellClass(cell.score) : "bg-neutral-50 text-neutral-400"}`}
                         title={`Likelihood ${ci + 1} × Impact ${5 - ri} = ${cell.score}${cell.count ? ` · ${cell.count} risk(s)` : ""}`}
                       >
                         {cell.count > 0 ? <span className="font-semibold tabular-nums">{cell.count}</span> : ""}
@@ -129,7 +129,7 @@ export default async function RisksPage({
                 <tr>
                   <td></td>
                   {[1, 2, 3, 4, 5].map((l) => (
-                    <td key={l} className="text-center text-neutral-400">
+                    <td key={l} className="text-center text-neutral-500">
                       L{l}
                     </td>
                   ))}
@@ -198,7 +198,7 @@ export default async function RisksPage({
                     <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${scoreClass(score)}`}>
                       {score}
                     </span>
-                    <span className="ml-1 text-xs text-neutral-400">
+                    <span className="ml-1 text-xs text-neutral-500">
                       L{r.likelihood}×I{r.impact}
                     </span>
                     <span className="ml-1 text-xs text-neutral-500">{priorityBandForRiskScore(score)}</span>

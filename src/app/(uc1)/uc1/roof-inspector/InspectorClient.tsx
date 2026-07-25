@@ -41,7 +41,7 @@ export function InspectorClient({ apiKey }: { apiKey: string }) {
 
   return (
     <div className="px-8 grid gap-6 lg:grid-cols-2">
-      <div className="ae-card p-4">
+      <div className="ae-card p-5">
         <GoogleMap apiKey={apiKey} center={center} zoom={zoom} clickPoint={clickPoint} outline={outline} showSearch onMapClick={analyze} onPlaceSelected={onPlace} height={480} />
         <p className="text-xs text-neutral-500 mt-2">Click a roof to inspect measurements + solar potential.</p>
       </div>

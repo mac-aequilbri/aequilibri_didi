@@ -29,7 +29,7 @@ function toggleFollowingSiblings(from: Element, boundaryClass: string, hide: boo
 
 function Chevron({ collapsed }: { collapsed: boolean }) {
   return (
-    <span aria-hidden="true" className="inline-block w-3 text-neutral-400">
+    <span aria-hidden="true" className="inline-block w-3 text-neutral-500">
       {collapsed ? "▸" : "▾"}
     </span>
   );
@@ -66,7 +66,7 @@ export function GroupHeaderRow({
         >
           <Chevron collapsed={collapsed} />
           <span>{label}</span>
-          <span className="font-normal normal-case text-neutral-400 tabular-nums">{count}</span>
+          <span className="font-normal normal-case text-neutral-500 tabular-nums">{count}</span>
         </button>
       </td>
     </tr>
@@ -95,7 +95,7 @@ export function GroupHeading({ label, count }: { label: string; count: number })
       >
         <Chevron collapsed={collapsed} />
         <span>{label}</span>
-        <span className="font-normal normal-case text-neutral-400 tabular-nums">{count}</span>
+        <span className="font-normal normal-case text-neutral-500 tabular-nums">{count}</span>
       </button>
     </div>
   );

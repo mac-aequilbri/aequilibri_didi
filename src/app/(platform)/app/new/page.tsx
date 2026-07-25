@@ -73,7 +73,7 @@ export default async function NewOrganisationPage({
 
       <form action={provisionOrgAction} className="relative space-y-8">
         <section className="ae-card p-5 space-y-4">
-          <h2 className="font-semibold text-sm">1 · Instance setup</h2>
+          <h2 className="text-base font-semibold">1 · Instance setup</h2>
           <div className="rounded border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 space-y-1">
             <p className="font-medium text-neutral-700">The customer&apos;s Airtable base is created automatically.</p>
             <p>On submit, a new base is cloned from the selected industry&apos;s template. Leave the base-id field blank to auto-create; only fill it to reuse an existing base.</p>
@@ -179,7 +179,7 @@ export default async function NewOrganisationPage({
         </section>
 
         <section className="ae-card p-5 space-y-4">
-          <h2 className="font-semibold text-sm">2 · Assistant & features</h2>
+          <h2 className="text-base font-semibold">2 · Assistant & features</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block text-sm">
               <span className="text-neutral-600">Assistant name</span>
@@ -209,7 +209,7 @@ export default async function NewOrganisationPage({
         </section>
 
         <section className="ae-card p-5 space-y-4">
-          <h2 className="font-semibold text-sm">3 · Domain knowledge initialisation</h2>
+          <h2 className="text-base font-semibold">3 · Domain knowledge initialisation</h2>
           <p className="text-xs text-neutral-500">
             Encode the customer&apos;s expertise before any jobs run — these become active guidance
             rules the assistant follows from the first session, and the learning loop refines them

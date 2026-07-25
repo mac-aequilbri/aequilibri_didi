@@ -60,7 +60,9 @@ export function BarsCompare({
               <title>{row.label}</title>
               {row.label.slice(0, 22)}
             </text>
-            <rect x={labelW} y={y + 4} width={w1} height={9} rx={2} fill={SERIES[0]} opacity={0.85} />
+            <rect x={labelW} y={y + 4} width={w1} height={9} rx={2} fill={SERIES[0]} opacity={0.85}>
+              <title>{`${row.label} — ${primaryLabel}: ${formatValue(row.primary)}`}</title>
+            </rect>
             <rect
               x={labelW}
               y={y + 16}
@@ -69,7 +71,9 @@ export function BarsCompare({
               rx={2}
               fill={row.secondary > row.primary ? OVER : SERIES[1]}
               opacity={0.85}
-            />
+            >
+              <title>{`${row.label} — ${secondaryLabel}: ${formatValue(row.secondary)}`}</title>
+            </rect>
             <text x={labelW + w1 + 6} y={y + 12} fontSize="9.5" fill={LABEL}>
               {formatValue(row.primary)}
             </text>
@@ -149,7 +153,9 @@ export function TrendChart({
           <g key={s.name}>
             <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
             {s.points.map((p, i) => (
-              <circle key={i} cx={x(i)} cy={y(p.value)} r={2.5} fill={color} />
+              <circle key={i} cx={x(i)} cy={y(p.value)} r={2.5} fill={color}>
+                <title>{`${s.name} — ${p.label}: ${formatValue(p.value)}`}</title>
+              </circle>
             ))}
             <g transform={`translate(${pad.left + si * 150}, ${pad.top - 2})`} fontSize="9.5">
               <rect x={0} y={-7} width={9} height={9} rx={2} fill={color} />

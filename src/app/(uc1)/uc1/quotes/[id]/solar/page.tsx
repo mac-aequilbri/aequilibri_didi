@@ -46,9 +46,9 @@ export default async function SolarBundle({ params }: { params: Promise<{ id: st
       <PageHeader title="Solar Bundle" subtitle={quote.refNumber} actions={[{ href: `/uc1/quotes/${quoteId}`, label: "Back to Quote", variant: "outline" }]} />
       <div className="px-8 space-y-6">
         {!point ? (
-          <div className="ae-card p-6 text-neutral-600">This quote has no roof polygon, so solar potential can&apos;t be located. Use the <strong>Roof Inspector</strong> to analyse solar potential by clicking a roof.</div>
+          <div className="ae-card p-5 text-neutral-600">This quote has no roof polygon, so solar potential can&apos;t be located. Use the <strong>Roof Inspector</strong> to analyse solar potential by clicking a roof.</div>
         ) : !solar?.ok ? (
-          <div className="ae-card p-6 text-neutral-600">Google Solar API has no coverage at this location ({String(solar?.error ?? "no data")}).</div>
+          <div className="ae-card p-5 text-neutral-600">Google Solar API has no coverage at this location ({String(solar?.error ?? "no data")}).</div>
         ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-4">

@@ -19,7 +19,7 @@ export default async function RegionsPage() {
       />
       <div className="px-8 space-y-4">
         {rows.length === 0 && (
-          <div className="ae-card p-4 bg-amber-50 border border-amber-200 flex items-center justify-between">
+          <div className="ae-card p-5 bg-amber-50 border border-amber-200 flex items-center justify-between">
             <span className="text-sm text-amber-800">No regions configured. Seed the Port City defaults to get started.</span>
             <form action={seedDefaultRegions}><button className="btn-ae text-sm">Seed defaults</button></form>
           </div>

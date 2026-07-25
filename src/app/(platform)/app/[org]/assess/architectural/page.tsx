@@ -133,7 +133,7 @@ export default async function ArchitecturalScopePage({
         </div>
 
         <div>
-          <h2 className="font-semibold text-sm mb-1">Architectural documents</h2>
+          <h2 className="text-base font-semibold mb-1">Architectural documents</h2>
           <p className="text-xs text-neutral-500 mb-2">
             Tick the documents to parse for room-by-room scope.
           </p>
@@ -167,7 +167,7 @@ export default async function ArchitecturalScopePage({
                     </td>
                     <td className="px-3 py-2">
                       {d.title}
-                      <span className="block font-mono text-[0.65rem] text-neutral-400">{String(d.id)}</span>
+                      <span className="block font-mono text-[0.65rem] text-neutral-500">{String(d.id)}</span>
                     </td>
                     <td className="px-3 py-2 text-xs text-neutral-500">{d.docType || d.classification}</td>
                   </tr>
@@ -210,7 +210,7 @@ export default async function ArchitecturalScopePage({
               </p>
 
               <div>
-                <h3 className="text-sm font-semibold mb-1.5">
+                <h3 className="text-base font-semibold mb-1.5">
                   Rooms recognised ({scope.rooms.length})
                 </h3>
                 <div className="overflow-auto border border-neutral-100 rounded">

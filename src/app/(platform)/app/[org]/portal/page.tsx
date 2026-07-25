@@ -53,7 +53,7 @@ export default async function PortalPage({
       />
 
       <form action={generatePortalToken} className="ae-card p-5 space-y-4 mb-8">
-        <h2 className="font-semibold text-sm">Issue new link</h2>
+        <h2 className="text-base font-semibold">Issue new link</h2>
         <div className="grid grid-cols-3 gap-4">
           <label className="block text-sm">
             <span className="text-neutral-600">Job *</span>
@@ -79,7 +79,7 @@ export default async function PortalPage({
       </form>
 
       <div className="ae-card p-5">
-        <h2 className="font-semibold text-sm mb-3">Issued links</h2>
+        <h2 className="text-base font-semibold mb-3">Issued links</h2>
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>

@@ -163,7 +163,7 @@ export default async function PhasesPage({
                               {p.rag}
                             </span>
                           ) : (
-                            <span className="text-xs text-neutral-400">—</span>
+                            <span className="text-xs text-neutral-500">—</span>
                           )}
                           <select
                             name="rag"
@@ -201,7 +201,7 @@ export default async function PhasesPage({
                             defaultValue={p.completionPct}
                             className="w-16 text-xs border border-neutral-200 rounded px-1 py-0.5"
                           />
-                          <span className="text-xs text-neutral-400">%</span>
+                          <span className="text-xs text-neutral-500">%</span>
                           <button type="submit" className="btn-ae-outline text-xs">
                             Set
                           </button>

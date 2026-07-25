@@ -108,7 +108,7 @@ export function PhaseRefiner({
       <div className="space-y-2">
         {phases.map((p, i) => (
           <div key={i} className="flex items-center gap-2">
-            <span className="text-xs text-neutral-400 w-5 text-right">{i + 1}</span>
+            <span className="text-xs text-neutral-500 w-5 text-right">{i + 1}</span>
             <input
               value={p.name}
               onChange={(e) => rename(i, e.target.value)}
@@ -123,11 +123,11 @@ export function PhaseRefiner({
               className="w-14 rounded border border-neutral-300 px-2 py-1.5 text-sm"
               aria-label={`Weeks for phase ${i + 1}`}
             />
-            <span className="text-xs text-neutral-400">wk</span>
+            <span className="text-xs text-neutral-500">wk</span>
             <div className="flex items-center">
               <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="px-1.5 py-1 text-neutral-500 disabled:opacity-25 hover:text-[var(--ae-space)]">↑</button>
               <button type="button" onClick={() => move(i, 1)} disabled={i === phases.length - 1} aria-label="Move down" className="px-1.5 py-1 text-neutral-500 disabled:opacity-25 hover:text-[var(--ae-space)]">↓</button>
-              <button type="button" onClick={() => remove(i)} aria-label="Remove phase" className="px-1.5 py-1 text-neutral-400 hover:text-red-600">✕</button>
+              <button type="button" onClick={() => remove(i)} aria-label="Remove phase" className="px-1.5 py-1 text-neutral-500 hover:text-red-600">✕</button>
             </div>
           </div>
         ))}

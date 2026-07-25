@@ -51,7 +51,7 @@ export default async function PoPrint({ params }: { params: Promise<{ po_id: str
       </div>
 
       {po.notes && <p className="text-xs text-neutral-600 mt-6 whitespace-pre-wrap">Notes: {po.notes}</p>}
-      <p className="text-xs text-neutral-400 mt-10">Use your browser&apos;s Print function (Ctrl/Cmd+P) to produce a PDF.</p>
+      <p className="text-xs text-neutral-500 mt-10">Use your browser&apos;s Print function (Ctrl/Cmd+P) to produce a PDF.</p>
     </main>
   );
 }

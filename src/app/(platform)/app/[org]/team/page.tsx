@@ -41,7 +41,7 @@ function StatusBanner({ sp }: { sp: Record<string, string | string[] | undefined
   const msg = typeof sp.msg === "string" ? sp.msg : "";
   const ok = "bg-emerald-50 text-emerald-800 border-emerald-200";
   const warn = "bg-amber-50 text-amber-800 border-amber-200";
-  const err = "bg-rose-50 text-rose-800 border-rose-200";
+  const err = "bg-red-50 text-red-800 border-red-200";
   const map: Record<string, { cls: string; text: string }> = {
     invited: { cls: ok, text: `Invitation email sent to ${who}. They'll appear as signed-in once they create their account.` },
     added: { cls: ok, text: `${who} added. No invitation email sent — they either already have an account or auth is not active.` },
@@ -119,7 +119,7 @@ export default async function TeamPage({
       )}
 
       <section className="ae-card p-5 mb-6">
-        <h2 className="text-sm font-semibold mb-3">Invite a member</h2>
+        <h2 className="text-base font-semibold mb-3">Invite a member</h2>
         <form action={inviteMemberAction} className="flex flex-wrap items-end gap-3">
           <input type="hidden" name="org" value={ctx.orgSlug} />
           <label className="text-xs text-neutral-600">
@@ -165,7 +165,7 @@ export default async function TeamPage({
 
       {showProjects && (
         <section className="ae-card p-5 mb-6">
-          <h2 className="text-sm font-semibold mb-1">Project-level access (RLS)</h2>
+          <h2 className="text-base font-semibold mb-1">Project-level access (RLS)</h2>
           <p className="text-xs text-neutral-500 mb-3 max-w-2xl">
             {enforcing
               ? "ON — each member sees and edits only the projects assigned to them below. Owners, Auditors and Business Owners always see everything."
@@ -222,9 +222,9 @@ export default async function TeamPage({
                   <td className="py-2 pr-2">
                     <div className="font-medium">
                       {m.name}
-                      {self && <span className="ml-1.5 text-xs font-normal text-neutral-400">(you)</span>}
+                      {self && <span className="ml-1.5 text-xs font-normal text-neutral-500">(you)</span>}
                     </div>
-                    <div className="text-xs text-neutral-400">{m.email}</div>
+                    <div className="text-xs text-neutral-500">{m.email}</div>
                   </td>
                   <td className="py-2 pr-2">
                     <form action={setMemberRoleAction} className="flex items-center gap-2">
@@ -251,7 +251,7 @@ export default async function TeamPage({
                   {showProjects && (
                     <td className="py-2 pr-2 align-top">
                       {rlsExempt(m.role) ? (
-                        <span className="text-xs text-neutral-400" title="This role sees every project">
+                        <span className="text-xs text-neutral-500" title="This role sees every project">
                           Full access
                         </span>
                       ) : (
@@ -307,7 +307,7 @@ export default async function TeamPage({
             )}
           </tbody>
         </table>
-        <p className="text-xs text-neutral-400 mt-3">
+        <p className="text-xs text-neutral-500 mt-3">
           Membership here is the source of truth for access: a user signs in with their email
           (via Clerk) and must match an active member of this organisation. Deactivating a member
           revokes access without deleting their sign-in account. Every organisation must keep at

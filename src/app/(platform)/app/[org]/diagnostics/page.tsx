@@ -111,7 +111,7 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
       </section>
 
       <section className="ae-card p-5 mb-6">
-        <h2 className="font-semibold text-sm mb-3">Row counts by backend</h2>
+        <h2 className="text-base font-semibold mb-3">Row counts by backend</h2>
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
@@ -130,14 +130,14 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
             ))}
           </tbody>
         </table>
-        <p className="text-xs text-neutral-400 mt-3">
+        <p className="text-xs text-neutral-500 mt-3">
           With the flag on, new records should land in the Airtable column. A non-zero Postgres
           count for a migrated org is legacy data (or writes made while the flag was off).
         </p>
       </section>
 
       <section className="ae-card p-5 text-sm">
-        <h2 className="font-semibold text-sm mb-2">Postgres by design (not migrated)</h2>
+        <h2 className="text-base font-semibold mb-2">Postgres by design (not migrated)</h2>
         <ul className="list-disc pl-5 space-y-1 text-neutral-600">
           {POSTGRES_BY_DESIGN.map((x) => (
             <li key={x}>{x}</li>

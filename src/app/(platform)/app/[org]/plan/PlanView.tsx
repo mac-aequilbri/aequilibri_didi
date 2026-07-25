@@ -73,7 +73,7 @@ function Gantt({ tasks }: { tasks: PlanTaskView[] }) {
   return (
     <div>
       {min != null && max != null && (
-        <p className="mb-2 text-xs text-neutral-400">
+        <p className="mb-2 text-xs text-neutral-500">
           {formatDate(new Date(min))} — {formatDate(new Date(max))}
         </p>
       )}
@@ -102,12 +102,12 @@ function Gantt({ tasks }: { tasks: PlanTaskView[] }) {
                         title={`${task.name} · ${task.status}${task.assignedTo ? ` · ${task.assignedTo}` : ""}`}
                       />
                     ) : (
-                      <span className="absolute inset-y-0 left-2 flex items-center text-[0.65rem] text-neutral-400">
+                      <span className="absolute inset-y-0 left-2 flex items-center text-[0.65rem] text-neutral-500">
                         no dates
                       </span>
                     )}
                   </div>
-                  <span className="w-20 shrink-0 text-right text-neutral-400">{task.status}</span>
+                  <span className="w-20 shrink-0 text-right text-neutral-500">{task.status}</span>
                 </div>
               ))}
             </div>
@@ -128,12 +128,12 @@ function Checklist({ tasks }: { tasks: PlanTaskView[] }) {
           <ul className="space-y-1 text-sm">
             {list.map((t) => (
               <li key={t.id} className="flex items-center gap-2">
-                <span aria-hidden className={t.status === "Complete" ? "text-emerald-600" : "text-neutral-300"}>
+                <span aria-hidden className={t.status === "Complete" ? "text-emerald-600" : "text-neutral-400"}>
                   {t.status === "Complete" ? "☑" : "☐"}
                 </span>
-                <span className={t.status === "Complete" ? "line-through text-neutral-400" : ""}>{t.name}</span>
+                <span className={t.status === "Complete" ? "line-through text-neutral-500" : ""}>{t.name}</span>
                 {t.endDate && (
-                  <span className={`text-xs ${t.isOverdue ? "text-red-600" : "text-neutral-400"}`}>
+                  <span className={`text-xs ${t.isOverdue ? "text-red-600" : "text-neutral-500"}`}>
                     {formatDate(t.endDate)}
                   </span>
                 )}
@@ -156,16 +156,16 @@ function Workflow({ tasks }: { tasks: PlanTaskView[] }) {
         return (
           <div key={col} className="rounded-lg bg-neutral-50 p-2">
             <p className="text-xs font-semibold text-neutral-500 mb-1.5">
-              {col} <span className="text-neutral-400">({list.length})</span>
+              {col} <span className="text-neutral-500">({list.length})</span>
             </p>
             <div className="space-y-1.5">
               {list.map((t) => (
                 <div key={t.id} className="rounded border border-neutral-200 bg-white px-2 py-1.5 text-xs">
                   <span className="font-medium">{t.name}</span>
-                  {t.assignedTo && <span className="block text-neutral-400">{t.assignedTo}</span>}
+                  {t.assignedTo && <span className="block text-neutral-500">{t.assignedTo}</span>}
                 </div>
               ))}
-              {list.length === 0 && <p className="text-[0.65rem] text-neutral-300">—</p>}
+              {list.length === 0 && <p className="text-[0.65rem] text-neutral-400">—</p>}
             </div>
           </div>
         );
@@ -192,11 +192,11 @@ function Season({ tasks }: { tasks: PlanTaskView[] }) {
           <ul className="space-y-1 text-sm">
             {byMonth.get(month)!.map((t) => (
               <li key={t.id} className="flex items-center gap-2">
-                <span className="text-xs text-neutral-400 w-14 shrink-0">
+                <span className="text-xs text-neutral-500 w-14 shrink-0">
                   {t.startDate ? formatDate(t.startDate).slice(0, 6) : "—"}
                 </span>
                 <span>{t.name}</span>
-                <span className="text-xs text-neutral-400">{t.status}</span>
+                <span className="text-xs text-neutral-500">{t.status}</span>
               </li>
             ))}
           </ul>
@@ -219,7 +219,7 @@ export function PlanView({ tasks, mode }: { tasks: PlanTaskView[]; mode: PlanVie
     <section className="ae-card p-5 mb-6">
       <h2 className="font-semibold mb-3">
         {MODE_TITLE[mode]}{" "}
-        <span className="text-xs font-normal text-neutral-400">
+        <span className="text-xs font-normal text-neutral-500">
           render mode from the engagement type (Spec 12 M8)
         </span>
       </h2>

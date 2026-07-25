@@ -82,18 +82,18 @@ export default async function AssistantPage({ params }: { params: Promise<{ org:
         />
       </div>
       <aside className="hidden lg:block pt-16">
-        <div className="ae-card p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">
+        <div className="ae-card p-5">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2">
             Active rules ({rules.length})
           </h2>
           <ul className="space-y-2">
             {rules.slice(0, 8).map((r) => (
               <li key={r.id} className="text-xs text-neutral-600">
-                <span className="font-mono text-[0.65rem] text-neutral-400">{r.ruleCode}</span>{" "}
+                <span className="font-mono text-[0.65rem] text-neutral-500">{r.ruleCode}</span>{" "}
                 {r.description.slice(0, 90)}
               </li>
             ))}
-            {rules.length === 0 && <li className="text-xs text-neutral-400">None yet.</li>}
+            {rules.length === 0 && <li className="text-xs text-neutral-500">None yet.</li>}
           </ul>
         </div>
       </aside>

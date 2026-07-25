@@ -90,7 +90,7 @@ export default async function RoomMatrixPage({
                     >
                       {r.name}
                     </Link>{" "}
-                    <span className="text-xs font-normal text-neutral-400">{r.jobCode}</span>
+                    <span className="text-xs font-normal text-neutral-500">{r.jobCode}</span>
                   </td>
                   <td className="py-2 pr-2 text-right whitespace-nowrap text-xs">
                     {r.areaSqm ? `${r.areaSqm} m²` : "—"}
@@ -99,7 +99,7 @@ export default async function RoomMatrixPage({
                   <td className="py-2 text-xs text-neutral-600">
                     {parseFinishes(r.finishes).map(([k, v]) => (
                       <span key={k} className="inline-block mr-3">
-                        <span className="text-neutral-400">{k}:</span> {v}
+                        <span className="text-neutral-500">{k}:</span> {v}
                       </span>
                     ))}
                   </td>

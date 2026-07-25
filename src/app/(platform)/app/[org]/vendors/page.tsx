@@ -91,7 +91,7 @@ export default async function VendorsPage({
                 >
                   <span aria-hidden="true">
                     {"★".repeat(Math.round(v.rating / 2)) || "—"}{" "}
-                    <span className="text-neutral-400">{v.rating}/10</span>
+                    <span className="text-neutral-500">{v.rating}/10</span>
                   </span>
                 </td>
                 <td className="py-2 text-xs">

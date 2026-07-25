@@ -41,12 +41,12 @@ export default async function DocumentsPage({
         actions={[{ href: orgPath(ctx.orgSlug, "/documents/new"), label: "+ Add document" }]}
       />
       {(sync.processed || sync.documents || sync.proposals) && (
-        <div className="mb-4 ae-card p-4 text-sm text-neutral-700">
+        <div className="mb-4 ae-card p-5 text-sm text-neutral-700">
           Inbox sync processed {sync.processed || "0"} email(s), created {sync.documents || "0"} document(s),
           and queued {sync.proposals || "0"} proposal(s).
         </div>
       )}
-      <form action={ingestInboxAction} className="ae-card p-4 mb-4 flex flex-wrap items-end gap-3 text-sm">
+      <form action={ingestInboxAction} className="ae-card p-5 mb-4 flex flex-wrap items-end gap-3 text-sm">
         <input type="hidden" name="org" value={ctx.orgSlug} />
         <label className="block">
           <span className="text-neutral-600">Sync inbox against job</span>

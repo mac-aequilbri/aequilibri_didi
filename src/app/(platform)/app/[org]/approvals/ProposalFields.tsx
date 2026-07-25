@@ -34,10 +34,10 @@ export function ProposalFields({
   return (
     <>
       <dl className="mt-3 pt-3 border-t border-neutral-100 space-y-1.5 text-sm">
-        {changes.length === 0 && <p className="text-xs text-neutral-400">No effective change.</p>}
+        {changes.length === 0 && <p className="text-xs text-neutral-500">No effective change.</p>}
         {changes.map((c) => (
           <div key={c.key} className="flex flex-wrap items-baseline gap-x-2">
-            <dt className="text-[0.7rem] uppercase tracking-wide text-neutral-400 w-32 shrink-0">
+            <dt className="text-[0.7rem] uppercase tracking-wide text-neutral-500 w-32 shrink-0">
               {c.label ?? c.key}
             </dt>
             <dd className="min-w-0 text-neutral-700 flex-1">
@@ -45,8 +45,8 @@ export function ProposalFields({
                 <span className="flex flex-wrap items-baseline gap-x-1.5">
                   {c.before !== null && (
                     <>
-                      <span className="line-through text-neutral-400">{c.before}</span>
-                      <span className="text-neutral-300">→</span>
+                      <span className="line-through text-neutral-500">{c.before}</span>
+                      <span className="text-neutral-400">→</span>
                     </>
                   )}
                   <input
@@ -62,8 +62,8 @@ export function ProposalFields({
                 <span className="text-[var(--ae-success)]">{c.after}</span>
               ) : (
                 <>
-                  <span className="line-through text-neutral-400">{c.before}</span>
-                  <span className="mx-1.5 text-neutral-300">→</span>
+                  <span className="line-through text-neutral-500">{c.before}</span>
+                  <span className="mx-1.5 text-neutral-400">→</span>
                   <span className="font-medium text-[var(--ae-space-deep)]">{c.after}</span>
                 </>
               )}

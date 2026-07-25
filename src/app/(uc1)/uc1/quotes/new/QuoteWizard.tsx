@@ -235,7 +235,7 @@ export function QuoteWizard({ apiKey }: { apiKey: string }) {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
           {step <= 2 && (
-            <div className="ae-card p-4">
+            <div className="ae-card p-5">
               <GoogleMap apiKey={apiKey} center={center} zoom={zoom} clickPoint={clickPoint} outline={analysis?.outline ?? []} showSearch clickable onMapClick={analyze} onPlaceSelected={onPlaceSelected} height={440}>
                 {!analysis && !analyzing && <div className="mode-overlay">👆 Search an address or click the roof to measure</div>}
                 {effectiveArea > 0 && <div className="area-badge"><span className="est-area-big" style={{ fontSize: "1.3rem" }}>{effectiveArea}</span> m²</div>}

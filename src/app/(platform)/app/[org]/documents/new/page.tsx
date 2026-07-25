@@ -76,7 +76,7 @@ export default async function NewDocumentPage({
           <span className="text-neutral-600">File upload</span>
           <input type="file" name="file" className="mt-1 w-full text-sm" />
         </label>
-        <div className="text-xs text-neutral-400 text-center">— or —</div>
+        <div className="text-xs text-neutral-500 text-center">— or —</div>
         <label className="block text-sm">
           <span className="text-neutral-600">External link (Drive, Dropbox…)</span>
           <input name="url" type="url" placeholder="https://…" className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />

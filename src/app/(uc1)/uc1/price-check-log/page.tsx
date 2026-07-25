@@ -82,7 +82,7 @@ export default async function PriceCheckLogPage() {
                       <td>{c.description}</td>
                       <td className="text-right">{currency(prev)}</td>
                       <td className="text-right">{currency(cur)}</td>
-                      <td className={`text-right ${delta > 0 ? "text-red-600" : delta < 0 ? "text-green-600" : ""}`}>
+                      <td className={`text-right ${delta > 0 ? "text-red-600" : delta < 0 ? "text-emerald-600" : ""}`}>
                         {delta > 0 ? "+" : ""}{currency(delta)}
                       </td>
                       <td>{formatDate(c.updatedAt)}</td>

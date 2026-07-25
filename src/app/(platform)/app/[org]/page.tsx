@@ -174,7 +174,7 @@ export default async function OrgDashboard({
                     </span>
                   )}
                   <StatusBadge status={job.status} />
-                  <span className="text-neutral-300 group-hover:text-[var(--ae-space)]">›</span>
+                  <span className="text-neutral-400 group-hover:text-[var(--ae-space)]">›</span>
                 </span>
               </Link>
             ))}

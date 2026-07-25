@@ -102,7 +102,7 @@ export default async function ProcurementPage({
                 </td>
                 <td
                   className={`py-2 pr-2 text-right whitespace-nowrap text-xs tabular-nums ${
-                    o.deltaDays != null && o.deltaDays > 0 ? "text-red-600 font-medium" : o.deltaDays != null && o.deltaDays < 0 ? "text-emerald-700" : "text-neutral-400"
+                    o.deltaDays != null && o.deltaDays > 0 ? "text-red-600 font-medium" : o.deltaDays != null && o.deltaDays < 0 ? "text-emerald-700" : "text-neutral-500"
                   }`}
                   title="Delivery delta: actual − expected (positive = late)"
                 >

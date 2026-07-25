@@ -150,7 +150,7 @@ export default async function PlanPage({
                           {t.rag}
                         </span>
                       ) : (
-                        <span className="text-xs text-neutral-400">—</span>
+                        <span className="text-xs text-neutral-500">—</span>
                       )}
                     </td>
                     <td className="relative z-10 py-2 whitespace-nowrap">

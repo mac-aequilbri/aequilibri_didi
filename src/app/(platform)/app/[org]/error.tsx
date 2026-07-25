@@ -30,7 +30,7 @@ export default function PlatformError({
           Try again
         </button>
         {error.digest && (
-          <p className="text-[0.72rem] text-neutral-400 mt-4">Reference: {error.digest}</p>
+          <p className="text-[0.72rem] text-neutral-500 mt-4">Reference: {error.digest}</p>
         )}
       </div>
     </div>

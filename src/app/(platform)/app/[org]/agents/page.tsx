@@ -35,7 +35,7 @@ function RiskBadge({ risk }: { risk: string }) {
       ? "bg-neutral-100 text-neutral-600"
       : risk === "low_write"
         ? "bg-amber-100 text-amber-800"
-        : "bg-rose-100 text-rose-800";
+        : "bg-red-100 text-red-800";
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{risk}</span>;
 }
 
@@ -58,6 +58,11 @@ export default async function AgentsPage({
         title="AI agents & authorization"
         subtitle="What each agent may read, propose, and who resolves it (governance §8)."
       />
+      <p className="-mt-3 mb-6 text-sm text-neutral-500">
+        This controls how much the assistant may do on its own. Every write it proposes is
+        recorded in Activity; the authority level below decides whether those writes queue for
+        human approval or, for low-risk operations, apply immediately.
+      </p>
 
       {status === "saved" && (
         <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -66,7 +71,7 @@ export default async function AgentsPage({
       )}
 
       <section className="ae-card p-5 mb-6">
-        <h2 className="text-sm font-semibold mb-1">AI write authority</h2>
+        <h2 className="text-base font-semibold mb-1">AI write authority</h2>
         <p className="text-xs text-neutral-500 mb-3">
           Applies to every agent. Writes always land through the PENDING_WRITES queue and the
           canonical-vocabulary guard — this sets whether low-risk writes may execute without a
@@ -100,8 +105,8 @@ export default async function AgentsPage({
         return (
           <section key={agent.key} className="ae-card p-5 mb-4">
             <div className="flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold">
-                {agent.label} <span className="font-normal text-neutral-400">· Module {agent.module}</span>
+              <h2 className="text-base font-semibold">
+                {agent.label} <span className="font-normal text-neutral-500">· Module {agent.module}</span>
               </h2>
             </div>
             <p className="text-xs text-neutral-500 mb-3">{agent.description}</p>
@@ -135,7 +140,7 @@ export default async function AgentsPage({
         );
       })}
 
-      <p className="text-xs text-neutral-400">
+      <p className="text-xs text-neutral-500">
         An agent&apos;s reach is defined by what it may propose into PENDING_WRITES — this page renders
         the same registry the executor enforces, so it cannot drift from reality. Per-agent
         overrides beyond the authority level require a code change to TOOL_POLICY by design.

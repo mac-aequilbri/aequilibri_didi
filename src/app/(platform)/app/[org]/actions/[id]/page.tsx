@@ -22,7 +22,7 @@ export default async function ActionDetailPage({
   if (!action) {
     return (
       <div className="p-6 max-w-xl">
-        <PageHeader title="Action" actions={[{ href: backHref, label: "← Back to actions", variant: "outline" }]} />
+        <PageHeader title="Action" />
         <div className="ae-card p-5">
           <EmptyState
             title="Action not found"

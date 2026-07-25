@@ -12,7 +12,7 @@ export default function Home() {
       <p className="text-neutral-600 mb-10">AI-assisted operations platform — two use-cases, one stack.</p>
       <div className="grid gap-6 sm:grid-cols-2">
         {CARDS.map((c) => (
-          <Link key={c.href} href={c.href} className="ae-card p-6 block hover:shadow-md transition-shadow">
+          <Link key={c.href} href={c.href} className="ae-card p-5 block hover:shadow-md transition-shadow">
             <span className={`uc-badge ${c.badge} mb-3 inline-block`}>{c.tag}</span>
             <h2 className="text-lg font-semibold mb-2">{c.title}</h2>
             <p className="text-sm text-neutral-600">{c.desc}</p>

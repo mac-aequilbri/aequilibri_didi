@@ -39,7 +39,7 @@ export default async function MinutesDetailPage({
         <StatusBadge status={minutes.status} />
 
         <div>
-          <h2 className="font-semibold text-sm mb-2">
+          <h2 className="text-base font-semibold mb-2">
             Extracted actions ({actions.length})
             {minutes.status === "processed" && (
               <span className="font-normal text-xs text-neutral-500"> — not yet created</span>

@@ -127,7 +127,7 @@ function Field({
     <label className={`block text-sm ${field.full ? "sm:col-span-2" : ""}`}>
       {label}
       {control}
-      {field.help && <span className="mt-0.5 block text-xs text-neutral-400">{field.help}</span>}
+      {field.help && <span className="mt-0.5 block text-xs text-neutral-500">{field.help}</span>}
     </label>
   );
 }
@@ -183,6 +183,16 @@ export default function RecordEditor({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+
+  // Two-step Cancel while dirty (same arm/confirm idiom as ConfirmSubmitButton):
+  // first click arms, second navigates. Auto-disarms so a stale armed link can't
+  // discard later.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  useEffect(() => {
+    if (!confirmDiscard) return;
+    const t = setTimeout(() => setConfirmDiscard(false), 5000);
+    return () => clearTimeout(t);
+  }, [confirmDiscard]);
 
   const aiFields = toAiFields(config.fields);
   const [aiState, runAi, aiPending] = useActionState(suggestRecordEdits, null);
@@ -273,11 +283,18 @@ export default function RecordEditor({
         <Link
           href={backHref}
           onClick={(e) => {
-            if (dirty && !window.confirm("Discard unsaved changes?")) e.preventDefault();
+            if (dirty && !confirmDiscard) {
+              e.preventDefault();
+              setConfirmDiscard(true);
+            }
           }}
+          onBlur={() => setConfirmDiscard(false)}
           className="btn-ae-outline"
+          style={
+            confirmDiscard ? { borderColor: "var(--ae-danger)", color: "var(--ae-danger)" } : undefined
+          }
         >
-          Cancel
+          {confirmDiscard ? "Discard changes?" : "Cancel"}
         </Link>
       </div>
     </form>

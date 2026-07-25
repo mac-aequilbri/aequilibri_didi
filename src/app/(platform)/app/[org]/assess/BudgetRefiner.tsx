@@ -96,7 +96,7 @@ export function BudgetRefiner({
               className="flex-1 min-w-0 rounded border border-neutral-300 px-2 py-1.5 text-sm"
             />
             <div className="flex items-center gap-1">
-              <span className="text-xs text-neutral-400">$</span>
+              <span className="text-xs text-neutral-500">$</span>
               <input
                 type="number"
                 min={0}
@@ -111,7 +111,7 @@ export function BudgetRefiner({
               type="button"
               onClick={() => remove(i)}
               aria-label="Remove line"
-              className="px-1.5 py-1 text-neutral-400 hover:text-red-600"
+              className="px-1.5 py-1 text-neutral-500 hover:text-red-600"
             >
               ✕
             </button>

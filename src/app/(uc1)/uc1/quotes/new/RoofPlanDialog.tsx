@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 
 const RoofModel3D = dynamic(() => import("./RoofModel3D"), {
   ssr: false,
-  loading: () => <div className="text-neutral-400 text-sm p-8">Loading 3D model…</div>,
+  loading: () => <div className="text-neutral-500 text-sm p-8">Loading 3D model…</div>,
 });
 
 export interface RoofSection { polygon?: number[][]; color?: string; facing?: string; area_m2?: number; label?: string; pitch_est?: number }
@@ -113,7 +113,7 @@ export default function RoofPlanDialog({ plan, onClose, onApply }: { plan: RoofP
         <span className="grid place-items-center w-9 h-9 rounded font-bold text-sm" style={{ background: "#3a3b52" }}>RM</span>
         <div className="flex-1">
           <div className="font-bold leading-tight">Roof Measurements</div>
-          <div className="text-xs text-neutral-400">Review outline, sections and pitch</div>
+          <div className="text-xs text-neutral-500">Review outline, sections and pitch</div>
         </div>
         <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: conf === "HIGH" ? "#27ae60" : conf === "MEDIUM" ? "#e6a700" : "#b06a4a", color: "#fff" }}>{conf[0] + conf.slice(1).toLowerCase()}</span>
         <div className="flex rounded-lg overflow-hidden" style={{ background: "#2a2b40" }}>
