@@ -17,7 +17,6 @@ export function StatusMenu({
   options,
   label,
   badgeStatus,
-  display,
 }: {
   /** Server action taking FormData with org/recordId/status. */
   action: (formData: FormData) => Promise<void>;
