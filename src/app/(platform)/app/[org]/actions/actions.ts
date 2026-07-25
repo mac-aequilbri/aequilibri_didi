@@ -52,60 +52,6 @@ export async function updateActionStatus(formData: FormData): Promise<void> {
   revalidatePath(orgPath(ctx.orgSlug, "/actions"));
 }
 
-/** Result of a Save from the action editor, surfaced back via useActionState so
- *  a failed write is visible and the client controls navigation (a redirect
- *  here would route through the [org] loading fallback and blank the editor). */
-export interface UpdateActionResult {
-  ok: boolean;
-  error?: string;
-}
-
-/** Edit a single action's core fields from the detail page. Unlike the inline
- *  quick-set (updateActionStatus), this writes title/detail/owner/due/priority
- *  together. Clear = erase: a blank field is sent as an explicit null so the
- *  write layer erases the cell (Airtable) rather than the default presence-
- *  driven "skip". On Postgres a blank owner/detail is "" (clears); a blank date
- *  is left untouched (the Zod date schema can't represent an explicit null). */
-export async function updateActionDetail(
-  _prev: UpdateActionResult | null,
-  formData: FormData,
-): Promise<UpdateActionResult> {
-  const ctx = await requireOrgCtx(String(formData.get("org") ?? ""));
-  const user = await getCurrentUser(ctx); // also enforces the write gate
-  const recordId = String(formData.get("recordId") ?? "");
-  if (!recordId) return { ok: false, error: "Missing action reference." };
-
-  const air = airtableEnabled();
-  const owner = str(formData.get("owner")).trim();
-  const detail = str(formData.get("detail"));
-  const dueDate = str(formData.get("dueDate")).trim();
-  const jobId = str(formData.get("jobId")).trim();
-
-  try {
-    await writeRecord(ctx, {
-      table: "action",
-      op: "update",
-      recordId,
-      data: {
-        title: str(formData.get("title")),
-        priority: str(formData.get("priority")) || "P2",
-        status: str(formData.get("status")) || "open",
-        detail: detail === "" && air ? null : detail,
-        owner: owner === "" ? (air ? null : "") : owner,
-        dueDate: dueDate === "" ? (air ? null : undefined) : dueDate,
-        // Project (job) — set/correct the record's job (drives RLS). Blank =
-        // clear on Airtable; skip on Postgres (Zod jobId can't take "").
-        jobId: jobId === "" ? (air ? null : undefined) : jobId,
-      },
-      actor: { type: "human", name: user.name },
-    });
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "The change could not be saved." };
-  }
-  revalidatePath(orgPath(ctx.orgSlug, "/actions"));
-  return { ok: true };
-}
-
 /** Save (or update) a per-org raw→canonical action-status mapping. This is the
  *  non-destructive cleanup for migrated bases: it records how to interpret an
  *  unrecognised Status value, never touching the ISSUES rows themselves. Stored

@@ -1,11 +1,12 @@
-// Single-action edit page. Reachable by clicking a row on the Action Hub.
+// Single-action detail page (read-only). Reachable by clicking a row on the
+// Action Hub; editing is the explicit Edit step ([id]/edit) — the same
+// paradigm as every other register.
 
-import { EmptyState, PageHeader } from "@/components/PageHeader";
+import RecordDetailPage from "../../_record-edit/RecordDetailPage";
+import { actionEditorConfig as config, actionEditorValues } from "../editorConfig";
 import { loadAction } from "@/lib/platform/actionsSource";
-import { loadJobLabelMap, loadJobOptions } from "@/lib/platform/jobOptionsSource";
+import { loadJobLabelMap } from "@/lib/platform/jobOptionsSource";
 import { requireOrgCtx } from "@/lib/platform/org-context";
-import { orgPath } from "@/lib/platform/paths";
-import ActionEditor from "./ActionEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -17,39 +18,12 @@ export default async function ActionDetailPage({
   const { org, id } = await params;
   const ctx = await requireOrgCtx(org);
   const action = await loadAction(ctx, id);
-  const backHref = orgPath(ctx.orgSlug, "/actions");
-
-  if (!action) {
-    return (
-      <div className="p-6 max-w-xl">
-        <PageHeader title="Action" />
-        <div className="ae-card p-5">
-          <EmptyState
-            title="Action not found"
-            hint="It may have been removed, or the link is out of date."
-            action={{ href: backHref, label: "Back to Action Hub" }}
-          />
-        </div>
-      </div>
-    );
+  const values = actionEditorValues(action);
+  // Linked project for the detail view's Project row (label resolved once,
+  // from the TTL-cached job map — no extra Airtable read).
+  if (values && action?.jobId) {
+    values.jobId = action.jobId;
+    values.jobName = (await loadJobLabelMap(ctx)).get(action.jobId) ?? "";
   }
-
-  const jobs = await loadJobOptions(ctx);
-  const jobOptions = [
-    { value: "", label: "— none —" },
-    ...jobs.map((j) => ({ value: j.id, label: j.label })),
-  ];
-  // Keep the current job selectable even if it fell outside the loaded set, so
-  // saving can't silently clear it.
-  if (action.jobId && !jobs.some((j) => j.id === action.jobId)) {
-    const labels = await loadJobLabelMap(ctx);
-    jobOptions.push({ value: action.jobId, label: labels.get(action.jobId) ?? "(current project)" });
-  }
-
-  return (
-    <div className="p-6 max-w-2xl">
-      <PageHeader title="Edit action" subtitle={action.title} />
-      <ActionEditor orgSlug={ctx.orgSlug} action={action} backHref={backHref} jobOptions={jobOptions} />
-    </div>
-  );
+  return <RecordDetailPage orgSlug={ctx.orgSlug} config={config} values={values} recordId={id} />;
 }
