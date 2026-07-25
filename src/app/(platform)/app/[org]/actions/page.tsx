@@ -4,8 +4,9 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
-import { EmptyState, MetricCard, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, MetricCard, PageHeader } from "@/components/PageHeader";
 import { SortableTh } from "@/components/SortableTh";
+import { StatusMenu } from "@/components/StatusMenu";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { formatDate } from "@/lib/format";
@@ -177,35 +178,46 @@ export default async function ActionsPage({
                   {a.sourceType.replace("_", " ")}
                 </td>
                 <td className="relative z-10 py-2">
-                  <form action={updateActionStatus} className="flex items-center gap-1">
-                    <input type="hidden" name="org" value={ctx.orgSlug} />
-                    <input type="hidden" name="recordId" value={a.id} />
-                    {a.needsMapping ? (
+                  {a.needsMapping ? (
+                    // Unmapped raw status: keep the explicit select + Set form —
+                    // this is a mapping decision, not a routine status change.
+                    <form action={updateActionStatus} className="flex items-center gap-1">
+                      <input type="hidden" name="org" value={ctx.orgSlug} />
+                      <input type="hidden" name="recordId" value={a.id} />
                       <span
                         className="status-badge status-draft"
                         title="Unrecognised status — map it in the panel above"
                       >
                         {a.rawStatus || "(blank)"} · unmapped
                       </span>
-                    ) : (
-                      <StatusBadge status={isOverdue(a) ? "overdue" : a.status} />
-                    )}
-                    <select
-                      name="status"
-                      defaultValue={a.needsMapping ? "open" : a.status}
-                      aria-label={`Status for ${a.title}`}
-                      className="text-xs border border-neutral-200 rounded px-1 py-0.5"
-                    >
-                      {ACTION_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s.replace("_", " ")}
-                        </option>
-                      ))}
-                    </select>
-                    <Button type="submit" variant="outline" size="sm">
-                      Set
-                    </Button>
-                  </form>
+                      <select
+                        name="status"
+                        defaultValue="open"
+                        aria-label={`Status for ${a.title}`}
+                        className="text-xs border border-neutral-200 rounded px-1 py-0.5"
+                      >
+                        {ACTION_STATUSES.map((s) => (
+                          <option key={s} value={s}>
+                            {s.replace("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                      <Button type="submit" variant="outline" size="sm">
+                        Set
+                      </Button>
+                    </form>
+                  ) : (
+                    <StatusMenu
+                      action={updateActionStatus}
+                      org={ctx.orgSlug}
+                      recordId={a.id}
+                      current={a.status}
+                      badgeStatus={isOverdue(a) ? "overdue" : a.status}
+                      options={ACTION_STATUSES}
+                      label={`Status for ${a.title}`}
+                      display={(s) => s.replace("_", " ")}
+                    />
+                  )}
                 </td>
               </tr>
                 ))}

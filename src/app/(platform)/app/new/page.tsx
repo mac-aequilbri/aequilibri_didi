@@ -8,6 +8,7 @@ import { VERTICAL_TEMPLATE_BASE_IDS } from "@/lib/airtable/config";
 import { listTemplateRegistry } from "@/lib/airtable/control";
 import { isPlatformAdmin } from "@/lib/platform/org-context";
 import { DEFAULT_FEATURES } from "@/lib/platform/types";
+import { FormStepper } from "@/components/form/FormStepper";
 import { PendingSubmitButton } from "@/app/(platform)/app/[org]/assess/SubmitButtons";
 import { provisionOrgAction } from "./actions";
 import { LogoField } from "./LogoField";
@@ -71,9 +72,13 @@ export default async function NewOrganisationPage({
       />
       {error && <p className="text-ae-danger text-sm mb-4">{error}</p>}
 
-      <form action={provisionOrgAction} className="relative space-y-8">
+      <form action={provisionOrgAction} className="relative">
+        <FormStepper
+          steps={[
+            {
+              title: "Instance setup",
+              body: (
         <section className="ae-card p-5 space-y-4">
-          <h2 className="text-base font-semibold">1 · Instance setup</h2>
           <div className="rounded border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 space-y-1">
             <p className="font-medium text-neutral-700">The customer&apos;s Airtable base is created automatically.</p>
             <p>On submit, a new base is cloned from the selected industry&apos;s template. Leave the base-id field blank to auto-create; only fill it to reuse an existing base.</p>
@@ -177,9 +182,12 @@ export default async function NewOrganisationPage({
             </label>
           </div>
         </section>
-
+              ),
+            },
+            {
+              title: "Assistant & features",
+              body: (
         <section className="ae-card p-5 space-y-4">
-          <h2 className="text-base font-semibold">2 · Assistant & features</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block text-sm">
               <span className="text-neutral-600">Assistant name</span>
@@ -207,9 +215,12 @@ export default async function NewOrganisationPage({
             </div>
           </fieldset>
         </section>
-
+              ),
+            },
+            {
+              title: "Domain knowledge",
+              body: (
         <section className="ae-card p-5 space-y-4">
-          <h2 className="text-base font-semibold">3 · Domain knowledge initialisation</h2>
           <p className="text-xs text-neutral-500">
             Encode the customer&apos;s expertise before any jobs run — these become active guidance
             rules the assistant follows from the first session, and the learning loop refines them
@@ -252,18 +263,23 @@ export default async function NewOrganisationPage({
             />
           </label>
         </section>
-
-        <PendingSubmitButton
-          label="Provision customer instance"
-          pendingTitle="Provisioning instance"
-          stages={[
-            "Creating the customer's Airtable base…",
-            "Cloning the template tables…",
-            "Ensuring app runtime tables…",
-            "Checking record access…",
-            "Writing instance configuration…",
-            "Registering the organisation…",
+              ),
+            },
           ]}
+          submit={
+            <PendingSubmitButton
+              label="Provision customer instance"
+              pendingTitle="Provisioning instance"
+              stages={[
+                "Creating the customer's Airtable base…",
+                "Cloning the template tables…",
+                "Ensuring app runtime tables…",
+                "Checking record access…",
+                "Writing instance configuration…",
+                "Registering the organisation…",
+              ]}
+            />
+          }
         />
       </form>
     </main>

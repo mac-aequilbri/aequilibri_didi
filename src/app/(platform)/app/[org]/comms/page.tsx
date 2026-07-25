@@ -6,9 +6,9 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
-import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { SortableTh } from "@/components/SortableTh";
-import { Button } from "@/components/ui/Button";
+import { StatusMenu } from "@/components/StatusMenu";
 import { formatDate } from "@/lib/format";
 import { loadComms } from "@/lib/platform/commsSource";
 import {
@@ -100,21 +100,14 @@ export default async function CommsPage({
                   )}
                 </td>
                 <td className="relative z-10 py-2 whitespace-nowrap">
-                  <form action={setCommStatus} className="flex items-center gap-1">
-                    <input type="hidden" name="org" value={ctx.orgSlug} />
-                    <input type="hidden" name="recordId" value={c.id} />
-                    <StatusBadge status={c.status} />
-                    <select name="status" defaultValue={c.status} aria-label={`Status for ${c.topic}`} className="text-xs border border-neutral-200 rounded px-1 py-0.5">
-                      {STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                    <Button type="submit" variant="outline" size="sm">
-                      Set
-                    </Button>
-                  </form>
+                  <StatusMenu
+                    action={setCommStatus}
+                    org={ctx.orgSlug}
+                    recordId={c.id}
+                    current={c.status}
+                    options={STATUSES}
+                    label={`Status for ${c.topic}`}
+                  />
                 </td>
               </tr>
                 ))}

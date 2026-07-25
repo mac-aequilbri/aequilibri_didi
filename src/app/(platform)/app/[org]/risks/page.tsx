@@ -4,9 +4,9 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
-import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { SortableTh } from "@/components/SortableTh";
-import { Button } from "@/components/ui/Button";
+import { StatusMenu } from "@/components/StatusMenu";
 import { AiChip, Chip } from "@/components/ui/Chip";
 import { formatDate } from "@/lib/format";
 import { ragClass } from "@/lib/platform/ragStyles";
@@ -210,21 +210,14 @@ export default async function RisksPage({
                     )}
                   </td>
                   <td className="relative z-10 py-2 whitespace-nowrap">
-                    <form action={setRiskStatus} className="flex items-center gap-1">
-                      <input type="hidden" name="org" value={ctx.orgSlug} />
-                      <input type="hidden" name="recordId" value={r.id} />
-                      <StatusBadge status={r.status} />
-                      <select name="status" defaultValue={r.status} aria-label={`Status for ${r.description}`} className="text-xs border border-neutral-200 rounded px-1 py-0.5">
-                        {["open", "accepted", "mitigated", "closed", "materialised"].map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                      <Button type="submit" variant="outline" size="sm">
-                        Set
-                      </Button>
-                    </form>
+                    <StatusMenu
+                      action={setRiskStatus}
+                      org={ctx.orgSlug}
+                      recordId={r.id}
+                      current={r.status}
+                      options={["open", "accepted", "mitigated", "closed", "materialised"]}
+                      label={`Status for ${r.description}`}
+                    />
                   </td>
                 </tr>
                   );

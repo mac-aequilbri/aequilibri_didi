@@ -108,6 +108,24 @@ export function FilterBar({
       if (e.key === "Escape") {
         setOpenField(null);
         pillRefs.current[openField]?.focus();
+        return;
+      }
+      // Trap Tab inside the open popover: cycle from last control back to the
+      // first (and vice versa with Shift+Tab) instead of tabbing out of it.
+      if (e.key === "Tab" && popRef.current) {
+        const focusables = popRef.current.querySelectorAll<HTMLElement>(
+          'button, input, select, [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     document.addEventListener("mousedown", onDown);

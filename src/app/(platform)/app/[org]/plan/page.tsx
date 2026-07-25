@@ -8,8 +8,9 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { FilterBar } from "@/components/FilterBar";
 import { GroupHeaderRow } from "@/components/GroupHeader";
-import { EmptyState, PageHeader, StatusBadge } from "@/components/PageHeader";
+import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { SortableTh } from "@/components/SortableTh";
+import { StatusMenu } from "@/components/StatusMenu";
 import { formatDate } from "@/lib/format";
 import { ragClass } from "@/lib/platform/ragStyles";
 import { getDomainLabels, labelForAppField } from "@/lib/platform/domainLabels";
@@ -149,26 +150,14 @@ export default async function PlanPage({
                       )}
                     </td>
                     <td className="relative z-10 py-2 whitespace-nowrap">
-                      <form action={setPlanTaskStatus} className="flex items-center gap-1">
-                        <input type="hidden" name="org" value={ctx.orgSlug} />
-                        <input type="hidden" name="recordId" value={t.id} />
-                        <StatusBadge status={t.status} />
-                        <select
-                          name="status"
-                          defaultValue={t.status}
-                          aria-label={`Status for ${t.name}`}
-                          className="text-xs border border-neutral-200 rounded px-1 py-0.5"
-                        >
-                          {STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                        <button type="submit" className="btn-ae-outline text-xs">
-                          Set
-                        </button>
-                      </form>
+                      <StatusMenu
+                        action={setPlanTaskStatus}
+                        org={ctx.orgSlug}
+                        recordId={t.id}
+                        current={t.status}
+                        options={STATUSES}
+                        label={`Status for ${t.name}`}
+                      />
                     </td>
                   </tr>
                 ))}
