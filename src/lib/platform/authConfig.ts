@@ -18,12 +18,15 @@ export function clerkMisconfigured(): boolean {
   );
 }
 
-/** May the platform run unauthenticated? Outside production: yes (local dev).
- *  In production: only with the explicit ALLOW_DEMO_MODE=true opt-in, and
- *  never when Clerk is half-configured. */
+/** May the platform run unauthenticated? In local dev/test: yes. Anywhere
+ *  else — including a deployment whose NODE_ENV is unset or mistyped — only
+ *  with the explicit ALLOW_DEMO_MODE=true opt-in, and never when Clerk is
+ *  half-configured. (Keying on === "development" rather than !== "production"
+ *  means a misconfigured production box fails closed, not open.) */
 export function demoModeAllowed(): boolean {
   if (clerkMisconfigured()) return false;
-  if (process.env.NODE_ENV !== "production") return true;
+  const env = process.env.NODE_ENV;
+  if (env === "development" || env === "test") return true;
   return process.env.ALLOW_DEMO_MODE === "true";
 }
 

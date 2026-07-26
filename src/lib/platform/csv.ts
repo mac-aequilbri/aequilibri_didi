@@ -7,7 +7,13 @@
 
 export function toCsv(headers: readonly string[], rows: readonly (readonly unknown[])[]): string {
   const cell = (v: unknown): string => {
-    const s = v == null ? "" : v instanceof Date ? v.toISOString().slice(0, 10) : String(v);
+    let s = v == null ? "" : v instanceof Date ? v.toISOString().slice(0, 10) : String(v);
+    // Spreadsheet formula-injection guard: a leading =, +, -, @ or tab makes
+    // Excel/Sheets evaluate the cell. Prefix a ' unless the value is a plain
+    // number (so negative amounts still parse as numbers on import).
+    if (/^[=+@\t\r-]/.test(s) && (typeof v !== "number" && !Number.isFinite(Number(s)))) {
+      s = "'" + s;
+    }
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [headers.map(cell).join(","), ...rows.map((r) => r.map(cell).join(","))];

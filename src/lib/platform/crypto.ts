@@ -22,6 +22,12 @@ export function isEncryptionConfigured(): boolean {
 // Derive a 32-byte key from the configured secret (or the dev fallback) via
 // SHA-256, so any-length env value yields a valid AES-256 key.
 function key(): Buffer {
+  if (!isEncryptionConfigured() && process.env.NODE_ENV === "production") {
+    // Never encrypt real tenant secrets under the public dev constant.
+    throw new Error(
+      "PLATFORM_ENCRYPTION_KEY is not set (min 16 chars) — refusing to use the dev fallback key in production.",
+    );
+  }
   const raw = isEncryptionConfigured() ? (process.env.PLATFORM_ENCRYPTION_KEY as string) : DEV_FALLBACK;
   return createHash("sha256").update(raw).digest();
 }

@@ -83,7 +83,11 @@ export default async function OrgPickerPage({
       metrics: null, // Postgres mode has no control-base cache; card fetches live.
     }));
   }
-  const visible = email === null ? orgs : orgs.filter((o) => o.emails.includes(email));
+  // Platform operators (PLATFORM_ADMIN_EMAILS) oversee every client, so they
+  // see the full registry. Demo mode (no auth) also shows everything. Every
+  // other signed-in user sees only the orgs they belong to.
+  const visible =
+    email === null || canProvision ? orgs : orgs.filter((o) => o.emails.includes(email));
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-16">

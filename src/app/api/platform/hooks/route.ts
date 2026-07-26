@@ -150,7 +150,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, orgSlug, channel, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // Detail goes to connection health (internal); the wire gets a generic
+    // marker — senders are partners, not operators.
     await touchConnectionHealth(orgSlug, channel, "in", `error: ${message}`);
-    return NextResponse.json({ ok: false, orgSlug, channel, error: message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, orgSlug, channel, error: "Internal error — see connection health" },
+      { status: 500 },
+    );
   }
 }

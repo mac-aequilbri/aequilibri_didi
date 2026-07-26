@@ -110,11 +110,29 @@ export async function callClaudeVision(
     };
     if (temperature !== null) params.temperature = temperature;
     const response = await client.messages.create(params);
+    logUsage("vision", model, response.usage);
     return { content: textFrom(response.content), demo_mode: false };
   } catch (e) {
     logger.error("Claude vision call failed", errMeta(e));
     return { content: `{"sections":[],"notes":"Claude error: ${e}","confidence":"low"}`, demo_mode: false };
   }
+}
+
+/** Token accounting: log usage on every successful call so spend per
+ *  model/call-site is visible in structured logs — no other metering exists. */
+function logUsage(
+  call: string,
+  model: string,
+  usage?: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null },
+) {
+  if (!usage) return;
+  logger.info("Claude usage", {
+    call,
+    model,
+    inputTokens: usage.input_tokens,
+    outputTokens: usage.output_tokens,
+    cacheReadTokens: usage.cache_read_input_tokens ?? 0,
+  });
 }
 
 /** Multiple base64 images + text prompt (used for feature-detection voting). */
@@ -150,6 +168,7 @@ export async function callClaudeVisionMulti(
       system: systemPrompt,
       messages: [{ role: "user", content }],
     });
+    logUsage("vision-multi", model, response.usage);
     return { content: textFrom(response.content), demo_mode: false };
   } catch (e) {
     logger.error("Claude vision-multi call failed", errMeta(e));
@@ -214,9 +233,11 @@ export async function callClaudeConversation(
       const stream = client.messages.stream(params);
       stream.on("text", (delta) => onEvent({ type: "delta", text: delta }));
       const final = await stream.finalMessage();
+      logUsage("conversation-stream", model, final.usage);
       return { ...parseBlocks(final.content), demo_mode: false };
     }
     const response = await client.messages.create(params);
+    logUsage("conversation", model, response.usage);
     return { ...parseBlocks(response.content), demo_mode: false };
   } catch (e) {
     logger.error("Claude conversation call failed", errMeta(e));

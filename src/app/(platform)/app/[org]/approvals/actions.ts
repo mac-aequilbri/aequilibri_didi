@@ -82,7 +82,8 @@ export async function approveProposalAction(formData: FormData): Promise<void> {
     writeResult = await executeProposal(
       ctx,
       proposalId,
-      user.name,
+      // Stable identity for non-repudiation — display names are editable.
+      user.email || user.name,
       Object.keys(edits).length ? edits : undefined,
     );
   } catch {
@@ -150,7 +151,7 @@ export async function rejectProposalAction(formData: FormData): Promise<void> {
     // stored on the pending row / exec log, mirroring the exec-log variant.
     const reason = String(formData.get("reason") ?? "").trim();
     try {
-      await rejectProposal(ctx, proposalId, user.name, reason);
+      await rejectProposal(ctx, proposalId, user.email || user.name, reason);
     } catch {
       /* already resolved */
     }

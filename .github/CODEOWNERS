@@ -1,0 +1,3 @@
+# Default owner for everything — required-review target once branch
+# protection is enabled (Settings → Branches → require PR + CODEOWNERS review).
+* @mac-aequilbri

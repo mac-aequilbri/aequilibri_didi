@@ -56,9 +56,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
     return NextResponse.json({ ok: true, orgSlug, ...result });
   } catch (err) {
-    return NextResponse.json(
-      { ok: false, orgSlug, error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    );
+    const { errMeta, logger } = await import("@/lib/logger");
+    logger.error("ingest-inbox failed", { orgSlug, ...errMeta(err) });
+    return NextResponse.json({ ok: false, orgSlug, error: "Ingestion failed" }, { status: 500 });
   }
 }

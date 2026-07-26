@@ -63,8 +63,8 @@ export async function POST(request: Request) {
     roofImageB64 = body.roof_image_b64 ?? "";
     roofMediaType = body.roof_media_type ?? "image/png";
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error("lat/lng required");
-  } catch (exc) {
-    return NextResponse.json({ error: String(exc) }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "Invalid request body — numeric lat/lng required" }, { status: 400 });
   }
 
   const googleKey = process.env.GOOGLE_MAPS_API_KEY ?? "";

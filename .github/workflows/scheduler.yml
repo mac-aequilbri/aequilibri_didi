@@ -25,12 +25,20 @@ jobs:
             echo "CRON_SECRET not configured — skipping."
             exit 0
           fi
-          curl -fsS -X POST \
-            -H "Authorization: Bearer ${CRON_SECRET}" \
-            --max-time 280 \
-            "https://aequilibri-next.onrender.com/api/platform/scheduler" || {
-              echo "Scheduler call failed (free-tier cold start is the usual cause; next hourly run retries)."
+          # Retry once after 60s (absorbs free-tier cold starts), then FAIL the
+          # workflow — a silently-dead scheduler stops draining the outbox DLQ,
+          # and a red workflow run is the only absence-alert we have.
+          for attempt in 1 2; do
+            if curl -fsS -X POST \
+              -H "Authorization: Bearer ${CRON_SECRET}" \
+              --max-time 280 \
+              "https://aequilibri-next.onrender.com/api/platform/scheduler"; then
               exit 0
-            }
+            fi
+            echo "Scheduler call failed (attempt ${attempt})."
+            [ "$attempt" = "1" ] && sleep 60
+          done
+          echo "::error::Scheduler unreachable after retry — investigate (CRON_SECRET mismatch, Render outage, or Actions/Render drift)."
+          exit 1
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}

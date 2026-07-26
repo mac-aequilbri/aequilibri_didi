@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errMeta, logger } from "@/lib/logger";
 import { fullSolarAnalysis } from "@/services/uc1/solar";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
     );
     return NextResponse.json(result);
   } catch (exc) {
-    return NextResponse.json({ ok: false, error: String(exc) }, { status: 400 });
+    logger.error("uc1 solar-analyze failed", errMeta(exc));
+    return NextResponse.json({ ok: false, error: "Solar analysis failed" }, { status: 400 });
   }
 }

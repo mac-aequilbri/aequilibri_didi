@@ -8,6 +8,17 @@ if (process.env.NODE_ENV === "production") {
   console.error("Refusing to run: NODE_ENV=production.");
   process.exit(1);
 }
+// NODE_ENV alone is not enough: a workstation whose DATABASE_URL points at a
+// remote database would still cascade-delete it. Require the extra flag then.
+const dbUrl = process.env.DATABASE_URL ?? "";
+const isLocal = /localhost|127\.0\.0\.1|^file:/.test(dbUrl);
+if (dbUrl && !isLocal && !process.argv.includes("--remote-i-know-what-i-am-doing")) {
+  console.error(
+    "Refusing to run: DATABASE_URL is not local. If you truly mean to wipe a " +
+      "remote database, re-run with --remote-i-know-what-i-am-doing as well.",
+  );
+  process.exit(1);
+}
 if (!process.argv.includes("--yes")) {
   const target = (process.env.DATABASE_URL ?? "").replace(/\/\/[^@]*@/, "//***@");
   console.error(

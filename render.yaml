@@ -17,7 +17,14 @@ services:
     #                    of record, so there is no Postgres to migrate or seed.
     buildCommand: npm ci --include=dev && npx prisma generate && npm run build
     startCommand: npm start
-    healthCheckPath: /
+    # Real health endpoint (config checks; ?deep=1 adds Airtable reachability).
+    # The old "/" pointer returned 200 even during a total data-layer outage.
+    healthCheckPath: /api/health
+    # HARD CONSTRAINT: the rate limiter, caches, proposal claim and scheduler
+    # lock are per-process. N instances × 4.5 req/s exceeds Airtable's
+    # 5 req/s/base cap → sustained 429 outage. Do NOT raise until a shared
+    # (Redis) limiter/cache exists. This pin is the mechanical guard.
+    numInstances: 1
 
     envVars:
       # ── Data layer ─────────────────────────────────────────────────────────
@@ -58,17 +65,25 @@ services:
 
       # ── Auth (Clerk) ────────────────────────────────────────────────────────
       # The platform FAILS CLOSED without these: /app/* returns 503 unless
-      # ALLOW_DEMO_MODE=true is set explicitly. Remove ALLOW_DEMO_MODE when
-      # Clerk keys are configured.
+      # ALLOW_DEMO_MODE=true is set. Production runs with Clerk auth ON, so both
+      # keys below MUST be set (production pk_live_/sk_live_ values) in the Render
+      # dashboard, and ALLOW_DEMO_MODE must stay UNSET — hence it is intentionally
+      # not declared here. Setting only one key is treated as misconfiguration and
+      # also fails closed (503). If you ever need an open demo deployment, add
+      # ALLOW_DEMO_MODE=true back in the dashboard.
       - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
         sync: false
       - key: CLERK_SECRET_KEY
         sync: false
-      - key: ALLOW_DEMO_MODE
-        value: "true"
-      # Platform operators allowed to provision new orgs once auth is on
-      # (comma-separated emails).
+      # Platform operators allowed to provision new orgs and see every client
+      # (comma-separated emails, e.g. mac@aequilibri.com).
       - key: PLATFORM_ADMIN_EMAILS
+        sync: false
+
+      # ── Secrets at rest (AES-256-GCM key for stored OAuth tokens etc.) ─────
+      # Min 16 chars. The app refuses to encrypt under the dev fallback key in
+      # production, so this MUST be set before enabling Xero/Drive per-org.
+      - key: PLATFORM_ENCRYPTION_KEY
         sync: false
 
       # ── Automation (scheduler endpoint token; omit to disable) ─────────────

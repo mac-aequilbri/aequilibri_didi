@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# aequilibri-next
 
-## Getting Started
+Multi-tenant AI-assisted operations platform for project-based businesses (construction, roofing, legal verticals). Next.js 16 App Router + TypeScript, **Airtable as the system of record** (one base per client org + a shared control base), Clerk authentication, Anthropic-powered assistant/agents, deployed on **Render**.
 
-First, run the development server:
+## Architecture in one paragraph
+
+UI (server components, `src/components`) → server actions / API routes (`src/app`) → data-source layer (`src/lib/platform/*Source.ts`) → Airtable client with per-base rate limiter + TTL caches (`src/lib/airtable`). All writes funnel through one chokepoint, [recordWriter.ts](src/lib/platform/recordWriter.ts) (role/RLS gating, approval queue, append-only EXECUTION_LOG, post-write reconciliation). Prisma/Postgres remains as the legacy dual path (`AIRTABLE_MIGRATION` flag). Full details: [docs/PLATFORM_ARCHITECTURE.md](docs/PLATFORM_ARCHITECTURE.md).
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Without any secrets the app runs in **demo mode** (fixture data, no Clerk, no Airtable). Copy real values into `.env` to activate integrations — every var and its activation behavior is documented in [render.yaml](render.yaml). Key switches: `AIRTABLE_MIGRATION` + `AIRTABLE_PAT` (live data), Clerk key pair (auth — fails closed in production without them), `ANTHROPIC_API_KEY` (live AI).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run typecheck && npm run lint && npm test   # the CI gate, locally
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deployment
 
-## Learn More
+Push to `master` → GitHub Actions CI ([ci.yml](.github/workflows/ci.yml)) → Render auto-deploy per [render.yaml](render.yaml) (single instance — **do not scale >1**; see the `numInstances` note there). Health: `GET /api/health` (`?deep=1` adds Airtable reachability). Hourly automation via [scheduler.yml](.github/workflows/scheduler.yml); daily Airtable DR export via [backup.yml](.github/workflows/backup.yml).
 
-To learn more about Next.js, take a look at the following resources:
+## Operations
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Runbook, incident response, rollback, DR:** [docs/production-readiness-audit.md](docs/production-readiness-audit.md) (Operations artifacts section)
+- **Enterprise audit + action register:** [docs/enterprise-audit-2026-07-26.md](docs/enterprise-audit-2026-07-26.md)
+- **Client onboarding:** [docs/module1-onboarding-runbook.md](docs/module1-onboarding-runbook.md)
+- **Design system / UI conventions:** [docs/design-system.md](docs/design-system.md)
+- Operational scripts live in `scripts/` (Airtable schema/seeding, `airtable-export-backup.mjs`, guarded `reset-platform-orgs.mjs`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Repo map
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Path | What |
+|---|---|
+| `src/app/(platform)` | Multi-tenant platform (`/app/[org]/…` — dashboards, approvals, cashflow, reports, assistant) |
+| `src/app/(uc1)` | Legacy roofing app (auth-gated with the platform) |
+| `src/app/(public)` | Landing + client portal (`/portal/[token]`) |
+| `src/lib/airtable` | Airtable client, rate limiter, caches, control-base registry |
+| `src/lib/platform` | Auth/org context, RLS, recordWriter, sources, crypto, logger |
+| `src/services` | Domain services (assistant/agents, documents, scheduler, construction) |
+| `docs/` | Architecture, audits, plans, runbooks |

@@ -1,0 +1,44 @@
+# Daily DR export of every Airtable base (system of record). Wraps the
+# existing scripts/airtable-export-backup.mjs and stores the dump as a
+# workflow artifact (90-day retention) — a real, automated RPO instead of
+# "the script exists but nothing runs it".
+#
+# Setup (one-time, GitHub repo secrets):
+#   AIRTABLE_PAT        — read-scoped PAT that can reach every base below.
+#   BACKUP_BASE_IDS     — space-separated base ids: every live org base,
+#                         the control base, and both template bases.
+# Until both exist the job fails loudly (that is the point: a backup that
+# silently doesn't run is worse than none).
+
+name: airtable-backup
+
+on:
+  schedule:
+    - cron: "43 15 * * *" # daily 15:43 UTC ≈ 01:43 AEST, off-peak
+  workflow_dispatch: {}
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Export all bases
+        env:
+          AIRTABLE_PAT: ${{ secrets.AIRTABLE_PAT }}
+          BACKUP_BASE_IDS: ${{ secrets.BACKUP_BASE_IDS }}
+        run: |
+          if [ -z "$AIRTABLE_PAT" ] || [ -z "$BACKUP_BASE_IDS" ]; then
+            echo "::error::AIRTABLE_PAT and BACKUP_BASE_IDS repo secrets must be set."
+            exit 1
+          fi
+          node scripts/airtable-export-backup.mjs $BACKUP_BASE_IDS
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: airtable-backup-${{ github.run_id }}
+          path: outputs/airtable-backups/
+          if-no-files-found: error
+          retention-days: 90

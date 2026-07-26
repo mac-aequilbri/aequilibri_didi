@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { errMeta, logger } from "@/lib/logger";
 import { initSession } from "@/services/uc1/session";
 
 export async function GET(req: NextRequest) {
@@ -9,6 +10,7 @@ export async function GET(req: NextRequest) {
     const ctx = await initSession(address, suburb);
     return NextResponse.json(ctx);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    logger.error("uc1 session-init failed", errMeta(err));
+    return NextResponse.json({ error: "Session initialisation failed" }, { status: 500 });
   }
 }

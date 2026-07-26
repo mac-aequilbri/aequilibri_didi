@@ -212,7 +212,7 @@ async function cascadeProcurementToCashflow(ctx: OrgCtx, write: CascadeWrite): P
   const { writeRecord } = await import("./recordWriter");
   const existing = await core.list(ctx.orgSlug, "CASHFLOWS", {
     maxRecords: 5,
-    filterByFormula: `SEARCH("${marker}", {Notes}&"")`,
+    filterByFormula: `SEARCH("${marker.replace(/"/g, "")}", {Notes}&"")`,
   });
   const payload = {
     name: `Procurement — ${S(proc["Procurement_Name"]) || "item"}`,

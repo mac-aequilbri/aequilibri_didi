@@ -3,6 +3,7 @@
 // operational tables via approval-gated proposals.
 
 import { airtableEnabled, core } from "@/lib/airtable";
+import { formulaSafe } from "@/lib/airtable/control";
 import { callClaude } from "@/lib/claude";
 import { prisma } from "@/lib/db";
 import { classifyDocument, parseDocumentText } from "@/lib/platform/docs";
@@ -672,7 +673,7 @@ async function findByExternalId(ctx: OrgCtx, storageRef: string): Promise<boolea
   if (airtableEnabled()) {
     const recs = await core
       .list(ctx.orgSlug, "DOCUMENTS", {
-        filterByFormula: `{Drive_URL}='${storageRef.replace(/'/g, "")}'`,
+        filterByFormula: `{Drive_URL}='${formulaSafe(storageRef)}'`,
         maxRecords: 1,
       })
       .catch(() => [] as unknown[]);

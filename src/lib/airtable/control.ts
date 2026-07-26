@@ -215,7 +215,7 @@ export async function setProjectRlsEnforce(slug: string, enabled: boolean): Prom
 
 /** Single-quote is the only char that breaks an Airtable formula string; org
  *  slugs can't contain it (SLUG_RE), but strip it defensively for emails. */
-const formulaSafe = (v: string): string => v.replace(/'/g, "");
+export const formulaSafe = (v: string): string => v.replace(/'/g, "");
 
 function toEntry(r: { id: string; fields: Record<string, unknown> }): OrgRegistryEntry {
   const f = r.fields;
