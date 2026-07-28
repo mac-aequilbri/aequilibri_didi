@@ -1,5 +1,6 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
+import { scopeByJob } from "./rls";
 import {
   PriorityBand,
   priorityBandForActionDueDate,
@@ -18,6 +19,7 @@ export interface ProjectPlanActionView {
 
 export interface ProjectPlanWorkstreamView {
   id: string;
+  jobId: string | null;
   name: string;
   status: string;
   description: string;
@@ -85,6 +87,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<ProjectPlanWorkstreamView[]> {
       return { priority, attentionReason: reason };
     })(),
     id: String(ws.id),
+    jobId: ws.job ? String(ws.job.id) : null,
     name: ws.name,
     status: ws.status,
     description: ws.description,
@@ -148,6 +151,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<ProjectPlanWorkstreamView[]> {
 
     return {
       id: j.id,
+      jobId: j.id,
       name: str(j["Job_Name"]) || "(job)",
       status: str(j["Status"]) || "active",
       description: str(j["Description"]),
@@ -161,6 +165,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<ProjectPlanWorkstreamView[]> {
   });
 }
 
-export function loadProjectPlan(ctx: OrgCtx): Promise<ProjectPlanWorkstreamView[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+export async function loadProjectPlan(ctx: OrgCtx): Promise<ProjectPlanWorkstreamView[]> {
+  const rows = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  return scopeByJob(ctx, rows, (r) => r.jobId);
 }

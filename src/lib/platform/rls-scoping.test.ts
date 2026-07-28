@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   listOptional: vi.fn(),
   listControlAssignments: vi.fn(),
   getCurrentViewer: vi.fn(),
+  requireOrgCtx: vi.fn(),
   loadActionStatusMap: vi.fn(),
 }));
 
@@ -24,15 +25,21 @@ vi.mock("@/lib/airtable/control", () => ({
   controlEnabled: () => true,
   listControlAssignments: h.listControlAssignments,
 }));
-vi.mock("./org-context", () => ({ getCurrentViewer: h.getCurrentViewer }));
+vi.mock("./org-context", () => ({
+  getCurrentViewer: h.getCurrentViewer,
+  requireOrgCtx: h.requireOrgCtx,
+}));
 vi.mock("@/lib/db", () => ({ prisma: {} }));
 vi.mock("./optionalList", () => ({ listOptional: h.listOptional }));
 vi.mock("./configSource", () => ({ loadActionStatusMap: h.loadActionStatusMap }));
 
+import { NextRequest } from "next/server";
 import { resolveJobScope, type JobScope } from "./rls";
 import { loadRisks } from "./risksSource";
 import { loadJobOptions } from "./jobOptionsSource";
 import { loadOrgHighlights } from "./orgHighlightsSource";
+import { loadProjectPlan } from "./projectPlanSource";
+import { GET as searchGET } from "@/app/(platform)/app/[org]/search/route";
 import type { OrgCtx } from "./types";
 
 const makeCtx = (over: Record<string, unknown> = {}): OrgCtx =>
@@ -137,6 +144,50 @@ describe("loadJobOptions (picker) filters per assignment", () => {
     });
     const opts = await loadJobOptions(makeCtx({ config: { features: {}, generalJobId: "jG" } }));
     expect(opts.map((o) => o.id).sort()).toEqual(["jA", "jG"]); // NOT jB
+  });
+});
+
+// ── The project-plan board shows only assigned jobs' workstreams ────────────
+describe("loadProjectPlan (workstreams) filters per assignment", () => {
+  it("drops other jobs' workstreams, actions and risk scores", async () => {
+    h.listControlAssignments.mockResolvedValue([{ email: "u@x.io", jobRecId: "jA" }]);
+    stubTables({
+      JOBS: [{ id: "jA", Job_Name: "Assigned" }, { id: "jB", Job_Name: "Other" }],
+      PHASES: [],
+      ISSUES: [{ id: "a1", Action_Name: "other job action", Job: ["jB"], Status: "open" }],
+      RISKS: [],
+    });
+    const rows = await loadProjectPlan(makeCtx());
+    expect(rows.map((w) => w.id)).toEqual(["jA"]); // jB's workstream never rendered
+  });
+});
+
+// ── ⌘K search returns no hits from unassigned jobs ──────────────────────────
+describe("search route filters hits per assignment", () => {
+  it("omits out-of-scope records but keeps org-global vendors", async () => {
+    h.listControlAssignments.mockResolvedValue([{ email: "u@x.io", jobRecId: "jA" }]);
+    h.requireOrgCtx.mockResolvedValue(makeCtx());
+    stubTables({
+      JOBS: [{ id: "jA", Job_Name: "widget A" }, { id: "jB", Job_Name: "widget B" }],
+      ISSUES: [
+        { id: "a1", Action_Name: "widget action mine", Job: ["jA"], Status: "open" },
+        { id: "a2", Action_Name: "widget action theirs", Job: ["jB"], Status: "open" },
+      ],
+      RISKS: [],
+      DECISIONS: [],
+      CHANGE_LOG: [],
+      DOCUMENTS: [],
+    });
+    h.listOptional.mockImplementation(async (_slug: string, table: string) =>
+      table === "VENDORS" ? [{ id: "v1", Vendor_Name: "widget vendor", Category: "supply" }] : [],
+    );
+    const res = await searchGET(
+      new NextRequest("http://localhost/app/acme/search?q=widget"),
+      { params: Promise.resolve({ org: "acme" }) },
+    );
+    const { results } = (await res.json()) as { results: { label: string }[] };
+    const labels = results.map((r) => r.label).sort();
+    expect(labels).toEqual(["widget A", "widget action mine", "widget vendor"]);
   });
 });
 
