@@ -272,7 +272,7 @@ async function snapshotsFromAirtable(ctx: OrgCtx): Promise<SnapshotView[]> {
 /** Load the learning-loop data: rules + the corrections/hypotheses loop from the
  *  active backend; the snapshot history always from Postgres. */
 export async function loadLearning(ctx: OrgCtx): Promise<LearningData> {
-  const on = airtableEnabled();
+  const on = airtableEnabled(ctx);
   const [rules, engine, snapshots] = await Promise.all([
     on ? rulesFromAirtable(ctx) : rulesFromPostgres(ctx),
     on ? engineFromAirtable(ctx) : engineFromPostgres(ctx),

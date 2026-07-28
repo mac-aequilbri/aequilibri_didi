@@ -42,7 +42,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobOption[]> {
  *  the viewer's assigned jobs (+ their org's General project). A scoped user
  *  can only file records against, or target, projects they're assigned to. */
 export async function loadJobOptions(ctx: OrgCtx): Promise<JobOption[]> {
-  const all = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  const all = await (airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx));
   const scope = await currentJobScope(ctx);
   return scope.mode === "all" ? all : all.filter((o) => inScope(scope, o.id));
 }
@@ -53,7 +53,7 @@ export async function loadJobOptions(ctx: OrgCtx): Promise<JobOption[]> {
  *  is warm. Empty in Postgres mode — those sources resolve the job through a
  *  Prisma relation include instead. (Plan P4: unlocks "group by project".) */
 export async function loadJobLabelMap(ctx: OrgCtx): Promise<Map<string, string>> {
-  if (!airtableEnabled()) return new Map();
+  if (!airtableEnabled(ctx)) return new Map();
   const jobs = await core.list(ctx.orgSlug, "JOBS", { maxRecords: 200 });
   return new Map(jobs.map((j) => [j.id, str(j["Job_Name"]) || "(job)"]));
 }

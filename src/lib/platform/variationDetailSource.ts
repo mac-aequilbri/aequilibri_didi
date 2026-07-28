@@ -94,5 +94,5 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<VariationDetailVie
 }
 
 export function loadVariationDetail(ctx: OrgCtx, id: string): Promise<VariationDetailView | null> {
-  return airtableEnabled() ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
+  return airtableEnabled(ctx) ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
 }

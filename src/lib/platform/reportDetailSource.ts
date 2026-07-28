@@ -89,5 +89,5 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<ReportDetailView |
 }
 
 export function loadReportDetail(ctx: OrgCtx, id: string): Promise<ReportDetailView | null> {
-  return airtableEnabled() ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
+  return airtableEnabled(ctx) ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
 }

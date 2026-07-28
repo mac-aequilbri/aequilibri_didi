@@ -119,7 +119,7 @@ export async function getOrCreateSession(
     const existing = await listChatSessions(ctx);
     return existing.length ? existing[0].id : createChatSession(ctx);
   }
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "CHAT_SESSIONS", { maxRecords: 200 });
     const open = rows
       .filter((r) => !str(r["Ended_At"]) && str(r["Session_Title"]) === PROJECT_TITLE)
@@ -146,7 +146,7 @@ export async function getOrCreateSession(
 
 /** All standalone-chat conversations for the org, most recent first. */
 export async function listChatSessions(ctx: OrgCtx): Promise<ChatSessionSummary[]> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "CHAT_SESSIONS", { maxRecords: 200 });
     return rows
       .filter((r) => isStandaloneTitle(str(r["Session_Title"])))
@@ -173,7 +173,7 @@ export async function listChatSessions(ctx: OrgCtx): Promise<ChatSessionSummary[
 /** Open a fresh standalone conversation and return its id. */
 export async function createChatSession(ctx: OrgCtx, title?: string): Promise<RecordId> {
   const encoded = encodeChatTitle(title ?? DEFAULT_CHAT_TITLE);
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const created = await core.create(ctx.orgSlug, "CHAT_SESSIONS", {
       Session_Title: encoded,
       Job_Id: "",
@@ -189,7 +189,7 @@ export async function createChatSession(ctx: OrgCtx, title?: string): Promise<Re
 /** Rename a standalone conversation (used for first-message auto-titling). */
 export async function renameChatSession(ctx: OrgCtx, sessionId: RecordId, title: string): Promise<void> {
   const encoded = encodeChatTitle(title);
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     await core.update(ctx.orgSlug, "CHAT_SESSIONS", String(sessionId), { Session_Title: encoded });
     return;
   }
@@ -202,7 +202,7 @@ export async function renameChatSession(ctx: OrgCtx, sessionId: RecordId, title:
 /** Permanently delete a standalone conversation and its messages. Callers must
  *  first confirm the id belongs to this org's standalone set (isChatSession). */
 export async function deleteChatSession(ctx: OrgCtx, sessionId: RecordId): Promise<void> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const msgs = await core.list(ctx.orgSlug, "CHAT_MESSAGES", {
       filterByFormula: `{Session_Id}='${formulaSafe(String(sessionId))}'`,
     });
@@ -245,7 +245,7 @@ export async function endSession(
    *  persistence record; per-turn logs cover the turns, not the close). */
   close?: { summary?: string; rulesFlagged?: string[]; correctionCaptured?: boolean },
 ): Promise<void> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     await core.update(ctx.orgSlug, "CHAT_SESSIONS", String(sessionId), {
       Ended_At: new Date().toISOString(),
       ...(close?.summary ? { Summary: close.summary } : {}),
@@ -279,7 +279,7 @@ export async function endSession(
 }
 
 export async function listMessages(ctx: OrgCtx, sessionId: RecordId): Promise<ChatMessageRow[]> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     return listSessionMessagesAirtable(ctx, sessionId);
   }
   const rows = await prisma.platChatMessage.findMany({
@@ -302,7 +302,7 @@ async function dataContext(ctx: OrgCtx): Promise<string> {
   const scope = await currentJobScope(ctx);
   const firstLink = (v: unknown): string | null =>
     Array.isArray(v) && v.length > 0 ? String(v[0]) : null;
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     // Read a wider page when scoping so the viewer's jobs aren't missed by the
     // grounding snapshot; whole-tenant viewers keep the cheap top-10 read.
     const [jobsAll, actionsAll, pendingAll] = await Promise.all([
@@ -353,7 +353,7 @@ async function dataContext(ctx: OrgCtx): Promise<string> {
  *  CORRECTIONS.Date_Found (stamped by emitCorrection) against the most recent
  *  CHAT_SESSIONS.Ended_At. Airtable mode only; "" when below threshold. */
 async function recentCorrectionsBlock(ctx: OrgCtx): Promise<string> {
-  if (!airtableEnabled()) return "";
+  if (!airtableEnabled(ctx)) return "";
   try {
     const sessions = await core.list(ctx.orgSlug, "CHAT_SESSIONS", { maxRecords: 200 });
     const lastEnded = sessions
@@ -398,7 +398,7 @@ export async function sendChatMessage(
   const sessionId = opts.sessionId ?? (await getOrCreateSession(ctx, opts.jobId));
   let userMsgId: number | undefined;
   let userMsgRecordId: string | undefined;
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const userMsg = await core.create(ctx.orgSlug, "CHAT_MESSAGES", {
       Session_Id: String(sessionId),
       Role: "user",
@@ -424,7 +424,7 @@ export async function sendChatMessage(
     // activity — TTL-cached, invalidated by every write through recordWriter.
     jobContextBlock(ctx, { jobId: opts.jobId, role: opts.userRole }),
     domainVocabBlock(ctx),
-    airtableEnabled()
+    airtableEnabled(ctx)
       ? listSessionMessagesAirtable(ctx, sessionId).then((rows) =>
           rows.filter((m) => String(m.id) !== String(userMsgRecordId)).slice(-HISTORY_LIMIT).reverse(),
         )
@@ -510,7 +510,7 @@ export async function sendChatMessage(
     })),
   ];
 
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     await core.create(ctx.orgSlug, "CHAT_MESSAGES", {
       Session_Id: String(sessionId),
       Role: "assistant",

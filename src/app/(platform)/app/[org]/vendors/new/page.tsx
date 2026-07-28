@@ -16,7 +16,7 @@ export default async function NewVendorPage({
 
   // VENDORS is optional on older bases — a create can't fall back to [], so
   // explain instead of offering a form whose save is doomed.
-  if (airtableEnabled() && !(await tableExists(ctx.orgSlug, "VENDORS"))) {
+  if (airtableEnabled(ctx) && !(await tableExists(ctx.orgSlug, "VENDORS"))) {
     return (
       <div className="p-6 max-w-xl">
         <PageHeader title="New vendor" />

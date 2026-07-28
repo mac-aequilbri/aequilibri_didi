@@ -44,7 +44,7 @@ export async function loadVariations(ctx: OrgCtx): Promise<VariationView[]> {
   return scopeByJob(ctx, await loadVariationsInner(ctx), (v) => v.jobId);
 }
 async function loadVariationsInner(ctx: OrgCtx): Promise<VariationView[]> {
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     const rows = await prisma.platConVariationOrder.findMany({
       where: { orgId: ctx.orgId },
       orderBy: { createdAt: "desc" },
@@ -103,7 +103,7 @@ export async function loadRoomMatrix(ctx: OrgCtx): Promise<RoomView[]> {
   return scopeByJob(ctx, await loadRoomMatrixInner(ctx), (r) => r.jobId);
 }
 async function loadRoomMatrixInner(ctx: OrgCtx): Promise<RoomView[]> {
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     const rows = await prisma.platConRoomMatrix.findMany({
       where: { orgId: ctx.orgId },
       orderBy: [{ zone: "asc" }, { name: "asc" }],
@@ -136,7 +136,7 @@ async function loadRoomMatrixInner(ctx: OrgCtx): Promise<RoomView[]> {
 /** Form-ready values for a single room's edit page. Limited to the fields the
  *  Airtable ROOM_MATRIX table is known to carry (Finishes has no field yet). */
 export async function loadRoomDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     let r: CoreRow | null = null;
     try {
       r = await core.get(ctx.orgSlug, "ROOM_MATRIX", id);
@@ -178,7 +178,7 @@ export async function loadMeetingMinutes(ctx: OrgCtx): Promise<MinutesView[]> {
   return scopeByJob(ctx, await loadMeetingMinutesInner(ctx), (m) => m.jobId);
 }
 async function loadMeetingMinutesInner(ctx: OrgCtx): Promise<MinutesView[]> {
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     const rows = await prisma.platConMeetingMinutes.findMany({
       where: { orgId: ctx.orgId },
       orderBy: { meetingDate: "desc" },
@@ -237,7 +237,7 @@ export async function loadQuotes(ctx: OrgCtx): Promise<QuoteView[]> {
   return scopeByJob(ctx, await loadQuotesInner(ctx), (q) => q.jobId);
 }
 async function loadQuotesInner(ctx: OrgCtx): Promise<QuoteView[]> {
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     const rows = await prisma.platConQuote.findMany({
       where: { orgId: ctx.orgId },
       orderBy: { createdAt: "desc" },
@@ -291,7 +291,7 @@ export async function loadWeeklyReports(ctx: OrgCtx): Promise<ReportView[]> {
   return scopeByJob(ctx, await loadWeeklyReportsInner(ctx), (r) => r.jobId);
 }
 async function loadWeeklyReportsInner(ctx: OrgCtx): Promise<ReportView[]> {
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     const rows = await prisma.platConWeeklyReport.findMany({
       where: { orgId: ctx.orgId },
       orderBy: { weekEnding: "desc" },

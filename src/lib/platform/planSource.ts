@@ -71,7 +71,7 @@ async function loadContactLabelMap(ctx: OrgCtx): Promise<Map<string, string>> {
 /** Load the task schedule from the active backend (Airtable, or []) — RLS-
  *  scoped to the viewer's assigned jobs. Ordered by start date (unset last). */
 export async function loadPlanTasks(ctx: OrgCtx): Promise<PlanTaskView[]> {
-  if (!airtableEnabled()) return [];
+  if (!airtableEnabled(ctx)) return [];
   const [rows, jobLabels, phaseLabels, contactLabels] = await Promise.all([
     core.list(ctx.orgSlug, "PLAN", { maxRecords: 1000 }),
     loadJobLabelMap(ctx),
@@ -118,7 +118,7 @@ export async function loadPlanTasks(ctx: OrgCtx): Promise<PlanTaskView[]> {
 /** Form-ready values for a single task's detail/edit page. Airtable-only, so
  *  null unless Airtable mode is active (matching loadCommDetail). */
 export async function loadPlanTaskDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
-  if (!airtableEnabled()) return null;
+  if (!airtableEnabled(ctx)) return null;
   let r: Record<string, unknown> | null = null;
   try {
     r = await core.get(ctx.orgSlug, "PLAN", id);

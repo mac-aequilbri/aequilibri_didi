@@ -15,7 +15,10 @@ import { PrismaClient } from "@prisma/client";
 // root and is exempt. The rare legitimate cross-org lookup (portal token
 // resolution, seeds, ops scripts) must use `prismaUnscoped` explicitly.
 
-const ORG_SCOPED = /^Plat(?!Organisation$)/;
+// PlatCtl* models mirror the cross-org Airtable control base (org registry,
+// team, assignments, catalogs) — they carry orgSlug, not orgId, so the orgId
+// guard cannot apply. PlatOrganisation is the tenancy root itself.
+const ORG_SCOPED = /^Plat(?!Organisation$|Ctl)/;
 const FANOUT_OPS = new Set([
   "findMany",
   "findFirst",

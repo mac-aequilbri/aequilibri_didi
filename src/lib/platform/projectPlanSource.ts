@@ -166,6 +166,6 @@ async function fromAirtable(ctx: OrgCtx): Promise<ProjectPlanWorkstreamView[]> {
 }
 
 export async function loadProjectPlan(ctx: OrgCtx): Promise<ProjectPlanWorkstreamView[]> {
-  const rows = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  const rows = await (airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx));
   return scopeByJob(ctx, rows, (r) => r.jobId);
 }

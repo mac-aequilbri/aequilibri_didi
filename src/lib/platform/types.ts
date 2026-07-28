@@ -68,4 +68,10 @@ export const DEFAULT_FEATURES: Record<string, boolean> = {
   project_plan: false,
   vendors: true,
   learning_rules: true,
+  // Backend-switch Phase D: per-org data-backend override. When true, this
+  // org's reads/writes use Postgres even while AIRTABLE_MIGRATION is on
+  // globally (opt-OUT of Airtable; the reverse — forcing Airtable while the
+  // global flag is off — is not supported). Consumed by airtableEnabled(ctx);
+  // requires the org's rows to exist in Postgres (scripts/migration/).
+  data_backend_postgres: false,
 };

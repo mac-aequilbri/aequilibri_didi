@@ -25,7 +25,7 @@ const S = (v: unknown): string => (typeof v === "string" ? v : "");
  *  Domain matching is prefix/case tolerant ("Construction" ↔ "construction");
  *  "General" rows apply to every vertical, specific rows win. */
 export async function getDomainLabels(ctx: OrgCtx): Promise<Map<string, DomainLabel>> {
-  if (!airtableEnabled()) return new Map();
+  if (!airtableEnabled(ctx)) return new Map();
   return cache.get(ctx.orgSlug, async () => {
     try {
       const rows = await core.list(ctx.orgSlug, "DOMAIN_LABELS", { maxRecords: 1000 });

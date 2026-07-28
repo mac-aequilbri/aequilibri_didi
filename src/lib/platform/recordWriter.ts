@@ -440,8 +440,11 @@ const REGISTRY = {
   workstream: { physical: "plat_core_workstream", delegate: d(prisma.platWorkstream), create: workstreamSchema, update: upd(workstreamSchema) },
   action: { physical: "plat_core_actionhub", delegate: d(prisma.platActionHub), pgOmit: ["issueType", "phaseId", "riskId"], create: actionSchema, update: upd(actionSchema) },
   decision: { physical: "plat_core_decision", delegate: d(prisma.platDecision), create: decisionSchema, update: upd(decisionSchema) },
-  comms: { physical: "COMMS", create: commsSchema, update: upd(commsSchema) },
-  plan: { physical: "PLAN", create: planSchema, update: upd(planSchema) },
+  // Phase D: comms/plan gained Postgres mirrors (PlatComms/PlatConPlanTask,
+  // Phase B) — the zod keys match the model columns 1:1, so the standard
+  // delegate branch serves them when this org is on Postgres.
+  comms: { physical: "COMMS", delegate: d(prisma.platComms), create: commsSchema, update: upd(commsSchema) },
+  plan: { physical: "PLAN", delegate: d(prisma.platConPlanTask), create: planSchema, update: upd(planSchema) },
   learning_rule: { physical: "plat_core_learningrule", delegate: d(prisma.platLearningRule), create: learningRuleSchema, update: upd(learningRuleSchema) },
   document: { physical: "plat_core_document", delegate: d(prisma.platDocument), create: documentSchema, update: upd(documentSchema) },
   phase: { physical: "plat_con_phase", delegate: d(prisma.platConPhase), pgOmit: ["rag"], create: phaseSchema, update: upd(phaseSchema) },
@@ -477,7 +480,7 @@ export async function readRecord(
   table: WritableTable,
   recordId: number | string,
 ): Promise<Record<string, unknown> | null> {
-  const map = airtableEnabled() ? airtableMapFor(table) : undefined;
+  const map = airtableEnabled(ctx) ? airtableMapFor(table) : undefined;
   if (map && typeof recordId === "string") {
     try {
       return await core.get(ctx.orgSlug, map.table, recordId);
@@ -574,7 +577,7 @@ async function performWrite(
   // Airtable as system of record: route to the org's base when the flag is on
   // and the table has a field map. Tenancy is structural (the base is the org),
   // so there is no orgId guard here — base resolution derives from ctx.orgSlug.
-  const map = airtableEnabled() ? airtableMapFor(table) : undefined;
+  const map = airtableEnabled(ctx) ? airtableMapFor(table) : undefined;
   if (map) {
     if (op === "create") {
       // Learning-rule codes are allocated at write time (mirrors the Postgres
@@ -683,7 +686,7 @@ async function writeExecutedLog(
   // Airtable system of record: the audit trail lives in the org's base
   // EXECUTION_LOG (so it survives a Postgres-free prod). Best-effort — a failed
   // audit must never undo a write that already landed.
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     try {
       await core.create(ctx.orgSlug, "EXECUTION_LOG", {
         Log_Entry: `${args.op} ${args.physical}`.slice(0, 200),
@@ -766,7 +769,7 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
   // Airtable mode skips the Postgres-shaped Zod schema (which would reject the
   // string record ids / missing numeric FKs of the Airtable world) and lets the
   // field map do its own coercion from the raw payload.
-  const onAirtable = airtableEnabled() && airtableMapFor(req.table) !== undefined;
+  const onAirtable = airtableEnabled(ctx) && airtableMapFor(req.table) !== undefined;
   const data = onAirtable
     ? ((req.data ?? {}) as Record<string, unknown>)
     : validated(def, req.op, req.data);
@@ -804,7 +807,7 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
   // stores carry it without a column; executeProposal strips it pre-write.
   const rationaleMeta = req.rationale?.trim() ? { __rationale: req.rationale.trim() } : {};
   if (req.requireApproval) {
-    if (airtableEnabled()) {
+    if (airtableEnabled(ctx)) {
       const expiresAt = new Date(Date.now() + PROPOSAL_TTL_DAYS * 86_400_000).toISOString();
       const pending = await core.create(ctx.orgSlug, "PENDING_WRITES", {
         Table_Key: req.table,
@@ -955,7 +958,7 @@ function claimProposal(ctx: OrgCtx, proposalId: RecordId): () => void {
 }
 
 async function resolvePending(ctx: OrgCtx, proposalId: RecordId): Promise<PendingProposal> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const row = await core.get(ctx.orgSlug, "PENDING_WRITES", String(proposalId));
     const status = typeof row["Status"] === "string" ? row["Status"] : "";
     if (status !== "proposed") throw new Error("Proposal not found (already resolved?)");
@@ -1010,7 +1013,7 @@ async function executeProposalClaimed(
 ): Promise<WriteResult> {
   const pending = await resolvePending(ctx, proposalId);
 
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     // Atomic claim across instances: only one resolver may move the row out of
     // "proposed". A second concurrent approval matches zero rows and bails
     // before performing the write.
@@ -1022,7 +1025,7 @@ async function executeProposalClaimed(
   }
 
   if (pending.expiresAt < new Date()) {
-    if (airtableEnabled()) {
+    if (airtableEnabled(ctx)) {
       await core.update(ctx.orgSlug, "PENDING_WRITES", String(pending.id), {
         Status: "expired",
         Resolved_By: approvedBy,
@@ -1043,7 +1046,7 @@ async function executeProposalClaimed(
   if (!def) throw new Error(`Unknown table in proposal: ${pending.tableKey}`);
   const op = pending.op as WriteRequest["op"];
 
-  const onAirtable = airtableEnabled() && airtableMapFor(pending.tableKey) !== undefined;
+  const onAirtable = airtableEnabled(ctx) && airtableMapFor(pending.tableKey) !== undefined;
   try {
     const payloadObj = {
       ...(JSON.parse(pending.payload) as Record<string, unknown>),
@@ -1089,7 +1092,7 @@ async function executeProposalClaimed(
       approvedBy,
       result: `Deferred write approved (proposal #${pending.id})`,
     });
-    if (airtableEnabled()) {
+    if (airtableEnabled(ctx)) {
       await core.update(ctx.orgSlug, "PENDING_WRITES", String(pending.id), {
         Status: "executed",
         Resolved_By: approvedBy,
@@ -1141,7 +1144,7 @@ async function executeProposalClaimed(
       op: pending.op,
       ...errMeta(err),
     });
-    if (airtableEnabled()) {
+    if (airtableEnabled(ctx)) {
       await core.update(ctx.orgSlug, "PENDING_WRITES", String(pending.id), {
         Status: "failed",
         Resolved_By: approvedBy,
@@ -1180,7 +1183,7 @@ async function rejectProposalClaimed(
   reason: string,
 ): Promise<void> {
   const pending = await resolvePending(ctx, proposalId);
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     await core.update(ctx.orgSlug, "PENDING_WRITES", String(pending.id), {
       Status: "rejected",
       Resolved_By: rejectedBy,

@@ -94,5 +94,5 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<MinutesDetailView 
 
 /** Load a single meeting-minutes detail view from whichever backend is active. */
 export function loadMinutesDetail(ctx: OrgCtx, id: string): Promise<MinutesDetailView | null> {
-  return airtableEnabled() ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
+  return airtableEnabled(ctx) ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
 }

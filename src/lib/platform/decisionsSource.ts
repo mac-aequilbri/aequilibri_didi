@@ -88,7 +88,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<DecisionView[]> {
 
 /** Load decisions for the page from whichever backend is active. */
 export async function loadDecisions(ctx: OrgCtx): Promise<DecisionView[]> {
-  const rows = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  const rows = await (airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx));
   return scopeByJob(ctx, rows, (d) => d.jobId);
 }
 
@@ -96,7 +96,7 @@ export async function loadDecisions(ctx: OrgCtx): Promise<DecisionView[]> {
  *  those the Airtable field map persists (description, rationale, status,
  *  decidedAt). Null if the record isn't in this org. */
 export async function loadDecisionDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     let r: Record<string, unknown> | null = null;
     try {
       r = await core.get(ctx.orgSlug, "DECISIONS", id);

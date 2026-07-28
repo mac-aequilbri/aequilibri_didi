@@ -40,7 +40,7 @@ async function airtableQuoteLines(
 /** Next QUO-### code for this org (max existing suffix + 1). */
 async function nextQuoteRef(ctx: OrgCtx): Promise<string> {
   let max = 0;
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "QUOTES", { maxRecords: 500 });
     for (const r of rows) {
       const m = /^QUO-(\d+)$/.exec(String(r["Ref_Number"] ?? ""));
@@ -63,7 +63,7 @@ async function nextQuoteRef(ctx: OrgCtx): Promise<string> {
 export async function recalcQuoteTotals(ctx: OrgCtx, quoteId: RecordId): Promise<void> {
   let subtotal: number;
   let gstRate: number;
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const lines = await airtableQuoteLines(ctx, quoteId);
     subtotal = sumMoney(lines.map((l) => num(l["Line_Total"])));
     const quote = await core.get(ctx.orgSlug, "QUOTES", String(quoteId)).catch(() => null);
@@ -270,7 +270,7 @@ export interface QuoteLineInput {
 
 /** Highest existing line sort-order for a quote, in either backend. */
 async function nextLineSortOrder(ctx: OrgCtx, quoteId: RecordId): Promise<number> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const lines = await airtableQuoteLines(ctx, quoteId);
     return lines.reduce((m, l) => Math.max(m, num(l["Sort_Order"])), 0) + 1;
   }
@@ -364,7 +364,7 @@ export async function setQuoteStatus(
     actor: { type: "human", name: userName },
   });
   if (status === "sent") {
-    const linkedJobId = airtableEnabled()
+    const linkedJobId = airtableEnabled(ctx)
       ? (await core.get(ctx.orgSlug, "QUOTES", String(quoteId)).catch(() => null))?.["Job"]
       : (
           await prisma.platConQuote.findFirst({

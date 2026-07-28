@@ -113,5 +113,5 @@ async function fromPostgres(ctx: OrgCtx, scope?: JobScope): Promise<OrgHighlight
 /** Org counts. Pass a viewer `scope` (from resolveJobScope) to filter to that
  *  viewer's jobs; omit it for the org-wide snapshot (org-picker cards). */
 export function loadOrgHighlights(ctx: OrgCtx, scope?: JobScope): Promise<OrgHighlights> {
-  return airtableEnabled() ? fromAirtable(ctx, scope) : fromPostgres(ctx, scope);
+  return airtableEnabled(ctx) ? fromAirtable(ctx, scope) : fromPostgres(ctx, scope);
 }

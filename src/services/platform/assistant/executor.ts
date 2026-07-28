@@ -60,7 +60,7 @@ const QUERYABLE = {
 
 async function runQuery(ctx: OrgCtx, input: Record<string, unknown>): Promise<string> {
   const table = String(input.table ?? "");
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const map = {
       jobs: "JOBS",
       actions: "ISSUES",

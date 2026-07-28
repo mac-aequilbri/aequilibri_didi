@@ -35,7 +35,7 @@ export async function uploadDocument(_prev: CreateFormState, formData: FormData)
     if (file.size > MAX_UPLOAD_BYTES) {
       return { error: "Couldn't save — the file is too large (max 5 MB). Nothing was recorded." };
     }
-    const jobCode = !airtableEnabled() && typeof jobId === "number"
+    const jobCode = !airtableEnabled(ctx) && typeof jobId === "number"
       ? (await prisma.platJob.findFirst({ where: { id: jobId, orgId: ctx.orgId }, select: { code: true } }))?.code
       : undefined;
     try {

@@ -19,7 +19,7 @@ export async function migrateBaseAction(formData: FormData): Promise<void> {
 
   const back = (qs: string) => orgPath(ctx.orgSlug, `/schema-drift?${qs}`);
 
-  if (!airtableEnabled() || !baseId) {
+  if (!airtableEnabled(ctx) || !baseId) {
     redirect(back("status=unavailable"));
   }
 

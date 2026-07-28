@@ -64,7 +64,7 @@ export async function saveStatusMapping(formData: FormData): Promise<void> {
   if (!raw || !isAppStatus(status)) return;
   const code = normStatusKey(raw);
 
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "PLAT_CFG_REFERENCE", { maxRecords: 500 });
     const existing = rows.find(
       (r) => str(r["Ref_Type"]) === STATUS_MAP_REF_TYPE && str(r["Code"]) === code,

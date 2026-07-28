@@ -103,7 +103,7 @@ export async function emitCorrection(
   // Hypothesis link is set later by runHypothesisEngine. The execution-log
   // audit stays Postgres (best effort).
   let correctionId: RecordId;
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rec = await core.create(ctx.orgSlug, "CORRECTIONS", {
       Field_Corrected: input.dimension,
       Root_Cause: input.rootCauseCategory,
@@ -176,7 +176,7 @@ export async function emitCorrection(
   });
   // Audit failure must not lose the correction. Airtable mode audits into the
   // org base's EXECUTION_LOG (Postgres may not exist at all in that world).
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     await core
       .create(ctx.orgSlug, "EXECUTION_LOG", {
         Log_Entry: `correction ${input.dimension}`.slice(0, 200),

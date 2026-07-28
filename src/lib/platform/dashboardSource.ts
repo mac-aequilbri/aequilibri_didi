@@ -254,5 +254,5 @@ async function fromPostgres(ctx: OrgCtx): Promise<DashboardView> {
 }
 
 export function loadDashboard(ctx: OrgCtx): Promise<DashboardView> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+  return airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx);
 }

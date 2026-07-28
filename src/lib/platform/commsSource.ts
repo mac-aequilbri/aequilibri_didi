@@ -34,7 +34,7 @@ function firstLink(v: unknown): string | null {
 
 /** Load the coordination schedule from the active backend (Airtable, or []). */
 export async function loadComms(ctx: OrgCtx): Promise<CommView[]> {
-  if (!airtableEnabled()) return [];
+  if (!airtableEnabled(ctx)) return [];
   const [rows, jobLabels] = await Promise.all([
     core.list(ctx.orgSlug, "COMMS", { maxRecords: 300 }),
     loadJobLabelMap(ctx),
@@ -75,7 +75,7 @@ export async function loadComms(ctx: OrgCtx): Promise<CommView[]> {
  *  Airtable-only, so this is null unless Airtable mode is active. Status is
  *  lower-cased to match the app select vocabulary (writeRecord maps it back). */
 export async function loadCommDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
-  if (!airtableEnabled()) return null;
+  if (!airtableEnabled(ctx)) return null;
   let r: Record<string, unknown> | null = null;
   try {
     r = await core.get(ctx.orgSlug, "COMMS", id);

@@ -252,5 +252,5 @@ async function fromAirtable(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | 
 export async function loadJobContext(ctx: OrgCtx, jobId: RecordId): Promise<JobContext | null> {
   const { currentJobScope, inScope } = await import("./rls");
   if (!inScope(await currentJobScope(ctx), String(jobId))) return null;
-  return airtableEnabled() ? fromAirtable(ctx, jobId) : fromPostgres(ctx, jobId);
+  return airtableEnabled(ctx) ? fromAirtable(ctx, jobId) : fromPostgres(ctx, jobId);
 }

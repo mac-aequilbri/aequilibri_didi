@@ -108,7 +108,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobBudget[]> {
 /** Load budget grouped by job from whichever backend is active — RLS-scoped to
  *  the viewer's assigned jobs (each entry is one job). */
 export async function loadBudgetJobs(ctx: OrgCtx): Promise<JobBudget[]> {
-  const jobs = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  const jobs = await (airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx));
   return scopeByJob(ctx, jobs, (j) => j.id);
 }
 
@@ -116,7 +116,7 @@ export async function loadBudgetJobs(ctx: OrgCtx): Promise<JobBudget[]> {
  *  derived rollup (from confirmed procurement) — shown read-only. Null if the
  *  line isn't in this org. */
 export async function loadBudgetLineDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     let b: Record<string, unknown> | null = null;
     try {
       b = await core.get(ctx.orgSlug, "BUDGET", id);

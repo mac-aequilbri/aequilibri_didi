@@ -50,7 +50,7 @@ export async function GET(
   const p = (path: string) => orgPath(ctx.orgSlug, path);
   const take = PER_TYPE;
   const scope = await currentJobScope(ctx);
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     // VARIATIONS live in CHANGE_LOG now; VENDORS/QUOTES are optional Domain-tier
     // tables absent from Spec 12 construction bases — read tolerantly so a
     // missing table yields no hits rather than 403-ing the whole search.

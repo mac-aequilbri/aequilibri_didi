@@ -42,7 +42,7 @@ export default async function ProjectsPage({
   const filtered = hasActiveFilters(query);
 
   // Decide the pagination strategy from the org's cached matter count.
-  const reg = airtableEnabled() ? await getOrgRegistry(ctx.orgSlug) : null;
+  const reg = airtableEnabled(ctx) ? await getOrgRegistry(ctx.orgSlug) : null;
   const projectCount = reg ? (readMetricsSnapshot(reg.settings)?.projects ?? 0) : 0;
   // A scoped viewer only has a handful of assigned jobs, so skip server
   // pagination (which can't scope) and use the scoped client path.

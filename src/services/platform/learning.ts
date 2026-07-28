@@ -159,7 +159,7 @@ const SETTING_KEYS: Record<keyof LearningSettings, string> = {
 };
 
 async function settingsByKey(ctx: OrgCtx): Promise<Map<string, string>> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "PLAT_CFG_SETTING", { maxRecords: 500 });
     const m = new Map<string, string>();
     for (const r of rows) {
@@ -542,7 +542,7 @@ export async function runHypothesisEngine(
   ctx: OrgCtx,
 ): Promise<{ created: number; updated: number }> {
   const settings = await getLearningSettings(ctx);
-  if (airtableEnabled()) return runHypothesisEngineAirtable(ctx, settings);
+  if (airtableEnabled(ctx)) return runHypothesisEngineAirtable(ctx, settings);
   const rows = await prisma.platCorrection.findMany({
     where: { orgId: ctx.orgId, hypothesisId: null, rootCause: { not: "" } },
   });
@@ -637,7 +637,7 @@ export async function setHypothesisStatus(
   id: RecordId,
   status: "active" | "rejected",
 ): Promise<void> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     await core.update(ctx.orgSlug, "HYPOTHESES", String(id), {
       Status: status,
       Date_Closed: status === "rejected" ? new Date().toISOString() : undefined,
@@ -657,7 +657,7 @@ export async function setHypothesisStatus(
  *  dup tolerated, matching the rest of the Airtable write path). */
 export async function nextRuleCode(ctx: OrgCtx, bump = 0): Promise<string> {
   let max = 0;
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
     max = rows.reduce((m, r) => Math.max(m, Number(S(r["Instance"]).replace(/\D/g, "")) || 0), 0);
   } else {
@@ -685,7 +685,7 @@ export async function createRuleWithCode(
   ctx: OrgCtx,
   data: RuleCreateData,
 ): Promise<{ id: string; ruleCode: string }> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const ruleCode = await nextRuleCode(ctx);
     const map = airtableMapFor("learning_rule")!;
     const rec = await core.create(
@@ -739,7 +739,7 @@ export async function promoteHypothesisToRule(
   id: RecordId,
   kind: "adjustment" | "guidance" = "adjustment",
 ): Promise<string | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rec = await core.get(ctx.orgSlug, "HYPOTHESES", String(id)).catch(() => null);
     if (!rec) return null;
     const h = airHypothesis(rec);
@@ -912,7 +912,7 @@ function ruleFromAirtable(r: Record<string, unknown> & { id: string }): RuleRow 
 
 export async function getActiveRules(ctx: OrgCtx): Promise<RuleRow[]> {
   // Spec 12 session protocol: Active rules sorted by Priority descending.
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
     return rows
       .map(ruleFromAirtable)
@@ -999,7 +999,7 @@ export async function applyRules(
     const newAutoApply =
       newConfidence >= settings.autoApplyConfidence &&
       r.timesTriggered + 1 >= settings.autoApplyTriggers;
-    if (airtableEnabled()) {
+    if (airtableEnabled(ctx)) {
       await core.update(ctx.orgSlug, "LEARNING_RULES", r.id, {
         Times_Triggered: r.timesTriggered + 1,
         Last_Triggered: new Date().toISOString().slice(0, 10),
@@ -1034,7 +1034,7 @@ export async function recordRuleOverride(
   ctx: OrgCtx,
   ruleCode: string,
 ): Promise<{ confidence: number; underReview: boolean } | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
     const row = rows.find((r) => S(r["Instance"]) === ruleCode);
     if (!row) return null;
@@ -1096,7 +1096,7 @@ export async function setRuleOverrideLevel(
   ruleId: string,
   level: OverrideLevel,
 ): Promise<void> {
-  if (!airtableEnabled()) return;
+  if (!airtableEnabled(ctx)) return;
   try {
     await core.update(ctx.orgSlug, "LEARNING_RULES", ruleId, {
       Override_Level: overrideLevelOption(level),
@@ -1111,7 +1111,7 @@ export async function setRuleOverrideLevel(
  *  applyRules' context matching — an empty Trigger_Context matches everything
  *  there, which would fire unrelated rules. Airtable-only (cascades are). */
 export async function markRuleApplied(ctx: OrgCtx, rule: RuleRow): Promise<void> {
-  if (!airtableEnabled()) return;
+  if (!airtableEnabled(ctx)) return;
   await core.update(ctx.orgSlug, "LEARNING_RULES", rule.id, {
     Times_Triggered: rule.timesTriggered + 1,
     Last_Triggered: new Date().toISOString().slice(0, 10),
@@ -1155,7 +1155,7 @@ export async function learningPromptText(ctx: OrgCtx): Promise<string> {
 
 /** Corrections with a variance, from the active backend. */
 async function snapshotCorrections(ctx: OrgCtx): Promise<{ variancePct: number | null }[]> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "CORRECTIONS", { maxRecords: 1000 });
     return rows
       .map((r) => ({
@@ -1171,7 +1171,7 @@ async function snapshotCorrections(ctx: OrgCtx): Promise<{ variancePct: number |
 
 /** Count of pending hypotheses, from the active backend. */
 async function snapshotPendingHyp(ctx: OrgCtx): Promise<number> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "HYPOTHESES", { maxRecords: 500 });
     return rows.filter((r) => (S(r["Status"]) || "pending") === "pending").length;
   }
@@ -1180,7 +1180,7 @@ async function snapshotPendingHyp(ctx: OrgCtx): Promise<number> {
 
 /** Total + completed job counts from the active backend. */
 async function snapshotJobCounts(ctx: OrgCtx): Promise<{ total: number; completed: number }> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const jobs = await core.list(ctx.orgSlug, "JOBS", { maxRecords: 1000 });
     const done = new Set(["completed", "archived"]);
     return { total: jobs.length, completed: jobs.filter((j) => done.has(S(j["Status"]))).length };
@@ -1194,7 +1194,7 @@ async function snapshotJobCounts(ctx: OrgCtx): Promise<{ total: number; complete
 
 /** Average confidence of the most recent snapshot (for the trajectory delta). */
 async function snapshotPrevAvg(ctx: OrgCtx): Promise<number | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const recs = await core.list(ctx.orgSlug, "INTELLIGENCE_SNAPSHOT", { maxRecords: 50 });
     if (!recs.length) return null;
     const latest = recs.sort((a, b) => S(b["Snapshot_Date"]).localeCompare(S(a["Snapshot_Date"])))[0];
@@ -1254,7 +1254,7 @@ export async function snapshotIntelligence(ctx: OrgCtx): Promise<number> {
     desc: r.description,
   }));
 
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const day = new Date().toISOString().slice(0, 10);
     // Rich app metrics ride in Accuracy_Summary JSON so learningSource can
     // recover accuracy/autoApply/avgConfidence the canonical columns lack.

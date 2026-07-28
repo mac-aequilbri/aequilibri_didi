@@ -101,7 +101,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<JobCashflow[]> {
 /** Load cashflow grouped by job from whichever backend is active — RLS-scoped to
  *  the viewer's assigned jobs (each entry is one job). */
 export async function loadCashflowJobs(ctx: OrgCtx): Promise<JobCashflow[]> {
-  const jobs = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  const jobs = await (airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx));
   return scopeByJob(ctx, jobs, (j) => j.id);
 }
 
@@ -110,7 +110,7 @@ export async function loadCashflowJobs(ctx: OrgCtx): Promise<JobCashflow[]> {
  *  period row into synthetic non-editable txns, so editing is Airtable-only here
  *  (null otherwise). */
 export async function loadCashflowDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
-  if (!airtableEnabled()) return null;
+  if (!airtableEnabled(ctx)) return null;
   let c: Record<string, unknown> | null = null;
   try {
     c = await core.get(ctx.orgSlug, "CASHFLOWS", id);

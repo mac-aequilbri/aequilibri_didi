@@ -306,12 +306,12 @@ async function fromAirtable(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData
 
 /** Load actions + headline metrics from whichever backend is active. */
 export function loadActions(ctx: OrgCtx, query?: ListQuery): Promise<ActionsData> {
-  return airtableEnabled() ? fromAirtable(ctx, query) : fromPostgres(ctx, query);
+  return airtableEnabled(ctx) ? fromAirtable(ctx, query) : fromPostgres(ctx, query);
 }
 
 /** Load a single action for the edit page. Null if it doesn't exist in this org. */
 export async function loadAction(ctx: OrgCtx, id: string): Promise<ActionDetail | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     let r: Record<string, unknown> | null = null;
     try {
       r = await core.get(ctx.orgSlug, "ISSUES", id);

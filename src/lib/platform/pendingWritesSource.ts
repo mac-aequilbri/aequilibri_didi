@@ -91,7 +91,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<PendingWriteView[]> {
 }
 
 export function loadPendingWrites(ctx: OrgCtx): Promise<PendingWriteView[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+  return airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx);
 }
 
 /** Server-side filter for the approval queue's "awaiting decision" rows. Every
@@ -105,7 +105,7 @@ export async function loadProposedPendingCount(ctx: OrgCtx): Promise<number> {
   // RLS: count only proposals on the viewer's assigned jobs (org-global rows —
   // no job — always count). No-op for whole-tenant viewers.
   const scope = await currentJobScope(ctx);
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     const ids = scope.mode === "some" ? [...scope.jobIds].map(Number).filter((n) => Number.isFinite(n)) : null;
     const jobW = ids ? { jobId: { in: ids } } : scope.mode === "none" ? { jobId: -1 } : {};
     return prisma.platPendingWrite.count({ where: { orgId: ctx.orgId, status: "proposed", ...jobW } });

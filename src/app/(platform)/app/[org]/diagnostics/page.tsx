@@ -32,14 +32,21 @@ const ROWS: { label: string; air: CoreTableName; pg: (orgId: number) => Promise<
 ];
 
 const POSTGRES_BY_DESIGN = [
-  "Organisation identity + team members (auth & tenancy)",
-  "Execution-log audit trail + pending-write approval queue",
-  "Assessment drafts (no ASSESSMENTS table yet — P3)",
-  "Intelligence-snapshot history (local metric log)",
+  "Failed-write audit rows + pending-write claim registry (always Postgres, even in Airtable mode)",
+  "UC1 roofing subsystem (direct Prisma, not on the migration path)",
+  "Client-portal tokens + accounting connections",
+];
+
+// The inverse asymmetry: these only work with AIRTABLE_MIGRATION on.
+const AIRTABLE_ONLY = [
+  "CASHFLOWS writes (the Spec-12 ledger has no Postgres model — they throw in Postgres mode)",
+  "Control plane: assignments, connections, outbox, template/job/report catalogs",
 ];
 
 async function airtableCount(orgSlug: string, table: CoreTableName): Promise<number | string> {
   try {
+    // maxRecords >= UNCAP_THRESHOLD means "follow pagination to the end", so
+    // this is a true full count, not a 1000-row cap.
     const rows = await core.list(orgSlug, table, { maxRecords: 1000 });
     return rows.length;
   } catch (err) {
@@ -52,7 +59,8 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
   const ctx = await requireOrgCtx(org);
   await requireAdmin(ctx);
 
-  const on = airtableEnabled();
+  const on = airtableEnabled(ctx); // per-org: honours features.data_backend_postgres
+  const globalOn = airtableEnabled();
   let baseId = "—";
   if (on) {
     baseId = await resolveBaseId(ctx.orgSlug).catch((e) => `unresolved: ${e instanceof Error ? e.message : String(e)}`);
@@ -79,9 +87,13 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
 
       <section className="ae-card p-5 mb-6 space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="text-neutral-600">AIRTABLE_MIGRATION</span>
+          <span className="text-neutral-600">Data backend (this org)</span>
           <Chip variant={on ? "success" : "neutral"} className="font-mono">
-            {on ? "true — reads & writes use Airtable" : "off — everything uses Postgres"}
+            {on
+              ? "airtable — reads & writes use this org's base"
+              : globalOn
+                ? "postgres — per-org data_backend_postgres override"
+                : "postgres — AIRTABLE_MIGRATION off globally"}
           </Chip>
         </div>
         <div className="flex justify-between">
@@ -145,13 +157,26 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ or
         </p>
       </section>
 
-      <section className="ae-card p-5 text-sm">
+      <section className="ae-card p-5 mb-6 text-sm">
         <h2 className="text-base font-semibold mb-2">Postgres by design (not migrated)</h2>
         <ul className="list-disc pl-5 space-y-1 text-neutral-600">
           {POSTGRES_BY_DESIGN.map((x) => (
             <li key={x}>{x}</li>
           ))}
         </ul>
+      </section>
+
+      <section className="ae-card p-5 text-sm">
+        <h2 className="text-base font-semibold mb-2">Airtable-only (unavailable when the flag is off)</h2>
+        <ul className="list-disc pl-5 space-y-1 text-neutral-600">
+          {AIRTABLE_ONLY.map((x) => (
+            <li key={x}>{x}</li>
+          ))}
+        </ul>
+        <p className="text-xs text-neutral-500 mt-3">
+          The flag is a process-wide, one-way migration lever — flipping it moves every org at
+          once and does not migrate existing rows. See docs/airtable-postgres-switch-audit.md.
+        </p>
       </section>
     </div>
   );

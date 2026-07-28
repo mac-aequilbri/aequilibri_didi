@@ -103,13 +103,13 @@ async function fromAirtable(ctx: OrgCtx): Promise<RiskView[]> {
 
 /** Load the risk register from whichever backend is active. */
 export async function loadRisks(ctx: OrgCtx): Promise<RiskView[]> {
-  const rows = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  const rows = await (airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx));
   return scopeByJob(ctx, rows, (r) => r.jobId);
 }
 
 /** Form-ready values for a single risk's edit page. Null if not in this org. */
 export async function loadRiskDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     let r: Record<string, unknown> | null = null;
     try {
       r = await core.get(ctx.orgSlug, "RISKS", id);

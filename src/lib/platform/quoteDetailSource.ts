@@ -178,5 +178,5 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<QuoteDetailView | 
 
 /** Load a single quote's detail view from whichever backend is active. */
 export function loadQuoteDetail(ctx: OrgCtx, id: string): Promise<QuoteDetailView | null> {
-  return airtableEnabled() ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
+  return airtableEnabled(ctx) ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
 }

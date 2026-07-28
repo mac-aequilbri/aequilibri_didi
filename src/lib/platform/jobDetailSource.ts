@@ -237,5 +237,5 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<JobDetailView | nu
 
 /** Load a single job's detail view from whichever backend is active. */
 export function loadJobDetail(ctx: OrgCtx, id: string): Promise<JobDetailView | null> {
-  return airtableEnabled() ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
+  return airtableEnabled(ctx) ? fromAirtable(ctx, id) : fromPostgres(ctx, id);
 }

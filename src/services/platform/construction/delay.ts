@@ -80,7 +80,7 @@ export async function analyzeDelayCascade(
     }
   }
 
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     await core.create(ctx.orgSlug, "EXECUTION_LOG", {
       Log_Entry: "delay_cascade analysis",
       Action_Type: "generate",

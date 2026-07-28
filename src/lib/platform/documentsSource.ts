@@ -235,16 +235,16 @@ async function fromAirtableDetail(ctx: OrgCtx, id: string): Promise<DocumentDeta
 }
 
 export async function loadDocuments(ctx: OrgCtx): Promise<DocumentView[]> {
-  const rows = await (airtableEnabled() ? fromAirtableList(ctx) : fromPostgresList(ctx));
+  const rows = await (airtableEnabled(ctx) ? fromAirtableList(ctx) : fromPostgresList(ctx));
   return scopeByJob(ctx, rows, (d) => d.jobId);
 }
 
 export function loadDocumentDetail(ctx: OrgCtx, id: string): Promise<DocumentDetailView | null> {
-  return airtableEnabled() ? fromAirtableDetail(ctx, id) : fromPostgresDetail(ctx, id);
+  return airtableEnabled(ctx) ? fromAirtableDetail(ctx, id) : fromPostgresDetail(ctx, id);
 }
 
 export async function findAirtableDocumentByJob(ctx: OrgCtx, jobId: string): Promise<DocumentView[]> {
-  if (!airtableEnabled()) return [];
+  if (!airtableEnabled(ctx)) return [];
   const rows = await core.list(ctx.orgSlug, "DOCUMENTS", { maxRecords: 500 });
   return rows
     .filter((r) => linksTo(r["Job"], jobId))

@@ -52,7 +52,7 @@ export async function jobContextBlock(
   ctx: OrgCtx,
   opts: { jobId?: RecordId; role?: string },
 ): Promise<string> {
-  if (!airtableEnabled()) return "";
+  if (!airtableEnabled(ctx)) return "";
   const fin = financeVisible(opts.role ?? "broker");
   const key = `${ctx.orgSlug}:${opts.jobId ?? "-"}:${fin ? 1 : 0}`;
   const hit = cache.get(key);

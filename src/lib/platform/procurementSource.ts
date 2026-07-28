@@ -164,7 +164,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<ProcurementView[]> {
 
 /** Load procurement orders from whichever backend is active. */
 export async function loadProcurement(ctx: OrgCtx): Promise<ProcurementView[]> {
-  const rows = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  const rows = await (airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx));
   return scopeByJob(ctx, rows, (o) => o.jobId);
 }
 
@@ -173,7 +173,7 @@ export async function loadProcurement(ctx: OrgCtx): Promise<ProcurementView[]> {
  *  Fields are limited to what the Airtable field map persists (Supplier /
  *  Budget_Category links and the Total_Cost formula are not editable here). */
 export async function loadProcurementDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     let r: Record<string, unknown> | null = null;
     try {
       r = await core.get(ctx.orgSlug, "PROCUREMENT", id);

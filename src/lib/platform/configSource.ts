@@ -54,7 +54,7 @@ async function referencesFromPostgres(ctx: OrgCtx, type: string): Promise<RefOpt
 
 /** Reference values of a given type (e.g. "budget_category") for a picker. */
 export async function loadReferenceOptions(ctx: OrgCtx, type: string): Promise<RefOption[]> {
-  if (!airtableEnabled()) return referencesFromPostgres(ctx, type);
+  if (!airtableEnabled(ctx)) return referencesFromPostgres(ctx, type);
   const rows = await core.list(ctx.orgSlug, "PLAT_CFG_REFERENCE", { maxRecords: 500 });
   const out = rows
     .filter((r) => str(r["Ref_Type"]) === type && r["Is_Active"] !== false)
@@ -81,7 +81,7 @@ async function vendorsFromPostgres(ctx: OrgCtx): Promise<RefOption[]> {
  *  (PLAT_CFG_* don't need this: ensureAppRuntimeTables creates them on every
  *  onboarding path, supplied bases included.) */
 export async function loadVendorOptions(ctx: OrgCtx): Promise<RefOption[]> {
-  if (!airtableEnabled()) return vendorsFromPostgres(ctx);
+  if (!airtableEnabled(ctx)) return vendorsFromPostgres(ctx);
   const rows = await listOptional(ctx.orgSlug, "VENDORS", { maxRecords: 500 });
   const out = rows
     .filter((v) => v["Is_Active"] !== false)
@@ -108,7 +108,7 @@ async function statusMapFromPostgres(ctx: OrgCtx): Promise<Map<string, AppStatus
 }
 
 export async function loadActionStatusMap(ctx: OrgCtx): Promise<Map<string, AppStatus>> {
-  if (!airtableEnabled()) return statusMapFromPostgres(ctx);
+  if (!airtableEnabled(ctx)) return statusMapFromPostgres(ctx);
   const rows = await core.list(ctx.orgSlug, "PLAT_CFG_REFERENCE", { maxRecords: 500 });
   const map = new Map<string, AppStatus>();
   for (const r of rows) {

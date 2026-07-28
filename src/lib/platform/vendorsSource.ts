@@ -56,12 +56,12 @@ async function fromAirtable(ctx: OrgCtx): Promise<VendorView[]> {
 
 /** Load the vendor registry from whichever backend is active. */
 export function loadVendors(ctx: OrgCtx): Promise<VendorView[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+  return airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx);
 }
 
 /** Form-ready values for a single vendor's edit page. Null if not in this org. */
 export async function loadVendorDetail(ctx: OrgCtx, id: string): Promise<EditorValues | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     let r: Record<string, unknown> | null = null;
     try {
       r = await core.get(ctx.orgSlug, "VENDORS", id);

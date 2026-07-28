@@ -237,7 +237,7 @@ export async function loadJobsList(
   ctx: OrgCtx,
   viewer?: { email: string; role: string },
 ): Promise<JobListView[]> {
-  const jobs = await (airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx));
+  const jobs = await (airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx));
   if (!viewer) return jobs;
   // Canonical scope: exempt → all; otherwise assigned jobs ∪ the org's General
   // project, honouring the fail-open/closed enforce gate (see resolveJobScope).

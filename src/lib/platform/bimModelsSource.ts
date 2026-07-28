@@ -69,5 +69,5 @@ async function fromAirtable(ctx: OrgCtx, id: string): Promise<JobBimModelsView |
 }
 
 export function loadJobBimModels(ctx: OrgCtx, jobId: string): Promise<JobBimModelsView | null> {
-  return airtableEnabled() ? fromAirtable(ctx, jobId) : fromPostgres(ctx, jobId);
+  return airtableEnabled(ctx) ? fromAirtable(ctx, jobId) : fromPostgres(ctx, jobId);
 }

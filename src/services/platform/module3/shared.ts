@@ -26,7 +26,7 @@ export async function loadCapabilityDocuments(
 ): Promise<CapabilityDocument[]> {
   if (docIds.length === 0) return [];
 
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const docs = await Promise.all(
       docIds
         .map((id) => String(id))

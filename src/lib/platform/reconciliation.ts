@@ -82,7 +82,7 @@ export async function reconcileAirtableWrite(
   recordId: number | string | undefined,
   actor: Actor,
 ): Promise<FieldMismatch[]> {
-  if (!airtableEnabled() || recordId == null || typeof recordId !== "string") return [];
+  if (!airtableEnabled(ctx) || recordId == null || typeof recordId !== "string") return [];
   const map = airtableMapFor(table);
   if (!map) return [];
 

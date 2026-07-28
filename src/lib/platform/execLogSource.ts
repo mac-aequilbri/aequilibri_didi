@@ -67,5 +67,5 @@ async function fromAirtable(ctx: OrgCtx): Promise<LogView[]> {
 
 /** Load the execution-log history from whichever backend is active. */
 export function loadExecLogHistory(ctx: OrgCtx): Promise<LogView[]> {
-  return airtableEnabled() ? fromAirtable(ctx) : fromPostgres(ctx);
+  return airtableEnabled(ctx) ? fromAirtable(ctx) : fromPostgres(ctx);
 }

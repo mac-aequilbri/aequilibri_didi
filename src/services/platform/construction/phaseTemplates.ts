@@ -31,7 +31,7 @@ export async function derivePhaseTemplate(
   ctx: OrgCtx,
   opts: { engagementType: string; category?: string },
 ): Promise<PhaseTemplate | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     // Airtable JOBS does not carry engagementType/category metadata. Keep the
     // same-category safeguard (return null) and otherwise derive from prior
     // saved phases across jobs.

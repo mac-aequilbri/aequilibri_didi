@@ -44,7 +44,7 @@ export function parseSuggestion(json: string): EvidenceSuggestion | null {
 }
 
 async function getPhase(ctx: OrgCtx, phaseId: RecordId) {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const phaseRecId = String(phaseId);
     if (!phaseRecId.startsWith("rec")) return null;
     const phase = await core.get(ctx.orgSlug, "PHASES", phaseRecId).catch(() => null);
@@ -113,7 +113,7 @@ export async function assessPhaseEvidence(
   const phase = await getPhase(ctx, phaseId);
   if (!phase) return { ok: false, demoMode: false, error: "Phase not found" };
 
-  const evidence = airtableEnabled()
+  const evidence = airtableEnabled(ctx)
     ? await core.list(ctx.orgSlug, "PHASE_EVIDENCE", { maxRecords: 500 }).then(async (rows) =>
         Promise.all(
           rows
@@ -165,7 +165,7 @@ export async function assessPhaseEvidence(
     }
   }
 
-  const siblings = airtableEnabled()
+  const siblings = airtableEnabled(ctx)
     ? await core.list(ctx.orgSlug, "PHASES", { maxRecords: 1000 }).then((rows) =>
         rows
           .filter(
@@ -243,7 +243,7 @@ export async function assessPhaseEvidence(
     actor: { type: "ai", name: "Phase Evidence Review" },
     requireApproval: false, // annotation only — completionPct is untouched
   });
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     await prisma.platExecutionLog.updateMany({
       where: { orgId: ctx.orgId, targetTable: "plat_con_phase", targetId: Number(phase.id), promptVersion: "" },
       data: { promptVersion: version },

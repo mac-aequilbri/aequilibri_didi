@@ -43,8 +43,29 @@ export function templateBaseIdForVertical(vertical: string): string {
   return id;
 }
 
-/** Feature flag. Nothing in this layer activates unless explicitly enabled. */
-export function airtableEnabled(): boolean {
+/** Feature flag. Nothing in this layer activates unless explicitly enabled.
+ *
+ *  Scope honesty (see docs/airtable-postgres-switch-audit.md): this is a
+ *  PROCESS-WIDE, ONE-WAY migration lever, not a per-org backend selector.
+ *  Flipping it moves every org at once, and the two backends are not
+ *  feature-equivalent — off: COMMS/PLAN/CASHFLOWS writes throw (no Postgres
+ *  model) and the control plane is unavailable; on: Postgres remains a hard
+ *  dependency (failure audit rows, pending-write claims, UC1). There is no
+ *  data migration attached to the flag — flipping it strands existing rows
+ *  on the previous backend (scripts/migration/ moves them). src/instrumentation.ts
+ *  logs these asymmetries at boot.
+ *
+ *  Phase D per-org override: pass the org context wherever org data is being
+ *  read or written, and the org's `data_backend_postgres` feature (org registry
+ *  Settings JSON → {"features":{"data_backend_postgres":true}}) opts THAT org
+ *  back onto Postgres while the rest of the platform stays on Airtable — the
+ *  per-org escape hatch for staged migration in either direction. Call sites
+ *  without an org in scope (control plane, health, boot) stay on the global
+ *  env decision. */
+export function airtableEnabled(
+  ctx?: { config?: { features?: Record<string, boolean> } } | null,
+): boolean {
+  if (ctx?.config?.features?.["data_backend_postgres"]) return false;
   return process.env.AIRTABLE_MIGRATION === "true";
 }
 

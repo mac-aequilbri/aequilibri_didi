@@ -21,10 +21,10 @@ export default async function EditProjectPage({
   if (!detail) notFound();
   // RLS: can't edit a project you're not assigned to (matches the view page).
   if (!inScope(await currentJobScope(ctx), detail.id)) notFound();
-  const pgJob = !airtableEnabled()
+  const pgJob = !airtableEnabled(ctx)
     ? await prisma.platJob.findFirst({ where: { id: Number(id), orgId: ctx.orgId } })
     : null;
-  const airJob = airtableEnabled() ? await core.get(ctx.orgSlug, "JOBS", detail.id).catch(() => null) : null;
+  const airJob = airtableEnabled(ctx) ? await core.get(ctx.orgSlug, "JOBS", detail.id).catch(() => null) : null;
   const job = {
     id: detail.id,
     code: detail.code,

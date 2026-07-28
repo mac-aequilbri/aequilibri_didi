@@ -17,7 +17,7 @@ import { toNum } from "@/lib/format";
  *  globally over VARIATIONS — simpler than reading each row's Job link, and the
  *  ref is only a display label (the Job link is the real association). */
 async function nextRefNumber(ctx: OrgCtx, jobId: RecordId): Promise<string> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     // Spec 12: variations are CHANGE_LOG rows (Change_Type="Variation").
     const rows = await core.list(ctx.orgSlug, "CHANGE_LOG", {
       maxRecords: 500,
@@ -137,7 +137,7 @@ export async function approveVariation(
   // Airtable mode: read priors from the base, write the approval. The
   // correction-capture learning loop stays Postgres-only (it threads numeric
   // entity ids and writes to the corrections pipeline).
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const vo = await core.get(ctx.orgSlug, "CHANGE_LOG", String(id)).catch(() => null);
     const finalCost = edits.costImpact ?? (vo ? toNum(vo["Impact_Cost"] as number) : 0);
     const finalDays = edits.timeImpactDays ?? (vo ? Number(vo["Impact_Schedule_Days"]) || 0 : 0);

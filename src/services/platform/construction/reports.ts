@@ -241,7 +241,7 @@ export async function generateReport(
 
   // Airtable (Spec 12): the report is a DOCUMENTS row — body in Text_Content,
   // lifecycle in AI_Analysis.module8. Doc_Status stays a neutral "Active".
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const stored = await getStorer()
       .put({ orgSlug: ctx.orgSlug, docType: REPORT_DOC_TYPE, name: `${title}.md` }, Buffer.from(content, "utf8"))
       .catch(() => null);
@@ -346,7 +346,7 @@ export async function generateCustomReport(
     recordId?: RecordId;
   },
 ): Promise<{ id?: RecordId; demoMode: boolean }> {
-  if (!airtableEnabled()) throw new Error("Custom reports require the Airtable backend.");
+  if (!airtableEnabled(ctx)) throw new Error("Custom reports require the Airtable backend.");
   const job = await loadJobContext(ctx, args.jobId);
   if (!job) throw new Error("Job not found");
 
@@ -407,7 +407,7 @@ export function generateWeeklyReport(
 }
 
 export async function approveReport(ctx: OrgCtx, userName: string, id: RecordId): Promise<void> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const doc = await core.get(ctx.orgSlug, "DOCUMENTS", String(id)).catch(() => null);
     await writeRecord(ctx, {
       table: "document",
@@ -452,7 +452,7 @@ export async function approveReport(ctx: OrgCtx, userName: string, id: RecordId)
 }
 
 export async function markReportSent(ctx: OrgCtx, userName: string, id: RecordId): Promise<void> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const doc = await core.get(ctx.orgSlug, "DOCUMENTS", String(id)).catch(() => null);
     await writeRecord(ctx, {
       table: "document",

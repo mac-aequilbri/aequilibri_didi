@@ -127,7 +127,7 @@ async function resolveJobContext(
   jobId?: RecordId,
   fallbackTitle?: string,
 ): Promise<{ jobId?: RecordId; jobCode?: string }> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     if (jobId != null) return { jobId, jobCode: undefined };
     const jobs = await core.list(ctx.orgSlug, "JOBS", { maxRecords: 2 });
     return jobs.length === 1 ? { jobId: jobs[0].id, jobCode: undefined } : {};
@@ -189,7 +189,7 @@ function brandedSnapshotText(input: {
 }
 
 async function existingDocuments(ctx: OrgCtx, jobId?: RecordId): Promise<ExistingDocumentLite[]> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "DOCUMENTS", { maxRecords: 500 });
     return rows
       .filter((r) => {
@@ -365,7 +365,7 @@ async function createDocumentRecord(
       mimeType: input.mimeType || "",
       sizeBytes: input.sizeBytes || 0,
       version: canonical.version,
-      parentDocumentId: !airtableEnabled() && typeof prior?.id === "number" ? prior.id : undefined,
+      parentDocumentId: !airtableEnabled(ctx) && typeof prior?.id === "number" ? prior.id : undefined,
       textContent: input.textContent,
       aiSummary:
         routeSuggestions.length > 0
@@ -670,7 +670,7 @@ export interface InboundMessage {
  *  (the DOCUMENTS `Drive_URL` field in Airtable), so a match means the whole
  *  message — body + attachments — was already processed. */
 async function findByExternalId(ctx: OrgCtx, storageRef: string): Promise<boolean> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const recs = await core
       .list(ctx.orgSlug, "DOCUMENTS", {
         filterByFormula: `{Drive_URL}='${formulaSafe(storageRef)}'`,
@@ -794,7 +794,7 @@ export async function analyzeDocument(
   userName: string,
   id: RecordId,
 ): Promise<{ ok: boolean; demoMode: boolean; error?: string }> {
-  const doc = airtableEnabled()
+  const doc = airtableEnabled(ctx)
     ? await core.get(ctx.orgSlug, "DOCUMENTS", String(id)).catch(() => null)
     : await prisma.platDocument.findFirst({ where: { id: Number(id), orgId: ctx.orgId } });
   if (!doc) return { ok: false, demoMode: false, error: "Document not found" };
@@ -852,7 +852,7 @@ export async function analyzeDocument(
     requireApproval: false,
   });
 
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     await prisma.platExecutionLog.updateMany({
       where: { orgId: ctx.orgId, targetTable: "plat_core_document", targetId: Number(row.id), promptVersion: "" },
       data: { promptVersion: version },

@@ -112,7 +112,7 @@ export async function loadNavCounts(ctx: OrgCtx): Promise<NavCounts> {
     if (scope.mode !== "all") {
       return toCounts({ ...(await loadOrgHighlights(ctx, scope)), at: "" });
     }
-    return await (airtableEnabled()
+    return await (airtableEnabled(ctx)
       ? fromAirtable(ctx)
       : fromPostgres(ctx, ctx.config.features));
   } catch (err) {

@@ -74,7 +74,7 @@ export async function updateRecordDetail(
     return { ok: false, error: "The form spec could not be read — reload and try again." };
   }
 
-  const air = airtableEnabled();
+  const air = airtableEnabled(ctx);
   const data: Record<string, unknown> = {};
   for (const f of spec) {
     if (f.readOnly) continue;

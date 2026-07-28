@@ -96,7 +96,7 @@ const cache = new TtlCache<ConfigRow[]>(10 * 60_000);
 const S = (v: unknown): string => (typeof v === "string" ? v : "");
 
 async function loadConfigRows(ctx: OrgCtx): Promise<ConfigRow[]> {
-  if (!airtableEnabled()) return [];
+  if (!airtableEnabled(ctx)) return [];
   return cache.get(ctx.orgSlug, async () => {
     try {
       const rows = await core.list(ctx.orgSlug, "ENGAGEMENT_TYPE_CONFIG", { maxRecords: 50 });

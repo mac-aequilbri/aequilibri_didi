@@ -95,7 +95,7 @@ export async function processMeetingMinutes(
   const status = res.demo_mode ? "raw" : "processed";
 
   // Airtable (Spec 12): minutes are a DOCUMENTS row.
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const result = await writeRecord(ctx, {
       table: "document",
       op: "create",
@@ -144,7 +144,7 @@ export async function confirmMeetingMinutes(
   userName: string,
   id: RecordId,
 ): Promise<number> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const doc = await core.get(ctx.orgSlug, "DOCUMENTS", String(id)).catch(() => null);
     const m = doc ? parseMinutesModule(doc["AI_Analysis"]) : null;
     if (!m || m.status === "confirmed") return 0;

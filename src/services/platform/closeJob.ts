@@ -69,7 +69,7 @@ export function computeJobCloseDeltas(args: {
  *  the job. Best-effort throughout. */
 export async function handleJobCompletion(ctx: OrgCtx, write: CascadeWrite): Promise<void> {
   try {
-    if (!airtableEnabled()) return;
+    if (!airtableEnabled(ctx)) return;
     if (write.table !== "job" || write.op !== "update") return;
     if (!CLOSED.has(S(write.data.status).toLowerCase())) return;
     const jobId = typeof write.recordId === "string" ? write.recordId : null;

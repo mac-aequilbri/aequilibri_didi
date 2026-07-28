@@ -16,7 +16,7 @@ export default async function DelayCascadePage({ params }: { params: Promise<{ o
   const ctx = await requireOrgCtx((await params).org);
   const [jobs, analyses] = await Promise.all([
     loadJobOptions(ctx),
-    airtableEnabled()
+    airtableEnabled(ctx)
       ? core.list(ctx.orgSlug, "EXECUTION_LOG", { maxRecords: 100 })
       : prisma.platExecutionLog.findMany({
           where: { orgId: ctx.orgId, targetTable: "delay_cascade" },
@@ -32,7 +32,7 @@ export default async function DelayCascadePage({ params }: { params: Promise<{ o
       return null;
     }
   };
-  const logs: { id: string | number; payload: string; result: string }[] = airtableEnabled()
+  const logs: { id: string | number; payload: string; result: string }[] = airtableEnabled(ctx)
     ? (analyses as Array<{ id: string; [k: string]: unknown }>)
         .filter((r) => String(r["Tables_Affected"] ?? "") === "delay_cascade")
         .slice(0, 5)

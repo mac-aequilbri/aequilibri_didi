@@ -102,7 +102,7 @@ export async function logIntegrationAudit(
 ): Promise<void> {
   const status = entry.status ?? "executed";
   try {
-    if (airtableEnabled()) {
+    if (airtableEnabled(ctx)) {
       await core.create(ctx.orgSlug, "EXECUTION_LOG", {
         Log_Entry: entry.label.slice(0, 200),
         Action_Type: "integration",

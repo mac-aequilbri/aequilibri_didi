@@ -311,7 +311,7 @@ export async function runConstructionAssessment(
     createdBy: userName,
   };
   let assessmentId: RecordId;
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const map = airtableMapFor("assessment")!;
     const rec = await core.create(ctx.orgSlug, map.table, toFields(map, data, "create"));
     assessmentId = rec.id;
@@ -349,7 +349,7 @@ async function readAssessment(
   ctx: OrgCtx,
   assessmentId: RecordId,
 ): Promise<{ stored: StoredAssessment; status: string } | null> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rec = await core.get(ctx.orgSlug, "ASSESSMENTS", String(assessmentId)).catch(() => null);
     if (!rec) return null;
     const raw = typeof rec["Result"] === "string" ? rec["Result"] : "";
@@ -377,7 +377,7 @@ async function updateAssessmentResult(
   assessmentId: RecordId,
   stored: StoredAssessment,
 ): Promise<void> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     await core.update(ctx.orgSlug, "ASSESSMENTS", String(assessmentId), {
       Result: JSON.stringify(stored),
     });
@@ -404,7 +404,7 @@ export async function setAssessmentStatus(
   assessmentId: RecordId,
   status: string,
 ): Promise<void> {
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const map = airtableMapFor("assessment")!;
     await core.update(ctx.orgSlug, map.table, String(assessmentId), toFields(map, { status }, "update"));
     return;
@@ -478,7 +478,7 @@ async function createJobWithCode(
   // Airtable JOBS has no Code field (the map drops it), so the code is only
   // meaningful in Postgres mode — skip the read otherwise (no Postgres in prod).
   let max = 0;
-  if (!airtableEnabled()) {
+  if (!airtableEnabled(ctx)) {
     const jobs = await prisma.platJob.findMany({
       where: { orgId: ctx.orgId },
       select: { code: true },
@@ -605,7 +605,7 @@ export async function materializeProjectFromAssessment(
     });
   }
 
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const map = airtableMapFor("assessment")!;
     await core.update(
       ctx.orgSlug,

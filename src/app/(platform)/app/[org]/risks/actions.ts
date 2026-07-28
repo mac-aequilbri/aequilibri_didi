@@ -67,7 +67,7 @@ export async function escalateHighRisks(formData: FormData): Promise<void> {
       actor: { type: "human", name: user.name },
     });
 
-  if (airtableEnabled()) {
+  if (airtableEnabled(ctx)) {
     const rows = await core.list(ctx.orgSlug, "RISKS", { maxRecords: 500 });
     for (const r of rows) {
       if (String(r["Status"] ?? "") !== "open" || r["Escalated_At"]) continue;

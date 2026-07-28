@@ -147,7 +147,7 @@ export const CASCADE_RULE_SEEDS = CASCADE_RULES.map((r) => ({
  *  primary write. Wired into writeRecord + executeProposal (recordWriter). */
 export async function runCascades(ctx: OrgCtx, write: CascadeWrite): Promise<void> {
   try {
-    if (!airtableEnabled()) return;
+    if (!airtableEnabled(ctx)) return;
     if (write.actor.type === "system") return; // no cascade-on-cascade
     if (write.op === "delete") return;
     const matches = CASCADE_RULES.filter(
@@ -335,7 +335,7 @@ async function recordAdvisory(ctx: OrgCtx, rule: CascadeRule, write: CascadeWrit
 /** Open advisories for the coordination queue (Airtable mode, [] otherwise).
  *  Reads the same TTL-cached EXECUTION_LOG page as the dashboard. */
 export async function loadCascadeAdvisories(ctx: OrgCtx): Promise<CascadeAdvisory[]> {
-  if (!airtableEnabled()) return [];
+  if (!airtableEnabled(ctx)) return [];
   try {
     const rows = await core.list(ctx.orgSlug, "EXECUTION_LOG", { maxRecords: 100 });
     const out: CascadeAdvisory[] = [];
@@ -373,7 +373,7 @@ export async function dismissCascadeAdvisory(
   actor: Actor,
   override: boolean,
 ): Promise<void> {
-  if (!airtableEnabled()) return;
+  if (!airtableEnabled(ctx)) return;
   const row = await core.get(ctx.orgSlug, "EXECUTION_LOG", advisoryId);
   if (!row || S(row["Status"]) !== "Ongoing") return;
   let ruleCode = "";
@@ -407,7 +407,7 @@ export async function dismissCascadeAdvisory(
  *  codes only). Used by onboarding and the learning-rules page's owner action
  *  (existing orgs predate the seeds). */
 export async function seedCascadeRules(ctx: OrgCtx): Promise<number> {
-  if (!airtableEnabled()) return 0;
+  if (!airtableEnabled(ctx)) return 0;
   const { airtableMapFor, toFields } = await import("@/lib/airtable/fieldMaps");
   const { setRuleOverrideLevel } = await import("@/services/platform/learning");
   const rows = await core.list(ctx.orgSlug, "LEARNING_RULES", { maxRecords: 500 });
