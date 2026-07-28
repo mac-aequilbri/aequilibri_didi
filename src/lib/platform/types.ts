@@ -23,7 +23,7 @@ export interface OrgConfig {
   branding?: { logo?: string };
   /** Rec id of the org's "General" project — the shared bucket for org-level
    *  records. RLS always keeps it in scope so every member sees it. Set at
-   *  provisioning; absent until then (docs/project-general-bucket-plan.md). */
+   *  provisioning; absent until then (docs/archive/project-general-bucket-plan.md). */
   generalJobId?: string;
 }
 

@@ -1,6 +1,6 @@
 // Report (and optionally backfill) records with no Job link across the
 // job-scoped tables in each org's base — the RLS "null job = visible to all"
-// tightening (docs/project-general-bucket-plan.md, phase M).
+// tightening (docs/archive/project-general-bucket-plan.md, phase M).
 //
 //   node scripts/airtable-backfill-null-jobs.mjs                 # dry report, all orgs
 //   node scripts/airtable-backfill-null-jobs.mjs --org=<slug> --target=<recId> --apply

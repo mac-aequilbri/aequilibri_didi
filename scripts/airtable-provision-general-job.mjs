@@ -1,5 +1,5 @@
 // Provision a per-org "General" project — the shared bucket for org-level
-// records (docs/project-general-bucket-plan.md). For every org in the control
+// records (docs/archive/project-general-bucket-plan.md). For every org in the control
 // registry: ensure a JOBS record named "General" exists in the org's customer
 // base, and record its rec id in the org's registry Settings.generalJobId (which
 // flows into ctx.config.generalJobId and keeps General in RLS scope for all).

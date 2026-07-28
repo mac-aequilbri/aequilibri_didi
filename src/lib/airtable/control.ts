@@ -143,7 +143,7 @@ export async function saveMetricsSnapshot(slug: string, metrics: OrgMetricsSnaps
 }
 
 /** Record the org's "General" project rec id in its Settings JSON so RLS keeps
- *  it in scope for everyone (docs/project-general-bucket-plan.md). Preserves the
+ *  it in scope for everyone (docs/archive/project-general-bucket-plan.md). Preserves the
  *  rest of the config. Called at provisioning / by the backfill script. */
 export async function setGeneralJobId(slug: string, jobRecId: string): Promise<void> {
   const base = controlBaseId();

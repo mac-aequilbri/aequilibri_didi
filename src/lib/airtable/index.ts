@@ -2,7 +2,7 @@
 //
 // Status: SKELETON. Reads are functional; writes are gated behind
 // AIRTABLE_MIGRATION=true. The Postgres/Prisma path is untouched — this layer
-// activates only when wired in deliberately. See docs/airtable-migration-mapping.md.
+// activates only when wired in deliberately. See docs/archive/airtable-migration-mapping.md.
 
 export {
   DEMO_BASE_ID,

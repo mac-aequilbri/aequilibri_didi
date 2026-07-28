@@ -4,7 +4,7 @@ Multi-tenant AI-assisted operations platform for project-based businesses (const
 
 ## Architecture in one paragraph
 
-UI (server components, `src/components`) → server actions / API routes (`src/app`) → data-source layer (`src/lib/platform/*Source.ts`) → Airtable client with per-base rate limiter + TTL caches (`src/lib/airtable`). All writes funnel through one chokepoint, [recordWriter.ts](src/lib/platform/recordWriter.ts) (role/RLS gating, approval queue, append-only EXECUTION_LOG, post-write reconciliation). Prisma/Postgres remains as the legacy dual path (`AIRTABLE_MIGRATION` flag). Full details: [docs/PLATFORM_ARCHITECTURE.md](docs/PLATFORM_ARCHITECTURE.md).
+UI (server components, `src/components`) → server actions / API routes (`src/app`) → data-source layer (`src/lib/platform/*Source.ts`) → Airtable client with per-base rate limiter + TTL caches (`src/lib/airtable`). All writes funnel through one chokepoint, [recordWriter.ts](src/lib/platform/recordWriter.ts) (role/RLS gating, approval queue, append-only EXECUTION_LOG, post-write reconciliation). Prisma/Postgres remains as the legacy dual path (`AIRTABLE_MIGRATION` flag). Full details: [MASTER_IMPLEMENTATION_GUIDE.md](MASTER_IMPLEMENTATION_GUIDE.md).
 
 ## Local development
 
@@ -25,6 +25,7 @@ Push to `master` → GitHub Actions CI ([ci.yml](.github/workflows/ci.yml)) → 
 
 ## Operations
 
+- **Consolidated implementation reference:** [MASTER_IMPLEMENTATION_GUIDE.md](MASTER_IMPLEMENTATION_GUIDE.md) (architecture, configuration, ops, ADRs; historical docs live in `docs/archive/`)
 - **Runbook, incident response, rollback, DR:** [docs/production-readiness-audit.md](docs/production-readiness-audit.md) (Operations artifacts section)
 - **Enterprise audit + action register:** [docs/enterprise-audit-2026-07-26.md](docs/enterprise-audit-2026-07-26.md)
 - **Client onboarding:** [docs/module1-onboarding-runbook.md](docs/module1-onboarding-runbook.md)

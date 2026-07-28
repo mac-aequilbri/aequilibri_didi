@@ -1,4 +1,5 @@
-// Predefined report catalog — Phase 1 of docs/reporting-revamp-plan.md.
+// Predefined report catalog — Phase 1 of the reporting revamp (all phases
+// shipped 2026-07-20; see MASTER_IMPLEMENTATION_GUIDE.md, ADR-13).
 // v1 ships narrative (AI-drafted) reports in code; deterministic registers are
 // Phase 2 and a control-base overlay (PLAT_REPORT_CATALOG) is Phase 4.
 

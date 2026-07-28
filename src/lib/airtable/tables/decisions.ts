@@ -5,7 +5,7 @@
 // canonical one and is RICHER than PlatDecision: it has a required primary
 // `Decision_Name`, links Owner->TEAM and to WORKSTREAMS/ACTION_HUB (not JOBS),
 // and adds Reversibility/Confidence/Context/etc. App writes must supply
-// Decision_Name. See docs/airtable-migration-mapping.md §10.
+// Decision_Name. See docs/archive/airtable-migration-mapping.md §10.
 
 import { createRecords, listRecords, updateRecords } from "../client";
 import { airtableEnabled } from "../config";

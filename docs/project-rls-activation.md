@@ -1,6 +1,6 @@
 # Project (job) level security — activation plan
 
-**Status:** plan · **Date:** 2026-07-24 · Follows [project-rls-plan.md](project-rls-plan.md)
+**Status:** plan · **Date:** 2026-07-24 · Follows [project-rls-plan.md](archive/project-rls-plan.md)
 
 The enforcement machinery is built and shipped (commit `3903b87`): every read/write
 seam funnels through `inScope`/`scopeRows`, gated by `PROJECT_RLS_ENFORCE` (default
