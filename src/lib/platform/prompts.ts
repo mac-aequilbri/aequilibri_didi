@@ -63,6 +63,34 @@ changed unless a specialist reported it (including whether it is pending approva
       '{"actions": [{"title": "…", "owner": "…", "dueDate": "YYYY-MM-DD or null"}]}. ' +
       "Only include genuine commitments. No prose outside the JSON.",
   },
+  "email.extract": {
+    key: "email.extract",
+    version: "1.0",
+    system:
+      "You read inbound business correspondence for the project \"{{jobName}}\" and extract the " +
+      "operational intent in it — the things someone must now do, decide, buy, pay, schedule or " +
+      "worry about. Today is {{today}}; resolve relative dates (\"Friday\", \"next week\") against it. " +
+      "Reply with strict JSON: " +
+      '{"intents": [{"table": "…", "summary": "one line, what this record is for", ' +
+      '"evidence": "the sentence from the email that justifies it, quoted verbatim", ' +
+      '"confidence": 0-1, "fields": { … }}]}. ' +
+      "Choose `table` and its `fields` from exactly this list — use no other field names:\n" +
+      '- "action" — someone must do something. fields: title, detail, owner, dueDate (YYYY-MM-DD), priority ("P1" urgent | "P2" | "P3")\n' +
+      '- "decision" — a choice was made or is being asked for. fields: description, rationale, madeBy, decidedAt (YYYY-MM-DD)\n' +
+      '- "risk" — something threatens cost, time or safety. fields: description, likelihood (1-5), impact (1-5), mitigation, owner\n' +
+      '- "variation_order" — a change to agreed scope, cost or programme. fields: title, description, scopeChange, costImpact (number), timeImpactDays (number)\n' +
+      '- "procurement" — materials or services to order. fields: item, qty (number), unitPrice (number), vendorName, dueDate (YYYY-MM-DD)\n' +
+      '- "cashflow" — money invoiced, due or paid. fields: name, amount (number), type ("In" received | "Out" paid), period (YYYY-MM), sourceOrPayee, category\n' +
+      '- "comms" — someone must be told or must reply. fields: topic, messageType ("Decision Notification" | "Status Update" | "Action Required" | "Approval Request" | "Escalation"), stakeholderRole ("Owner" | "Builder" | "Architect" | "Broker" | "Supplier" | "Regulatory" | "Other"), dueDate (YYYY-MM-DD), notes\n' +
+      '- "plan" — scheduled work with dates. fields: name, startDate (YYYY-MM-DD), endDate (YYYY-MM-DD), durationDays (number), notes\n' +
+      "Rules: extract only what the email actually states — never infer an amount, a date, a " +
+      "quantity or an owner that is not written down, and leave such a field out rather than " +
+      "guessing it. One intent per distinct item; a single sentence may justify only one. Set " +
+      "confidence below 0.5 when the email is vague about whether the thing is really being asked " +
+      "for. `evidence` must be text copied from the email, not your own words. Return " +
+      '{"intents": []} for a newsletter, an auto-reply, a pleasantry, or anything with no ' +
+      "operational content. No prose outside the JSON.",
+  },
   "variations.draft": {
     key: "variations.draft",
     version: "1.0",

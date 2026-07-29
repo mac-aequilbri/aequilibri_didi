@@ -1,3 +1,5 @@
+import type { WritableTable } from "./recordWriter";
+
 export type Module2SourceChannel =
   | "upload"
   | "link"
@@ -26,10 +28,36 @@ export interface CanonicalNameResult {
   docDate: string;
 }
 
+/** The tables ingestion may route into. A strict subset of the write registry —
+ *  `satisfies` makes the compiler prove it, so a typo or a table that loses its
+ *  writer breaks the build instead of failing at runtime in writeRecord.
+ *  Type-only import: erased at compile time, so no module cycle. */
+export const ROUTE_TABLES = [
+  "cashflow",
+  "procurement",
+  "decision",
+  "action",
+  "risk",
+  "variation_order",
+  "comms",
+  "plan",
+] as const satisfies readonly WritableTable[];
+
+export type RouteTable = (typeof ROUTE_TABLES)[number];
+
+export function isRouteTable(v: unknown): v is RouteTable {
+  return typeof v === "string" && (ROUTE_TABLES as readonly string[]).includes(v);
+}
+
 export interface RouteSuggestion {
-  table: "cashflow" | "procurement" | "decision" | "action";
+  table: RouteTable;
   summary: string;
   payload: Record<string, unknown>;
+  /** The sentence in the source that justifies this suggestion. Shown to the
+   *  reviewer and threaded into the proposal's rationale. */
+  evidence?: string;
+  /** 0-1 extraction confidence. Absent for the deterministic regex rules. */
+  confidence?: number;
 }
 
 const NOISE_WORDS = new Set([

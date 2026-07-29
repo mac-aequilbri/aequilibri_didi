@@ -774,6 +774,12 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
     ? ((req.data ?? {}) as Record<string, unknown>)
     : validated(def, req.op, req.data);
   const jobId = typeof data.jobId === "number" ? data.jobId : undefined;
+  // The Postgres columns above are integer-only, but a proposal's Job_Id is a
+  // text cell that must also hold an Airtable "rec…" id — otherwise every
+  // Airtable-mode proposal stores a blank project and the approvals queue has
+  // to recover it from the payload to scope correctly.
+  const proposalJobId =
+    data.jobId == null || data.jobId === "" ? undefined : String(data.jobId);
   // Postgres ids live in the Int column; Airtable "rec…" ids ride in the payload.
   // A numeric string (a Postgres id from a form) coerces to the Int column so
   // the audit trail keeps its numeric target in Postgres mode.
@@ -821,7 +827,7 @@ export async function writeRecord(ctx: OrgCtx, req: WriteRequest): Promise<Write
         Status: "proposed",
         Created_At: new Date().toISOString(),
         Expires_At: expiresAt,
-        Job_Id: jobId == null ? "" : String(jobId),
+        Job_Id: proposalJobId ?? "",
       });
       return { status: "proposed", proposalId: pending.id };
     }
@@ -1052,8 +1058,12 @@ async function executeProposalClaimed(
       ...(JSON.parse(pending.payload) as Record<string, unknown>),
       ...(edits ?? {}),
     };
-    // Reviewer-facing metadata only — never written to the record.
-    delete payloadObj.__rationale;
+    // Reviewer-facing metadata only — never written to the record. Every "__"
+    // key is proposal metadata by convention (__rationale, __source, …), so
+    // strip them all; __recId is consumed a few lines below before it goes.
+    for (const k of Object.keys(payloadObj)) {
+      if (k.startsWith("__") && k !== "__recId") delete payloadObj[k];
+    }
     // Airtable update/delete proposals stash their "rec…" target in the payload
     // (the Postgres recordId column is integer-only). Strip it before writing.
     let target: number | string | undefined = pending.recordId ?? undefined;

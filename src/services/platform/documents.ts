@@ -20,8 +20,12 @@ import {
   renderManagedDocument,
   type ManagedDocFormat,
 } from "@/lib/platform/documentRenderer";
+import { resolveJobFromText, type JobResolution } from "@/lib/platform/jobResolver";
+import { logger, errMeta } from "@/lib/logger";
 import { modelFor } from "@/lib/platform/modelRouter";
 import { getPrompt } from "@/lib/platform/prompts";
+import type { ProposalProvenance } from "@/lib/platform/proposalSource";
+import { extractEmailIntents } from "@/services/platform/emailIntel";
 import { writeRecord, type RecordId } from "@/lib/platform/recordWriter";
 import { getStorer, getStorerFor } from "@/lib/platform/storage";
 import { type OrgCtx } from "@/lib/platform/types";
@@ -126,7 +130,28 @@ async function resolveJobContext(
   ctx: OrgCtx,
   jobId?: RecordId,
   fallbackTitle?: string,
-): Promise<{ jobId?: RecordId; jobCode?: string }> {
+  /** Free text to identify the project from, for channels that carry no job id
+   *  (inbound email, Slack, forms). Supplying it switches on the resolution
+   *  ladder; without it the historic behaviour is preserved exactly, so manual
+   *  uploads keep resolving as they always have. */
+  text?: { subject?: string; body?: string; sender?: string },
+): Promise<{ jobId?: RecordId; jobCode?: string; resolution?: JobResolution }> {
+  if (text) {
+    const resolution = await resolveJobFromText(ctx, {
+      explicitJobId: jobId,
+      subject: text.subject,
+      body: text.body,
+      sender: text.sender,
+    });
+    if (airtableEnabled(ctx) || typeof resolution.jobId !== "number") {
+      return { jobId: resolution.jobId, jobCode: fallbackTitle, resolution };
+    }
+    const job = await prisma.platJob.findFirst({
+      where: { id: resolution.jobId, orgId: ctx.orgId },
+      select: { code: true },
+    });
+    return { jobId: resolution.jobId, jobCode: job?.code || fallbackTitle, resolution };
+  }
   if (airtableEnabled(ctx)) {
     if (jobId != null) return { jobId, jobCode: undefined };
     const jobs = await core.list(ctx.orgSlug, "JOBS", { maxRecords: 2 });
@@ -255,23 +280,26 @@ async function routeOperationalWrites(
   actorName: string,
   suggestions: RouteSuggestion[],
   sourceDocumentId?: RecordId,
+  /** Where the project came from, stamped onto every proposal so a reviewer
+   *  can see which project was chosen and on what evidence. */
+  provenance?: ProposalProvenance,
 ): Promise<NonNullable<Module2Metadata["routeSuggestions"]>> {
   const out: NonNullable<Module2Metadata["routeSuggestions"]> = [];
   for (const suggestion of suggestions) {
+    // The source fields go on last: this document IS the source, so it wins
+    // over whatever the suggestion carried (previously an undefined from
+    // inferRouteSuggestions silently erased the link).
     const payload =
       sourceDocumentId != null && (suggestion.table === "decision" || suggestion.table === "action")
-        ? {
-            sourceType: "document",
-            sourceId: sourceDocumentId,
-            ...suggestion.payload,
-          }
+        ? { ...suggestion.payload, sourceType: "document", sourceId: sourceDocumentId }
         : suggestion.payload;
     const result = await writeRecord(ctx, {
       table: suggestion.table,
       op: "create",
-      data: payload,
+      data: provenance ? { ...payload, __source: { ...provenance, evidence: suggestion.evidence ?? "" } } : payload,
       actor: { type: "system", name: actorName },
       requireApproval: true,
+      rationale: suggestion.evidence || suggestion.summary,
     });
     out.push({
       table: suggestion.table,
@@ -308,6 +336,11 @@ async function createDocumentRecord(
     disableRouting?: boolean;
     module4?: Module4Metadata;
     actorType?: "human" | "system" | "ai";
+    /** Pre-computed suggestions (the AI email extraction) used instead of the
+     *  keyword rules. An empty array means "extraction ran and found nothing" —
+     *  distinct from undefined, which means "no extraction ran, use the rules". */
+    routeSuggestions?: RouteSuggestion[];
+    provenance?: ProposalProvenance;
   },
 ): Promise<{ id?: RecordId; classification: string; title: string; proposals: number }> {
   const prior = await findPriorVersion(
@@ -333,14 +366,15 @@ async function createDocumentRecord(
   });
   const routeSuggestions = input.disableRouting
     ? []
-    : inferRouteSuggestions({
+    : (input.routeSuggestions ??
+      inferRouteSuggestions({
         classification: input.classification,
         text: input.textContent,
         title: canonical.title,
         sender: input.sender,
         docDate: canonical.docDate,
         jobId: input.jobId,
-      });
+      }));
   const routeResults: Module2Metadata["routeSuggestions"] = [];
   const meta: Module2Metadata = {
     canonicalName: canonical.storedName,
@@ -383,7 +417,13 @@ async function createDocumentRecord(
     requireApproval: false,
   });
   if (routeSuggestions.length > 0 && result.recordId != null) {
-    const resolved = await routeOperationalWrites(ctx, actorName, routeSuggestions, result.recordId);
+    const resolved = await routeOperationalWrites(
+      ctx,
+      actorName,
+      routeSuggestions,
+      result.recordId,
+      input.provenance,
+    );
     routeResults.push(...resolved);
     const mergedMeta: Module2Metadata = { ...meta, routeSuggestions: resolved };
     await writeRecord(ctx, {
@@ -701,13 +741,48 @@ export async function ingestInboundMessage(
     return { deduped: true, documents: 0, proposals: 0 };
   }
 
-  const job = await resolveJobContext(ctx, msg.jobId);
   const subject = msg.subject || `${msg.channel} message ${msg.externalId}`;
   const body = msg.body || "";
   const sender = msg.from || "";
   const topicHint = sender ? sender.split("@")[0] : msg.channel;
   let documents = 0;
   let proposals = 0;
+
+  // Which project is this about? The message names it in prose, if at all —
+  // so the resolution ladder reads the subject and body, which is exactly what
+  // this path failed to do before (it passed nothing, so nothing could match).
+  const job = await resolveJobContext(ctx, msg.jobId, subject, { subject, body, sender });
+  const resolution: JobResolution =
+    job.resolution ?? { strategy: "none", confidence: 0, unassigned: true };
+  const provenance: ProposalProvenance = {
+    jobName: resolution.jobName,
+    strategy: resolution.strategy,
+    confidence: resolution.confidence,
+    unassigned: resolution.unassigned,
+    subject,
+    channel: msg.channel,
+  };
+
+  // What does it ask for? Extraction runs inline — a single sonnet call, well
+  // inside the route's 300s budget — and degrades to the keyword rules when
+  // there's no API key. Everything it returns is still approval-gated.
+  const docDate = (msg.receivedAt || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const suggestions = await extractEmailIntents(ctx, {
+    subject,
+    body,
+    sender,
+    jobId: job.jobId,
+    jobName: resolution.jobName,
+    receivedAt: msg.receivedAt,
+    docDate,
+  }).catch((err) => {
+    // Extraction is an enhancement, never a reason to lose the message.
+    logger.warn("Email intent extraction failed; filing as correspondence only", {
+      orgSlug: ctx.orgSlug,
+      ...errMeta(err),
+    });
+    return [] as RouteSuggestion[];
+  });
 
   const bodyDoc = await createDocumentRecord(ctx, actorName, {
     jobId: job.jobId,
@@ -727,6 +802,8 @@ export async function ingestInboundMessage(
     dateHint: msg.receivedAt,
     sender,
     kind: "generated",
+    routeSuggestions: suggestions,
+    provenance,
   });
   documents += bodyDoc.id ? 1 : 0;
   proposals += bodyDoc.proposals;

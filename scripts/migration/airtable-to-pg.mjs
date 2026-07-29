@@ -97,7 +97,8 @@ for (const t of TABLES) {
 
     const existing = map.get(rec.id);
     if (!execute) {
-      existing ? updated++ : created++;
+      if (existing) updated++;
+      else created++;
       continue;
     }
     try {

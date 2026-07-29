@@ -24,6 +24,7 @@ import { getCurrentViewer, requireOrgCtx } from "@/lib/platform/org-context";
 import { orgPath } from "@/lib/platform/paths";
 import { isWritableTable, readRecord } from "@/lib/platform/recordWriter";
 import { loadPendingWrites, type PendingWriteView } from "@/lib/platform/pendingWritesSource";
+import { proposalSourceOf, strategyLabel, type ProposalSource } from "@/lib/platform/proposalSource";
 import { inScope, resolveJobScope } from "@/lib/platform/rls";
 import { canApprove } from "@/lib/platform/roles";
 import { getDomainLabels, labelForAppField, tableLabelFor } from "@/lib/platform/domainLabels";
@@ -37,7 +38,17 @@ const opLabel = (op: string) => ({ create: "Create", update: "Update", delete: "
 
 // Storage/plumbing fields that are noise in a human review. __rationale is the
 // proposer's reason — rendered as its own line, not as a field diff.
-const SKIP_FIELDS = new Set(["context", "meta", "aiDraft", "aiAnalysis", "extractedActions", "jobId", "__rationale"]);
+const SKIP_FIELDS = new Set([
+  "context",
+  "meta",
+  "aiDraft",
+  "aiAnalysis",
+  "extractedActions",
+  "jobId",
+  "__rationale",
+  // Ingestion provenance — rendered as its own block, not as a field diff.
+  "__source",
+]);
 
 /** Proposer's rationale from the stored payload (Spec 12 Module 7 card). */
 function rationaleOf(payload: string): string {
@@ -146,6 +157,33 @@ interface ProposalView {
   prop: PendingWriteView;
   changes: Array<Change & { label: string }>;
   rationale: string;
+  /** Present when the proposal came from an ingested message (email, Slack…). */
+  source: ProposalSource | null;
+}
+
+/** Provenance block for a proposal raised from inbound correspondence: which
+ *  project it was attached to and on what basis. An unresolved project is
+ *  called out in warning tone — approving it as-is files the record against
+ *  General, which is almost never what the sender meant. */
+function SourceNote({ source }: { source: ProposalSource }) {
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
+      {source.subject && <span className="truncate max-w-xs">From “{source.subject}”</span>}
+      {source.unassigned ? (
+        <Chip variant="warning" title="Approving this files it against the General project">
+          No project identified
+        </Chip>
+      ) : (
+        source.jobName && <Chip variant="info">{source.jobName}</Chip>
+      )}
+      <span>
+        {strategyLabel(source.strategy)}
+        {source.confidence > 0 && !source.unassigned
+          ? ` · ${Math.round(source.confidence * 100)}% confidence`
+          : ""}
+      </span>
+    </p>
+  );
 }
 
 // Filter/search/sort config for the pending queue. NO pageSize: approvers must
@@ -235,7 +273,12 @@ export default async function ApprovalsPage({
         ...c,
         label: labelForAppField(labels, prop.tableKey, c.key) ?? c.key,
       }));
-      return { prop, changes, rationale: rationaleOf(prop.payload) };
+      return {
+        prop,
+        changes,
+        rationale: rationaleOf(prop.payload),
+        source: proposalSourceOf(prop.payload),
+      };
     }),
   );
 
@@ -304,7 +347,7 @@ export default async function ApprovalsPage({
           searchPlaceholder="Search proposals…"
         >
         <div className="space-y-3">
-          {items.map(({ prop, changes, rationale }) => {
+          {items.map(({ prop, changes, rationale, source }) => {
             const exp = expiryNote(prop.expiresAt);
             const isAi = prop.actorType === "ai";
             const editable = prop.op !== "delete" && changes.some((c) => c.raw !== null);
@@ -339,6 +382,7 @@ export default async function ApprovalsPage({
                         &ldquo;{rationale}&rdquo;
                       </p>
                     )}
+                    {source && <SourceNote source={source} />}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <SubmitButton label="Approve" pendingLabel="Approving…" className="btn-ae text-sm" />

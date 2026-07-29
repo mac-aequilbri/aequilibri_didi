@@ -106,7 +106,16 @@ export async function GET(
   const [jobs, actions, risks, decisions, variations, documents, vendors, quotes] =
     await Promise.all([
       prisma.platJob.findMany({
-        where: { ...where, OR: [{ name: { contains: q } }, { code: { contains: q } }] },
+        // Case-insensitive to match the Airtable branch above, which lowercases
+        // both sides — without `mode` Postgres `contains` is case-sensitive, so
+        // "maleny" found nothing while "Maleny" did.
+        where: {
+          ...where,
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { code: { contains: q, mode: "insensitive" } },
+          ],
+        },
         take,
         orderBy: { updatedAt: "desc" },
       }),
