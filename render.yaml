@@ -62,6 +62,13 @@ services:
         value: "wsp0SwxU3j8IwLZJ1"
       - key: AIRTABLE_TEMPLATE_BASE_ID
         value: "appXfwBLE6zBEL5Zr"
+      # Control plane. controlEnabled() = AIRTABLE_MIGRATION && this — it gates
+      # the org registry, PLAT_TEAM auth, PLAT_CONNECTIONS default-deny on the
+      # inbound webhook, and PLAT_OUTBOX emission. It was set in the Render
+      # dashboard but undeclared here until 2026-07-29, so a fresh blueprint
+      # deploy would have silently come up with the whole control plane off.
+      - key: AIRTABLE_CONTROL_BASE_ID
+        value: "app51Tmrgab3QYP4Z"
 
       # ── Auth (Clerk) ────────────────────────────────────────────────────────
       # The platform FAILS CLOSED without these: /app/* returns 503 unless
