@@ -1,0 +1,146 @@
+{
+  "name": "A · Inbound email → aequilibri (dulong-downs-didi)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Manual test trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-220, 60]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": true,
+        "filters": {},
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [-220, 260]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Builds the exact JSON string that will be signed AND sent. The HMAC is over\n// `${timestamp}.${rawBody}`, so rawBody must reach the HTTP node byte-for-byte —\n// never let a downstream node re-serialize it.\n\nconst ORG_SLUG = 'dulong-downs-didi';   // per-client constant; must match PLAT_ORG_REGISTRY\n\nconst m = $input.item.json ?? {};\n\n// Gmail Trigger sets an `id`; the Manual Trigger yields an empty item, in which\n// case we send a synthetic message so signing + transport can be proven before\n// a Gmail credential exists.\nconst isGmail = Boolean(m.id);\n\n// Gmail field names differ between simple/raw modes — read defensively.\nconst header = (name) => {\n  const hs = m.payload?.headers ?? m.headers ?? [];\n  const hit = Array.isArray(hs) ? hs.find((h) => String(h.name).toLowerCase() === name) : null;\n  return hit?.value ?? '';\n};\n\nconst payload = isGmail\n  ? {\n      orgSlug: ORG_SLUG,\n      channel: 'email',\n      externalId: String(m.id),                       // Gmail message id = dedup key\n      from: m.from?.value?.[0]?.address || m.From || m.from || header('from'),\n      subject: m.subject || m.Subject || header('subject'),\n      body: m.textPlain || m.text || m.textHtml || m.snippet || '',\n      receivedAt: m.date || m.Date || new Date().toISOString(),\n    }\n  : {\n      orgSlug: ORG_SLUG,\n      channel: 'email',\n      externalId: `n8n-test-${Date.now()}`,           // fresh id each run = no dedup\n      from: 'test@aequilibri.com',\n      subject: 'n8n connectivity test',\n      body: 'Hi team, please order 40 sheets of 13mm plasterboard for the Riverside job by Friday.',\n      receivedAt: new Date().toISOString(),\n    };\n\nconst rawBody = JSON.stringify(payload);\nconst ts = Math.floor(Date.now() / 1000).toString();\n\nreturn {\n  json: {\n    rawBody,\n    ts,\n    signBase: `${ts}.${rawBody}`,   // the Crypto node HMACs exactly this\n    isTest: !isGmail,\n  },\n};"
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Build signed payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [40, 160]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "binaryData": false,
+        "value": "={{ $json.signBase }}",
+        "dataPropertyName": "signature",
+        "secret": "PASTE_ORG_WEBHOOK_SECRET_HERE",
+        "encoding": "hex"
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Sign (HMAC-SHA256)",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [280, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://aequilibri-next.onrender.com/api/platform/hooks",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Aequilibri-Timestamp",
+              "value": "={{ $json.ts }}"
+            },
+            {
+              "name": "X-Aequilibri-Signature",
+              "value": "=sha256={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.rawBody }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "POST /api/platform/hooks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 160],
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "Manual test trigger": {
+      "main": [
+        [
+          {
+            "node": "Build signed payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build signed payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build signed payload": {
+      "main": [
+        [
+          {
+            "node": "Sign (HMAC-SHA256)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign (HMAC-SHA256)": {
+      "main": [
+        [
+          {
+            "node": "POST /api/platform/hooks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

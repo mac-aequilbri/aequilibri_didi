@@ -33,36 +33,37 @@ Consequence — the two workflow shapes are asymmetric:
 
 ## Workflow A — Inbound Gmail → webhook (per client; a template to duplicate)
 
+**Ready to import: [`n8n/workflow-a-inbound-email.json`](../n8n/workflow-a-inbound-email.json).**
+Import it rather than hand-building — it encodes all four gotchas below.
+
 **Nodes:**
-1. **Gmail Trigger** — credential = *this client's* Gmail OAuth2. Event: "Message Received". (Poll
+1. **Manual test trigger** — lets you prove signing + transport *before* a Gmail credential exists.
+   When no Gmail item is present the Code node emits a synthetic message instead.
+2. **Gmail Trigger** — credential = *this client's* Gmail OAuth2. Event: "Message Received". (Poll
    interval per n8n Cloud minimums.)
-2. **Code node** — build the normalized payload, sign it. Signs `${timestamp}.${rawBody}` with the
-   org secret; **outputs the exact `rawBody` string** (must be sent verbatim — see gotcha).
-   ```js
-   const crypto = require('crypto');
-   const m = $input.item.json;
-   const payload = {
-     orgSlug: 'dulong-downs',                       // per-client constant
-     channel: 'email',
-     externalId: m.id,                              // Gmail message id = dedup key
-     from: (m.from && m.from.value && m.from.value[0] && m.from.value[0].address) || m.From || '',
-     subject: m.subject || m.Subject || '',
-     body: m.textPlain || m.text || m.snippet || '',
-     receivedAt: m.date || new Date().toISOString(),
-   };
-   const rawBody = JSON.stringify(payload);
-   const ts = Math.floor(Date.now() / 1000).toString();
-   const sig = crypto.createHmac('sha256', $env.AEQ_SECRET_DULONG).update(`${ts}.${rawBody}`).digest('hex');
-   return [{ json: { rawBody, ts, signature: `sha256=${sig}` } }];
-   ```
-3. **HTTP Request** — `POST https://aequilibri-next.onrender.com/api/platform/hooks`.
-   - **Body: "Raw", content `{{$json.rawBody}}`, type `application/json`.** ⚠️ NOT "JSON" mode — that
-     re-serializes and breaks the signature. This is the #1 failure mode.
-   - Headers: `X-Aequilibri-Timestamp: {{$json.ts}}`, `X-Aequilibri-Signature: {{$json.signature}}`.
-   - "Continue on Fail" on so a 4xx doesn't kill the run; branch to a notify/log on error.
+3. **Code node** — builds the normalized payload and the string to sign. Emits `rawBody` (the exact
+   bytes to send), `ts`, and `signBase = ${ts}.${rawBody}`. **No `require('crypto')`** — see gotcha 2.
+4. **Crypto node** — action `HMAC`, type `SHA256`, value `{{ $json.signBase }}`, secret
+   `{{ $vars.AEQ_SECRET_DULONG }}`, output property `signature`, encoding `hex`.
+5. **HTTP Request** — `POST https://aequilibri-next.onrender.com/api/platform/hooks`.
+
+**The four gotchas** (each one silently produces a 401, which is why they're worth naming):
+
+1. **Body must be "Raw" mode**, content `{{$json.rawBody}}`, type `application/json`. NOT "JSON"
+   mode — that re-serializes and invalidates the signature. This is the #1 failure mode.
+2. **`require('crypto')` is unreliable in Code nodes on n8n Cloud** (sandboxed built-ins). Use the
+   built-in **Crypto node** for the HMAC instead — that's why the shape above has 5 nodes, not 3.
+3. **`$env` is blocked on n8n Cloud.** Use **Variables** (`$vars.AEQ_SECRET_DULONG`), created under
+   Overview → Variables. Confirmed available on this instance's plan (2026-07-29).
+4. **The org slug is `dulong-downs-didi`, not `dulong-downs`.** An earlier draft of this doc had the
+   short form; `dulong-downs` is a *different* seeded org with no webhook secret and no connection
+   row, so it fails 503/403 rather than obviously.
+
+Set the HTTP node's response options to `fullResponse` + `neverError` so a 4xx surfaces as readable
+output (status + body) instead of a red node — much faster to debug than "Continue on Fail".
 
 **Per-client variables** (the only things that change when duplicating): the Gmail credential, the
-`orgSlug` constant, and the secret (`$env.AEQ_SECRET_<ORG>`, or an n8n credential/variable).
+`ORG_SLUG` constant in the Code node, and the `$vars` secret name.
 
 **Attachments (phase 1b):** add a step to base64-encode Gmail binary attachments into
 `payload.attachments = [{name, mimeType, contentBase64}]` before signing. Skip for the first pass.
@@ -95,9 +96,19 @@ connection is active (else 403) → dedups on `email:<messageId>` → runs the i
 - resolve from the org's team/contact record.
 Pick one before building B.
 
+## Instance state (checked 2026-07-29)
+
+`https://aequilibri.app.n8n.cloud` — n8n Cloud 2.31.5. **Zero workflows**; one credential
+(`n8n free OpenAI API credits`), no Gmail and no Airtable credential yet. Variables are available on
+the plan. So Workflows A and B are both still unbuilt: the platform half is live, the n8n half is empty.
+
+Platform side verified the same day: `/api/platform/hooks` returns 401 to an unsigned POST (endpoint
+live, pilot secret set); `/api/platform/scheduler` returns 503, i.e. **`CRON_SECRET` is still unset on
+Render** — which keeps the outbox retry/DLQ sweep off and blocks Phase 2.
+
 ## Phasing
 
-- **Phase 1 — prove inbound (pilot):** Workflow A for one org (`dulong-downs`) end-to-end on Render.
+- **Phase 1 — prove inbound (pilot):** Workflow A for one org (`dulong-downs-didi`) end-to-end on Render.
   Validates the signed webhook, default-deny, dedup, and health stamping on real infra (none of the
   `/api` paths were locally testable). Success = an inbound email creates a document + proposals, and
   the connection's "Last event" updates.
