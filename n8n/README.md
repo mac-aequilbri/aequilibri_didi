@@ -177,7 +177,7 @@ than a red node:
 
 | Status | Meaning |
 | --- | --- |
-| 401 `Invalid signature` | The timestamp was fine; only the HMAC failed. **First check the Crypto node's Secret field** — it is a masked password input, so a leftover `PASTE_..._HERE` placeholder looks identical to a real secret. Otherwise the body was re-serialized (gotcha 1). Diagnose with the script below. |
+| 401 `Invalid signature` | The timestamp was fine; only the HMAC failed. **If a manual run passes but real emails fail, see "Manual works, real email 401s" below** — that is a different cause. Otherwise check the Crypto node's Secret field: it is a masked password input, so a leftover `PASTE_..._HERE` placeholder looks identical to a real secret. Diagnose with the script below. |
 | 401 `Missing or stale timestamp` | Clock skew >300s, or the timestamp header didn't arrive. |
 | 403 | No active `email / in` connection row for the org. |
 | 404 | Unknown `orgSlug` — check the `ORG_SLUG` constant in the Code node. |
@@ -198,6 +198,30 @@ AEQ_WEBHOOK_SECRET="<org secret>" node scripts/verify-webhook-signature.mjs samp
   node's Body Content Type is **RAW**, not JSON.
 
 It also flags stray whitespace and non-canonical JSON, both of which are invisible in the n8n UI.
+
+## Manual works, real email 401s
+
+Reported 2026-07-29: **Execute workflow** succeeded every time, while every Gmail-triggered run
+failed on the signature. That asymmetry is the diagnosis.
+
+The manual trigger's synthetic message is pure ASCII, so its bytes are identical under *any*
+character encoding — it cannot fail this way. A real email is not: smart quotes, em dashes,
+non-breaking spaces, accented sender names and emoji are all multi-byte in UTF-8. The HMAC is
+computed by the Crypto node over a JavaScript **string**, but the platform recomputes it from the
+**bytes** it received (`await request.text()`). If anything re-encodes those bytes between the two,
+the signature no longer matches — and only non-ASCII content can expose it.
+
+**Fixed in the Code node** (both inbound workflows): `rawBody` now escapes every non-ASCII
+codepoint as `\uXXXX`, so the string that gets signed is pure ASCII and survives any transit
+encoding unchanged. This is not lossy — `\uXXXX` is valid JSON, and the platform's `JSON.parse`
+restores the exact original characters, emoji and surrogate pairs included.
+
+**If you already imported the old workflow, re-paste the Code node** — the fix is in the JSON, not
+on the platform, so an existing n8n copy keeps the old behaviour until you update it.
+
+Verified against a message carrying `“ ” — nbsp 🎉 👷‍♂️` and a `José Núñez` sender: rawBody is
+ASCII-only, the HMAC holds under both UTF-8 and a deliberately wrong transit encoding, and subject,
+body, sender and dedup id all round-trip byte-identical.
 
 ## Testing without n8n at all
 

@@ -7,7 +7,10 @@
       "name": "Manual test trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [-220, 60]
+      "position": [
+        -220,
+        60
+      ]
     },
     {
       "parameters": {
@@ -26,18 +29,24 @@
       "name": "Gmail Trigger (mac@aequilibri)",
       "type": "n8n-nodes-base.gmailTrigger",
       "typeVersion": 1.2,
-      "position": [-220, 260]
+      "position": [
+        -220,
+        260
+      ]
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Builds the exact JSON string that is both signed AND sent. The HMAC covers\n// `${timestamp}.${rawBody}`, so rawBody must reach the HTTP node byte-for-byte.\n\nconst ORG_SLUG = 'sunridge';\n\nconst m = $input.item.json ?? {};\n\n// Gmail Trigger sets an `id`; the Manual Trigger yields an empty item, in which\n// case we send a synthetic message so signing + transport can be proven before\n// the Gmail credential is connected.\nconst isGmail = Boolean(m.id);\n\nconst header = (name) => {\n  const hs = m.payload?.headers ?? m.headers ?? [];\n  const hit = Array.isArray(hs) ? hs.find((h) => String(h.name).toLowerCase() === name) : null;\n  return hit?.value ?? '';\n};\n\nconst payload = isGmail\n  ? {\n      orgSlug: ORG_SLUG,\n      channel: 'email',\n      externalId: String(m.id),\n      from: m.from?.value?.[0]?.address || m.From || m.from || header('from'),\n      subject: m.subject || m.Subject || header('subject'),\n      body: m.textPlain || m.text || m.textHtml || m.snippet || '',\n      receivedAt: m.date || m.Date || new Date().toISOString(),\n    }\n  : {\n      orgSlug: ORG_SLUG,\n      channel: 'email',\n      externalId: `n8n-test-${Date.now()}`,\n      from: 'mac@aequilibri.com',\n      subject: 'Inbound demo — site instruction',\n      body: 'Hi team, please order 40 sheets of 13mm plasterboard for the Riverside job by Friday.',\n      receivedAt: new Date().toISOString(),\n    };\n\nconst rawBody = JSON.stringify(payload);\nconst ts = Math.floor(Date.now() / 1000).toString();\n\nreturn {\n  json: {\n    rawBody,\n    ts,\n    signBase: `${ts}.${rawBody}`,\n    isTest: !isGmail,\n  },\n};"
+        "jsCode": "// Builds the exact JSON string that is both signed AND sent. The HMAC covers\n// `${timestamp}.${rawBody}`, so rawBody must reach the HTTP node byte-for-byte.\n\nconst ORG_SLUG = 'sunridge';\n\nconst m = $input.item.json ?? {};\n\n// Gmail Trigger sets an `id`; the Manual Trigger yields an empty item, in which\n// case we send a synthetic message so signing + transport can be proven before\n// the Gmail credential is connected.\nconst isGmail = Boolean(m.id);\n\nconst header = (name) => {\n  const hs = m.payload?.headers ?? m.headers ?? [];\n  const hit = Array.isArray(hs) ? hs.find((h) => String(h.name).toLowerCase() === name) : null;\n  return hit?.value ?? '';\n};\n\nconst payload = isGmail\n  ? {\n      orgSlug: ORG_SLUG,\n      channel: 'email',\n      externalId: String(m.id),\n      from: m.from?.value?.[0]?.address || m.From || m.from || header('from'),\n      subject: m.subject || m.Subject || header('subject'),\n      body: m.textPlain || m.text || m.textHtml || m.snippet || '',\n      receivedAt: m.date || m.Date || new Date().toISOString(),\n    }\n  : {\n      orgSlug: ORG_SLUG,\n      channel: 'email',\n      externalId: `n8n-test-${Date.now()}`,\n      from: 'mac@aequilibri.com',\n      subject: 'Inbound demo — site instruction',\n      body: 'Hi team, please order 40 sheets of 13mm plasterboard for the Riverside job by Friday.',\n      receivedAt: new Date().toISOString(),\n    };\n\n// Sign and send pure ASCII. A real email carries smart quotes, em dashes,\n// non-breaking spaces and emoji; if anything re-encodes those bytes between\n// the Crypto node and the wire, the HMAC stops matching what the platform\n// recomputes from the body it received. That is why a hand-run test (plain\n// ASCII, identical under any encoding) passed while every real message 401'd.\n// \\uXXXX escapes are still valid JSON and JSON.parse restores the exact\n// same string, so the platform sees no difference.\nconst rawBody = JSON.stringify(payload).replace(\n  /[\\u0080-\\uFFFF]/g,\n  (c) => '\\\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'),\n);\nconst ts = Math.floor(Date.now() / 1000).toString();\n\nreturn {\n  json: {\n    rawBody,\n    ts,\n    signBase: `${ts}.${rawBody}`,\n    isTest: !isGmail,\n  },\n};"
       },
       "id": "b1000000-0000-4000-8000-000000000003",
       "name": "Build signed payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [40, 160]
+      "position": [
+        40,
+        160
+      ]
     },
     {
       "parameters": {
@@ -53,7 +62,10 @@
       "name": "Sign (HMAC-SHA256)",
       "type": "n8n-nodes-base.crypto",
       "typeVersion": 1,
-      "position": [280, 160]
+      "position": [
+        280,
+        160
+      ]
     },
     {
       "parameters": {
@@ -89,22 +101,57 @@
       "name": "POST /api/platform/hooks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [520, 160],
+      "position": [
+        520,
+        160
+      ],
       "alwaysOutputData": true
     }
   ],
   "connections": {
     "Manual test trigger": {
-      "main": [[{ "node": "Build signed payload", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build signed payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Gmail Trigger (mac@aequilibri)": {
-      "main": [[{ "node": "Build signed payload", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build signed payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build signed payload": {
-      "main": [[{ "node": "Sign (HMAC-SHA256)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Sign (HMAC-SHA256)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Sign (HMAC-SHA256)": {
-      "main": [[{ "node": "POST /api/platform/hooks", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "POST /api/platform/hooks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
