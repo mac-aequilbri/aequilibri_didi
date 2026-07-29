@@ -14,6 +14,7 @@ import { prisma } from "@/lib/db";
 import { logger, errMeta } from "@/lib/logger";
 import { Actor, OrgCtx } from "./types";
 import { emitOutboundEvent } from "./outbox";
+import { proposalJobId } from "./proposalSource";
 import { reconcileAirtableWrite } from "./reconciliation";
 import { enforceVocab, type VocabCoercion } from "./vocab";
 import { canWrite } from "./roles";
@@ -943,7 +944,14 @@ interface PendingProposal {
   sourceMessageId: number | null;
   status: string;
   expiresAt: Date;
+  /** Postgres Int id only — this feeds the execution-log's integer jobId
+   *  column, so it stays null for an Airtable proposal. Use jobRef for
+   *  anything that needs to know the project regardless of backend. */
   jobId: number | null;
+  /** The proposal's project as an id of either backend ("rec…" or a numeric
+   *  string). What outbound events carry, so a consumer can route on project
+   *  — jobId alone is always null on Airtable, which is every real org. */
+  jobRef: string | null;
 }
 
 // In-process claim registry: two concurrent resolutions of the same proposal
@@ -970,25 +978,29 @@ async function resolvePending(ctx: OrgCtx, proposalId: RecordId): Promise<Pendin
     if (status !== "proposed") throw new Error("Proposal not found (already resolved?)");
     const expiresAtRaw = typeof row["Expires_At"] === "string" ? row["Expires_At"] : "";
     const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : new Date(0);
+    const payload = typeof row["Payload"] === "string" ? row["Payload"] : "{}";
     return {
       id: row.id,
       tableKey: typeof row["Table_Key"] === "string" ? row["Table_Key"] : "",
       op: typeof row["Op"] === "string" ? row["Op"] : "",
       recordId: null,
-      payload: typeof row["Payload"] === "string" ? row["Payload"] : "{}",
+      payload,
       actorType: typeof row["Actor_Type"] === "string" ? row["Actor_Type"] : "system",
       actorName: typeof row["Actor_Name"] === "string" ? row["Actor_Name"] : "",
       sourceMessageId: null,
       status,
       expiresAt,
+      // No numeric id exists in Airtable — but the project itself does, in the
+      // Job_Id column (payload for proposals raised before it was persisted).
       jobId: null,
+      jobRef: proposalJobId(row["Job_Id"], payload),
     };
   }
   const pending = await prisma.platPendingWrite.findFirst({
     where: { id: Number(proposalId), orgId: ctx.orgId, status: "proposed" },
   });
   if (!pending) throw new Error("Proposal not found (already resolved?)");
-  return pending;
+  return { ...pending, jobRef: proposalJobId(pending.jobId, pending.payload) };
 }
 
 /** Perform the deferred write behind a pending proposal. The execution log
@@ -1119,7 +1131,7 @@ async function executeProposalClaimed(
     await emitOutboundEvent(ctx, `${pending.tableKey}.${op}`, {
       entityType: pending.tableKey,
       entityId: recordId,
-      jobId: pending.jobId ?? undefined,
+      jobId: pending.jobRef ?? undefined,
       data: { approvedBy },
     });
     // Spec 12 Module 5 cascades fire on EXECUTION, not proposal — an approved

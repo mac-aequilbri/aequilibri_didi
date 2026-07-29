@@ -186,6 +186,13 @@ read-only wrapper over `inferRouteSuggestions`.
    back to `jobIdFromPayload(payload)` when the column is blank (both in `loadPendingWrites` and
    `loadProposedPendingCount`), so scoping worked all along. The real defect was a blank column
    in Airtable: bad data and an unfilterable view, not a security or correctness hole.
+   **Follow-on (fixed):** the *read* side threw the project away too — `resolvePending`
+   hardcoded `jobId: null` for Airtable and `PendingProposal.jobId` was typed `number | null`,
+   so **every outbound event from an Airtable org carried no project** and n8n could not route
+   on one. `PendingProposal` gained a `jobRef` (either backend's id) which is what
+   `emitOutboundEvent` now sends; the numeric `jobId` stays for the execution-log Int column.
+   The column-then-payload precedence is now one pure, tested helper (`proposalJobId`) shared by
+   the approvals queue and the outbound emitter, instead of being written out twice.
 2. **Case-sensitive job search in Postgres.** `search/route.ts` now passes
    `mode: "insensitive"`, matching the Airtable branch which lowercases both sides.
 3. **(New, found during the build) Source links were silently erased.** `routeOperationalWrites`

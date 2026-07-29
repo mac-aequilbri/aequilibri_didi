@@ -1,6 +1,7 @@
 import { airtableEnabled, core } from "@/lib/airtable";
 import { prisma } from "@/lib/db";
 import type { RecordId } from "@/lib/platform/recordWriter";
+import { proposalJobId } from "./proposalSource";
 import { currentJobScope, inScope } from "./rls";
 import type { OrgCtx } from "./types";
 
@@ -28,17 +29,6 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
-/** The job id embedded in a proposal payload (Airtable rec id or Postgres
- *  numeric), or null. The write path always posts jobId on a create. */
-function jobIdFromPayload(payload: string): string | null {
-  try {
-    const j = (JSON.parse(payload) as { jobId?: unknown }).jobId;
-    return j == null || j === "" ? null : String(j);
-  } catch {
-    return null;
-  }
-}
-
 function date(v: unknown): Date | null {
   if (typeof v !== "string" || !v) return null;
   const d = new Date(v);
@@ -55,7 +45,7 @@ async function fromPostgres(ctx: OrgCtx): Promise<PendingWriteView[]> {
     tableKey: r.tableKey,
     op: r.op,
     recordId: r.recordId == null ? "" : String(r.recordId),
-    jobId: r.jobId != null ? String(r.jobId) : jobIdFromPayload(r.payload),
+    jobId: proposalJobId(r.jobId, r.payload),
     payload: r.payload,
     actorType: r.actorType,
     actorName: r.actorName,
@@ -76,7 +66,7 @@ async function fromAirtable(ctx: OrgCtx): Promise<PendingWriteView[]> {
       tableKey: str(r["Table_Key"]),
       op: str(r["Op"]),
       recordId: str(r["Record_Id"]),
-      jobId: str(r["Job_Id"]) || jobIdFromPayload(str(r["Payload"])),
+      jobId: proposalJobId(r["Job_Id"], str(r["Payload"])),
       payload: str(r["Payload"]),
       actorType: str(r["Actor_Type"]),
       actorName: str(r["Actor_Name"]),
@@ -115,5 +105,5 @@ export async function loadProposedPendingCount(ctx: OrgCtx): Promise<number> {
     filterByFormula: PROPOSED_PENDING_FORMULA,
   });
   if (scope.mode === "all") return rows.length;
-  return rows.filter((r) => inScope(scope, str(r["Job_Id"]) || jobIdFromPayload(str(r["Payload"])))).length;
+  return rows.filter((r) => inScope(scope, proposalJobId(r["Job_Id"], str(r["Payload"])))).length;
 }

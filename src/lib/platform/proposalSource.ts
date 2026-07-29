@@ -29,6 +29,26 @@ export interface ProposalSource extends ProposalProvenance {
   evidence: string;
 }
 
+/** The project a proposal targets, as an id of whichever backend produced it.
+ *
+ *  One definition, two readers: the approvals queue scopes on it (RLS) and the
+ *  outbound emitter routes on it. The column is authoritative when populated;
+ *  the payload is the fallback, because proposals raised before the writer
+ *  learned to persist Airtable "rec…" ids left that column blank.
+ *
+ *  Pure, so the precedence is testable without a backend. */
+export function proposalJobId(column: unknown, payload: string): string | null {
+  const fromColumn =
+    column == null || column === "" ? "" : String(column);
+  if (fromColumn) return fromColumn;
+  try {
+    const j = (JSON.parse(payload) as { jobId?: unknown }).jobId;
+    return j == null || j === "" ? null : String(j);
+  } catch {
+    return null;
+  }
+}
+
 /** How the project was chosen, in words a reviewer can act on. */
 export function strategyLabel(strategy: ResolutionStrategy): string {
   switch (strategy) {
